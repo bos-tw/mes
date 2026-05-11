@@ -197,6 +197,17 @@ $params = @{
 - 打包輸出：`dist/update_v1.0.3_*.zip`
 - release note：`release-notes/2026-05-09-v1.0.3.txt`（三筆）
 
+### Git 一鍵更新起點（2026-05-11，強制參考）
+
+- 本專案「一鍵更新功能」Git 基線如下：
+  - 分支：`main`
+  - 基線 commit：`1ce804a`（`chore: initialize git baseline for one-click update workflow`）
+  - 基線 tag：`update-base-2026-05-11`
+- 後續 AI/開發者在整理更新包檔案清單時，必須先比對：
+  - `git diff --name-only update-base-2026-05-11..HEAD`
+- 打包與覆蓋時必須避開以下路徑（避免覆蓋使用者資料與環境相依內容）：
+  - `uploads/**`, `export/**`, `backup/**`, `db_backups/**`, `db_exports/**`, `old/**`, `vendor/**`
+
 #### 強制規則範例
 
 ❌ **錯誤範例：**
