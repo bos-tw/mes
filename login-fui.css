@@ -203,6 +203,22 @@ body.login-page::after {
     color: rgba(49, 58, 70, 0.45);
 }
 
+.login-timeout-notice {
+    display: none;
+    margin-top: 10px;
+    padding: 8px 10px;
+    border: 1px solid rgba(49, 58, 70, 0.14);
+    background: #f8fbff;
+    color: #1e2a38;
+    font-size: 12px;
+}
+
+.login-timeout-notice a {
+    color: #2d7dd2;
+    text-decoration: underline;
+    font-weight: 700;
+}
+
 /* 狀態指示燈列 */
 .fui-status {
     display: flex;

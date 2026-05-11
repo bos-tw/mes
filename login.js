@@ -25,6 +25,30 @@
         }
     }
 
+    function renderLoginReasonNotice() {
+        const noticeEl = document.getElementById('login-timeout-notice');
+        if (!noticeEl) {
+            return;
+        }
+
+        const reason = new URLSearchParams(window.location.search).get('reason');
+        if (!reason) {
+            return;
+        }
+
+        if (reason === 'idle_timeout' || reason === 'session_expired') {
+            noticeEl.innerHTML = '你已經登入，請再次登入系統。 <a href="login.html">LOGIN</a>';
+            noticeEl.style.display = 'block';
+        } else if (reason === 'manual_logout') {
+            noticeEl.innerHTML = '你已成功登出。 <a href="login.html">LOGIN</a>';
+            noticeEl.style.display = 'block';
+        }
+
+        if (window.history && typeof window.history.replaceState === 'function') {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+
     async function checkExistingSession() {
         try {
             const response = await fetch('api/session.php', {
@@ -169,6 +193,7 @@
 
         // 初始化 FUI 粒子動畫
         initFuiParticles();
+        renderLoginReasonNotice();
 
         bindPasswordToggle(passwordInput, togglePassword);
 

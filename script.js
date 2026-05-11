@@ -153,7 +153,7 @@ window.AppSecurityManager = (function () {
             if (sec <= 0) {
                 clearInterval(_countdownId);
                 _countdownId = null;
-                if (_logoutFn) { _logoutFn(); }
+                if (_logoutFn) { _logoutFn('idle_timeout'); }
             }
         }, 1000);
     }
@@ -165,7 +165,7 @@ window.AppSecurityManager = (function () {
 
         if (idle >= _idleMs) {
             // 時間到，直接登出（不應到這裡，倒數結束已登出）
-            if (_logoutFn) { _logoutFn(); }
+            if (_logoutFn) { _logoutFn('idle_timeout'); }
         } else if (warnAt > 0 && idle >= warnAt && !_warningShown) {
             const remaining = Math.ceil((_idleMs - idle) / 1000);
             showWarning(remaining);
@@ -232,10 +232,55 @@ window.AppSecurityManager = (function () {
 (function() {
     const originalFetch = window.fetch;
     const WRITE_METHODS = ['POST', 'PUT', 'DELETE', 'PATCH'];
+    let authRedirecting = false;
+
+    function resolveRequestUrl(input) {
+        if (typeof input === 'string') {
+            return input;
+        }
+        if (input && typeof input.url === 'string') {
+            return input.url;
+        }
+        return '';
+    }
+
+    function shouldSkipUnauthorizedRedirect(requestUrl) {
+        if (!requestUrl) {
+            return false;
+        }
+
+        const skipPaths = [
+            'api/login.php',
+            'api/logout.php',
+        ];
+
+        return skipPaths.some(path => requestUrl.includes(path));
+    }
+
+    function redirectToLoginWithReason(reason) {
+        if (authRedirecting) {
+            return;
+        }
+        authRedirecting = true;
+
+        try {
+            localStorage.removeItem('screwsystem_open_tabs');
+            localStorage.removeItem('screwsystem_active_tab');
+            localStorage.removeItem('screwsystem_sidebar_collapsed');
+        } catch (_err) {
+            // 靜默忽略 localStorage 清理失敗
+        }
+
+        const target = reason
+            ? `login.html?reason=${encodeURIComponent(reason)}`
+            : 'login.html';
+        window.location.href = target;
+    }
 
     window.fetch = function(input, init) {
         init = init || {};
         const method = (init.method || 'GET').toUpperCase();
+        const requestUrl = resolveRequestUrl(input);
 
         // 僅對寫入方法附加 CSRF Token
         if (WRITE_METHODS.includes(method)) {
@@ -253,7 +298,13 @@ window.AppSecurityManager = (function () {
                 }
             }
         }
-        return originalFetch.call(this, input, init);
+
+        return originalFetch.call(this, input, init).then((response) => {
+            if (response.status === 401 && !shouldSkipUnauthorizedRedirect(requestUrl)) {
+                redirectToLoginWithReason('session_expired');
+            }
+            return response;
+        });
     };
 })();
 
@@ -540,7 +591,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    async function performLogout() {
+    function clearSavedClientState() {
+        try {
+            localStorage.removeItem(STORAGE_KEYS.OPEN_TABS);
+            localStorage.removeItem(STORAGE_KEYS.ACTIVE_TAB);
+            localStorage.removeItem(STORAGE_KEYS.SIDEBAR_COLLAPSED);
+        } catch (error) {
+            console.warn('Failed to clear tab state from localStorage:', error);
+        }
+    }
+
+    function redirectToLogin(reason = '') {
+        clearSavedClientState();
+        const target = reason
+            ? `login.html?reason=${encodeURIComponent(reason)}`
+            : 'login.html';
+        window.location.href = target;
+    }
+
+    async function performLogout(reason = 'manual_logout') {
         try {
             const response = await fetch('api/logout.php', {
                 method: 'POST',
@@ -556,29 +625,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             console.error('登出時發生錯誤：', error);
         } finally {
-            // Clear saved tab state on logout
-            try {
-                localStorage.removeItem(STORAGE_KEYS.OPEN_TABS);
-                localStorage.removeItem(STORAGE_KEYS.ACTIVE_TAB);
-                localStorage.removeItem(STORAGE_KEYS.SIDEBAR_COLLAPSED);
-            } catch (error) {
-                console.warn('Failed to clear tab state from localStorage:', error);
-            }
-            window.location.href = 'login.html';
+            redirectToLogin(reason);
         }
     }
 
     currentUser = await fetchSession();
     if (!currentUser) {
-        // Clear saved tab state when session is invalid
-        try {
-            localStorage.removeItem(STORAGE_KEYS.OPEN_TABS);
-            localStorage.removeItem(STORAGE_KEYS.ACTIVE_TAB);
-            localStorage.removeItem(STORAGE_KEYS.SIDEBAR_COLLAPSED);
-        } catch (error) {
-            console.warn('Failed to clear tab state from localStorage:', error);
-        }
-        window.location.href = 'login.html';
+        redirectToLogin('session_expired');
         return;
     }
 
@@ -648,7 +701,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (logoutButton) {
-        logoutButton.addEventListener('click', performLogout);
+        logoutButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            performLogout('manual_logout');
+        });
     }
 
     // ====== 使用者下拉選單處理 ======

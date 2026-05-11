@@ -23,6 +23,19 @@
 - 一鍵更新功能已確認整合於「安全設定」頁：
   - 前端：`modules/security_settings.html`, `js/security_settings.js`
   - API：`api/system_update_upload.php`, `api/system_update_apply.php`, `api/system_update_status.php`, `api/system_update_rollback.php`, `api/system_update_maintenance.php`, `api/system_update_init_check.php`, `api/system_update_history.php`
+- 閒置自動登出流程修正已完成並通過遠端主機實測：
+  - 修正檔案：`script.js`, `login.js`, `login.html`, `login-fui.css`
+  - 行為修正：
+    - 閒置倒數到期會強制登出並導回登入頁
+    - API 回傳 401（Session 逾時）時會自動導回登入頁
+    - 登入頁顯示「你已經登入，請再次登入系統」與 `LOGIN` 連結
+  - 設定測試：遠端主機以 15 分鐘閒置登出設定測試通過
+- 更新包 `v1.0.4` 已建立並完成遠端套用測試：
+  - release note：`release-notes/2026-05-11-v1.0.4.txt`
+  - 發布檔案：`dist/update_v1.0.4_20260511_205237.zip`
+  - 遠端初始化檢查處理：
+    - 已補 `system_update_jobs` / `system_update_logs` migration
+    - 已排除 ZipArchive 與更新暫存目錄檢查問題
 - Git 基線已建立（作為一鍵更新版本比對起點）：
   - 初始化 commit：`1ce804a`
   - 基線 tag：`update-base-2026-05-11`（已 push 到 origin）
@@ -40,8 +53,8 @@
 1. 系統健康審計尚有既有失敗項（技術債，非本輪新增）。
 - 重現：在專案根目錄執行 `node tools/audit-system-health.js`，可見現存錯誤/警告清單。
 
-2. 一鍵更新整體流程尚缺「以最新 Git 基線版本」的完整端到端回歸紀錄。
-- 重現：以新功能變更產生更新包後，在測試機執行「上傳→驗證→套用→回滾」流程，尚未有完整測試報告歸檔。
+2. 一鍵更新流程尚缺「回滾流程」完整測試紀錄歸檔。
+- 現況：`v1.0.4` 已完成「上傳→驗證→套用」與功能驗證，仍待補「回滾」報告。
 
 ## 下一步任務
 
