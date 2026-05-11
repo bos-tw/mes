@@ -1,0 +1,1 @@
+1. 新增安全設定頁系統更新中心。n2. 新增初始化檢查、上傳驗證與一鍵套用更新。n3. 新增 system_update_jobs 與 system_update_logs migration。

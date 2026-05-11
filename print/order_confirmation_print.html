@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客戶光篩代工委託確認單 - 列印規格</title>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @page {
+            size: A4;
+            margin: 12mm;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", "SimHei", sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4; /* 螢幕顯示背景 */
+            color: #000;
+            font-size: 9pt;
+            line-height: 1.2;
+        }
+
+        .page-container {
+            background-color: white;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 20px auto;
+            padding: 12mm;
+            box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 主要內容區 */
+        .main-content {
+            flex: 1;
+        }
+
+        /* 頂部標題區 */
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #000;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+        }
+
+        .company-branding {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .company-logo {
+            height: 50px;
+            max-height: 60px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .company-logo:not([src]),
+        .company-logo[src=""],
+        .company-logo.hidden {
+            display: none;
+        }
+
+        .main-title {
+            font-size: 20pt;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        /* 業者與訂單資訊區 */
+        .info-grid {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 8px;
+        }
+
+        .customer-info {
+            line-height: 1.3;
+        }
+
+        .customer-info .name {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .customer-info .detail {
+            font-size: 9pt;
+        }
+
+        .order-info {
+            text-align: right;
+            line-height: 1.4;
+        }
+
+        .order-info .order-no {
+            font-size: 12pt;
+        }
+
+        .order-info .order-date {
+            font-size: 10pt;
+        }
+
+        .order-info .delivery-date {
+            font-size: 10pt;
+        }
+
+        .content-section {
+            margin-top: 10px;
+        }
+
+        /* 表格共用設定 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin-bottom: 8px;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+            border-left: none;
+            border-right: none;
+        }
+
+        th, td {
+            border: 1px solid #777;
+            padding: 3px 5px;
+            text-align: left;
+            vertical-align: middle;
+            font-size: 9pt;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        th:first-child, td:first-child { border-left: none; }
+        th:last-child, td:last-child { border-right: none; }
+
+        th {
+            background-color: #e6e6e6;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-emphasis { font-size: 11pt; font-weight: bold; }
+
+        .batch-section {
+            margin-bottom: 4px;
+        }
+
+        .batch-subtitle {
+            font-size: 9.5pt;
+            font-weight: bold;
+            margin: 1px 0;
+        }
+
+        .batch-info-table {
+            margin-bottom: 2px;
+        }
+
+        .batch-info-table th {
+            width: 12%;
+            white-space: nowrap;
+            font-size: 8.5pt;
+        }
+
+        .batch-info-table td {
+            font-size: 8.8pt;
+        }
+
+        .batch-info-table th,
+        .batch-info-table td {
+            padding: 2px 4px;
+        }
+
+        /* 特殊表格高度控制 */
+        .row-large { height: 50px; }
+
+        /* 備註區塊 */
+        .notes-container {
+            margin-top: 18px;
+        }
+
+        .order-main-notes {
+            margin-top: 16px;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+            padding: 4px 6px;
+            font-size: 8.8pt;
+            line-height: 1.35;
+            min-height: 26px;
+            white-space: pre-wrap;
+        }
+
+        .notes-header {
+            background-color: #e6e6e6;
+            padding: 6px 10px;
+            font-weight: bold;
+            font-size: 11pt;
+            letter-spacing: 1px;
+        }
+
+        .notes-box {
+            border: 1px solid #000;
+            border-left: none;
+            border-right: none;
+            padding: 6px 10px;
+            font-size: 8pt;
+            line-height: 1.4;
+            background-color: #fff;
+        }
+
+        .notes-list {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        .blessing {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 9pt;
+        }
+
+        /* 確認授權區 */
+        .confirmation-area {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            border: 2px solid #000;
+            margin-bottom: 15px;
+        }
+
+        .confirm-stamp {
+            background-color: #e6e6e6;
+            border-right: 2px solid #000;
+            border-bottom: 2px solid #000;
+            padding: 10px 30px;
+            font-weight: bold;
+            font-size: 12pt;
+            white-space: nowrap;
+            grid-column: 1;
+            grid-row: 1;
+        }
+
+        .confirm-signature {
+            grid-column: 2;
+            grid-row: 1;
+            min-height: 52px;
+            border-bottom: 2px solid #000;
+        }
+
+        .confirm-msg {
+            grid-column: 2;
+            grid-row: 2;
+            padding: 8px 15px;
+            font-size: 9pt;
+        }
+
+        /* 簽署線 */
+        .sign-area {
+            display: flex;
+            justify-content: flex-start;
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 6px;
+            margin-left: 0;
+        }
+
+        .sign-box {
+            width: 120px;
+            text-align: center;
+            margin-left: 30px;
+            font-size: 10pt;
+        }
+
+        .sign-box:first-child {
+            margin-left: 0;
+        }
+
+        /* 頁尾資訊 */
+        footer {
+            margin-top: auto;
+            padding-top: 15px;
+            border-top: 2px solid #000;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .footer-brand-text .zh {
+            font-size: 20pt;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .footer-brand-text .en {
+            font-size: 10pt;
+            letter-spacing: 1px;
+            margin-top: 2px;
+        }
+
+        .footer-logo {
+            height: 40px;
+            max-height: 50px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .footer-logo:not([src]),
+        .footer-logo[src=""],
+        .footer-logo.hidden {
+            display: none;
+        }
+
+        .footer-contacts {
+            text-align: right;
+            font-size: 8pt;
+            line-height: 1.4;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body {
+                background-color: white;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                font-size: 9pt;
+            }
+            .page-container {
+                margin: 0;
+                width: 100%;
+                min-height: 100vh;
+                height: 100vh;
+                box-shadow: none;
+                padding: 5mm;
+                display: flex;
+                flex-direction: column;
+            }
+            .main-content {
+                flex: 1;
+            }
+            footer {
+                margin-top: auto;
+            }
+            .company-logo,
+            .footer-logo {
+                height: 1.2cm;
+                max-height: 1.5cm;
+            }
+            /* 防止表格跨頁分割 */
+            table {
+                page-break-inside: avoid;
+            }
+            /* 防止備註區跨頁 */
+            .notes-container {
+                page-break-inside: avoid;
+            }
+            /* 防止確認區跨頁 */
+            .confirmation-area {
+                page-break-inside: avoid;
+            }
+            /* 頁尾保持在底部 */
+            footer {
+                page-break-inside: avoid;
+            }
+        }
+
+        /* 列印工具列 */
+        .print-toolbar {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 8px;
+            z-index: 1000;
+        }
+
+        .print-toolbar button {
+            padding: 8px 16px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+        }
+
+        .print-toolbar button.primary {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .print-toolbar button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 列印工具列 -->
+<div class="print-toolbar no-print">
+    <button onclick="window.print()" class="primary">
+        <i class="fas fa-print"></i> 列印
+    </button>
+    <button onclick="window.close()">
+        <i class="fas fa-times"></i> 關閉
+    </button>
+</div>
+
+<div class="page-container">
+    <div class="main-content">
+    <div class="header-section">
+        <div class="main-title">客戶光篩代工委託確認單</div>
+    </div>
+
+    <div class="info-grid">
+        <div class="customer-info">
+            <div class="name" id="customerName">載入中...</div>
+            <div class="detail" id="customerContact"></div>
+            <div class="detail" id="customerAddress"></div>
+        </div>
+        <div class="order-info">
+            <div class="order-no" id="orderNo">載入中...</div>
+            <div class="order-date">訂單日期：<span id="orderDate"></span></div>
+            <div class="delivery-date">預計交期：<span id="expectedDeliveryDate"></span></div>
+        </div>
+    </div>
+
+    <div class="content-section">
+    <div id="batchSectionsContainer">
+        <table>
+            <tbody>
+                <tr>
+                    <td class="text-center">載入中...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 表格 3: 篩選細項 -->
+    <table id="screeningDetailsTable">
+        <colgroup>
+            <col style="width: 17%;">
+            <col style="width: 23%;">
+            <col style="width: 18%;">
+            <col style="width: 12%;">
+            <col style="width: 30%;">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>篩選項目</th>
+                <th>公差值</th>
+                <th>光篩類別</th>
+                <th>單價(元)</th>
+                <th>說明</th>
+            </tr>
+        </thead>
+        <tbody id="screeningDetailsBody">
+            <tr>
+                <td colspan="5" class="text-center">載入中...</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="order-main-notes" id="orderMainNotesDisplay"></div>
+
+    <div class="notes-container">
+        <div class="notes-header">備註</div>
+        <div class="notes-box">
+            <ol class="notes-list" id="notesList">
+                <li>載入中...</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="blessing">祈貴公司生意興隆，雙方合作愉快。</div>
+
+    <div class="confirmation-area">
+        <div class="confirm-stamp">客戶確認</div>
+        <div class="confirm-signature"></div>
+        <div class="confirm-msg">
+            以上訂單資料、篩選內容確認無誤後，盡速回傳以利安排上線。謝謝。
+        </div>
+    </div>
+
+    <div class="sign-area">
+        <div class="sign-box">承認</div>
+        <div class="sign-box">審核</div>
+        <div class="sign-box">作成</div>
+    </div>
+    </div>
+    </div><!-- end main-content -->
+
+    <footer>
+        <div class="footer-brand">
+            <img src="" alt="公司LOGO" class="footer-logo hidden" id="footerLogo">
+            <div class="footer-brand-text">
+                <div class="zh" id="footerCompanyName">載入中...</div>
+                <div class="en" id="footerCompanyNameEn"></div>
+            </div>
+        </div>
+        <div class="footer-contacts" id="footerContacts">
+            載入中...
+        </div>
+    </footer>
+</div>
+
+<script>
+/**
+ * 載入公司基本資訊、客戶資訊與使用中的 LOGO
+ * 遵循 company-branding-skill.md 規範
+ * 使用公開 API（不需登入認證）
+ * 預設使用公司 ID = 1（主公司）
+ */
+(function() {
+    'use strict';
+    let currentFinalQuotePerM = null;
+    let currentSinglePpm = null;
+    let currentOrderMainNotes = '';
+
+    /**
+     * 載入公司 LOGO 到指定的 img 元素（使用公開 API）
+     * @param {string} imgId - img 元素的 ID
+     * @param {number} companyId - 公司 ID
+     */
+    async function loadCompanyLogo(imgId, companyId) {
+        const logoImg = document.getElementById(imgId);
+        if (!logoImg) return;
+
+        try {
+            const response = await fetch(`../api/companies/public_logo.php?company_id=${companyId}`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Accept': 'application/json' },
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data && result.data.file_path) {
+                logoImg.src = '../' + result.data.file_path;
+                logoImg.classList.remove('hidden');
+                logoImg.onerror = function() {
+                    this.classList.add('hidden');
+                };
+            } else {
+                logoImg.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error('載入公司 LOGO 失敗:', error);
+            logoImg.classList.add('hidden');
+        }
+    }
+
+    /**
+     * 載入公司基本資訊（頁尾）- 使用公開 API
+     * @param {number} companyId - 公司 ID
+     */
+    async function loadCompanyInfo(companyId) {
+        const nameEl = document.getElementById('footerCompanyName');
+        const nameEnEl = document.getElementById('footerCompanyNameEn');
+        const contactsEl = document.getElementById('footerContacts');
+
+        try {
+            const response = await fetch(`../api/companies/public_info.php?id=${companyId}`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Accept': 'application/json' },
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const company = result.data;
+
+                // 設定公司名稱
+                if (nameEl) {
+                    nameEl.textContent = company.name || '';
+                }
+
+                // 設定英文名稱
+                if (nameEnEl) {
+                    nameEnEl.textContent = company.name_en || '';
+                    if (!company.name_en) {
+                        nameEnEl.style.display = 'none';
+                    }
+                }
+
+                // 組合聯絡資訊
+                if (contactsEl) {
+                    const contactParts = [];
+
+                    if (company.address) {
+                        contactParts.push(company.address);
+                    }
+
+                    if (company.phone) {
+                        contactParts.push(`電話：${company.phone}`);
+                    }
+
+                    if (company.fax) {
+                        contactParts.push(`傳真：${company.fax}`);
+                    }
+
+                    if (company.tax_id) {
+                        contactParts.push(`統編：${company.tax_id}`);
+                    }
+
+                    contactsEl.innerHTML = contactParts.join('<br>') || '無聯絡資訊';
+                }
+            } else {
+                if (nameEl) nameEl.textContent = '無法載入公司資訊';
+                if (contactsEl) contactsEl.textContent = '';
+            }
+        } catch (error) {
+            console.error('載入公司資訊失敗:', error);
+            if (nameEl) nameEl.textContent = '載入失敗';
+            if (contactsEl) contactsEl.textContent = '';
+        }
+    }
+
+    /**
+     * 載入客戶資訊 - 使用公開 API
+     * @param {number} customerId - 客戶 ID
+     */
+    async function loadCustomerInfo(customerId) {
+        const nameEl = document.getElementById('customerName');
+        const addressEl = document.getElementById('customerAddress');
+        const contactEl = document.getElementById('customerContact');
+
+        if (!customerId) {
+            if (nameEl) nameEl.textContent = '請指定客戶';
+            return;
+        }
+
+        try {
+            const response = await fetch(`../api/customers/public_info.php?id=${customerId}`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Accept': 'application/json' },
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const customer = result.data;
+
+                // 設定客戶名稱
+                if (nameEl) {
+                    nameEl.textContent = customer.name || '';
+                }
+
+                // 設定地址（優先使用 shipping_address，其次 address）
+                if (addressEl) {
+                    addressEl.textContent = customer.shipping_address || customer.address || '';
+                }
+
+                // 設定聯絡資訊
+                if (contactEl) {
+                    const contactParts = [];
+                    if (customer.phone) {
+                        contactParts.push(customer.phone);
+                    }
+                    if (customer.contact_person) {
+                        contactParts.push(`聯絡窗口：${customer.contact_person}`);
+                    }
+                    contactEl.innerHTML = contactParts.join('&nbsp;&nbsp;&nbsp;&nbsp;');
+                }
+            } else {
+                if (nameEl) nameEl.textContent = '無法載入客戶資訊';
+            }
+        } catch (error) {
+            console.error('載入客戶資訊失敗:', error);
+            if (nameEl) nameEl.textContent = '載入失敗';
+        }
+    }
+
+    /**
+     * 載入訂單資訊 - 使用公開 API
+     * @param {number} orderId - 訂單 ID
+     * @returns {number|null} 訂單關聯的客戶 ID
+     */
+    async function loadOrderInfo(orderId) {
+        const orderNoEl = document.getElementById('orderNo');
+        const orderDateEl = document.getElementById('orderDate');
+        const expectedDeliveryDateEl = document.getElementById('expectedDeliveryDate');
+
+        if (!orderId) {
+            if (orderNoEl) orderNoEl.textContent = '請指定訂單';
+            if (orderDateEl) orderDateEl.textContent = '';
+            if (expectedDeliveryDateEl) expectedDeliveryDateEl.textContent = '';
+            currentFinalQuotePerM = null;
+            currentSinglePpm = null;
+            currentOrderMainNotes = '';
+            renderOrderMainNotes();
+            return null;
+        }
+
+        try {
+            const response = await fetch(`../api/orders/public_info.php?id=${orderId}`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Accept': 'application/json' },
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const order = result.data;
+
+                // 設定訂單編號
+                if (orderNoEl) {
+                    orderNoEl.textContent = order.order_number || '';
+                }
+
+                // 設定訂單日期（民國年 + 星期）
+                if (orderDateEl && order.order_date) {
+                    orderDateEl.textContent = formatRocDateWithWeekday(order.order_date);
+                } else if (orderDateEl) {
+                    orderDateEl.textContent = '';
+                }
+
+                // 設定預計交期（民國年 + 星期）
+                if (expectedDeliveryDateEl && order.expected_delivery_date) {
+                    expectedDeliveryDateEl.textContent = formatRocDateWithWeekday(order.expected_delivery_date);
+                } else if (expectedDeliveryDateEl) {
+                    expectedDeliveryDateEl.textContent = '';
+                }
+
+                currentFinalQuotePerM = Number.isFinite(Number(order.final_quote_per_m))
+                    ? Number(order.final_quote_per_m)
+                    : null;
+                currentSinglePpm = Number.isFinite(Number(order.single_ppm))
+                    ? Number(order.single_ppm)
+                    : null;
+                currentOrderMainNotes = order.notes || '';
+                renderOrderMainNotes();
+
+                // 回傳客戶 ID 以便後續載入客戶資訊
+                return order.customer_id || null;
+            } else {
+                if (orderNoEl) orderNoEl.textContent = '無法載入訂單資訊';
+                currentFinalQuotePerM = null;
+                currentSinglePpm = null;
+                currentOrderMainNotes = '';
+                renderOrderMainNotes();
+                return null;
+            }
+        } catch (error) {
+            console.error('載入訂單資訊失敗:', error);
+            if (orderNoEl) orderNoEl.textContent = '載入失敗';
+            currentFinalQuotePerM = null;
+            currentSinglePpm = null;
+            currentOrderMainNotes = '';
+            renderOrderMainNotes();
+            return null;
+        }
+    }
+
+    /**
+     * 格式化數字（加入千分位）
+     * @param {number} num - 數字
+     * @param {number} decimals - 小數位數
+     * @returns {string} 格式化後的字串
+     */
+    function formatNumber(num, decimals = 0) {
+        if (num === null || num === undefined) return '';
+        return Number(num).toLocaleString('zh-TW', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        });
+    }
+
+    /**
+     * 將 YYYY-MM-DD 字串轉為 Date（避免時區解析偏移）
+     * @param {string} dateStr
+     * @returns {Date|null}
+     */
+    function parseDateOnly(dateStr) {
+        if (!dateStr || typeof dateStr !== 'string') return null;
+        const parts = dateStr.split('-').map(Number);
+        if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) {
+            return null;
+        }
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    /**
+     * 轉民國日期並附星期
+     * @param {string} dateStr
+     * @returns {string}
+     */
+    function formatRocDateWithWeekday(dateStr) {
+        const date = parseDateOnly(dateStr);
+        if (!date) return '';
+
+        const rocYear = date.getFullYear() - 1911;
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const weekdays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+        return `${rocYear}-${month}-${day} ${weekdays[date.getDay()]}`;
+    }
+
+    /**
+     * 樣品狀態轉中文顯示
+     * @param {string|null|undefined} status
+     * @returns {string}
+     */
+    function mapSampleStatusToZh(status) {
+        if (status === null || status === undefined) return '';
+        const raw = String(status).trim();
+        if (!raw) return '';
+
+        const normalized = raw.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+
+        if (normalized === 'yes') return '有';
+        if (normalized === 'no') return '無';
+        if (['yes_return', 'yes_need_return', 'need_return', 'return'].includes(normalized)) {
+            return '有，須歸還';
+        }
+
+        return raw;
+    }
+
+    /**
+     * 顯示訂單主表備註
+     */
+    function renderOrderMainNotes() {
+        const notesEl = document.getElementById('orderMainNotesDisplay');
+        if (!notesEl) return;
+
+        const content = (currentOrderMainNotes || '').trim();
+        notesEl.textContent = content === '' ? '訂單備註：' : `訂單備註：${content}`;
+    }
+
+    /**
+     * 載入訂單品項 - 使用公開 API
+     * @param {number} orderId - 訂單 ID
+     */
+    async function loadOrderItems(orderId) {
+        const batchSectionsContainer = document.getElementById('batchSectionsContainer');
+        const screeningDetailsBody = document.getElementById('screeningDetailsBody');
+
+        if (!orderId) {
+            if (batchSectionsContainer) {
+                batchSectionsContainer.innerHTML = '<table><tbody><tr><td class="text-center">請指定訂單</td></tr></tbody></table>';
+            }
+            if (screeningDetailsBody) screeningDetailsBody.innerHTML = '<tr><td colspan="5" class="text-center">請指定訂單</td></tr>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`../api/order_items/public_info.php?order_id=${orderId}`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Accept': 'application/json' },
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data && result.data.length > 0) {
+                const items = result.data;
+
+                function normaliseText(value) {
+                    if (value === null || value === undefined) return '';
+                    return String(value).trim();
+                }
+
+                function normaliseNumber(value, decimals = null) {
+                    if (value === null || value === undefined || value === '') return '';
+                    const num = Number(value);
+                    if (!Number.isFinite(num)) return '';
+                    if (decimals === null) return String(num);
+                    return num.toFixed(decimals);
+                }
+
+                function buildScreeningUniqueKey(detail) {
+                    return [
+                        normaliseText(detail.service_name),
+                        normaliseText(detail.tolerance_display),
+                        normaliseNumber(detail.ppm_standard),
+                        normaliseText(detail.category),
+                        normaliseNumber(detail.actual_price_per_unit, 2),
+                        normaliseText(detail.notes),
+                        normaliseText(detail.description),
+                    ].join('||');
+                }
+
+                function buildServiceGroupKey(detail) {
+                    // 以篩選項目名稱作為同群比較基礎：
+                    // 若同一項目在不同批號有不同參數，會拆成多筆 merged record。
+                    return normaliseText(detail.service_name);
+                }
+
+                // 渲染批號區塊（每個客戶批號一段，資訊固定兩列）
+                if (batchSectionsContainer) {
+                    batchSectionsContainer.innerHTML = items.map(item => {
+                        const si = item.screening_item || {};
+                        const toolsSummary = item.tools_summary || {};
+
+                        // 組合圖面編號（從 drawings 或 drawing_number）
+                        let drawingNumbers = item.drawing_number || '';
+                        if (item.drawings && item.drawings.length > 0) {
+                            const numbers = item.drawings
+                                .map(d => d.drawing_number)
+                                .filter(n => n)
+                                .join(', ');
+                            if (numbers) drawingNumbers = numbers;
+                        }
+                        const screeningItemText = [si.item_number, si.name].filter(Boolean).join(' - ');
+
+                        const toolWeight = Number(toolsSummary.total_weight_kg || 0);
+                        const productWeight = Number(item.total_weight_kg || 0);
+                        const totalWeightWithTool = productWeight + toolWeight;
+
+                        // 載具數量顯示
+                        let toolsDisplay = '';
+                        if (item.tools && item.tools.length > 0) {
+                            const toolParts = item.tools.map(t => `${t.quantity} ${t.tool_name || ''}`.trim());
+                            toolsDisplay = toolParts.join(', ');
+                        } else if (toolsSummary.total_quantity > 0) {
+                            toolsDisplay = String(toolsSummary.total_quantity);
+                        }
+
+                        return `
+                            <div class="batch-section">
+                                <div class="batch-subtitle">批號：${escapeHtml(item.customer_batch_number || '-')}</div>
+                                <table class="batch-info-table">
+                                    <tbody>
+                                        <tr>
+                                            <th>受篩品項</th>
+                                            <td colspan="3">${screeningItemText ? escapeHtml(screeningItemText) : '&nbsp;'}</td>
+                                            <th>圖面編號</th>
+                                            <td colspan="3">${drawingNumbers ? escapeHtml(drawingNumbers) : '&nbsp;'}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>總重量(含載具kg)</th>
+                                            <td class="text-right">${Number.isFinite(totalWeightWithTool) ? formatNumber(totalWeightWithTool, 2) : '&nbsp;'}</td>
+                                            <th>載具數</th>
+                                            <td>${toolsDisplay ? escapeHtml(toolsDisplay) : '&nbsp;'}</td>
+                                            <th>載具重(kg)</th>
+                                            <td class="text-right">${toolWeight ? formatNumber(toolWeight, 2) : '&nbsp;'}</td>
+                                            <th>單重(g)</th>
+                                            <td class="text-right">${si.weight_per_unit_g ? formatNumber(si.weight_per_unit_g, 2) : '&nbsp;'}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>支數</th>
+                                            <td class="text-right">${item.total_units ? formatNumber(Math.round(item.total_units)) : '&nbsp;'}</td>
+                                            <th>樣品狀態</th>
+                                            <td>${mapSampleStatusToZh(item.customer_sample_status) || '&nbsp;'}</td>
+                                            <th>料號</th>
+                                            <td>${item.part_number ? escapeHtml(item.part_number) : '&nbsp;'}</td>
+                                            <th>&nbsp;</th>
+                                            <td>&nbsp;</td>
+                                        </tr>
+                                        <tr>
+                                            <th>指送地點</th>
+                                            <td colspan="3">${item.delivery_location ? escapeHtml(item.delivery_location) : '&nbsp;'}</td>
+                                            <th>備註</th>
+                                            <td colspan="3">${item.notes ? escapeHtml(item.notes) : '&nbsp;'}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                // 渲染表格 3: 篩選細項（合併所有品項的篩選細項）
+                if (screeningDetailsBody) {
+                    const allScreeningDetails = [];
+                    items.forEach(item => {
+                        if (item.screening_details && item.screening_details.length > 0) {
+                            item.screening_details.forEach(detail => {
+                                allScreeningDetails.push({
+                                    ...detail,
+                                    customer_batch_number: item.customer_batch_number || '',
+                                });
+                            });
+                        }
+                    });
+
+                    if (allScreeningDetails.length > 0) {
+                        const mergedMap = new Map();
+                        const mergedList = [];
+
+                        allScreeningDetails.forEach(detail => {
+                            const key = buildScreeningUniqueKey(detail);
+                            if (!mergedMap.has(key)) {
+                                const record = {
+                                    ...detail,
+                                    serviceGroupKey: buildServiceGroupKey(detail),
+                                    batchNumbers: new Set(),
+                                    duplicatedCount: 0,
+                                };
+                                if (detail.customer_batch_number) {
+                                    record.batchNumbers.add(detail.customer_batch_number);
+                                }
+                                mergedMap.set(key, record);
+                                mergedList.push(record);
+                                return;
+                            }
+
+                            const existing = mergedMap.get(key);
+                            if (detail.customer_batch_number) {
+                                existing.batchNumbers.add(detail.customer_batch_number);
+                            }
+                            existing.duplicatedCount += 1;
+                        });
+
+                        // 判斷同一篩選項目是否存在多種參數版本（代表批號間有差異）
+                        const serviceVariantCountMap = new Map();
+                        mergedList.forEach(record => {
+                            const groupKey = record.serviceGroupKey || '';
+                            if (!groupKey) return;
+                            const current = serviceVariantCountMap.get(groupKey) || 0;
+                            serviceVariantCountMap.set(groupKey, current + 1);
+                        });
+
+                        const rowsHtml = mergedList.map(detail => {
+                            const batchList = Array.from(detail.batchNumbers || []).filter(v => v);
+                            const hasVariantWithinService =
+                                (serviceVariantCountMap.get(detail.serviceGroupKey || '') || 0) > 1;
+                            const batchHint = (hasVariantWithinService && batchList.length > 0)
+                                ? `適用批號：${batchList.join('、')}`
+                                : '';
+
+                            const noteParts = [
+                                normaliseText(detail.notes),
+                                normaliseText(detail.description),
+                                batchHint,
+                            ].filter(part => part !== '');
+
+                            const noteText = noteParts.join('；');
+
+                            return `<tr>
+                                <td>${detail.service_name ? escapeHtml(detail.service_name) : '&nbsp;'}</td>
+                                <td>${detail.tolerance_display ? escapeHtml(detail.tolerance_display) : '&nbsp;'}</td>
+                                <td>${detail.category ? escapeHtml(detail.category) : '&nbsp;'}</td>
+                                <td class="text-center">${detail.actual_price_per_unit ? formatNumber(detail.actual_price_per_unit, 2) : '&nbsp;'}</td>
+                                <td>${noteText ? escapeHtml(noteText) : '&nbsp;'}</td>
+                            </tr>`;
+                        }).join('');
+
+                        const totalUnitPrice = mergedList.reduce((sum, detail) => {
+                            const price = Number(detail.actual_price_per_unit);
+                            if (!Number.isFinite(price)) return sum;
+                            return sum + price;
+                        }, 0);
+
+                        const ppmText = currentSinglePpm !== null ? `PPM：${formatNumber(currentSinglePpm, 0)}` : 'PPM：--';
+                        const totalRowHtml = `
+                            <tr>
+                                <td colspan="2"><strong>${ppmText}</strong></td>
+                                <td colspan="3" class="text-right"><strong>總價：${formatNumber(totalUnitPrice, 2)} 元</strong></td>
+                            </tr>
+                        `;
+                        const finalQuoteText = currentFinalQuotePerM !== null
+                            ? `單價：${formatNumber(currentFinalQuotePerM, 2)} 元/M`
+                            : '單價：-- 元/M';
+                        const finalQuoteRowHtml = `
+                            <tr>
+                                <td colspan="5" class="text-right text-emphasis">${finalQuoteText}</td>
+                            </tr>
+                        `;
+
+                        screeningDetailsBody.innerHTML = rowsHtml + totalRowHtml + finalQuoteRowHtml;
+                    } else {
+                        screeningDetailsBody.innerHTML = '<tr><td colspan="5" class="text-center">無篩選細項</td></tr>';
+                    }
+                }
+            } else {
+                // 無資料
+                if (batchSectionsContainer) {
+                    batchSectionsContainer.innerHTML = '<table><tbody><tr><td class="text-center">此訂單無品項資料</td></tr></tbody></table>';
+                }
+                if (screeningDetailsBody) screeningDetailsBody.innerHTML = '<tr><td colspan="5" class="text-center">此訂單無品項資料</td></tr>';
+            }
+        } catch (error) {
+            console.error('載入訂單品項失敗:', error);
+            if (batchSectionsContainer) {
+                batchSectionsContainer.innerHTML = '<table><tbody><tr><td class="text-center">載入失敗</td></tr></tbody></table>';
+            }
+            if (screeningDetailsBody) screeningDetailsBody.innerHTML = '<tr><td colspan="5" class="text-center">載入失敗</td></tr>';
+        }
+    }
+
+    /**
+     * 載入報表備註說明（從 report_descriptions 表動態取得）
+     * @param {string} reportCode - 報表代碼
+     */
+    async function loadReportDescription(reportCode) {
+        const notesList = document.getElementById('notesList');
+        if (!notesList) return;
+
+        // 預設為空，確保列印內容必須來自資料庫
+        notesList.innerHTML = '';
+
+        try {
+            const response = await fetch(`../api/report_descriptions/show.php?report_code=${reportCode}`, { credentials: 'include' });
+            const result = await response.json();
+
+            if (result.success && result.data && result.data.description) {
+                // 依換行拆分為多個條目（支援 Windows CRLF）
+                const lines = result.data.description
+                    .split(/\r?\n/)
+                    .map(line => line.trim())
+                    .filter(line => line !== '');
+                if (lines.length > 0) {
+                    notesList.innerHTML = lines.map(line => `<li>${escapeHtml(line)}</li>`).join('');
+                }
+            }
+        } catch (e) {
+            console.error('載入報表備註說明失敗:', e);
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // 頁面載入時執行
+    document.addEventListener('DOMContentLoaded', async function() {
+        // 從 URL 參數取得各項 ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const companyId = parseInt(urlParams.get('company_id'), 10) || 1;
+        const orderId = parseInt(urlParams.get('order_id'), 10) || null;
+
+        // 載入底部 LOGO（頁尾）
+        loadCompanyLogo('footerLogo', companyId);
+
+        // 載入公司基本資訊（頁尾）
+        loadCompanyInfo(companyId);
+
+        // 載入報表備註說明
+        loadReportDescription('order_confirmation');
+
+        // 載入訂單資訊，並從訂單取得客戶 ID 後載入客戶資訊
+        if (orderId) {
+            const customerId = await loadOrderInfo(orderId);
+            if (customerId) {
+                loadCustomerInfo(customerId);
+            }
+            // 載入訂單品項
+            loadOrderItems(orderId);
+        }
+    });
+})();
+</script>
+
+</body>
+</html>

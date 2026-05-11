@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登入 - 精密光學篩選管理系統</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="login-fui.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="login-page">
+    <div class="login-wrapper">
+        <div class="login-card">
+            <!-- FUI HUD 四角框 -->
+            <div class="fui-corner-tr"></div>
+            <div class="fui-corner-bl"></div>
+            <!-- FUI 掃描線 -->
+            <div class="fui-scanline"></div>
+            <div class="login-brand">
+                <div class="brand-logo" id="company-logo-wrap">
+                    <i class="fas fa-bolt" id="company-logo-fallback"></i>
+                </div>
+                <h1 id="company-full-name">螺絲篩分管理系統</h1>
+                <p class="system-subtitle">精密光學篩選管理系統</p>
+                <p class="login-hint">請使用員工帳號登入系統</p>
+                <!-- FUI 狀態指示燈 -->
+                <div class="fui-status">
+                    <span class="fui-status-dot"></span>
+                    <span class="fui-status-dot"></span>
+                    <span class="fui-status-dot"></span>
+                    <span class="fui-status-text">SYSTEM ONLINE</span>
+                </div>
+            </div>
+
+            <form id="login-form" novalidate>
+                <div class="form-group">
+                    <label for="account">帳號</label>
+                    <input type="text" id="account" name="account" class="form-control" placeholder="輸入員工帳號" autocomplete="username" required>
+                </div>
+
+                <div class="form-group password-field">
+                    <label for="password">密碼</label>
+                    <input type="password" id="password" name="password" class="form-control" placeholder="輸入密碼" autocomplete="current-password" required>
+                    <button type="button" class="toggle-password" id="toggle-password" aria-label="顯示或隱藏密碼">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+
+                <div class="login-actions">
+                    <label class="remember-me">
+                        <input type="checkbox" id="remember-me"> 記住我
+                    </label>
+                </div>
+
+                <button type="submit" class="login-button">登入系統</button>
+
+                <div class="login-error" id="login-error" role="alert"></div>
+                <div class="login-success" id="login-success" role="status"></div>
+            </form>
+
+            <div class="login-footer">
+                © <span id="login-year"></span> YuCyuan Industrial Co., Ltd. 保留所有權利。
+            </div>
+        </div>
+    </div>
+
+    <script src="login.js"></script>
+    <!-- FUI 浮動粒子容器 -->
+    <div id="fui-particles"></div>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<div data-module="security_settings">
+
+    <!-- 內容標題區 -->
+    <div class="content-header with-actions">
+        <div>
+            <h2>安全設定</h2>
+            <p class="subtitle">調整頁面更新偵測、自動登出及登入鎖定等安全相關功能</p>
+        </div>
+        <div class="header-actions">
+            <button type="button" class="btn primary" data-action="save-security-settings">
+                <i class="fas fa-save"></i> <span>儲存設定</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 主要內容區 -->
+    <div class="content-area">
+
+        <!-- 模組警告訊息區 -->
+        <div class="module-alert hidden" data-security-settings-alert role="alert"></div>
+
+        <form data-security-settings-form novalidate>
+
+            <!-- ── 區塊 1：版本更新偵測 ── -->
+            <section class="form-section settings-section">
+                <h4>版本更新偵測</h4>
+                <p class="section-desc">系統有新版本時，顯示橫幅提示使用者重新整理頁面以載入最新版本。</p>
+
+                <div class="form-grid">
+                    <label class="inline-label toggle-label">
+                        <span>啟用版本更新偵測</span>
+                        <div class="toggle-control">
+                            <input type="checkbox"
+                                   name="security.auto_refresh.enabled"
+                                   id="autoRefreshEnabled"
+                                   data-toggle-group="auto_refresh">
+                            <label for="autoRefreshEnabled" class="toggle-switch" aria-label="啟用版本更新偵測"></label>
+                        </div>
+                    </label>
+
+                    <label class="inline-label" data-group="auto_refresh">
+                        <span>版本檢查間隔（分鐘）</span>
+                        <input type="number"
+                               name="security.auto_refresh.interval_minutes"
+                               id="autoRefreshInterval"
+                               min="5" max="1440"
+                               placeholder="60">
+                    </label>
+                </div>
+            </section>
+
+            <!-- ── 區塊 2：閒置自動登出 ── -->
+            <section class="form-section settings-section">
+                <h4>閒置自動登出</h4>
+                <p class="section-desc">使用者長時間無操作時，顯示倒數警告並自動執行登出，保護帳號安全。</p>
+
+                <div class="form-grid">
+                    <label class="inline-label toggle-label">
+                        <span>啟用閒置自動登出</span>
+                        <div class="toggle-control">
+                            <input type="checkbox"
+                                   name="security.auto_logout.enabled"
+                                   id="autoLogoutEnabled"
+                                   data-toggle-group="auto_logout">
+                            <label for="autoLogoutEnabled" class="toggle-switch" aria-label="啟用閒置自動登出"></label>
+                        </div>
+                    </label>
+
+                    <label class="inline-label" data-group="auto_logout">
+                        <span>閒置逾時（分鐘）</span>
+                        <input type="number"
+                               name="security.auto_logout.idle_minutes"
+                               id="autoLogoutIdleMinutes"
+                               min="5" max="480"
+                               placeholder="30">
+                    </label>
+
+                    <label class="inline-label" data-group="auto_logout">
+                        <span>登出前警告秒數</span>
+                        <input type="number"
+                               name="security.auto_logout.warning_seconds"
+                               id="autoLogoutWarningSeconds"
+                               min="10" max="300"
+                               placeholder="60">
+                    </label>
+                </div>
+            </section>
+
+            <!-- ── 區塊 3：登入失敗鎖定 ── -->
+            <section class="form-section settings-section">
+                <h4>登入失敗鎖定</h4>
+                <p class="section-desc">密碼錯誤次數過多時，暫時鎖定 IP 位址的登入請求，防止暴力破解。</p>
+
+                <div class="form-grid">
+                    <label class="inline-label toggle-label">
+                        <span>啟用登入失敗鎖定</span>
+                        <div class="toggle-control">
+                            <input type="checkbox"
+                                   name="security.lockout.enabled"
+                                   id="lockoutEnabled"
+                                   data-toggle-group="lockout">
+                            <label for="lockoutEnabled" class="toggle-switch" aria-label="啟用登入失敗鎖定"></label>
+                        </div>
+                    </label>
+
+                    <label class="inline-label" data-group="lockout">
+                        <span>最大失敗次數</span>
+                        <input type="number"
+                               name="security.lockout.max_attempts"
+                               id="lockoutMaxAttempts"
+                               min="1" max="20"
+                               placeholder="5">
+                    </label>
+
+                    <label class="inline-label" data-group="lockout">
+                        <span>鎖定時間窗口（分鐘）</span>
+                        <input type="number"
+                               name="security.lockout.window_minutes"
+                               id="lockoutWindowMinutes"
+                               min="1" max="1440"
+                               placeholder="15">
+                    </label>
+                </div>
+            </section>
+
+        </form>
+
+        <section class="form-section settings-section system-update-panel">
+            <h4>系統更新</h4>
+            <p class="section-desc">上傳更新壓縮檔（ZIP），通過驗證後可一鍵套用。套用時會先備份被覆蓋檔案，再執行 migration。</p>
+
+            <div class="system-update-maintenance-row">
+                <div class="system-update-maintenance-status">
+                    <span class="meta-label">維護模式：</span>
+                    <strong class="meta-value" data-update-maintenance-status>未啟用</strong>
+                </div>
+                <label class="inline-label full-width">
+                    <span>維護原因（選填）</span>
+                    <input type="text"
+                           data-system-update-maintenance-reason
+                           placeholder="例如：系統升級作業中，暫停操作。">
+                </label>
+            </div>
+
+            <div class="form-grid system-update-upload-grid">
+                <label class="inline-label full-width">
+                    <span>更新壓縮檔</span>
+                    <input type="file"
+                           data-system-update-package
+                           accept=".zip,application/zip">
+                </label>
+            </div>
+
+            <div class="system-update-actions">
+                <button type="button" class="btn outline small" data-action="check-system-update-init">
+                    <i class="fas fa-stethoscope"></i> 初始化檢查
+                </button>
+                <button type="button" class="btn outline small" data-action="upload-system-update">
+                    <i class="fas fa-upload"></i> 上傳並驗證
+                </button>
+                <button type="button" class="btn outline small" data-action="create-system-update-backup">
+                    <i class="fas fa-database"></i> 建立 DB 快照
+                </button>
+                <button type="button" class="btn primary small" data-action="apply-system-update" disabled>
+                    <i class="fas fa-bolt"></i> 一鍵套用更新
+                </button>
+                <button type="button" class="btn outline small" data-action="enable-system-maintenance">
+                    <i class="fas fa-lock"></i> 啟用維護模式
+                </button>
+                <button type="button" class="btn outline small" data-action="disable-system-maintenance">
+                    <i class="fas fa-lock-open"></i> 關閉維護模式
+                </button>
+                <button type="button" class="btn outline small" data-action="refresh-system-update">
+                    <i class="fas fa-sync"></i> 重新整理狀態
+                </button>
+            </div>
+
+            <div class="system-update-status hidden" data-system-update-status role="alert"></div>
+
+            <div class="system-rollback-panel">
+                <h5>一鍵手動回滾（選版本回退）</h5>
+                <div class="system-rollback-controls">
+                    <label class="inline-label full-width">
+                        <span>可回滾版本</span>
+                        <select data-system-rollback-job-select>
+                            <option value="">尚未載入可回滾版本</option>
+                        </select>
+                    </label>
+                    <button type="button" class="btn outline small" data-action="refresh-system-rollback-candidates">
+                        <i class="fas fa-list"></i> 重新載入可回滾版本
+                    </button>
+                    <button type="button" class="btn warning small" data-action="rollback-system-update">
+                        <i class="fas fa-history"></i> 一鍵回退所選版本
+                    </button>
+                </div>
+            </div>
+
+            <div class="system-update-meta" data-system-update-meta>
+                <div class="system-update-meta-item">
+                    <span class="meta-label">更新批次：</span>
+                    <strong class="meta-value" data-update-job-id>-</strong>
+                </div>
+                <div class="system-update-meta-item">
+                    <span class="meta-label">目標版本：</span>
+                    <strong class="meta-value" data-update-version>-</strong>
+                </div>
+                <div class="system-update-meta-item">
+                    <span class="meta-label">任務狀態：</span>
+                    <strong class="meta-value" data-update-status-value>-</strong>
+                </div>
+                <div class="system-update-meta-item">
+                    <span class="meta-label">檔案數量：</span>
+                    <strong class="meta-value" data-update-file-count>-</strong>
+                </div>
+                <div class="system-update-meta-item">
+                    <span class="meta-label">Migration：</span>
+                    <strong class="meta-value" data-update-migration-count>-</strong>
+                </div>
+                <div class="system-update-meta-item">
+                    <span class="meta-label">最後更新：</span>
+                    <strong class="meta-value" data-update-updated-at>-</strong>
+                </div>
+                <div class="system-update-meta-item">
+                    <span class="meta-label">DB 快照：</span>
+                    <strong class="meta-value" data-update-db-backup>-</strong>
+                </div>
+                <div class="system-update-meta-item">
+                    <span class="meta-label">健康檢查：</span>
+                    <strong class="meta-value" data-update-health-check>-</strong>
+                </div>
+            </div>
+
+            <div class="system-update-change-list">
+                <h5>更新內容摘要</h5>
+                <ul data-update-change-list>
+                    <li>尚未載入更新內容。</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 說明區 -->
+        <section class="form-section">
+            <h4>說明</h4>
+            <ul class="settings-note-list">
+                <li><strong>版本更新偵測</strong>：系統偵測到新版本時顯示橫幅，但<strong>不會</strong>強制重新整理，使用者自行決定是否更新。</li>
+                <li><strong>閒置自動登出</strong>：前端倒數計時器在到達逾時秒數前顯示警告，使用者可點擊「繼續使用」取消自動登出。儲存後<strong>立即生效</strong>，不需重新登入。</li>
+                <li><strong>登入失敗鎖定</strong>：鎖定依據 IP 位址判斷（非帳號），適用於防止網路暴力破解。關閉此功能請確認環境安全。</li>
+            </ul>
+        </section>
+
+    </div>
+
+</div>

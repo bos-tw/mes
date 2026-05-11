@@ -1,0 +1,122 @@
+<!-- 新增退貨單 Modal -->
+<div class="modal-overlay hidden" data-return-orders-modal>
+    <div class="modal-window large">
+        <button type="button" class="modal-close" data-action="close-modal" aria-label="關閉">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3 data-modal-title>新增退貨單</h3>
+
+        <div class="modal-alert hidden" data-return-orders-modal-alert role="alert"></div>
+
+        <form data-return-orders-form novalidate>
+            <input type="hidden" name="id">
+
+            <div class="form-row">
+                <!-- 基本資訊 -->
+                <section class="form-section">
+                    <h4>基本資訊</h4>
+                    <div class="form-grid">
+                        <label class="inline-label">
+                            <span>退貨單號</span>
+                            <input type="text" name="return_order_number" placeholder="自動產生" readonly tabindex="-1">
+                        </label>
+                        <label class="inline-label">
+                            <span>客戶 <abbr title="必填">*</abbr></span>
+                            <select name="customer_id" required>
+                                <option value="">-- 請選擇客戶 --</option>
+                            </select>
+                        </label>
+                        <label class="inline-label">
+                            <span>原出貨單</span>
+                            <select name="original_shipping_order_id" disabled>
+                                <option value="">-- 請先選擇客戶 --</option>
+                            </select>
+                            <small class="form-text text-muted">選擇出貨單以載入品項</small>
+                        </label>
+                    </div>
+                </section>
+
+                <!-- 退貨資訊 -->
+                <section class="form-section">
+                    <h4>退貨資訊</h4>
+                    <div class="form-grid">
+                        <label class="inline-label">
+                            <span>退貨日期 <abbr title="必填">*</abbr></span>
+                            <input type="date" name="return_date" required>
+                        </label>
+                        <label class="inline-label">
+                            <span>處理狀態 <abbr title="必填">*</abbr></span>
+                            <select name="processing_status" required>
+                                <option value="pending">待處理</option>
+                                <option value="processing">處理中</option>
+                                <option value="completed">已完成</option>
+                                <option value="rejected">已拒絕</option>
+                            </select>
+                        </label>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 退貨品項列表 -->
+            <section class="form-section" id="return-items-section" style="display: none;">
+                <h4>退貨品項 <span class="badge-sm info" id="selected-items-count">0</span></h4>
+                <div class="table-responsive">
+                    <table class="data-table" id="shipping-items-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="select-all-items"></th>
+                                <th>產品名稱</th>
+                                <th>客戶批號</th>
+                                <th>出貨數量</th>
+                                <th>退貨數量</th>
+                                <th>備註/原因</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 動態載入出貨單品項 -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 備註 -->
+            <section class="form-section">
+                <h4>備註說明</h4>
+                <div class="form-grid">
+                    <label class="inline-label full-width">
+                        <span>退貨原因</span>
+                        <textarea name="return_reason" rows="2" placeholder="說明整體退貨原因"></textarea>
+                    </label>
+                    <label class="inline-label full-width">
+                        <span>備註</span>
+                        <textarea name="notes" rows="2" placeholder="其他備註事項"></textarea>
+                    </label>
+                </div>
+            </section>
+
+            <div class="form-actions align-right">
+                <button type="button" class="btn outline" data-action="cancel">取消</button>
+                <button type="submit" class="btn primary" data-action="save">儲存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 退貨單詳情 Modal -->
+<div class="modal-overlay hidden" data-return-orders-detail-modal>
+    <div class="modal-window large">
+        <button type="button" class="modal-close" data-action="close-detail-modal" aria-label="關閉">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3><i class="fas fa-undo-alt"></i> 退貨單詳情</h3>
+
+        <div class="detail-content" data-return-orders-details>
+            <!-- 詳情內容動態載入 -->
+        </div>
+
+        <div class="form-actions align-right">
+            <button type="button" class="btn outline" data-action="close-detail-modal">關閉</button>
+            <button type="button" class="btn primary" data-action="edit-from-detail">編輯</button>
+        </div>
+    </div>
+</div>

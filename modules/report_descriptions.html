@@ -1,0 +1,157 @@
+<!--
+⚠️⚠️⚠️ 警告：此檔案已配置化，請勿直接修改！⚠️⚠️⚠️
+
+此模組已遷移到配置化系統，所有內容由以下配置檔控制：
+📁 core/configs/report_descriptions.config.js
+
+如需修改此模組的任何內容（標題、欄位、按鈕等），
+請編輯上述配置檔，修改此 HTML 檔案將不會生效。
+
+此檔案已重新命名為 .html.bak，僅供參考。
+
+配置化日期：2026-02-04
+配置化原因：統一系統架構，提高可維護性
+-->
+<div data-module="report_descriptions">
+<div class="content-header with-actions">
+    <div>
+        <h2>列印報表說明</h2>
+        <p class="subtitle">管理各類列印報表的說明文字</p>
+    </div>
+    <div class="header-actions">
+        <button type="button" class="btn primary" data-action="create">
+            <i class="fas fa-plus"></i> 新增
+        </button>
+    </div>
+</div>
+
+<div class="content-area">
+    <!-- 模組警告訊息區 -->
+    <div class="module-alert hidden" data-report-descriptions-alert></div>
+
+    <!-- 篩選工具列 -->
+    <section class="module-toolbar compact">
+        <form class="filter-form" data-report-descriptions-filter>
+            <div class="form-grid">
+                <label>
+                    <span>關鍵字</span>
+                    <input type="text" name="keyword" placeholder="報表代碼 / 報表名稱">
+                </label>
+                <label>
+                    <span>狀態</span>
+                    <select name="is_active">
+                        <option value="">全部</option>
+                        <option value="1">啟用</option>
+                        <option value="0">停用</option>
+                    </select>
+                </label>
+                <label>
+                    <span>每頁筆數</span>
+                    <select name="perPage">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="primary">套用</button>
+                <button type="button" data-action="reset-filter">重設</button>
+            </div>
+        </form>
+    </section>
+
+    <!-- 資料表格區 -->
+    <section class="table-section">
+        <div class="table-responsive">
+            <table class="data-table" data-report-descriptions-table>
+                <thead>
+                    <tr>
+                        <th data-sort="report_code" data-column="report_code" scope="col">報表代碼 <i class="fas fa-sort"></i></th>
+                        <th data-sort="report_name" data-column="report_name" scope="col">報表名稱 <i class="fas fa-sort"></i></th>
+                        <th data-column="report_name_en" scope="col">英文名稱</th>
+                        <th data-column="used_in" scope="col">使用報表</th>
+                        <th data-column="description" scope="col">說明摘要</th>
+                        <th data-sort="is_active" data-column="is_active" scope="col">狀態 <i class="fas fa-sort"></i></th>
+                        <th data-sort="updated_at" data-column="updated_at" scope="col">更新時間 <i class="fas fa-sort"></i></th>
+                        <th scope="col">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="8" class="text-center">資料載入中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="pagination" data-report-descriptions-pagination></div>
+    </section>
+</div>
+
+<!-- 新增/編輯 Modal -->
+<div class="modal-overlay hidden" data-report-descriptions-modal>
+    <div class="modal-window large">
+        <button type="button" class="modal-close" data-action="close-modal" aria-label="關閉">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3 data-modal-title>新增報表說明</h3>
+
+        <!-- Modal 內部錯誤訊息顯示區 -->
+        <div class="modal-alert hidden" data-report-descriptions-modal-alert role="alert"></div>
+
+        <form data-report-descriptions-form novalidate>
+            <input type="hidden" name="id">
+
+            <section class="form-section">
+                <h4>基本資訊</h4>
+                <div class="form-grid">
+                    <label class="inline-label">
+                        <span>報表代碼 <abbr title="必填">*</abbr></span>
+                        <input type="text" name="report_code" required placeholder="例如: screening_inspection" autocomplete="off">
+                    </label>
+                    <label class="inline-label">
+                        <span>是否啟用</span>
+                        <select name="is_active">
+                            <option value="1">啟用</option>
+                            <option value="0">停用</option>
+                        </select>
+                    </label>
+                    <label class="inline-label">
+                        <span>報表名稱 <abbr title="必填">*</abbr></span>
+                        <input type="text" name="report_name" required placeholder="例如: 篩分檢驗結果報表" autocomplete="off">
+                    </label>
+                    <label class="inline-label">
+                        <span>報表英文名稱</span>
+                        <input type="text" name="report_name_en" placeholder="例如: Screening Inspection Report" autocomplete="off">
+                    </label>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h4>說明內容（中文）</h4>
+                <div class="form-grid">
+                    <label class="inline-label full-width">
+                        <span>報表說明</span>
+                        <textarea name="description" rows="5" placeholder="請輸入報表說明內容，將顯示在列印報表上"></textarea>
+                    </label>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h4>說明內容（英文）</h4>
+                <div class="form-grid">
+                    <label class="inline-label full-width">
+                        <span>Report Description</span>
+                        <textarea name="description_en" rows="5" placeholder="Please enter the report description in English"></textarea>
+                    </label>
+                </div>
+            </section>
+
+            <div class="form-actions align-right">
+                <button type="button" class="outline" data-action="cancel">取消</button>
+                <button type="submit" class="primary" data-action="save">儲存</button>
+            </div>
+        </form>
+    </div>
+</div>
+</div>

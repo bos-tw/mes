@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>退貨單 - 列印</title>
+    <style>
+        @page {
+            size: A5 landscape; /* 中一刀尺寸 (A4/2) 橫向 = 210mm x 148mm */
+            margin: 6mm;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", "SimHei", sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #000;
+            font-size: 8pt;
+            line-height: 1.2;
+        }
+
+        .page-container {
+            background-color: white;
+            width: 210mm;
+            height: 148mm;
+            margin: 20px auto;
+            padding: 6mm;
+            box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            page-break-after: always;
+        }
+
+        .page-container:last-child {
+            page-break-after: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 公司資訊區 (頁首) */
+        .company-header {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 4px;
+            margin-bottom: 4px;
+            border-bottom: 2px solid #000;
+        }
+
+        .company-header .company-logo {
+            height: 50px;
+            max-height: 55px;
+            width: auto;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        .company-header .company-logo:not([src]),
+        .company-header .company-logo[src=""],
+        .company-header .company-logo.hidden {
+            display: none;
+        }
+
+        .company-header .company-info {
+            flex: 1;
+        }
+
+        .company-header .company-name {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .company-header .company-details {
+            font-size: 7pt;
+            color: #444;
+            line-height: 1.4;
+        }
+
+        /* 標題區 */
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+            padding-bottom: 4px;
+        }
+
+        .company-branding {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .main-title {
+            font-size: 16pt;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #d9534f; /* 退貨單使用紅色 */
+        }
+
+        .header-info {
+            text-align: right;
+        }
+
+        .ro-number {
+            font-size: 10pt;
+            font-weight: bold;
+        }
+
+        .ro-date {
+            font-size: 8pt;
+            color: #444;
+            margin-top: 1px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 7pt;
+            border-radius: 3px;
+            margin-top: 2px;
+        }
+
+        .status-badge.pending { background: #fff3cd; color: #856404; }
+        .status-badge.processing { background: #cce5ff; color: #004085; }
+        .status-badge.completed { background: #d4edda; color: #155724; }
+        .status-badge.rejected { background: #f8d7da; color: #721c24; }
+
+        /* 客戶資訊區 */
+        .customer-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            padding: 4px 0;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .customer-info {
+            flex: 1;
+        }
+
+        .customer-info .label {
+            font-size: 7pt;
+            color: #666;
+        }
+
+        .customer-info .value {
+            font-size: 10pt;
+            font-weight: bold;
+        }
+
+        .order-reference {
+            text-align: right;
+        }
+
+        .order-reference .label {
+            font-size: 7pt;
+            color: #666;
+        }
+
+        .order-reference .value {
+            font-size: 9pt;
+        }
+
+        /* 退貨原因區 */
+        .return-reason-section {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 3px;
+            padding: 4px 6px;
+            margin-bottom: 5px;
+            font-size: 7pt;
+        }
+
+        .return-reason-section .label {
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 2px;
+        }
+
+        .return-reason-section .content {
+            color: #333;
+            line-height: 1.4;
+        }
+
+        /* 品項表格 */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 5px;
+            flex: 1;
+        }
+
+        .items-table th,
+        .items-table td {
+            border: 1px solid #333;
+            padding: 3px 4px;
+            font-size: 7.5pt;
+            vertical-align: top;
+        }
+
+        .items-table th {
+            background-color: #e6e6e6;
+            font-weight: bold;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .items-table td.text-center {
+            text-align: center;
+        }
+
+        .items-table td.text-right {
+            text-align: right;
+        }
+
+        .items-table .item-name {
+            max-width: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 備註區 */
+        .notes-section {
+            margin-top: 5px;
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            background-color: #fafafa;
+            font-size: 7pt;
+        }
+
+        .notes-section .notes-title {
+            font-weight: bold;
+            margin-bottom: 2px;
+            color: #333;
+        }
+
+        .notes-section .notes-content {
+            color: #555;
+            white-space: pre-line;
+            line-height: 1.4;
+        }
+
+        /* 合計區 */
+        .summary-section {
+            display: flex;
+            justify-content: flex-end;
+            padding: 4px 0;
+            border-top: 2px solid #000;
+            margin-top: auto;
+        }
+
+        .summary-item {
+            margin-left: 20px;
+            text-align: right;
+        }
+
+        .summary-item .label {
+            font-size: 7pt;
+            color: #666;
+        }
+
+        .summary-item .value {
+            font-size: 10pt;
+            font-weight: bold;
+        }
+
+        /* 簽核區 */
+        .signature-section {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            padding-top: 5px;
+            border-top: 1px dashed #ccc;
+        }
+
+        .signature-box {
+            width: 30%;
+            text-align: center;
+        }
+
+        .signature-box .title {
+            font-size: 7pt;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .signature-box .line {
+            border-bottom: 1px solid #333;
+            margin: 0 10px;
+        }
+
+        /* 頁尾 */
+        .footer-section {
+            font-size: 6pt;
+            color: #999;
+            text-align: center;
+            margin-top: 4px;
+            padding-top: 3px;
+            border-top: 1px solid #ddd;
+        }
+
+        /* 列印樣式 */
+        @media print {
+            body {
+                background-color: white;
+            }
+
+            .page-container {
+                margin: 0;
+                box-shadow: none;
+                page-break-after: always;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        /* 列印工具列 */
+        .print-toolbar {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 8px;
+            z-index: 1000;
+        }
+
+        .print-toolbar button {
+            padding: 8px 16px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+        }
+
+        .print-toolbar button.primary {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .print-toolbar button:hover {
+            opacity: 0.9;
+        }
+
+        /* 空白狀態 */
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 10px;
+            color: #ccc;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <!-- 列印工具列 -->
+    <div class="print-toolbar no-print">
+        <button onclick="window.print()" class="primary">
+            <i class="fas fa-print"></i> 列印
+        </button>
+        <button onclick="window.close()">
+            <i class="fas fa-times"></i> 關閉
+        </button>
+    </div>
+
+    <div id="print-content">
+        <!-- 頁面內容將由 JavaScript 動態載入 -->
+        <div class="page-container">
+            <div class="main-content">
+                <div class="empty-state">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>載入退貨單資料中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // 快取變數
+            let companyInfoCache = null;
+            let companyLogoCache = null;
+            let reportDescriptionCache = null;
+
+            // 從 URL 取得參數
+            const urlParams = new URLSearchParams(window.location.search);
+            const returnOrderId = urlParams.get('id');
+
+            if (!returnOrderId) {
+                showError('缺少退貨單 ID 參數');
+                return;
+            }
+
+            // 載入所有資料
+            loadAllData(returnOrderId);
+
+            async function loadAllData(id) {
+                try {
+                    // 並行載入所有資料
+                    const [orderResult, companyInfo, companyLogo, reportDesc] = await Promise.all([
+                        loadReturnOrder(id),
+                        loadCompanyInfo(1),
+                        loadCompanyLogo(1),
+                        loadReportDescription('return_order')
+                    ]);
+
+                    if (orderResult) {
+                        renderReturnOrder(orderResult.data, companyInfo, companyLogo, reportDesc);
+                    }
+                } catch (error) {
+                    console.error('載入資料失敗:', error);
+                    showError('載入退貨單失敗: ' + error.message);
+                }
+            }
+
+            async function loadReturnOrder(id) {
+                const response = await fetch(`../api/return_orders/show.php?id=${id}`, { credentials: 'include' });
+                const result = await response.json();
+
+                if (!result.success) {
+                    showError(result.message || '載入退貨單失敗');
+                    return null;
+                }
+
+                return result;
+            }
+
+            async function loadCompanyInfo(companyId = 1) {
+                if (companyInfoCache) return companyInfoCache;
+                try {
+                    const response = await fetch(`../api/companies/public_info.php?id=${companyId}`, { credentials: 'include' });
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        companyInfoCache = result.data;
+                    }
+                } catch (e) {
+                    console.error('載入公司資訊失敗:', e);
+                }
+                return companyInfoCache;
+            }
+
+            async function loadCompanyLogo(companyId = 1) {
+                if (companyLogoCache !== null) return companyLogoCache;
+                try {
+                    const response = await fetch(`../api/companies/public_logo.php?company_id=${companyId}`, { credentials: 'include' });
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        companyLogoCache = result.data.file_path;
+                    } else {
+                        companyLogoCache = '';
+                    }
+                } catch (e) {
+                    console.error('載入公司 LOGO 失敗:', e);
+                    companyLogoCache = '';
+                }
+                return companyLogoCache;
+            }
+
+            async function loadReportDescription(reportCode) {
+                if (reportDescriptionCache) return reportDescriptionCache;
+                try {
+                    const response = await fetch(`../api/report_descriptions/show.php?report_code=${reportCode}`, { credentials: 'include' });
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        reportDescriptionCache = result.data;
+                    }
+                } catch (e) {
+                    console.error('載入報表說明失敗:', e);
+                }
+                return reportDescriptionCache;
+            }
+
+            function renderReturnOrder(data, companyInfo, companyLogo, reportDesc) {
+                const company = companyInfo || {};
+                const logoPath = companyLogo || '';
+                const reportNotes = reportDesc?.description || '';
+                const items = data.items || [];
+
+                // 計算合計
+                let totalQuantity = 0;
+                items.forEach(item => {
+                    totalQuantity += parseFloat(item.returned_quantity || 0);
+                });
+
+                // 處理狀態標籤
+                const statusLabels = {
+                    'pending': '待處理',
+                    'processing': '處理中',
+                    'completed': '已完成',
+                    'rejected': '已拒絕'
+                };
+                const statusClass = data.processing_status || 'pending';
+                const statusLabel = statusLabels[statusClass] || data.processing_status || '待處理';
+
+                const html = `
+                    <div class="page-container">
+                        <div class="main-content">
+                            <!-- 公司資訊區 (頁首) -->
+                            <div class="company-header">
+                                ${logoPath ? `<img src="../${escapeHtml(logoPath)}" alt="公司 LOGO" class="company-logo" onerror="this.classList.add('hidden')">` : ''}
+                                <div class="company-info">
+                                    <div class="company-name">${escapeHtml(company.name || '')}</div>
+                                    <div class="company-details">
+                                        ${company.address ? `地址：${escapeHtml(company.address)}<br>` : ''}
+                                        ${company.phone ? `電話：${escapeHtml(company.phone)}` : ''}${company.fax ? ` / 傳真：${escapeHtml(company.fax)}` : ''}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 標題區 -->
+                            <div class="header-section">
+                                <div class="company-branding">
+                                    <span class="main-title">退 貨 單</span>
+                                </div>
+                                <div class="header-info">
+                                    <div class="ro-number">${escapeHtml(data.return_order_number || '')}</div>
+                                    <div class="ro-date">退貨日期：${formatDate(data.return_date)}</div>
+                                    <span class="status-badge ${statusClass}">${statusLabel}</span>
+                                </div>
+                            </div>
+
+                            <!-- 客戶資訊 -->
+                            <div class="customer-section">
+                                <div class="customer-info">
+                                    <div class="label">客戶名稱</div>
+                                    <div class="value">${escapeHtml(data.customer_name || '-')}</div>
+                                </div>
+                                <div class="order-reference">
+                                    <div class="label">來源出貨單</div>
+                                    <div class="value">${escapeHtml(data.shipping_order_number || '-')}</div>
+                                </div>
+                            </div>
+
+                            <!-- 退貨原因區 -->
+                            ${data.return_reason ? `
+                            <div class="return-reason-section">
+                                <div class="label"><i class="fas fa-exclamation-circle"></i> 退貨原因</div>
+                                <div class="content">${escapeHtml(data.return_reason)}</div>
+                            </div>
+                            ` : ''}
+
+                            <!-- 品項表格 -->
+                            <table class="items-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 30px;">項次</th>
+                                        <th>產品名稱</th>
+                                        <th>客戶批號</th>
+                                        <th style="width: 60px;">出貨數量</th>
+                                        <th style="width: 60px;">退貨數量</th>
+                                        <th style="width: 40px;">單位</th>
+                                        <th>退貨原因</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${items.length > 0 ? items.map((item, index) => `
+                                        <tr>
+                                            <td class="text-center">${index + 1}</td>
+                                            <td class="item-name">${escapeHtml(item.screening_item_name || item.part_number || item.sub_item_number || '-')}</td>
+                                            <td>${escapeHtml(item.customer_batch_number || '-')}</td>
+                                            <td class="text-right">${formatNumber(item.shipped_quantity || 0, 0)}</td>
+                                            <td class="text-right">${formatNumber(item.returned_quantity || 0, 0)}</td>
+                                            <td class="text-center">${escapeHtml(item.returned_unit || item.shipped_unit || '支')}</td>
+                                            <td>${escapeHtml(item.reason || '-')}</td>
+                                        </tr>
+                                    `).join('') : `
+                                        <tr>
+                                            <td colspan="7" class="text-center">無退貨品項</td>
+                                        </tr>
+                                    `}
+                                </tbody>
+                            </table>
+
+                            <!-- 備註區 -->
+                            ${data.notes || reportNotes ? `
+                            <div class="notes-section">
+                                ${data.notes ? `
+                                <div class="notes-title">退貨單備註</div>
+                                <div class="notes-content">${escapeHtml(data.notes)}</div>
+                                ` : ''}
+                                ${reportNotes ? `
+                                <div class="notes-title" style="margin-top: 4px;">處理說明</div>
+                                <div class="notes-content">${escapeHtml(reportNotes)}</div>
+                                ` : ''}
+                            </div>
+                            ` : ''}
+
+                            <!-- 合計區 -->
+                            <div class="summary-section">
+                                <div class="summary-item">
+                                    <div class="label">退貨品項數</div>
+                                    <div class="value">${items.length} 項</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="label">退貨總數量</div>
+                                    <div class="value">${formatNumber(totalQuantity, 0)} 支</div>
+                                </div>
+                            </div>
+
+                            <!-- 簽核區 -->
+                            <div class="signature-section">
+                                <div class="signature-box">
+                                    <div class="title">製單人員</div>
+                                    <div class="line"></div>
+                                </div>
+                                <div class="signature-box">
+                                    <div class="title">驗收人員</div>
+                                    <div class="line"></div>
+                                </div>
+                                <div class="signature-box">
+                                    <div class="title">主管核准</div>
+                                    <div class="line"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 頁尾 -->
+                        <div class="footer-section">
+                            列印時間：${new Date().toLocaleString('zh-TW')} | 退貨單編號：${escapeHtml(data.return_order_number || '')}
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('print-content').innerHTML = html;
+                document.title = `退貨單 - ${data.return_order_number || ''}`;
+            }
+
+            function showError(message) {
+                document.getElementById('print-content').innerHTML = `
+                    <div class="page-container">
+                        <div class="main-content">
+                            <div class="empty-state">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <p>${escapeHtml(message)}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function escapeHtml(text) {
+                if (text === null || text === undefined) return '';
+                const div = document.createElement('div');
+                div.textContent = String(text);
+                return div.innerHTML;
+            }
+
+            function formatDate(dateStr) {
+                if (!dateStr) return '-';
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return dateStr;
+                return date.toLocaleDateString('zh-TW');
+            }
+
+            function formatNumber(value, decimals = 2) {
+                if (value === null || value === undefined || value === '') return '0';
+                const num = parseFloat(value);
+                if (isNaN(num)) return '0';
+                return num.toLocaleString('zh-TW', {
+                    minimumFractionDigits: decimals,
+                    maximumFractionDigits: decimals
+                });
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!-- 
+╔════════════════════════════════════════════════════════════════════════════╗
+║  ⚠️  警告：此模組已配置化（混合模式）                                         ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📋 模組名稱: audit_logs
+🔧 配置檔位置: core/configs/audit_logs.config.js
+🔀 模式: 混合配置模式
+
+───────────────────────────────────────────────────────────────────────────────
+
+🔀 混合模式說明：
+────────────────
+此模組採用混合配置模式：
+
+✅ 已配置化（修改配置檔會生效）：
+   - 頁面標題與副標題
+   - 標題區按鈕（新增、列印、匯出等）
+   - 篩選工具列
+   - 資料表格結構
+   - 欄位選擇器
+
+⚠️ 仍使用 HTML（修改此檔案會生效）：
+   - 複雜的 Modal 表單
+   - 特殊的 HTML 區塊（如 customHtml）
+   
+請查看配置檔中的註解，了解哪些部分由配置控制。
+
+───────────────────────────────────────────────────────────────────────────────
+
+📝 修改指引：
+─────────────
+
+1. 修改頁面標題、按鈕、篩選、表格 
+   → 編輯配置檔: core/configs/audit_logs.config.js
+
+2. 修改 Modal 表單（如配置檔有 requiresHtmlModal: true）
+   → 編輯此檔案: modules/audit_logs.html.bak
+
+3. 不確定要改哪個？
+   → 查看 modules/README.md
+
+───────────────────────────────────────────────────────────────────────────────
+
+🚫 重要提醒：
+─────────────
+- 此檔案已重命名為 .bak，表示「部分內容」仍在使用中
+- 不要刪除此檔案！系統會載入其中的 Modal 部分
+- 修改前請先查看配置檔，確認該部分是否由配置控制
+- 修改後務必測試功能是否正常
+
+───────────────────────────────────────────────────────────────────────────────
+
+📚 相關文件：
+─────────────
+- modules/README.md - 模組索引與修改指引
+- DEVELOPMENT.md - 開發指引
+- core/configs/README.md - 配置規範
+- docs/模組配置遷移進度.md - 遷移歷史
+
+───────────────────────────────────────────────────────────────────────────────
+最後更新: 2026-02-04
+-->
+<div data-module="audit_logs">
+<div class="content-header with-actions">
+    <div>
+        <h2>操作日誌</h2>
+        <p class="subtitle">檢視並管理系統操作記錄，可建立人工日誌或批次刪除</p>
+    </div>
+    <div class="header-actions">
+        <button type="button" class="btn secondary" data-action="export">
+            <i class="fas fa-file-export"></i>
+            <span>匯出</span>
+        </button>
+        <button type="button" class="btn danger" data-action="delete-selected" disabled>
+            <i class="fas fa-trash"></i>
+            <span>刪除勾選項目</span>
+        </button>
+    </div>
+</div>
+<div class="content-area">
+    <div class="module-alert hidden" data-auditlogs-alert></div>
+
+    <section class="module-toolbar compact">
+        <form class="filter-form" data-auditlogs-filter>
+            <div class="form-grid">
+                <label>
+                    <span>關鍵字</span>
+                    <input type="text" name="keyword" placeholder="動作 / 目標資料表 / IP" autocomplete="off">
+                </label>
+                <label>
+                    <span>每頁筆數</span>
+                    <select name="perPage">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn primary small">套用</button>
+                <button type="button" class="btn outline small" data-action="reset-filter">重設</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="table-section">
+        <div class="table-responsive">
+            <table class="data-table" data-auditlogs-table>
+                <thead>
+                    <tr>
+                        <th class="checkbox-column">
+                            <input type="checkbox" data-action="toggle-select-all" aria-label="全選此頁">
+                        </th>
+                        <th data-sort="employee_name">員工 <i class="fas fa-sort"></i></th>
+                        <th data-sort="action">動作 <i class="fas fa-sort"></i></th>
+                        <th data-sort="target_table">目標資料表 <i class="fas fa-sort"></i></th>
+                        <th data-sort="ip_address">IP 位址 <i class="fas fa-sort"></i></th>
+                        <th data-sort="created_at">建立時間 <i class="fas fa-sort"></i></th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="7" class="text-center">資料載入中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="pagination" data-auditlogs-pagination></div>
+    </section>
+
+    <div class="modal-overlay hidden" data-auditlogs-detail-modal>
+        <div class="modal-window large">
+            <button type="button" class="modal-close" data-action="close-detail-modal" aria-label="關閉">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3>日誌詳細資訊</h3>
+            <div class="detail-content" data-detail-content>
+                <dl>
+                    <div>
+                        <dt>ID</dt>
+                        <dd data-detail-field="id"></dd>
+                    </div>
+                    <div>
+                        <dt>員工</dt>
+                        <dd data-detail-field="employee"></dd>
+                    </div>
+                    <div>
+                        <dt>動作</dt>
+                        <dd data-detail-field="action"></dd>
+                    </div>
+                    <div>
+                        <dt>目標資料表</dt>
+                        <dd data-detail-field="target_table"></dd>
+                    </div>
+                    <div>
+                        <dt>目標 ID</dt>
+                        <dd data-detail-field="target_id"></dd>
+                    </div>
+                    <div>
+                        <dt>IP 位址</dt>
+                        <dd data-detail-field="ip_address"></dd>
+                    </div>
+                    <div>
+                        <dt>建立時間</dt>
+                        <dd data-detail-field="created_at"></dd>
+                    </div>
+                </dl>
+                <div class="detail-section">
+                    <h4>詳細資料</h4>
+                    <pre data-detail-field="details" class="detail-pre"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>

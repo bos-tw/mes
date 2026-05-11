@@ -1,0 +1,55 @@
+# =============================================
+# MES 螺絲篩分管理系統 - Git 版本控制排除清單
+# =============================================
+
+# ⚠️ 重要：資料庫憑證設定檔 (S-1 安全修正)
+# 正式環境請透過環境變數注入，而非修改此檔案：
+#   SCREWSYSTEM_DB_HOST
+#   SCREWSYSTEM_DB_NAME
+#   SCREWSYSTEM_DB_USER
+#   SCREWSYSTEM_DB_PASSWORD
+api/config.php
+
+# 建議：使用範本複製後加入本機設定
+# cp api/config.php.example api/config.php
+
+# ── 上傳檔案 ────────────────────────────────
+uploads/logos/*.jpg
+uploads/logos/*.jpeg
+uploads/logos/*.png
+uploads/logos/*.gif
+uploads/logos/*.webp
+uploads/**
+export/**
+db_backups/**
+db_exports/**
+old/**
+
+# ── 相依套件 ────────────────────────────────
+vendor/
+
+# ── 環境設定 ────────────────────────────────
+.env
+.env.local
+.env.production
+
+# ── 編輯器設定 ──────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ── 系統檔案 ────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── 測試產出 ────────────────────────────────
+tests/output/
+*.log
+
+# ── 備份檔案 ────────────────────────────────
+backup/
+*.bak
+*.backup

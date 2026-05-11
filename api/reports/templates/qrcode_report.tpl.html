@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{{COMPANY_SHORT_NAME}} - 篩分檢驗報表 {{WORK_ORDER_NUMBER}}</title>
+    <meta name="description" content="工單 {{WORK_ORDER_NUMBER}} 篩分檢驗結果報表">
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --light-bg: #f8f9fa;
+            --border-color: #dee2e6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", "Segoe UI", Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), #34495e);
+            color: white;
+            padding: 20px 16px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .header .subtitle {
+            font-size: 12px;
+            opacity: 0.85;
+        }
+
+        .work-order-badge {
+            display: inline-block;
+            background-color: rgba(255,255,255,0.2);
+            padding: 6px 16px;
+            border-radius: 20px;
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        /* Info Cards */
+        .card {
+            margin: 12px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background-color: var(--light-bg);
+            padding: 10px 16px;
+            font-weight: 600;
+            font-size: 14px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-header i {
+            font-size: 16px;
+        }
+
+        .card-body {
+            padding: 12px 16px;
+        }
+
+        .info-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            width: 100px;
+            color: #666;
+            flex-shrink: 0;
+        }
+
+        .info-value {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        /* Summary Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            padding: 16px;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 16px 12px;
+            border-radius: 12px;
+            background-color: var(--light-bg);
+        }
+
+        .stat-box.total {
+            background-color: #e8f4f8;
+            border: 2px solid #3498db;
+        }
+
+        .stat-box.good {
+            background-color: #e8f5e9;
+            border: 2px solid var(--success-color);
+        }
+
+        .stat-box.defect {
+            background-color: #ffebee;
+            border: 2px solid var(--danger-color);
+        }
+
+        .stat-box.rate {
+            background-color: #fff3e0;
+            border: 2px solid var(--warning-color);
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        /* Screening Results Table */
+        .result-table {
+            width: 100%;
+            font-size: 13px;
+        }
+
+        .result-table th {
+            background-color: var(--light-bg);
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .result-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: middle;
+        }
+
+        .result-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+
+        .defect-count {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .defect-count.zero {
+            background-color: #e8f5e9;
+            color: var(--success-color);
+        }
+
+        .defect-count.has-defect {
+            background-color: #ffebee;
+            color: var(--danger-color);
+        }
+
+        /* Chart Section */
+        .chart-container {
+            padding: 16px;
+            text-align: center;
+        }
+
+        .chart-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .pie-chart-wrapper {
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        .no-defect-message {
+            padding: 30px;
+            text-align: center;
+            color: var(--success-color);
+            font-size: 16px;
+            background-color: #e8f5e9;
+            border-radius: 12px;
+            margin: 16px;
+        }
+
+        .no-defect-message i {
+            font-size: 40px;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: var(--light-bg);
+            padding: 16px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .footer .company-name {
+            font-weight: bold;
+            color: var(--primary-color);
+            font-size: 14px;
+        }
+
+        .footer .generated-time {
+            margin-top: 8px;
+            font-size: 11px;
+        }
+
+        /* Legend for chart */
+        .chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 12px;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        /* Responsive */
+        @media (max-width: 400px) {
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                padding: 12px;
+            }
+
+            .stat-box {
+                padding: 12px 8px;
+            }
+
+            .stat-number {
+                font-size: 20px;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <h1>{{COMPANY_SHORT_NAME}} 篩分檢驗結果報表</h1>
+        <div class="subtitle">Screening Inspection Report</div>
+        <div class="work-order-badge">{{WORK_ORDER_NUMBER}}</div>
+    </div>
+
+    <!-- 客戶/訂單資訊 -->
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-file-invoice"></i> 訂單資訊
+        </div>
+        <div class="card-body">
+            <div class="info-row">
+                <span class="info-label">客戶名稱</span>
+                <span class="info-value">{{CUSTOMER_NAME}}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">訂單編號</span>
+                <span class="info-value">{{ORDER_NUMBER}}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">客戶批號</span>
+                <span class="info-value">{{CUSTOMER_BATCH_NUMBER}}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">受篩產品</span>
+                <span class="info-value">{{SCREENING_ITEM_NAME}}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">完工日期</span>
+                <span class="info-value">{{ACTUAL_END_DATE}}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 統計摘要 -->
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-chart-pie"></i> 檢驗結果摘要
+        </div>
+        <div class="stats-grid">
+            <div class="stat-box total">
+                <span class="stat-number">{{TOTAL_UNITS}}</span>
+                <span class="stat-label">總數量 (支)</span>
+            </div>
+            <div class="stat-box good">
+                <span class="stat-number">{{GOOD_UNITS}}</span>
+                <span class="stat-label">良品數量 (支)</span>
+            </div>
+            <div class="stat-box defect">
+                <span class="stat-number">{{DEFECT_UNITS}}</span>
+                <span class="stat-label">不良品數量</span>
+            </div>
+            <div class="stat-box rate">
+                <span class="stat-number">{{DEFECT_RATE_PERCENT}}%</span>
+                <span class="stat-label">不良率</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 篩分項目明細 -->
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-list-check"></i> 篩分項目明細
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <table class="result-table">
+                <thead>
+                    <tr>
+                        <th>篩分項目</th>
+                        <th class="text-center">公差值</th>
+                        <th class="text-center">不良數</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{SCREENING_RESULTS_ROWS}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 圓餅圖 -->
+    {{CHART_SECTION}}
+
+    <!-- Footer -->
+    <div class="footer">
+        <div class="company-name">{{COMPANY_NAME}}</div>
+        <div>{{COMPANY_ADDRESS}}</div>
+        <div>{{COMPANY_PHONE}}</div>
+        <div class="generated-time">報表產生時間：{{GENERATED_AT}}</div>
+    </div>
+</div>
+
+<script>
+{{CHART_SCRIPT}}
+</script>
+
+</body>
+</html>

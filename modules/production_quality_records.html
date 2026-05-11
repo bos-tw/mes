@@ -1,0 +1,316 @@
+<!-- 
+╔════════════════════════════════════════════════════════════════════════════╗
+║  ⚠️  警告：此模組已配置化（混合模式）                                         ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📋 模組名稱: production_quality_records
+🔧 配置檔位置: core/configs/production_quality_records.config.js
+🔀 模式: 混合配置模式
+
+───────────────────────────────────────────────────────────────────────────────
+
+🔀 混合模式說明：
+────────────────
+此模組採用混合配置模式：
+
+✅ 已配置化（修改配置檔會生效）：
+   - 頁面標題與副標題
+   - 標題區按鈕（新增、列印、匯出等）
+   - 篩選工具列
+   - 資料表格結構
+   - 欄位選擇器
+
+⚠️ 仍使用 HTML（修改此檔案會生效）：
+   - 複雜的 Modal 表單
+   - 特殊的 HTML 區塊（如 customHtml）
+   
+請查看配置檔中的註解，了解哪些部分由配置控制。
+
+───────────────────────────────────────────────────────────────────────────────
+
+📝 修改指引：
+─────────────
+
+1. 修改頁面標題、按鈕、篩選、表格 
+   → 編輯配置檔: core/configs/production_quality_records.config.js
+
+2. 修改 Modal 表單（如配置檔有 requiresHtmlModal: true）
+   → 編輯此檔案: modules/production_quality_records.html.bak
+
+3. 不確定要改哪個？
+   → 查看 modules/README.md
+
+───────────────────────────────────────────────────────────────────────────────
+
+🚫 重要提醒：
+─────────────
+- 此檔案已重命名為 .bak，表示「部分內容」仍在使用中
+- 不要刪除此檔案！系統會載入其中的 Modal 部分
+- 修改前請先查看配置檔，確認該部分是否由配置控制
+- 修改後務必測試功能是否正常
+
+───────────────────────────────────────────────────────────────────────────────
+
+📚 相關文件：
+─────────────
+- modules/README.md - 模組索引與修改指引
+- DEVELOPMENT.md - 開發指引
+- core/configs/README.md - 配置規範
+- docs/模組配置遷移進度.md - 遷移歷史
+
+───────────────────────────────────────────────────────────────────────────────
+最後更新: 2026-02-04
+-->
+<div data-module="production_quality_records">
+<div class="content-header with-actions">
+    <div>
+        <h2>生產品質檢驗</h2>
+        <p class="subtitle">管理生產過程中的品質檢驗記錄</p>
+    </div>
+    <div class="header-actions">
+        <button type="button" class="btn primary" data-action="create"><i class="fas fa-plus"></i> 新增</button>
+        <button type="button" class="btn outline" data-action="print">
+            <i class="fas fa-print"></i>
+            <span>列印</span>
+        </button>
+        <button type="button" class="btn outline" data-action="export">
+            <i class="fas fa-file-export"></i>
+            <span>匯出</span>
+        </button>
+    </div>
+</div>
+<div class="content-area">
+    <div class="module-alert hidden" data-production-quality-records-alert></div>
+
+    <!-- 欄位選擇面板 -->
+    <div class="column-selector hidden" data-production-quality-records-column-selector>
+        <div class="column-selector-header">
+            <h4>顯示欄位設定</h4>
+            <button type="button" class="close-btn" data-action="close-column-selector">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="column-selector-body">
+            <label class="column-option">
+                <input type="checkbox" data-column="work_order_number" checked>
+                <span>工單編號</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="card_number" checked>
+                <span>卡號</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="inspection_datetime" checked>
+                <span>檢驗時間</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="inspector_name" checked>
+                <span>檢驗員</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="sample_quantity_pcs" checked>
+                <span>抽樣數量</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="defective_quantity_pcs" checked>
+                <span>不良數量</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="rejection_rate_ppm" checked>
+                <span>不良率(ppm)</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="inspection_result" checked>
+                <span>檢驗結果</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="rework_needed" checked>
+                <span>需要重工</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="notes" checked>
+                <span>備註</span>
+            </label>
+        </div>
+        <div class="column-selector-footer">
+            <button type="button" class="btn outline small" data-action="select-all-columns">全選</button>
+            <button type="button" class="btn outline small" data-action="deselect-all-columns">全不選</button>
+            <button type="button" class="btn primary small" data-action="apply-column-settings">套用</button>
+        </div>
+    </div>
+
+    <section class="module-toolbar compact">
+        <form class="filter-form" data-production-quality-records-filter>
+            <div class="form-grid">
+                <label>
+                    <span>關鍵字</span>
+                    <input type="text" name="keyword" placeholder="工單編號 / 卡號 / 檢驗員">
+                </label>
+                <label>
+                    <span>每頁筆數</span>
+                    <select name="perPage">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn primary small">套用</button>
+                <button type="button" class="btn outline small" data-action="reset-filter">重設</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="table-section">
+        <div class="table-header-actions">
+            <button type="button" class="btn outline small" data-action="toggle-column-selector">
+                <i class="fas fa-columns"></i> 欄位設定
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table" data-production-quality-records-table>
+                <thead>
+                    <tr>
+                        <th data-sort="work_order_number" data-column="work_order_number" scope="col">工單編號 <i class="fas fa-sort"></i></th>
+                        <th data-column="card_number" scope="col">卡號</th>
+                        <th data-sort="inspection_datetime" data-column="inspection_datetime" scope="col">檢驗時間 <i class="fas fa-sort"></i></th>
+                        <th data-column="inspector_name" scope="col">檢驗員</th>
+                        <th data-sort="sample_quantity_pcs" data-column="sample_quantity_pcs" scope="col">抽樣數量 <i class="fas fa-sort"></i></th>
+                        <th data-sort="defective_quantity_pcs" data-column="defective_quantity_pcs" scope="col">不良數量 <i class="fas fa-sort"></i></th>
+                        <th data-sort="rejection_rate_ppm" data-column="rejection_rate_ppm" scope="col">不良率(ppm) <i class="fas fa-sort"></i></th>
+                        <th data-column="inspection_result" scope="col">檢驗結果</th>
+                        <th data-sort="rework_needed" data-column="rework_needed" scope="col">需要重工 <i class="fas fa-sort"></i></th>
+                        <th data-column="notes" scope="col">備註</th>
+                        <th scope="col">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="12" class="text-center">資料載入中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="pagination" data-production-quality-records-pagination></div>
+    </section>
+
+    <!-- Modal 使用 modal-window 類別以符合系統風格 -->
+    <div class="modal-overlay hidden" data-production-quality-records-modal>
+        <div class="modal-window">
+            <button type="button" class="modal-close" data-action="close-modal" aria-label="關閉">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 data-modal-title>新增生產品質檢驗</h3>
+
+            <!-- Modal 內部錯誤訊息顯示區 -->
+            <div class="modal-alert hidden" data-production-quality-records-modal-alert role="alert"></div>
+
+            <form data-production-quality-records-form novalidate>
+                <input type="hidden" name="id">
+
+                <!-- 第一區塊：基本資訊 + 檢驗人員 -->
+                <div class="form-row">
+                    <div class="form-section">
+                        <h4>基本資訊</h4>
+                        <div class="form-grid">
+                            <label class="inline-label">
+                                <span>生產紀錄 <abbr title="必填">*</abbr></span>
+                                <select name="production_record_id" required>
+                                    <option value="">請選擇生產紀錄</option>
+                                </select>
+                            </label>
+                            <label class="inline-label">
+                                <span>工單編號</span>
+                                <input type="text" name="work_order_number" readonly disabled placeholder="選擇生產紀錄後自動帶入">
+                            </label>
+                            <label class="inline-label">
+                                <span>卡號</span>
+                                <input type="text" name="card_number" readonly disabled placeholder="選擇生產紀錄後自動帶入">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h4>檢驗人員</h4>
+                        <div class="form-grid">
+                            <label class="inline-label">
+                                <span>檢驗時間 <abbr title="必填">*</abbr></span>
+                                <input type="datetime-local" name="inspection_datetime" required>
+                            </label>
+                            <label class="inline-label">
+                                <span>檢驗員 <abbr title="必填">*</abbr></span>
+                                <select name="inspector_id" required>
+                                    <option value="">請選擇檢驗員</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第二區塊：檢驗數據 + 檢驗結果 -->
+                <div class="form-row">
+                    <div class="form-section">
+                        <h4>檢驗數據</h4>
+                        <div class="form-grid">
+                            <label class="inline-label">
+                                <span>抽樣數量(件) <abbr title="必填">*</abbr></span>
+                                <input type="number" name="sample_quantity_pcs" min="1" required placeholder="請輸入抽樣數量">
+                            </label>
+                            <label class="inline-label">
+                                <span>不良數量(件) <abbr title="必填">*</abbr></span>
+                                <input type="number" name="defective_quantity_pcs" min="0" required placeholder="請輸入不良數量">
+                            </label>
+                            <label class="inline-label">
+                                <span>不良率(ppm)</span>
+                                <input type="text" name="rejection_rate_ppm" readonly disabled placeholder="系統自動計算">
+                                <small>系統自動計算：(不良數量 / 抽樣數量) × 1,000,000</small>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h4>檢驗結果</h4>
+                        <div class="form-grid">
+                            <label class="inline-label">
+                                <span>檢驗結果</span>
+                                <select name="inspection_result">
+                                    <option value="">請選擇</option>
+                                    <option value="合格">合格</option>
+                                    <option value="不合格">不合格</option>
+                                    <option value="待確認">待確認</option>
+                                </select>
+                            </label>
+                            <label class="inline-label">
+                                <span>是否需要重工</span>
+                                <select name="rework_needed">
+                                    <option value="0">否</option>
+                                    <option value="1">是</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第三區塊：備註 -->
+                <div class="form-row">
+                    <div class="form-section full-width">
+                        <h4>備註說明</h4>
+                        <div class="form-grid">
+                            <label class="inline-label full-width">
+                                <span>備註</span>
+                                <textarea name="notes" rows="3" placeholder="請輸入備註說明"></textarea>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions align-right">
+                    <button type="button" class="btn outline" data-action="cancel">取消</button>
+                    <button type="submit" class="btn primary" data-action="save">儲存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</div>

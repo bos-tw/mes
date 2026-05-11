@@ -1,0 +1,37 @@
+# ======================================================
+# MES 系統快取控制
+# 目的：確保使用者每次都能取得最新版本，不需手動清除快取
+# ======================================================
+
+# --- 入口頁優先順序：index.php 優先於 index.html ---
+# index.php 會在 HTTP 層設定 no-cache，並對所有靜態資源附加版本戳記
+DirectoryIndex index.php index.html
+
+# --- HTML 入口頁：完全不快取 ---
+# 保證每次訪問 index.html / login.html 都從伺服器取得最新版本
+<IfModule mod_headers.c>
+    <FilesMatch "\.(html|htm)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
+# --- 本地 JS / CSS：內部系統直接不快取，確保每次都取得最新版本 ---
+# 區域網路環境下效能影響微乎其微，換取零維護成本
+<IfModule mod_headers.c>
+    <FilesMatch "\.(js|css)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
+# --- PHP API：完全不快取（API 回應必須即時） ---
+<IfModule mod_headers.c>
+    <FilesMatch "\.php$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>

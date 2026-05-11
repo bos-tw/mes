@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生產命令單</title>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @page {
+            size: A4;
+            margin: 8mm;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", "SimHei", sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #000;
+            font-size: 8pt;
+            line-height: 1.3;
+        }
+
+        .page-container {
+            background-color: white;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 20px auto;
+            padding: 8mm;
+            box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            page-break-after: always;
+        }
+
+        .page-container:last-child {
+            page-break-after: auto;
+        }
+
+        .main-content {
+            flex: 1;
+        }
+
+        /* 標題區 */
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #000;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+        }
+
+        .company-branding {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .company-logo {
+            height: 50px;
+            max-height: 60px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .company-logo:not([src]),
+        .company-logo[src=""],
+        .company-logo.hidden {
+            display: none;
+        }
+
+        .main-title {
+            font-size: 18pt;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .header-info {
+            text-align: right;
+        }
+
+        .wo-number {
+            font-size: 11pt;
+            font-weight: bold;
+        }
+
+        .wo-meta {
+            font-size: 8pt;
+            color: #444;
+            margin-top: 1px;
+        }
+
+        /* 區塊標題 */
+        .section {
+            margin-bottom: 8px;
+        }
+
+        .section-title {
+            background-color: #e6e6e6;
+            padding: 4px 8px;
+            font-weight: bold;
+            font-size: 9pt;
+            letter-spacing: 1px;
+            margin-bottom: 0;
+        }
+
+        /* 資訊格線 */
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+        }
+
+        .info-table td {
+            padding: 3px 5px;
+            border: 1px solid #999;
+            font-size: 8pt;
+            vertical-align: middle;
+        }
+
+        .info-table td:first-child { border-left: none; }
+        .info-table td:last-child { border-right: none; }
+
+        .info-table .label {
+            background-color: #f5f5f5;
+            font-weight: bold;
+            width: 12%;
+            white-space: nowrap;
+        }
+
+        .info-table .value {
+            width: 21%;
+        }
+
+        .info-table .highlight {
+            color: #c00;
+            font-weight: bold;
+        }
+
+        /* 資料表格 */
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+        }
+
+        table.data-table th,
+        table.data-table td {
+            padding: 2px 4px;
+            border: 1px solid #999;
+            font-size: 8pt;
+            vertical-align: middle;
+        }
+
+        table.data-table th:first-child,
+        table.data-table td:first-child { border-left: none; }
+        table.data-table th:last-child,
+        table.data-table td:last-child { border-right: none; }
+
+        table.data-table th {
+            background-color: #e6e6e6;
+            font-weight: bold;
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+
+        /* 空白填寫欄位（供手寫） */
+        .writable-cell {
+            background-color: #fffef0;
+            min-height: 20px;
+            border-bottom: 1px dotted #999 !important;
+        }
+
+        /* 兩欄並排 */
+        .two-columns {
+            display: flex;
+            gap: 10px;
+        }
+
+        .two-columns > .column {
+            flex: 1;
+        }
+
+        .two-columns > .column.narrow {
+            flex: 0.6;
+        }
+
+        /* 備註區 */
+        .notes-box {
+            border: 1px solid #000;
+            border-left: none;
+            border-right: none;
+            padding: 4px 8px;
+            min-height: 20px;
+            font-size: 8pt;
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+
+        /* 頁尾 */
+        footer {
+            margin-top: auto;
+            padding-top: 8px;
+            border-top: 2px solid #000;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .footer-logo {
+            height: 28px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .footer-logo:not([src]),
+        .footer-logo[src=""],
+        .footer-logo.hidden {
+            display: none;
+        }
+
+        .footer-brand-text .zh {
+            font-size: 12pt;
+            font-weight: bold;
+        }
+
+        .footer-brand-text .en {
+            font-size: 8pt;
+            letter-spacing: 1px;
+        }
+
+        .footer-contacts {
+            text-align: right;
+            font-size: 8pt;
+            line-height: 1.4;
+        }
+
+        /* 列印樣式 */
+        @media print {
+            .no-print { display: none !important; }
+            body {
+                background-color: white;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+            .page-container {
+                margin: 0;
+                width: 100%;
+                min-height: 100vh;
+                box-shadow: none;
+                padding: 8mm;
+            }
+            table { page-break-inside: avoid; }
+            .section { page-break-inside: avoid; }
+            footer { page-break-inside: avoid; }
+
+            /* 強制顯示背景色 */
+            .section-title,
+            .info-table .label,
+            table.data-table th,
+            .writable-cell {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+        }
+
+        /* 載入中 */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 80vh;
+            font-size: 14pt;
+            color: #666;
+        }
+
+        .error-message {
+            text-align: center;
+            padding: 50px;
+            color: #c00;
+            font-size: 14pt;
+        }
+
+        /* 列印工具列 */
+        .print-toolbar {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 8px;
+            z-index: 1000;
+        }
+
+        .print-toolbar button {
+            padding: 8px 16px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+        }
+
+        .print-toolbar button.primary {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .print-toolbar button:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <!-- 列印工具列 -->
+    <div class="print-toolbar no-print">
+        <button onclick="window.print()" class="primary">
+            <i class="fas fa-print"></i> 列印
+        </button>
+        <button onclick="window.close()">
+            <i class="fas fa-times"></i> 關閉
+        </button>
+    </div>
+
+    <div id="content">
+        <div class="loading">載入工單資料中...</div>
+    </div>
+
+<script>
+(function() {
+    'use strict';
+
+    let companyInfoCache = null;
+    let companyLogoUrl = null;
+
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        const year = date.getFullYear() - 1911;
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}/${month}/${day}`;
+    }
+
+    function formatDateTime(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        const year = date.getFullYear() - 1911;
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hour = String(date.getHours()).padStart(2, '0');
+        const min = String(date.getMinutes()).padStart(2, '0');
+        return `${year}/${month}/${day} ${hour}:${min}`;
+    }
+
+    function formatNumber(num, decimals = 2) {
+        if (num === null || num === undefined || num === '') return '';
+        return Number(num).toLocaleString('zh-TW', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        });
+    }
+
+    function formatInt(num) {
+        if (num === null || num === undefined || num === '') return '';
+        return Number(num).toLocaleString('zh-TW', { maximumFractionDigits: 0 });
+    }
+
+    // 載入公司 LOGO
+    async function loadCompanyLogo(companyId = 1) {
+        try {
+            const response = await fetch(`../api/companies/public_logo.php?company_id=${companyId}`, { credentials: 'include' });
+            const result = await response.json();
+            if (result.success && result.data && result.data.file_path) {
+                companyLogoUrl = '../' + result.data.file_path;
+            }
+        } catch (e) {
+            console.error('載入公司 LOGO 失敗:', e);
+        }
+    }
+
+    // 載入公司資訊
+    async function loadCompanyInfo(companyId = 1) {
+        if (companyInfoCache) return companyInfoCache;
+        try {
+            const response = await fetch(`../api/companies/public_info.php?id=${companyId}`, { credentials: 'include' });
+            const result = await response.json();
+            if (result.success && result.data) {
+                companyInfoCache = result.data;
+            }
+        } catch (e) {
+            console.error('載入公司資訊失敗:', e);
+        }
+        return companyInfoCache;
+    }
+
+    // 載入列印報表說明
+    let reportDescriptionCache = null;
+    async function loadReportDescription(reportCode) {
+        if (reportDescriptionCache) return reportDescriptionCache;
+        try {
+            const response = await fetch(`../api/report_descriptions/show.php?report_code=${reportCode}`, { credentials: 'include' });
+            const result = await response.json();
+            if (result.success && result.data) {
+                reportDescriptionCache = result.data;
+            }
+        } catch (e) {
+            console.error('載入列印報表說明失敗:', e);
+        }
+        return reportDescriptionCache;
+    }
+
+    // 產生工單 HTML
+    function generateWorkOrderHtml(wo, companyInfo, reportDesc) {
+        const company = companyInfo || {};
+
+        // 篩選服務明細（新增不良品數量空白欄位）
+        const screeningDetails = wo.screening_services_details || [];
+        let screeningRowsHtml = screeningDetails.length > 0
+            ? screeningDetails.map((item, idx) => {
+                const tolerance = (item.tolerance_plus_value || item.tolerance_minus_value)
+                    ? `+${item.tolerance_plus_value || 0} / -${item.tolerance_minus_value || 0}`
+                    : '';
+                return `<tr>
+                    <td class="text-center">${idx + 1}</td>
+                    <td>${escapeHtml(item.custom_service_name || item.screening_service_name || '')}</td>
+                    <td class="text-center">${tolerance}</td>
+                    <td class="text-center">${item.ppm_standard || ''}</td>
+                    <td class="text-center writable-cell"></td>
+                    <td>${escapeHtml(item.notes || '')}</td>
+                </tr>`;
+            }).join('')
+            : '<tr><td colspan="6" class="text-center">無篩選項目</td></tr>';
+
+        // 首件尺寸：不論是否已量測，固定顯示所有項目供現場人員填寫；已有數值則顯示，否則留空
+        const fp = wo.first_piece_dimensions || {};
+        const fpData = [
+            { label: '頭高',   value: fp.head_height },
+            { label: '頭寬',   value: fp.head_width },
+            { label: '全長',   value: fp.overall_length || fp.length },
+            { label: '牙外徑', value: fp.thread_outer_diameter },
+            { label: '華司徑', value: fp.washer_diameter },
+            { label: '外徑',   value: fp.outer_diameter },
+            { label: '孔徑',   value: fp.hole_diameter },
+            { label: '厚度',   value: fp.thickness }
+        ];
+
+        // 所有項目一律顯示，有值則呈現量測結果，無值則留空白供現場填寫（不顯示 0）
+        let fpRowsHtml = fpData.map(f =>
+            `<tr><td class="label">${f.label}</td><td class="text-right">${f.value ? formatNumber(f.value, 4) : ''}</td></tr>`
+        ).join('');
+
+        const fpMeta = fp.measured_at
+            ? `測量：${formatDateTime(fp.measured_at)} / ${escapeHtml(fp.measured_by_name || '')}`
+            : '';
+
+        // 生產記錄（改為卡號預生成 + 重量填寫欄位）
+        // 根據載具數量產生卡號列表
+        const toolQuantity = parseInt(wo.tool_quantity) || 0;
+        const totalUnits = parseInt(wo.total_units) || 0;
+        let cardRecordsHtml = '';
+
+        if (toolQuantity > 0 && totalUnits > 0) {
+            const unitsPerCard = Math.ceil(totalUnits / toolQuantity);
+            for (let i = 1; i <= toolQuantity; i++) {
+                const cumulativeUnits = Math.min(unitsPerCard * i, totalUnits);
+                cardRecordsHtml += `<tr>
+                    <td class="text-center">${i}</td>
+                    <td class="text-right">${formatInt(cumulativeUnits)}</td>
+                    <td class="text-center writable-cell"></td>
+                    <td class="text-center writable-cell"></td>
+                    <td class="writable-cell"></td>
+                </tr>`;
+            }
+        } else {
+            // 無載具資料時提供空白行
+            for (let i = 1; i <= 5; i++) {
+                cardRecordsHtml += `<tr>
+                    <td class="text-center">${i}</td>
+                    <td class="text-center">-</td>
+                    <td class="text-center writable-cell"></td>
+                    <td class="text-center writable-cell"></td>
+                    <td class="writable-cell"></td>
+                </tr>`;
+            }
+        }
+
+        // 既有生產記錄（僅在有資料時顯示）
+        const productionRecords = wo.production_records || [];
+        let existingRecordsHtml = '';
+        if (productionRecords.length > 0) {
+            existingRecordsHtml = `
+        <div class="section">
+            <div class="section-title">已登錄生產記錄</div>
+            <table class="data-table">
+                <colgroup>
+                    <col style="width: 12%;">
+                    <col style="width: 12%;">
+                    <col style="width: 12%;">
+                    <col style="width: 10%;">
+                    <col style="width: 14%;">
+                    <col style="width: 10%;">
+                    <col style="width: 12%;">
+                    <col style="width: 18%;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>卡號</th>
+                        <th>重量(含載具)(kg)</th>
+                        <th>日期</th>
+                        <th>時間</th>
+                        <th>機台</th>
+                        <th>機台種類</th>
+                        <th>登錄者</th>
+                        <th>備註</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${productionRecords.map(rec => `<tr>
+                        <td>${escapeHtml(rec.card_number || '')}</td>
+                        <td class="text-right">${rec.weight_kg ? formatNumber(rec.weight_kg, 2) : ''}</td>
+                        <td class="text-center">${formatDate(rec.production_date)}</td>
+                        <td class="text-center">${rec.production_time ? rec.production_time.substring(0, 5) : ''}</td>
+                        <td>${escapeHtml(rec.machine_name || '')}</td>
+                        <td>${escapeHtml(rec.machine_type || '')}</td>
+                        <td>${escapeHtml(rec.employee_name || '')}</td>
+                        <td>${escapeHtml(rec.notes || '')}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>`;
+        }
+
+        // 公司聯絡資訊
+        const footerContacts = [
+            company.address,
+            company.phone ? `電話：${company.phone}` : '',
+            company.fax ? `傳真：${company.fax}` : '',
+            company.tax_id ? `統編：${company.tax_id}` : ''
+        ].filter(Boolean).join('<br>');
+
+        // 備註內容
+        const notesContent = [
+            wo.customer_instructions ? `【客戶交辦】${wo.customer_instructions}` : '',
+            wo.other_notes ? `【其他說明】${wo.other_notes}` : ''
+        ].filter(Boolean).join('\n');
+
+        // 列印報表說明的備註
+        const reportNotes = reportDesc?.description || '';
+
+        return `
+<div class="page-container">
+    <div class="main-content">
+        <!-- 標題區 -->
+        <div class="header-section">
+            <div class="main-title">生產命令單</div>
+            <div class="header-info">
+                <div class="wo-number">${escapeHtml(wo.work_order_number)}</div>
+                <div class="wo-meta">製單日期：${formatDate(wo.created_at)} ｜ 狀態：${escapeHtml(wo.status_label || '')}</div>
+            </div>
+        </div>
+
+        <!-- 訂單資訊 -->
+        <div class="section">
+            <div class="section-title">訂單資訊</div>
+            <table class="info-table">
+                <tr>
+                    <td class="label">客戶名稱</td>
+                    <td class="value">${escapeHtml(wo.customer_name)}</td>
+                    <td class="label">客戶訂單號</td>
+                    <td class="value">${escapeHtml(wo.customer_po_number)}</td>
+                    <td class="label">訂單編號</td>
+                    <td class="value">${escapeHtml(wo.order_number)}</td>
+                </tr>
+                <tr>
+                    <td class="label">客戶批號</td>
+                    <td class="value">${escapeHtml(wo.customer_batch_number)}</td>
+                    <td class="label">細項編號</td>
+                    <td class="value">${escapeHtml(wo.sub_item_number || '')}</td>
+                    <td class="label">料號</td>
+                    <td class="value">${escapeHtml(wo.part_number || '')}</td>
+                </tr>
+                <tr>
+                    <td class="label">受篩產品</td>
+                    <td class="value">${escapeHtml(wo.screening_item_name)}</td>
+                    <td class="label">圖面號碼</td>
+                    <td class="value">${escapeHtml(wo.drawing_number || '')}</td>
+                    <td class="label">客戶樣品</td>
+                    <td class="value">${escapeHtml(wo.customer_sample_status_label || wo.customer_sample_status || '')}</td>
+                </tr>
+                <tr>
+                    <td class="label">指送地點</td>
+                    <td class="value" colspan="3">${escapeHtml(wo.delivery_location || '')}</td>
+                    <td class="label highlight">預計交期</td>
+                    <td class="value highlight">${formatDate(wo.expected_delivery_date)}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 工單生產資訊 -->
+        <div class="section">
+            <div class="section-title">工單生產資訊</div>
+            <table class="info-table">
+                <tr>
+                    <td class="label">入貨重量(含載具)</td>
+                    <td class="value">${formatNumber(wo.total_weight_kg, 2)} kg</td>
+                    <td class="label">載具重量</td>
+                    <td class="value">${formatNumber(wo.total_tool_weight, 2)} kg</td>
+                    <td class="label">淨重</td>
+                    <td class="value">${formatNumber(wo.net_weight, 2)} kg</td>
+                </tr>
+                <tr>
+                    <td class="label">產品單重</td>
+                    <td class="value">${wo.weight_per_unit_g ? formatNumber(wo.weight_per_unit_g, 4) + ' g' : ''}</td>
+                    <td class="label">總支數</td>
+                    <td class="value">${formatInt(wo.total_units)} pcs</td>
+                    <td class="label">載具數量</td>
+                    <td class="value">${wo.tool_quantity || ''} 個</td>
+                </tr>
+                <tr>
+                    <td class="label">載具統計</td>
+                    <td class="value" colspan="5">${escapeHtml(wo.tool_statistics || '')}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 生產排程 -->
+        <div class="section">
+            <div class="section-title">生產排程</div>
+            <table class="info-table">
+                <tr>
+                    <td class="label">指派機台</td>
+                    <td class="value">${escapeHtml(wo.machine_name || '')}</td>
+                    <td class="label">指派員工</td>
+                    <td class="value">${escapeHtml(wo.assigned_employee_name || '')}</td>
+                    <td class="label">校機人員</td>
+                    <td class="value">${escapeHtml(wo.calibration_employee_name || '')}</td>
+                </tr>
+                <tr>
+                    <td class="label">篩選速度</td>
+                    <td class="value">${escapeHtml(wo.screening_speed || '')}</td>
+                    <td class="label">預定開始</td>
+                    <td class="value">${formatDateTime(wo.scheduled_start_date)}</td>
+                    <td class="label">預定結束</td>
+                    <td class="value">${formatDateTime(wo.scheduled_end_date)}</td>
+                </tr>
+                <tr>
+                    <td class="label">實際開始</td>
+                    <td class="value">${formatDateTime(wo.actual_start_date)}</td>
+                    <td class="label">實際結束</td>
+                    <td class="value">${formatDateTime(wo.actual_end_date)}</td>
+                    <td class="label"></td>
+                    <td class="value"></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 篩分服務明細 + 首件尺寸 -->
+        <div class="two-columns">
+            <div class="column">
+                <div class="section">
+                    <div class="section-title">篩分服務明細（不良品數量請手寫填入）</div>
+                    <table class="data-table">
+                        <colgroup>
+                            <col style="width: 6%;">
+                            <col style="width: 30%;">
+                            <col style="width: 16%;">
+                            <col style="width: 10%;">
+                            <col style="width: 16%;">
+                            <col style="width: 22%;">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>篩選項目</th>
+                                <th>公差值</th>
+                                <th>PPM</th>
+                                <th>不良品數</th>
+                                <th>備註</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${screeningRowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="column narrow">
+                <div class="section">
+                    <div class="section-title">首件尺寸 (mm)</div>
+                    <table class="data-table">
+                        <colgroup>
+                            <col style="width: 40%;">
+                            <col style="width: 60%;">
+                        </colgroup>
+                        <tbody>
+                            ${fpRowsHtml}
+                        </tbody>
+                    </table>
+                    ${fpMeta ? `<div style="font-size: 8pt; color: #666; margin-top: 3px;">${fpMeta}</div>` : ''}
+                </div>
+            </div>
+        </div>
+
+        <!-- 卡號與重量記錄（供現場人員填寫） -->
+        <div class="section">
+            <div class="section-title">卡號與重量記錄（請手寫填入實際重量）</div>
+            <table class="data-table">
+                <colgroup>
+                    <col style="width: 10%;">
+                    <col style="width: 20%;">
+                    <col style="width: 25%;">
+                    <col style="width: 20%;">
+                    <col style="width: 25%;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>卡號</th>
+                        <th>目標支數</th>
+                        <th>實際重量(kg)</th>
+                        <th>日期/時間</th>
+                        <th>備註</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${cardRecordsHtml}
+                </tbody>
+            </table>
+        </div>
+
+        ${existingRecordsHtml}
+
+        <!-- 交辦事項與備註 -->
+        <div class="section">
+            <div class="section-title">交辦事項與備註</div>
+            <div class="notes-box">${reportNotes ? escapeHtml(reportNotes) + '\n' : ''}${escapeHtml(notesContent) || '無'}</div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-brand">
+            ${companyLogoUrl ? `<img src="${companyLogoUrl}" alt="Logo" class="footer-logo" onerror="this.classList.add('hidden')">` : ''}
+            <div class="footer-brand-text">
+                <div class="zh">${escapeHtml(company.name || '')}</div>
+                <div class="en">${escapeHtml(company.name_en || '')}</div>
+            </div>
+        </div>
+        <div class="footer-contacts">${footerContacts}</div>
+    </footer>
+</div>
+        `;
+    }
+
+    // 載入工單資料
+    async function loadWorkOrders() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const singleId = urlParams.get('id');
+        const batchIds = urlParams.get('ids');
+
+        let workOrderIds = [];
+        if (singleId) {
+            workOrderIds = [singleId];
+        } else if (batchIds) {
+            workOrderIds = batchIds.split(',').filter(id => id.trim());
+        }
+
+        if (workOrderIds.length === 0) {
+            document.getElementById('content').innerHTML = '<div class="error-message">未指定工單ID</div>';
+            return;
+        }
+
+        try {
+            // 先載入公司資訊、LOGO 與報表說明
+            await Promise.all([
+                loadCompanyInfo(1),
+                loadCompanyLogo(1),
+                loadReportDescription('work_order')
+            ]);
+
+            const workOrders = [];
+            for (const id of workOrderIds) {
+                const response = await fetch(`../api/work_orders/show.php?id=${id}`, { credentials: 'include' });
+                const result = await response.json();
+                if (result.success && result.data) {
+                    workOrders.push(result.data);
+                }
+            }
+
+            if (workOrders.length === 0) {
+                document.getElementById('content').innerHTML = '<div class="error-message">無法載入工單資料</div>';
+                return;
+            }
+
+            // 產生所有工單的 HTML
+            const html = workOrders.map(wo => generateWorkOrderHtml(wo, companyInfoCache, reportDescriptionCache)).join('');
+            document.getElementById('content').innerHTML = html;
+
+            // 設定頁面標題
+            if (workOrders.length === 1) {
+                document.title = `生產命令單 - ${workOrders[0].work_order_number}`;
+            } else {
+                document.title = `生產命令單 - ${workOrders.length} 筆`;
+            }
+
+        } catch (error) {
+            console.error('載入工單失敗:', error);
+            document.getElementById('content').innerHTML = `<div class="error-message">載入工單時發生錯誤: ${error.message}</div>`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadWorkOrders);
+})();
+</script>
+</body>
+</html>

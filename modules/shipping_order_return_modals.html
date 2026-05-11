@@ -1,0 +1,134 @@
+<!-- 建立退貨單 Modal -->
+<div class="modal-overlay hidden" data-create-return-modal>
+    <div class="modal-window large">
+        <button type="button" class="modal-close" data-action="close-return-modal" aria-label="關閉">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3><i class="fas fa-undo"></i> 建立退貨單</h3>
+
+        <div class="modal-alert hidden" data-return-modal-alert role="alert"></div>
+
+        <form data-create-return-form novalidate>
+            <input type="hidden" name="shipping_order_id">
+
+            <section class="form-section">
+                <h4>退貨基本資訊</h4>
+                <div class="detail-grid info-box" data-shipping-order-info>
+                    <!-- 出貨單資訊動態載入 -->
+                </div>
+                <div class="form-grid">
+                    <label class="inline-label">
+                        <span>退貨日期 <abbr title="必填">*</abbr></span>
+                        <input type="date" name="return_date" required autocomplete="off">
+                    </label>
+                    <label class="inline-label full-width">
+                        <span>退貨原因</span>
+                        <textarea name="return_reason" rows="2" placeholder="請說明退貨原因"></textarea>
+                    </label>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <div class="subsection-header">
+                    <h4>選擇退貨品項</h4>
+                    <div class="subsection-actions">
+                        <button type="button" class="btn outline small" data-action="select-all-items">全選</button>
+                        <button type="button" class="btn outline small" data-action="deselect-all-items">全不選</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table compact" data-return-items-table>
+                        <thead>
+                            <tr>
+                                <th>
+                                    <input type="checkbox" data-action="toggle-all-items" title="全選/取消全選">
+                                </th>
+                                <th>庫存編號</th>
+                                <th>產品名稱</th>
+                                <th>出貨數量</th>
+                                <th>已退數量</th>
+                                <th>可退數量</th>
+                                <th>本次退貨數量 <abbr title="必填">*</abbr></th>
+                                <th>退貨原因</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="8" class="text-center text-muted">
+                                    <i class="fas fa-spinner fa-spin"></i> 載入中...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h4>備註</h4>
+                <div class="form-grid">
+                    <label class="inline-label full-width">
+                        <span>備註</span>
+                        <textarea name="notes" rows="2" placeholder="退貨單備註（選填）"></textarea>
+                    </label>
+                </div>
+            </section>
+
+            <div class="form-actions align-right">
+                <button type="button" class="btn outline" data-action="close-return-modal">取消</button>
+                <button type="submit" class="btn primary" data-action="submit-return">
+                    <i class="fas fa-check"></i> 建立退貨單
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 快速退貨 Modal (單一品項) -->
+<div class="modal-overlay hidden" data-quick-return-modal>
+    <div class="modal-window medium">
+        <button type="button" class="modal-close" data-action="close-quick-return-modal" aria-label="關閉">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3><i class="fas fa-bolt"></i> 快速退貨</h3>
+
+        <div class="modal-alert hidden" data-quick-return-modal-alert role="alert"></div>
+
+        <form data-quick-return-form novalidate>
+            <input type="hidden" name="shipping_order_id">
+            <input type="hidden" name="shipping_order_item_id">
+
+            <section class="form-section">
+                <h4>品項資訊</h4>
+                <div class="detail-grid info-box" data-quick-return-item-info>
+                    <!-- 品項資訊動態載入 -->
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h4>退貨資訊</h4>
+                <div class="form-grid">
+                    <label class="inline-label">
+                        <span>退貨日期 <abbr title="必填">*</abbr></span>
+                        <input type="date" name="return_date" required autocomplete="off">
+                    </label>
+                    <label class="inline-label">
+                        <span>退貨數量 <abbr title="必填">*</abbr></span>
+                        <input type="number" name="returned_quantity" min="1" step="0.01" required placeholder="輸入退貨數量" autocomplete="off">
+                        <small class="help-text" data-available-qty-hint>可退數量: 0</small>
+                    </label>
+                    <label class="inline-label full-width">
+                        <span>退貨原因</span>
+                        <textarea name="reason" rows="2" placeholder="請說明退貨原因"></textarea>
+                    </label>
+                </div>
+            </section>
+
+            <div class="form-actions align-right">
+                <button type="button" class="btn outline" data-action="close-quick-return-modal">取消</button>
+                <button type="submit" class="btn primary" data-action="submit-quick-return">
+                    <i class="fas fa-check"></i> 確認退貨
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

@@ -1,0 +1,394 @@
+﻿/*
+ * login-fui.css — FUI 科技感登入頁動畫
+ * 主題：淺灰背景 · 白卡 · 綠 + 深灰輔色 — 與系統主 UI 一致
+ */
+
+/* ================================================================
+   背景 — 淺灰系 + 移動細格線
+   ================================================================ */
+body.login-page {
+    background: linear-gradient(145deg, #edf1f7 0%, #e4eaf3 50%, #eef1f6 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+/* 移動細格線（極淡深灰） */
+body.login-page::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(49, 58, 70, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(49, 58, 70, 0.045) 1px, transparent 1px);
+    background-size: 52px 52px;
+    animation: fui-grid-drift 32s linear infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+@keyframes fui-grid-drift {
+    0%   { background-position: 0   0; }
+    100% { background-position: 52px 52px; }
+}
+
+/* 對角線光掃（極淡） */
+body.login-page::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(
+        128deg,
+        transparent 36%,
+        rgba(76, 175, 80, 0.022) 50%,
+        transparent 64%
+    );
+    background-size: 200% 200%;
+    animation: fui-diagonal-sweep 16s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+@keyframes fui-diagonal-sweep {
+    0%   { background-position: 180% 180%; }
+    50%  { background-position: -80% -80%; }
+    100% { background-position: 180% 180%; }
+}
+
+/* wrapper 浮在背景上 */
+.login-wrapper {
+    position: relative;
+    z-index: 1;
+}
+
+/* ================================================================
+   Login Card — 白色卡片 + 啟動動畫
+   ================================================================ */
+.login-card {
+    background: #ffffff;
+    border: 1px solid rgba(49, 58, 70, 0.12);
+    box-shadow:
+        0 4px 24px rgba(49, 58, 70, 0.1),
+        0 1px 4px  rgba(49, 58, 70, 0.06);
+    overflow: visible;
+    animation: fui-card-boot 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fui-card-boot {
+    0%   { opacity: 0; transform: scale(0.95) translateY(20px); }
+    55%  { transform: scale(1.003) translateY(0); }
+    57%  { transform: translateX(2px); }
+    59%  { transform: translateX(-1px); }
+    61%  { transform: translateX(0); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ---- 四角 HUD Bracket ---- */
+.login-card::before,
+.login-card::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.login-card::before {
+    top:  -1px;
+    left: -1px;
+    border-top:  2px solid #4caf50;
+    border-left: 2px solid #4caf50;
+    animation: fui-bracket-draw 0.4s 0.5s ease-out forwards,
+               fui-bracket-idle 5s  1.0s ease-in-out infinite;
+}
+
+.login-card::after {
+    bottom: -1px;
+    right:  -1px;
+    border-bottom: 2px solid #313a46;
+    border-right:  2px solid #313a46;
+    animation: fui-bracket-draw 0.4s 0.62s ease-out forwards,
+               fui-bracket-idle-dark 5s 1.1s ease-in-out infinite;
+}
+
+.fui-corner-tr,
+.fui-corner-bl {
+    position: absolute;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.fui-corner-tr {
+    top:   -1px;
+    right: -1px;
+    border-top:   2px solid #313a46;
+    border-right: 2px solid #313a46;
+    animation: fui-bracket-draw 0.4s 0.68s ease-out forwards,
+               fui-bracket-idle-dark 5s 1.18s ease-in-out infinite;
+}
+
+.fui-corner-bl {
+    bottom: -1px;
+    left:   -1px;
+    border-bottom: 2px solid #4caf50;
+    border-left:   2px solid #4caf50;
+    animation: fui-bracket-draw 0.4s 0.78s ease-out forwards,
+               fui-bracket-idle 5s  1.28s ease-in-out infinite;
+}
+
+@keyframes fui-bracket-draw {
+    from { width: 0;    height: 0;    opacity: 0; }
+    to   { width: 20px; height: 20px; opacity: 1; }
+}
+
+@keyframes fui-bracket-idle {
+    0%, 100% { opacity: 0.55; }
+    50%       { opacity: 1; }
+}
+
+@keyframes fui-bracket-idle-dark {
+    0%, 100% { opacity: 0.35; }
+    50%       { opacity: 0.8; }
+}
+
+/* ---- 掃描線：移除 ---- */
+.fui-scanline { display: none; }
+
+/* ================================================================
+   品牌區
+   ================================================================ */
+.login-brand {
+    border-right-color: rgba(49, 58, 70, 0.1);
+    animation: fui-slide-in 0.6s 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fui-slide-in {
+    from { opacity: 0; transform: translateX(-14px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Logo 框：邊框顏色動畫，無光暈 */
+.brand-logo {
+    background: #f4f6f8;
+    border-color: rgba(76, 175, 80, 0.35);
+    box-shadow: none;
+    animation: fui-logo-border 4.5s ease-in-out infinite;
+}
+
+@keyframes fui-logo-border {
+    0%, 100% { border-color: rgba(76, 175, 80, 0.25); }
+    50%       { border-color: rgba(76, 175, 80, 0.65); }
+}
+
+.brand-logo i { color: #4caf50; }
+
+/* 公司名稱 */
+.login-brand h1 {
+    color: #1e2a38;
+    text-shadow: none;
+    letter-spacing: 0.5px;
+}
+
+.login-brand .system-subtitle {
+    color: rgba(49, 58, 70, 0.42);
+    letter-spacing: 2px;
+    font-size: 13px;
+    text-transform: uppercase;
+    font-family: 'Courier New', 'Consolas', monospace;
+}
+
+.login-brand .login-hint {
+    color: rgba(49, 58, 70, 0.45);
+}
+
+/* 狀態指示燈列 */
+.fui-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-top: 22px;
+}
+
+.fui-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    animation: fui-dot-blink 2.5s ease-in-out infinite;
+}
+
+.fui-status-dot:nth-child(1) { background: #4caf50; animation-delay: 0s; }
+.fui-status-dot:nth-child(2) { background: #43a047; animation-delay: 0.5s; }
+.fui-status-dot:nth-child(3) { background: #5a6777; animation-delay: 1.0s; }
+
+@keyframes fui-dot-blink {
+    0%, 100% { opacity: 1;   transform: scale(1); }
+    50%       { opacity: 0.2; transform: scale(0.5); }
+}
+
+.fui-status-text {
+    font-size: 9px;
+    color: rgba(49, 58, 70, 0.3);
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    font-family: 'Courier New', 'Consolas', monospace;
+    margin-left: 4px;
+}
+
+/* ================================================================
+   表單 — 淺色主題
+   ================================================================ */
+.login-card form {
+    animation: fui-slide-in-right 0.6s 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fui-slide-in-right {
+    from { opacity: 0; transform: translateX(14px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+.form-group label {
+    color: #4caf50;
+    font-size: 11px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-weight: 600;
+}
+
+.form-group .form-control {
+    background: #f7f9fb;
+    border: 1px solid rgba(49, 58, 70, 0.14);
+    border-radius: 0;
+    color: #1e2a38;
+    padding: 10px 8px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group .form-control::placeholder {
+    color: rgba(49, 58, 70, 0.3);
+}
+
+.form-group .form-control:focus {
+    background: #ffffff;
+    border-color: #4caf50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+    color: #1e2a38;
+    outline: none;
+}
+
+.toggle-password { color: rgba(49, 58, 70, 0.4); }
+.toggle-password:hover { color: #4caf50; }
+
+.remember-me {
+    color: rgba(49, 58, 70, 0.55);
+    font-size: 12px;
+}
+
+/* ---- 登入按鈕 ---- */
+.login-button {
+    background: linear-gradient(90deg, #388e3c, #4caf50, #5abf5e, #4caf50, #388e3c);
+    background-size: 300% auto;
+    border: none;
+    color: #ffffff;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    font-size: 14px;
+    font-family: 'Courier New', 'Consolas', monospace;
+    position: relative;
+    overflow: hidden;
+    transition: filter 0.2s, transform 0.1s;
+    animation: fui-btn-bg-shift 7s linear infinite;
+}
+
+@keyframes fui-btn-bg-shift {
+    0%   { background-position: 0%   center; }
+    50%  { background-position: 100% center; }
+    100% { background-position: 0%   center; }
+}
+
+/* 光澤掃過 */
+.login-button::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -80%;
+    width: 32%;
+    height: 200%;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.25), transparent);
+    transform: skewX(-18deg);
+    animation: fui-btn-shimmer 5s ease-in-out 2s infinite;
+}
+
+@keyframes fui-btn-shimmer {
+    0%   { left: -80%; }
+    100% { left: 180%; }
+}
+
+.login-button:hover  { filter: brightness(1.06); }
+.login-button:active { transform: translateY(1px); filter: brightness(0.9); }
+
+/* ---- 錯誤 / 成功訊息 ---- */
+.login-error {
+    background: #fff5f5;
+    border: 1px solid rgba(220, 53, 69, 0.28);
+    color: #c0392b;
+    font-size: 12px;
+}
+
+.login-success {
+    background: #f0faf0;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    color: #2e7d32;
+    font-size: 12px;
+}
+
+/* ---- Footer ---- */
+.login-footer {
+    color: rgba(49, 58, 70, 0.32);
+    letter-spacing: 1px;
+    font-size: 10px;
+    font-family: 'Courier New', 'Consolas', monospace;
+}
+
+/* ================================================================
+   浮動粒子 — 極淡上飄方塊
+   ================================================================ */
+#fui-particles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.fui-particle {
+    position: absolute;
+    border-radius: 1px;
+    background: rgba(76, 175, 80, 0.28);
+    animation: fui-particle-float linear infinite;
+}
+
+.fui-particle-gray {
+    background: rgba(49, 58, 70, 0.15);
+}
+
+@keyframes fui-particle-float {
+    0%   { transform: translateY(108vh) translateX(0) rotate(0deg);   opacity: 0; }
+    6%   { opacity: 1; }
+    90%  { opacity: 0.5; }
+    100% { transform: translateY(-40px) translateX(28px) rotate(45deg); opacity: 0; }
+}
+
+/* ================================================================
+   RWD — 手機保持可讀
+   ================================================================ */
+@media (max-width: 768px) {
+    .login-brand {
+        border-right: none;
+        border-bottom: 1px solid rgba(49, 58, 70, 0.1);
+    }
+}

@@ -1,0 +1,592 @@
+<!-- 
+╔════════════════════════════════════════════════════════════════════════════╗
+║  ⚠️  警告：此模組已配置化（混合模式）                                         ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📋 模組名稱: order_items
+🔧 配置檔位置: core/configs/order_items.config.js
+🔀 模式: 混合配置模式
+
+───────────────────────────────────────────────────────────────────────────────
+
+🔀 混合模式說明：
+────────────────
+此模組採用混合配置模式：
+
+✅ 已配置化（修改配置檔會生效）：
+   - 頁面標題與副標題
+   - 標題區按鈕（新增、列印、匯出等）
+   - 篩選工具列
+   - 資料表格結構
+   - 欄位選擇器
+
+⚠️ 仍使用 HTML（修改此檔案會生效）：
+   - 複雜的 Modal 表單
+   - 特殊的 HTML 區塊（如 customHtml）
+   
+請查看配置檔中的註解，了解哪些部分由配置控制。
+
+───────────────────────────────────────────────────────────────────────────────
+
+📝 修改指引：
+─────────────
+
+1. 修改頁面標題、按鈕、篩選、表格 
+   → 編輯配置檔: core/configs/order_items.config.js
+
+2. 修改 Modal 表單（如配置檔有 requiresHtmlModal: true）
+   → 編輯此檔案: modules/order_items.html.bak
+
+3. 不確定要改哪個？
+   → 查看 modules/README.md
+
+───────────────────────────────────────────────────────────────────────────────
+
+🚫 重要提醒：
+─────────────
+- 此檔案已重命名為 .bak，表示「部分內容」仍在使用中
+- 不要刪除此檔案！系統會載入其中的 Modal 部分
+- 修改前請先查看配置檔，確認該部分是否由配置控制
+- 修改後務必測試功能是否正常
+
+───────────────────────────────────────────────────────────────────────────────
+
+📚 相關文件：
+─────────────
+- modules/README.md - 模組索引與修改指引
+- DEVELOPMENT.md - 開發指引
+- core/configs/README.md - 配置規範
+- docs/模組配置遷移進度.md - 遷移歷史
+
+───────────────────────────────────────────────────────────────────────────────
+最後更新: 2026-02-04
+-->
+<div data-module="order_items">
+<div class="content-header with-actions">
+    <div>
+        <h2>客戶批號管理</h2>
+        <p class="subtitle">維護篩分明細、載具與金額，並自動回寫訂單總額</p>
+    </div>
+    <div class="header-actions">
+        <button type="button" class="btn primary" data-action="create" disabled title="請先選擇訂單">
+            <i class="fas fa-plus"></i>
+            <span>新增品項</span>
+        </button>
+        <button type="button" class="btn outline" data-action="export" disabled title="請先選擇訂單">
+            <i class="fas fa-file-export"></i>
+            <span>匯出</span>
+        </button>
+    </div>
+</div>
+<div class="content-area">
+    <div class="module-alert hidden" data-order-items-alert></div>
+
+    <!-- 欄位選擇面板 -->
+    <div class="column-selector hidden" data-order-items-column-selector>
+        <div class="column-selector-header">
+            <h4>顯示欄位設定</h4>
+            <button type="button" class="close-btn" data-action="close-column-selector">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="column-selector-body">
+            <label class="column-option">
+                <input type="checkbox" data-column="customer_batch_number" checked>
+                <span>客戶批號</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="screening_label" checked>
+                <span>受篩品項</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="total_weight_kg" checked>
+                <span>總重量(kg)</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="tool_weight_kg" checked>
+                <span>載具重量(kg)</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="net_weight_kg" checked>
+                <span>淨重(kg)</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="total_units" checked>
+                <span>總支數</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="unit_price_per_thousand" checked>
+                <span>單價 (元/M)</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="total_price" checked>
+                <span>預估總金額</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="status_label" checked>
+                <span>狀態</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="sample_status_label" checked>
+                <span>客戶樣品狀態</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="updated_at" checked>
+                <span>更新時間</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="total_shipped_quantity">
+                <span>已出貨數量</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="shipping_status">
+                <span>出貨狀態</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="customer_provided_weight">
+                <span>客戶提供重量</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="confirmed_weight">
+                <span>我方確認重量</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="actual_production_weight">
+                <span>實際生產重量</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="weight_variance">
+                <span>重量差異</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="tool_types">
+                <span>載具類型</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="tool_unit_weight">
+                <span>載具單重(kg)</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="tool_quantity">
+                <span>載具數量</span>
+            </label>
+        </div>
+        <div class="column-selector-footer">
+            <button type="button" class="btn outline small" data-action="select-all-columns">全選</button>
+            <button type="button" class="btn outline small" data-action="deselect-all-columns">全不選</button>
+            <button type="button" class="btn primary small" data-action="apply-column-settings">套用</button>
+        </div>
+    </div>
+
+    <section class="info-banner" data-order-items-banner>
+        <div class="empty-state">
+            <i class="fas fa-clipboard-list"></i>
+            <p>請先於「訂單管理」的操作欄點擊 <span class="label">明細</span>，即可載入該訂單的品項資料。</p>
+        </div>
+    </section>
+
+    <section class="table-section">
+        <div class="table-header-actions">
+            <button type="button" class="btn outline small" data-action="toggle-column-selector">
+                <i class="fas fa-columns"></i> 欄位設定
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table" data-order-items-table>
+                <thead>
+                    <tr>
+                        <th data-sort="customer_batch_number" data-column="customer_batch_number">客戶批號 <i class="fas fa-sort"></i></th>
+                        <th data-sort="screening_label" data-column="screening_label">受篩品項 <i class="fas fa-sort"></i></th>
+                        <th class="text-right" data-sort="total_weight_kg" data-column="total_weight_kg">總重量(kg) <i class="fas fa-sort"></i></th>
+                        <th class="text-right" data-sort="tool_weight_kg" data-column="tool_weight_kg">載具重量(kg) <i class="fas fa-sort"></i></th>
+                        <th class="text-right" data-sort="net_weight_kg" data-column="net_weight_kg">淨重(kg) <i class="fas fa-sort"></i></th>
+                        <th class="text-right" data-sort="total_units" data-column="total_units">總支數 <i class="fas fa-sort"></i></th>
+                        <th class="text-right" data-sort="unit_price_per_thousand" data-column="unit_price_per_thousand">單價 (元/M) <i class="fas fa-sort"></i></th>
+                        <th class="text-right" data-sort="total_price" data-column="total_price">預估總金額 <i class="fas fa-sort"></i></th>
+                        <th data-sort="status_label" data-column="status_label">狀態 <i class="fas fa-sort"></i></th>
+                        <th data-sort="sample_status_label" data-column="sample_status_label">客戶樣品狀態 <i class="fas fa-sort"></i></th>
+                        <th data-sort="updated_at" data-column="updated_at">更新時間 <i class="fas fa-sort"></i></th>
+                        <th class="text-right" data-sort="total_shipped_quantity" data-column="total_shipped_quantity">已出貨數量 <i class="fas fa-sort"></i></th>
+                        <th data-sort="shipping_status" data-column="shipping_status">出貨狀態 <i class="fas fa-sort"></i></th>
+                        <th class="text-right" data-sort="customer_provided_weight" data-column="customer_provided_weight">客戶提供重量 <i class="fas fa-sort"></i></th>
+                        <th class="text-right" data-sort="confirmed_weight" data-column="confirmed_weight">我方確認重量 <i class="fas fa-sort"></i></th>
+                        <th class="text-right" data-sort="actual_production_weight" data-column="actual_production_weight">實際生產重量 <i class="fas fa-sort"></i></th>
+                        <th class="text-right" data-column="weight_variance">重量差異</th>
+                        <th data-column="tool_types">載具類型</th>
+                        <th class="text-right" data-column="tool_unit_weight">載具單重(kg)</th>
+                        <th class="text-right" data-column="tool_quantity">載具數量</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="22" class="text-center" data-order-items-placeholder>
+                            尚未選擇訂單，表格將於載入訂單後顯示。
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="order-items-guidance" data-order-items-guidance>
+        <h3>如何開始？</h3>
+        <ol>
+            <li>到 <strong>訂單管理</strong> 模組尋找目標訂單。</li>
+            <li>點擊操作欄的 <span class="label">明細</span> 按鈕。</li>
+            <li>系統會自動帶入訂單資訊，並啟用新增、匯出與編輯功能。</li>
+        </ol>
+        <p class="tip">完成訂單品項後，系統會自動累計並回寫品項金額至訂單。</p>
+    </div>
+
+    <div class="modal-overlay hidden" data-order-items-modal>
+        <div class="modal-window xlarge order-items-modal">
+            <button type="button" class="modal-close" data-action="close-modal" aria-label="關閉">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 data-modal-title>新增品項</h3>
+
+            <!-- Modal 內部錯誤訊息顯示區 -->
+            <div class="modal-alert hidden" data-order-items-modal-alert role="alert"></div>
+
+            <form data-order-items-form novalidate>
+                <div class="order-items-modal-body">
+                    <!-- 第一行:受篩產品選擇 + 總重量 -->
+                    <div class="form-row">
+                        <div class="form-section">
+                            <h4>受篩產品</h4>
+                            <div class="form-grid">
+                                <label class="inline-label screening-item-field">
+                                    <span>受篩產品 <abbr title="必填">*</abbr></span>
+                                    <div class="field-combo" data-field="screening-item-wrapper">
+                                        <select name="screening_item_id" required data-field="screening-item">
+                                            <option value="">-- 請選擇 --</option>
+                                        </select>
+                                        <button type="button" class="btn ghost icon-only" data-action="toggle-screening-create" title="新增受篩產品">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </label>
+                                <label class="inline-label">
+                                    <span>單價 (元/M)</span>
+                                    <input type="number" name="unit_price_per_thousand" min="0" step="0.01" placeholder="請輸入單價" data-field="unit-price">
+                                </label>
+                            </div>
+                            <small class="field-hint">可從清單選擇,或點擊右側按鈕新增新的受篩產品。單價單位為元/M(元/千支)。</small>
+                            <div class="screening-create-panel hidden" data-screening-create-panel>
+                                <div class="screening-create-card">
+                                    <header class="screening-create-header">
+                                        <h5>新增受篩產品</h5>
+                                        <button type="button" class="btn ghost icon-only" data-action="cancel-screening-create" title="收合">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </header>
+                                    <div class="screening-create-body form-grid">
+                                        <label class="inline-label">
+                                            <span>產品料號</span>
+                                            <input type="text" data-field="new-screening-item-number" maxlength="50" placeholder="例如 SI-001">
+                                        </label>
+                                        <label class="inline-label">
+                                            <span>規格尺寸 <abbr title="必填">*</abbr></span>
+                                            <input type="text" data-field="new-screening-item-name" maxlength="255" placeholder="請輸入名稱" required>
+                                        </label>
+                                        <label class="inline-label">
+                                            <span>材質</span>
+                                            <input type="text" data-field="new-screening-item-material" maxlength="50" placeholder="如 鋼、不銹鋼">
+                                        </label>
+                                        <label class="inline-label">
+                                            <span>螺紋類型</span>
+                                            <input type="text" data-field="new-screening-item-thread" maxlength="50" placeholder="如 公制、英制">
+                                        </label>
+                                        <label class="inline-label">
+                                            <span>單支重量 (克) <abbr title="必填">*</abbr></span>
+                                            <input type="number" data-field="new-screening-item-weight" min="0" step="0.01" placeholder="請輸入重量">
+                                        </label>
+                                        <label class="inline-label">
+                                            <span>單價 (元/M)</span>
+                                            <input type="number" data-field="new-screening-item-price" min="0" step="0.01" placeholder="請輸入單價">
+                                        </label>
+                                        <label class="inline-label">
+                                            <span>計量單位</span>
+                                            <input type="text" data-field="new-screening-item-unit" maxlength="50" placeholder="預設 pcs">
+                                        </label>
+                                        <label class="inline-label full-width">
+                                            <span>備註</span>
+                                            <textarea rows="2" data-field="new-screening-item-notes" maxlength="500" placeholder="可填寫補充資訊"></textarea>
+                                        </label>
+                                    </div>
+                                    <footer class="screening-create-footer">
+                                        <button type="button" class="btn primary small" data-action="confirm-screening-create">
+                                            <i class="fas fa-check"></i>
+                                            <span>加入受篩產品</span>
+                                        </button>
+                                        <button type="button" class="btn ghost small" data-action="cancel-screening-create">
+                                            <span>取消</span>
+                                        </button>
+                                    </footer>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h4>重量與狀態</h4>
+                            <div class="form-grid">
+                                <label class="inline-label">
+                                    <span>總重量(含桶重) (kg) <abbr title="必填">*</abbr></span>
+                                    <input type="number" name="total_weight_kg" min="0" step="0.01" required placeholder="請輸入總重量" data-field="total-weight">
+                                </label>
+                                <label class="inline-label">
+                                    <span>生產狀態</span>
+                                    <select name="status" data-field="status">
+                                        <option value="">-- 請選擇 --</option>
+                                    </select>
+                                </label>
+                                <label class="inline-label">
+                                    <span>單支重量 (g)</span>
+                                    <input type="text" name="weight_per_unit_g_display" readonly tabindex="-1" placeholder="選擇受篩產品後自動帶入" data-field="weight-per-unit-display" class="readonly-field">
+                                </label>
+                                <label class="inline-label">
+                                    <span>客戶樣品狀態</span>
+                                    <select name="customer_sample_status" data-field="sample-status">
+                                        <option value="">-- 請選擇 --</option>
+                                    </select>
+                                </label>
+                                <label class="inline-label">
+                                    <span>品項編號</span>
+                                    <input type="text" name="sub_item_number" maxlength="100" placeholder="請輸入品項編號" data-field="sub-item-number">
+                                </label>
+                                <label class="inline-label">
+                                    <span>料號</span>
+                                    <input type="text" name="part_number" maxlength="100" placeholder="請輸入料號" data-field="part-number">
+                                </label>
+                                <label class="inline-label">
+                                    <span>客戶批號</span>
+                                    <input type="text" name="customer_batch_number" maxlength="100" placeholder="請輸入客戶批號" data-field="customer-batch-number">
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 三階段重量追蹤 -->
+                        <div class="form-section">
+                            <h4>重量追蹤 <small class="text-muted">(選填)</small></h4>
+                            <div class="form-grid">
+                                <label class="inline-label">
+                                    <span>客戶提供重量 (kg)</span>
+                                    <input type="number" name="customer_provided_weight" min="0" step="0.01" placeholder="客戶委外單上的重量" data-field="customer-provided-weight">
+                                </label>
+                                <label class="inline-label">
+                                    <span>我方確認重量 (kg)</span>
+                                    <input type="number" name="confirmed_weight" min="0" step="0.01" placeholder="收貨時確認的重量" data-field="confirmed-weight">
+                                </label>
+                                <label class="inline-label">
+                                    <span>實際生產重量 (kg)</span>
+                                    <input type="number" name="actual_production_weight" min="0" step="0.01" placeholder="現場完成後秤重" data-field="actual-production-weight">
+                                </label>
+                                <label class="inline-label">
+                                    <span>重量公差限制</span>
+                                    <input type="text" name="weight_tolerance_display" readonly tabindex="-1" placeholder="由客戶設定自動帶入" data-field="weight-tolerance-display" class="readonly-field">
+                                </label>
+                            </div>
+                            <div class="weight-variance-alert hidden" data-weight-variance-alert>
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span data-weight-variance-message>重量差異超出客戶允許公差範圍</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 第二行：備註資訊 (全寬) -->
+                    <div class="form-section">
+                        <h4>備註資訊</h4>
+                        <div class="form-grid">
+                            <label class="inline-label full-width">
+                                <span>指送地點</span>
+                                <input type="text" name="delivery_location" placeholder="請輸入指送地點" data-field="delivery-location">
+                            </label>
+                            <label class="inline-label full-width">
+                                <span>備註</span>
+                                <textarea name="notes" rows="2" placeholder="請輸入備註" data-field="notes"></textarea>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 第三行：圖面附件 + 檔案附件 (兩欄) -->
+                    <div class="form-row">
+                        <section class="form-section subsection">
+                            <header class="subsection-header">
+                                <h4>圖面附件</h4>
+                                <button type="button" class="btn ghost small" data-action="add-drawing">
+                                    <i class="fas fa-plus"></i>
+                                    <span>新增圖面</span>
+                                </button>
+                            </header>
+                            <div class="table-responsive">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 180px;">圖面編號</th>
+                                            <th>檔案名稱</th>
+                                            <th style="width: 100px;">檔案大小</th>
+                                            <th style="width: 150px;">上傳時間</th>
+                                            <th style="width: 80px;">預覽</th>
+                                            <th style="width: 80px;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody data-drawings-rows>
+                                        <tr class="empty-row">
+                                            <td colspan="5" class="text-center">尚未上傳圖面</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="form-section subsection">
+                            <header class="subsection-header">
+                                <h4>檔案附件</h4>
+                                <button type="button" class="btn ghost small" data-action="add-attachment">
+                                    <i class="fas fa-plus"></i>
+                                    <span>新增檔案</span>
+                                </button>
+                            </header>
+                            <div class="table-responsive">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th>檔案名稱</th>
+                                            <th style="width: 100px;">檔案大小</th>
+                                            <th style="width: 150px;">上傳時間</th>
+                                            <th style="width: 80px;">預覽</th>
+                                            <th style="width: 80px;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody data-attachments-rows>
+                                        <tr class="empty-row">
+                                            <td colspan="5" class="text-center">尚未上傳檔案</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- 第四行：載具設定 + 篩分服務 (兩欄) -->
+                    <div class="form-row tools-services-row">
+                        <section class="form-section subsection">
+                            <header class="subsection-header">
+                                <h4>載具設定</h4>
+                                <button type="button" class="btn ghost small" data-action="add-tool">
+                                    <i class="fas fa-plus"></i>
+                                    <span>新增載具</span>
+                                </button>
+                            </header>
+                            <div class="tool-type-summary" data-tool-type-summary style="display: none;">
+                                <div class="summary-title">載具類型統計:</div>
+                                <div class="summary-content" data-tool-type-content></div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 39%;">載具</th>
+                                            <th style="width: 8%;">類型</th>
+                                            <th class="text-right" style="width: 9%;">數量</th>
+                                            <th class="text-right" style="width: 15%;">單件重量(kg)</th>
+                                            <th class="text-right" style="width: 15%;">小計重量(kg)</th>
+                                            <th style="width: 14%;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody data-tools-rows>
+                                        <tr class="empty-row">
+                                            <td colspan="6" class="text-center">尚未新增載具</td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="4" class="text-right"><strong>載具重量合計 (kg)：</strong></td>
+                                            <td class="text-right"><strong data-tool-total-weight-display>0.00</strong></td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section class="form-section subsection">
+                            <header class="subsection-header">
+                                <h4>篩分服務</h4>
+                                <button type="button" class="btn ghost small" data-action="add-service">
+                                    <i class="fas fa-plus"></i>
+                                    <span>新增篩分服務</span>
+                                </button>
+                            </header>
+                            <div class="table-responsive">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 24%;">服務項目</th>
+                                            <th style="width: 15%;">服務名稱 (客製)</th>
+                                            <th class="text-right" style="width: 10%;">實際單價 (每支)</th>
+                                            <th class="text-right" style="width: 10%;">公差 (+)</th>
+                                            <th class="text-right" style="width: 10%;">公差 (-)</th>
+                                            <th class="text-right" style="width: 8%;">PPM</th>
+                                            <th style="width: 15%;">備註</th>
+                                            <th style="width: 8%;">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody data-services-rows>
+                                        <tr class="empty-row">
+                                            <td colspan="8" class="text-center">尚未新增篩分服務</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <div class="order-items-modal-footer">
+                    <section class="metrics-panel" data-metrics>
+                        <div class="metric">
+                            <span class="metric-label">總重量(含桶重) (kg)</span>
+                            <strong data-metric="total-weight">0</strong>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">載具重量合計 (kg)</span>
+                            <strong data-metric="tool-weight">0</strong>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">淨重 (kg)</span>
+                            <strong data-metric="net-weight">0</strong>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">單支重 (g)</span>
+                            <strong data-metric="unit-weight">0</strong>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">總支數</span>
+                            <strong data-metric="total-units">0</strong>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">單價 (元/M)</span>
+                            <strong data-metric="unit-price">0</strong>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">單價合計 (參考)</span>
+                            <strong data-metric="unit-price-sum">0</strong>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">預估總金額</span>
+                            <strong data-metric="total-price">0</strong>
+                        </div>
+                    </section>
+
+                    <div class="form-actions align-right">
+                        <button type="button" class="btn outline" data-action="cancel">取消</button>
+                        <button type="submit" class="btn primary" data-action="submit">儲存</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</div>
