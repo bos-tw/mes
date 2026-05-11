@@ -102,3 +102,14 @@
 3. 補「手動回滾 UI」與「快照保留策略」（例如保留最近 N 份，自動清理舊檔）。
 4. 建立 v1.0.4 任務清單與打包內容（只納入實際變更檔）。
 5. 持續維持版本更新紀錄策略：前端/API/release note 均為最新三筆。
+
+## 5) Git 一鍵更新起點（給後續 AI/開發者）
+
+- 此專案已於 `2026-05-11` 建立 Git 基線，作為「一鍵更新功能」正式起點。
+- 基線分支：`main`
+- 基線 commit：`1ce804a`（`chore: initialize git baseline for one-click update workflow`）
+- 基線 tag：`update-base-2026-05-11`（已推送到 `origin`）
+- 後續若要產生更新檔清單，請以此 tag 比對：
+  - `git diff --name-only update-base-2026-05-11..HEAD`
+- 打包更新檔時，請只納入實際變更檔與對應 migration，避免覆蓋：
+  - `uploads/**`, `export/**`, `backup/**`, `db_backups/**`, `db_exports/**`, `old/**`, `vendor/**`
