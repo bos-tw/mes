@@ -48,7 +48,7 @@ try {
     }
 
     $exportPath = $params['REPORT_EXPORT_PATH'] ?? 'export/qrcode_pages';
-    $externalUrl = $params['REPORT_EXTERNAL_URL'] ?? '';
+    $externalUrl = trim((string)($params['REPORT_EXTERNAL_URL'] ?? ''));
     $companyShortName = $params['COMPANY_SHORT_NAME'] ?? '';
 
     // 確保匯出路徑存在
@@ -199,8 +199,17 @@ try {
         exit;
     }
 
-    // 建立外部 URL
-    $publicUrl = $externalUrl ? ($externalUrl . '/' . $fileName) : '';
+    // 建立外部 URL（若未設定 REPORT_EXTERNAL_URL，回退為同站可存取路徑）
+    if ($externalUrl === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/api/reports/generate_static.php';
+        $projectBasePath = preg_replace('#/api/reports/generate_static\.php$#', '', $scriptName);
+        $externalUrl = rtrim($scheme . '://' . $host . $projectBasePath, '/')
+            . '/' . ltrim($exportPath, '/');
+    }
+
+    $publicUrl = rtrim($externalUrl, '/') . '/' . $fileName;
 
     // 更新工單的 QR Code URL（可選）
     // $pdo->prepare("UPDATE work_orders SET qrcode_url = ? WHERE id = ?")->execute([$publicUrl, $workOrderId]);

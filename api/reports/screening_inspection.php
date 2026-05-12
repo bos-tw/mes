@@ -220,6 +220,18 @@ try {
         $reportDescription = $descZh . ($descZh && $descEn ? "\n\n" : '') . $descEn;
     }
 
+    // 建立 QR Code URL（未設定 REPORT_EXTERNAL_URL 時回退為同站靜態頁路徑）
+    $reportExternalBase = trim((string)($params['REPORT_EXTERNAL_URL'] ?? ''));
+    if ($reportExternalBase === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/api/reports/screening_inspection.php';
+        $projectBasePath = preg_replace('#/api/reports/screening_inspection\.php$#', '', $scriptName);
+        $reportExternalBase = rtrim($scheme . '://' . $host . $projectBasePath, '/')
+            . '/export/qrcode_pages';
+    }
+    $resolvedQrCodeUrl = rtrim($reportExternalBase, '/') . '/' . $workOrder['work_order_number'] . '.html';
+
     // 組裝回傳資料
     $response = [
         'success' => true,
@@ -235,6 +247,7 @@ try {
                 'screening_speed' => $workOrder['screening_speed'],
                 'status' => $workOrder['status'],
                 'status_label' => $workOrder['status_label'],
+                'assigned_employee_name' => $workOrder['assigned_employee_name'],
                 'actual_start_date' => $workOrder['actual_start_date'],
                 'actual_end_date' => $workOrder['actual_end_date'],
                 'customer_instructions' => $workOrder['customer_instructions'],
@@ -294,8 +307,7 @@ try {
             // 系統參數
             'system_params' => $params,
             // QR Code URL
-            'qrcode_url' => ($params['REPORT_EXTERNAL_URL'] ?? 'https://report.example.com')
-                         . '/' . $workOrder['work_order_number'] . '.html',
+            'qrcode_url' => $resolvedQrCodeUrl,
             // 報表說明
             'report_description' => $reportDescription,
             // 報表產生時間

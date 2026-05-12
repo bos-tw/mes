@@ -1719,3 +1719,69 @@ dataSyncHelper = DataSync.createModuleHelper('orders', {
 - [ ] 所有 建立/更新/刪除 成功後呼叫對應的 `dataSyncHelper.notify*()`
 - [ ] `js/data-sync.js` 的 `MODULE_DEPENDENCIES` 已添加此模組的相依宣告
 - [ ] 若此模組的資料異動會影響其他已開啟的模組頁面，確認相關模組的 `onDependencyUpdate` 或 `onRefresh` 能正確處理
+
+---
+
+## 🔗 QR Code 報表設計紀錄（2026-05-12 新增，試作階段）
+
+### 目標與定位
+
+- QR Code 的定位不是「重複紙本內容」，而是「紙本報表之外的數位延伸入口」。
+- 現階段目標：先確保掃碼**一定可顯示**暫時報表內容（避免 404 / 空白頁）。
+- 未來目標：在不重印紙本的前提下，持續擴充掃碼後可見資訊（追溯、附件、說明、歷程）。
+
+### 目前採用的「可用優先」策略（必須遵循）
+
+1. 列印報表頁在產生 QRCode 前，先呼叫：
+   - `POST /api/reports/generate_static.php`
+   - 成功後以回傳 `public_url` 作為 QR 內容。
+2. 若 `generate_static.php` 失敗，退回 API 回傳 `qrcode_url` 或同站本地靜態路徑（fallback）。
+3. `REPORT_EXTERNAL_URL` 未設定時，不可回傳示範網域（如 `report.example.com`）；
+   必須自動回退為「同站可開啟路徑」。
+
+### 路徑規劃（weberp 根目錄情境）
+
+- 假設網站實際根目錄是 `/{site}/weberp`（本系統部署在網站根目錄下）。
+- 靜態頁匯出目錄（預設）：`export/qrcode_pages`
+- 掃碼 URL 應可落在：
+  - `https://{host}/weberp/export/qrcode_pages/{work_order_number}.html`
+
+> 註：若後續有獨立報表子網域，再改 `REPORT_EXTERNAL_URL` 指向該網域即可，不需重構前端流程。
+
+### 現階段關鍵檔案（2026-05-12）
+
+- 列印頁（先產生靜態頁，再產生 QR）：
+  - `print/screening_inspection_print.html`
+- 報表 API（`qrcode_url` fallback 邏輯）：
+  - `api/reports/screening_inspection.php`
+- 靜態頁產生 API（`public_url` 解析與 fallback）：
+  - `api/reports/generate_static.php`
+- 靜態頁模板：
+  - `api/reports/templates/qrcode_report.tpl.html`
+
+### 未來擴充原則（AI 必讀）
+
+1. **保持固定入口概念**
+- 目前可先用 `.../{work_order_number}.html`。
+- 後續建議升級為 `.../report/{token}`，由後端決定內容區塊，避免 URL 可枚舉。
+
+2. **紙本與線上分層**
+- 紙本：當下快照（固定）。
+- 線上：可持續補充（可新增但不破壞既有欄位）。
+
+3. **模組化擴充區塊（建議）**
+- 先保留：報表摘要、檢驗明細、不良分布圖。
+- 可新增：異常說明、處置記錄、檢驗圖片、附件、品保聯絡窗口、修訂歷程。
+
+4. **安全性**
+- 不得直接暴露內部 API（需登入）給外部掃碼使用者。
+- 對外掃碼應走靜態頁或受控公開頁。
+- 若導入 token，需支援撤銷與有效期控制。
+
+### AI 執行檢查清單（QR 相關修改前後）
+
+- [ ] 列印時是否先嘗試產生靜態頁（`generate_static.php`）？
+- [ ] `REPORT_EXTERNAL_URL` 未設定時是否仍能掃碼成功？
+- [ ] 掃碼網址是否對應到實際存在檔案？
+- [ ] 是否避免回傳示範網域（`report.example.com`）？
+- [ ] 新增欄位是否保持向後相容（舊 QR 連結仍可用）？

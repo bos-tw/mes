@@ -62,13 +62,14 @@
 
         .main-title {
             font-size: 16pt;
-            font-weight: bold;
+            font-weight: 800;
             letter-spacing: 2px;
             margin-bottom: 4px;
         }
 
         .sub-title {
             font-size: 10pt;
+            font-weight: 600;
             color: #555;
         }
 
@@ -99,61 +100,69 @@
             margin-top: 3px;
         }
 
-        /* 資訊區 */
-        .info-grid {
+        /* 資訊分組區 */
+        .info-groups {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 6px;
-            margin-bottom: 7px;
+            margin-bottom: 8px;
         }
 
-        .info-box {
-            border: 1px solid #ccc;
-            padding: 3px 6px;
-            background-color: #fafafa;
+        .info-card {
+            border: 1px solid #cfcfcf;
+            border-radius: 4px;
+            background: linear-gradient(180deg, #fcfcfc 0%, #f7f7f7 100%);
+            overflow: hidden;
         }
 
-        .info-box h4 {
-            margin: 0 0 3px 0;
-            font-size: 9.5pt;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 3px;
+        .info-card-header {
+            padding: 4px 7px;
+            font-size: 9.2pt;
+            font-weight: 800;
+            border-bottom: 1px solid #dedede;
+            letter-spacing: 0.2px;
         }
 
-        .info-box h4 .title-en {
-            font-size: 8pt;
+        .info-card.customer .info-card-header {
+            background: #eef4ff;
+            border-left: 3px solid #2563eb;
+        }
+
+        .info-card.order .info-card-header {
+            background: #fff6ea;
+            border-left: 3px solid #d97706;
+        }
+
+        .info-card.production .info-card-header {
+            background: #eefaf3;
+            border-left: 3px solid #15803d;
+        }
+
+        .info-card.production {
+            grid-column: 1 / -1;
+        }
+
+        .info-card-header .title-en {
+            font-size: 7.8pt;
             font-weight: normal;
             color: #666;
-            margin-left: 8px;
+            margin-left: 6px;
         }
 
-        .info-row {
-            display: flex;
-            margin-bottom: 1px;
-            font-size: 9pt;
-        }
-
-        .info-label {
-            width: 90px;
-            color: #666;
-            flex-shrink: 0;
-        }
-
-        .info-value {
-            flex: 1;
-            font-weight: 500;
+        .meta-table {
+            width: 100%;
+            margin: 0;
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: auto;
         }
 
         /* 結果摘要區 */
         .summary-section {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 5px;
             margin-bottom: 5px;
-        }
-
-        .summary-section.hide-ppm {
-            grid-template-columns: repeat(4, 1fr);
         }
 
         .summary-card {
@@ -213,8 +222,42 @@
 
         th {
             background-color: #e6e6e6;
-            font-weight: bold;
+            font-weight: 800;
             text-align: center;
+        }
+
+        .meta-table th,
+        .meta-table td {
+            border: none;
+            font-size: 8.3pt;
+            padding: 3px 7px;
+            vertical-align: top;
+            line-height: 1.25;
+        }
+
+        .meta-table tr + tr th,
+        .meta-table tr + tr td {
+            border-top: 1px dashed #d9d9d9;
+        }
+
+        .meta-table th {
+            width: 38%;
+            text-align: left;
+            color: #555;
+            font-weight: 700;
+            background: transparent;
+            border-right: 1px solid #d7d7d7;
+        }
+
+        .meta-table td {
+            color: #1f2937;
+            font-weight: 600;
+            padding-left: 8px;
+        }
+
+        .meta-table tr.empty-row th,
+        .meta-table tr.empty-row td {
+            color: transparent;
         }
 
         .text-center { text-align: center; }
@@ -223,7 +266,7 @@
         /* 圖表區 */
         .chart-section {
             width: 100%;
-            margin: 10px 0 12px;
+            margin: 6px 0 8px;
             page-break-inside: avoid;
         }
 
@@ -234,21 +277,22 @@
         }
 
         .chart-title {
-            font-size: 11pt;
-            font-weight: bold;
-            margin-bottom: 6px;
+            font-size: 10pt;
+            font-weight: 800;
+            margin-bottom: 4px;
             text-align: center;
         }
 
         .pie-canvas-container {
-            width: 100%;
+            width: 92%;
+            margin: 0 auto;
             display: block;
         }
 
         /* SVG 圖表容器 */
 
         .chart-title-en {
-            font-size: 8.5pt;
+            font-size: 8pt;
             color: #555;
             font-weight: normal;
             margin-top: 1px;
@@ -264,13 +308,10 @@
             border-radius: 8px;
         }
 
-        /* PPM 欄位顯示/隱藏 */
-        table.hide-ppm .ppm-col { display: none !important; }
-
         /* 報表說明區 */
         .report-description-section {
-            margin: 8px 0 0;
-            padding: 8px 12px;
+            margin: 6px 0 0;
+            padding: 6px 10px;
             border: 1px solid #ccc;
             background-color: #f8f9fa;
             border-radius: 3px;
@@ -280,6 +321,7 @@
         .report-description-section h4 {
             margin: 0 0 3px 0;
             font-size: 9pt;
+            font-weight: 800;
             color: #333;
         }
 
@@ -367,6 +409,20 @@
             color: #666;
         }
 
+        @media (max-width: 1024px) {
+            .info-groups {
+                grid-template-columns: 1fr;
+            }
+
+            .info-card.production {
+                grid-column: auto;
+            }
+
+            .meta-table th {
+                width: 42%;
+            }
+        }
+
         /* 列印設定 */
         @media print {
             .no-print { display: none !important; }
@@ -381,14 +437,14 @@
                 min-height: auto;
                 height: auto;
                 box-shadow: none;
-                padding: 3mm;
+                padding: 2.5mm;
                 display: block;
             }
             .main-content {
                 flex: none;
             }
             footer {
-                margin-top: 10px;
+                margin-top: 8px;
                 page-break-inside: avoid;
                 padding-top: 6px;
                 gap: 8px;
@@ -453,9 +509,6 @@
 <div class="print-toolbar no-print">
     <button onclick="window.print()" class="primary">
         <i class="fas fa-print"></i> 列印
-    </button>
-    <button id="togglePpmBtn" onclick="togglePpm()">
-        <i class="fas fa-eye-slash"></i> 隱藏PPM
     </button>
     <button onclick="window.close()">
         <i class="fas fa-times"></i> 關閉
@@ -562,13 +615,61 @@
             .replace(/"/g, '&quot;');
     }
 
+    function buildLocalStaticReportUrl(filePath) {
+        const normalizedPath = String(filePath || '')
+            .replace(/\\/g, '/')
+            .replace(/^\/+/, '');
+        if (!normalizedPath) return '';
+
+        const pathname = window.location.pathname || '/';
+        const printMarker = '/print/';
+        const markerIndex = pathname.lastIndexOf(printMarker);
+        const appBasePath = markerIndex >= 0 ? pathname.slice(0, markerIndex + 1) : '/';
+        return `${window.location.origin}${appBasePath}${normalizedPath}`;
+    }
+
+    async function ensureQrReportUrl(workOrderId, fallbackUrl) {
+        try {
+            const body = new URLSearchParams({ work_order_id: String(workOrderId) });
+            const response = await fetch('../api/reports/generate_static.php', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                },
+                body: body.toString()
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (result.success && result.data) {
+                if (result.data.public_url) {
+                    return result.data.public_url;
+                }
+                if (result.data.file_path) {
+                    const localUrl = buildLocalStaticReportUrl(result.data.file_path);
+                    if (localUrl) return localUrl;
+                }
+            }
+        } catch (error) {
+            console.warn('產生 QR 靜態頁失敗，改用備援連結：', error);
+        }
+
+        return fallbackUrl;
+    }
+
     async function renderReport(data) {
         const { work_order, order, order_item, customer, screening_item,
                 screening_results, summary, chart_data, company, qrcode_url, generated_at,
                 report_description } = data;
 
-        // 生成 QR Code URL
-        const qrUrl = qrcode_url || `${window.location.origin}/report/${work_order.work_order_number}.html`;
+        // 生成 QR Code URL：優先確保靜態頁可用，再回退既有 URL
+        const localFallback = buildLocalStaticReportUrl(`export/qrcode_pages/${work_order.work_order_number}.html`);
+        const fallbackUrl = qrcode_url || localFallback || `${window.location.origin}/`;
+        const qrUrl = await ensureQrReportUrl(work_order.id, fallbackUrl);
 
         let html = `
             <!-- 標題區 -->
@@ -586,44 +687,65 @@
             </div>
 
             <!-- 基本資訊區 -->
-            <div class="info-grid">
-                <div class="info-box">
-                    <h4>📋 訂單資訊 <span class="title-en">Order Information</span></h4>
-                    <div class="info-row">
-                        <span class="info-label">訂單編號<br><small>Order No.</small></span>
-                        <span class="info-value">${escapeHtml(order.order_number)}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">客戶名稱<br><small>Customer</small></span>
-                        <span class="info-value">${escapeHtml(customer.name)}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">客戶批號<br><small>Batch No.</small></span>
-                        <span class="info-value">${escapeHtml(order_item.customer_batch_number)}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">客戶P/O<br><small>P/O No.</small></span>
-                        <span class="info-value">${escapeHtml(order.customer_po_number) || '-'}</span>
-                    </div>
+            <div class="info-groups">
+                <div class="info-card customer">
+                    <div class="info-card-header">👤 客戶資訊 <span class="title-en">Customer Profile</span></div>
+                    <table class="meta-table">
+                        <tr>
+                            <th>客戶名稱<br><small>Customer Name</small></th>
+                            <td>${escapeHtml(customer.name) || '-'}</td>
+                        </tr>
+                        <tr>
+                            <th>聯絡人<br><small>Customer Contact</small></th>
+                            <td>${escapeHtml(customer.contact_person) || '-'}</td>
+                        </tr>
+                        <tr class="empty-row">
+                            <th>&nbsp;<br><small>&nbsp;</small></th>
+                            <td>&nbsp;</td>
+                        </tr>
+                        <tr class="empty-row">
+                            <th>&nbsp;<br><small>&nbsp;</small></th>
+                            <td>&nbsp;</td>
+                        </tr>
+                    </table>
                 </div>
-                <div class="info-box">
-                    <h4>🔧 工單資訊 <span class="title-en">Work Order Information</span></h4>
-                    <div class="info-row">
-                        <span class="info-label">工單編號<br><small>W/O No.</small></span>
-                        <span class="info-value">${escapeHtml(work_order.work_order_number)}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">受篩產品<br><small>Product</small></span>
-                        <span class="info-value">${escapeHtml(screening_item.name)}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">完工日期<br><small>Completion</small></span>
-                        <span class="info-value">${formatDate(work_order.actual_end_date)}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">工單狀態<br><small>Status</small></span>
-                        <span class="info-value">${escapeHtml(work_order.status_label)}</span>
-                    </div>
+                <div class="info-card order">
+                    <div class="info-card-header">📦 訂單資訊 <span class="title-en">Order Details</span></div>
+                    <table class="meta-table">
+                        <tr>
+                            <th>客戶訂單編號<br><small>Customer Order No.</small></th>
+                            <td>${escapeHtml(order.customer_po_number || order.order_number) || '-'}</td>
+                        </tr>
+                        <tr>
+                            <th>料號<br><small>Part No.</small></th>
+                            <td>${escapeHtml(order_item.part_number) || '-'}</td>
+                        </tr>
+                        <tr>
+                            <th>圖號<br><small>Drawing No.</small></th>
+                            <td>${escapeHtml(order_item.drawing_number) || '-'}</td>
+                        </tr>
+                        <tr>
+                            <th>客戶批號<br><small>Customer Batch No.</small></th>
+                            <td>${escapeHtml(order_item.customer_batch_number) || '-'}</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="info-card production">
+                    <div class="info-card-header">🏭 生產資訊 <span class="title-en">Production Details</span></div>
+                    <table class="meta-table">
+                        <tr>
+                            <th>受篩產品<br><small>Screened Product</small></th>
+                            <td>${escapeHtml(screening_item.name) || '-'}</td>
+                        </tr>
+                        <tr>
+                            <th>完工日期<br><small>Completion Date</small></th>
+                            <td>${formatDate(work_order.actual_end_date)}</td>
+                        </tr>
+                        <tr>
+                            <th>操作人員<br><small>Assigned Operator</small></th>
+                            <td>${escapeHtml(work_order.assigned_employee_name) || '-'}</td>
+                        </tr>
+                    </table>
                 </div>
             </div>
 
@@ -645,27 +767,21 @@
                     <span class="summary-number">${summary.defect_rate_percent.toFixed(4)}%</span>
                     <span class="summary-label">不良率<br><small>Defect Rate</small></span>
                 </div>
-                <div class="summary-card rate ppm-summary-card" id="summaryPpmCard">
-                    <span class="summary-number">${formatNumber(summary.defect_rate_ppm, 1)}</span>
-                    <span class="summary-label">PPM</span>
-                </div>
             </div>
 
             <!-- 篩分項目明細表 -->
             <table id="screeningTable">
                 <colgroup>
-                    <col style="width: 28%;">
-                    <col style="width: 14%;">
-                    <col class="ppm-col" style="width: 11%;">
+                    <col style="width: 31%;">
+                    <col style="width: 16%;">
                     <col style="width: 13%;">
                     <col style="width: 8%;">
-                    <col style="width: 26%;">
+                    <col style="width: 32%;">
                 </colgroup>
                 <thead>
                     <tr>
                         <th>篩分項目<br><small>Screening Item</small></th>
                         <th>公差値<br><small>Tolerance</small></th>
-                        <th class="ppm-col">PPM標準<br><small>PPM Std.</small></th>
                         <th>不良品數量<br><small>Defect Qty</small></th>
                         <th>佔比<br><small>Ratio</small></th>
                         <th>備註<br><small>Remarks</small></th>
@@ -682,7 +798,6 @@
                         <tr>
                             <td>${escapeHtml(item.service_name)}<span style="color:#888;font-size:7pt;margin-left:3px;">${escapeHtml(serviceEn)}</span></td>
                             <td class="text-center">${escapeHtml(item.tolerance_display) || '-'}</td>
-                            <td class="text-center ppm-col">${item.ppm_standard !== null ? item.ppm_standard : '-'}</td>
                             <td class="text-right" style="color: ${item.defect_quantity > 0 ? '#dc3545' : '#28a745'}; font-weight: bold;">
                                 ${formatNumber(item.defect_quantity)}
                             </td>
@@ -693,7 +808,6 @@
                     }).join('')}
                     <tr style="background-color: #f5f5f5; font-weight: bold;">
                         <td colspan="2" class="text-right">合計 Total</td>
-                        <td class="ppm-col"></td>
                         <td class="text-right" style="color: #dc3545;">${formatNumber(summary.defect_units)}</td>
                         <td class="text-center">100%</td>
                         <td></td>
@@ -776,13 +890,13 @@
         const sorted = items.map((it, i) => ({ ...it, origIndex: i }))
             .sort((a, b) => b.value - a.value);
 
-        const rowH = Math.max(18, Math.min(22, 180 / n));
-        const svgH = Math.max(200, n * rowH + 30);
-        const svgW = 580;
+        const rowH = Math.max(15, Math.min(18, 150 / n));
+        const svgH = Math.max(168, n * rowH + 22);
+        const svgW = 520;
         const grays = ['#2d2d2d','#525252','#737373','#8f8f8f','#ababab','#c4c4c4','#d8d8d8','#3d3d3d','#616161','#7e7e7e'];
 
         // ── 柏拉圖區域 ────────────────────────────────────────────
-        const pX1 = 30, pY1 = 10, pX2 = 184, pY2 = svgH - 22;
+        const pX1 = 24, pY1 = 9, pX2 = 162, pY2 = svgH - 20;
         const pW = pX2 - pX1, pH = pY2 - pY1;
         const barW = (pW / n) * 0.62;
         const barGap = pW / n;
@@ -797,7 +911,7 @@
             const bx = pX1 + i * barGap + barGap * 0.19;
             const by = pY1 + pH - bh;
             barsSvg += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" fill="${grays[item.origIndex % grays.length]}"/>`;
-            barsSvg += `<text x="${(pX1 + i * barGap + barGap * 0.5).toFixed(1)}" y="${(pY2 + 11).toFixed(1)}" text-anchor="middle" font-size="7" fill="#555">${i + 1}</text>`;
+            barsSvg += `<text x="${(pX1 + i * barGap + barGap * 0.5).toFixed(1)}" y="${(pY2 + 10).toFixed(1)}" text-anchor="middle" font-size="6.2" fill="#555">${i + 1}</text>`;
             cumulative += item.value;
             const cumPct = cumulative / total;
             cumPoints.push({ x: pX1 + i * barGap + barGap * 0.5, y: pY1 + pH * (1 - cumPct), pct: cumPct });
@@ -807,13 +921,13 @@
         barsSvg += `<line x1="${pX1}" y1="${pY1}" x2="${pX1}" y2="${pY2}" stroke="#aaa" stroke-width="0.8"/>`;
         barsSvg += `<line x1="${pX1}" y1="${pY2}" x2="${pX2}" y2="${pY2}" stroke="#aaa" stroke-width="0.8"/>`;
         // 左 Y 軸刻度
-        barsSvg += `<text x="${pX1 - 2}" y="${pY1 + 4}" text-anchor="end" font-size="6.5" fill="#555">${maxVal}</text>`;
-        barsSvg += `<text x="${pX1 - 2}" y="${(pY1 + pH * 0.5 + 3).toFixed(1)}" text-anchor="end" font-size="6.5" fill="#555">${Math.round(maxVal / 2)}</text>`;
-        barsSvg += `<text x="${pX1 - 2}" y="${pY2}" text-anchor="end" font-size="6.5" fill="#555">0</text>`;
+        barsSvg += `<text x="${pX1 - 2}" y="${pY1 + 4}" text-anchor="end" font-size="6" fill="#555">${maxVal}</text>`;
+        barsSvg += `<text x="${pX1 - 2}" y="${(pY1 + pH * 0.5 + 3).toFixed(1)}" text-anchor="end" font-size="6" fill="#555">${Math.round(maxVal / 2)}</text>`;
+        barsSvg += `<text x="${pX1 - 2}" y="${pY2}" text-anchor="end" font-size="6" fill="#555">0</text>`;
         // 右 Y 軸（累積%）
         barsSvg += `<line x1="${pX2}" y1="${pY1}" x2="${pX2}" y2="${pY2}" stroke="#eee" stroke-width="0.6" stroke-dasharray="2,2"/>`;
-        barsSvg += `<text x="${pX2 + 2}" y="${pY1 + 4}" font-size="6.5" fill="#dc3545">100%</text>`;
-        barsSvg += `<text x="${pX2 + 2}" y="${(pY1 + pH * 0.5 + 3).toFixed(1)}" font-size="6.5" fill="#dc3545">50%</text>`;
+        barsSvg += `<text x="${pX2 + 2}" y="${pY1 + 4}" font-size="6" fill="#dc3545">100%</text>`;
+        barsSvg += `<text x="${pX2 + 2}" y="${(pY1 + pH * 0.5 + 3).toFixed(1)}" font-size="6" fill="#dc3545">50%</text>`;
         // 累積折線
         if (cumPoints.length > 1) {
             const pts = cumPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
@@ -824,8 +938,8 @@
         });
 
         // ── 圓餅圖（中央）─────────────────────────────────────────
-        const pieCX = 284, pieCY = svgH / 2;
-        const pieR = Math.min(76, (svgH - 30) / 2 - 4);
+        const pieCX = 250, pieCY = svgH / 2;
+        const pieR = Math.min(62, (svgH - 26) / 2 - 4);
         let pieSvg = '';
         let startAngle = -Math.PI / 2;
         items.forEach((item, i) => {
@@ -842,16 +956,16 @@
         pieSvg += `<circle cx="${pieCX}" cy="${pieCY.toFixed(1)}" r="${pieR}" fill="none" stroke="#444" stroke-width="0.8"/>`;
 
         // ── 數據明細（右欄）──────────────────────────────────────
-        const lgX = 376;
-        const lgStartY = Math.max(10, (svgH - n * rowH) / 2);
+        const lgX = 332;
+        const lgStartY = Math.max(8, (svgH - n * rowH) / 2);
         let legendSvg = '';
         items.forEach((item, i) => {
             const y = lgStartY + i * rowH;
             const pct = ((item.value / total) * 100).toFixed(1);
-            legendSvg += `<rect x="${lgX}" y="${y}" width="10" height="10" fill="${grays[i % grays.length]}" stroke="#666" stroke-width="0.4"/>`;
-            legendSvg += `<text x="${lgX + 14}" y="${y + 8}" font-size="8.5" fill="#111" font-weight="bold" font-family="Microsoft JhengHei,sans-serif">${i + 1}. ${item.label}</text>`;
-            legendSvg += `<text x="${lgX + 14}" y="${y + rowH - 3}" font-size="7" fill="#888" font-family="Arial,sans-serif">${item.labelEn}</text>`;
-            legendSvg += `<text x="${svgW - 3}" y="${y + 8}" font-size="8" fill="#333" text-anchor="end" font-family="Arial,sans-serif">${formatNumber(item.value)} (${pct}%)</text>`;
+            legendSvg += `<rect x="${lgX}" y="${y}" width="9" height="9" fill="${grays[i % grays.length]}" stroke="#666" stroke-width="0.4"/>`;
+            legendSvg += `<text x="${lgX + 12}" y="${y + 7}" font-size="7.6" fill="#111" font-weight="bold" font-family="Microsoft JhengHei,sans-serif">${i + 1}. ${item.label}</text>`;
+            legendSvg += `<text x="${lgX + 12}" y="${y + rowH - 3}" font-size="6.3" fill="#888" font-family="Arial,sans-serif">${item.labelEn}</text>`;
+            legendSvg += `<text x="${svgW - 3}" y="${y + 7}" font-size="7.2" fill="#333" text-anchor="end" font-family="Arial,sans-serif">${formatNumber(item.value)} (${pct}%)</text>`;
         });
 
         // ── 分隔線 ────────────────────────────────────────────────
@@ -864,25 +978,6 @@
             <line x1="${d2}" y1="5" x2="${d2}" y2="${svgH - 10}" stroke="#ddd" stroke-width="0.8"/>
         </svg>`;
     }
-
-    // PPM 欄位顯示/隱藏切換（同步更新表格欄位、摘要卡片、grid 欄數）
-    window.togglePpm = function() {
-        const table = document.getElementById('screeningTable');
-        const btn = document.getElementById('togglePpmBtn');
-        if (!table || !btn) return;
-        const isNowHidden = table.classList.toggle('hide-ppm');
-        btn.innerHTML = isNowHidden
-            ? '<i class="fas fa-eye"></i> 顯示PPM'
-            : '<i class="fas fa-eye-slash"></i> 隱藏PPM';
-        // 同步摘要卡片
-        const summaryCard = document.getElementById('summaryPpmCard');
-        if (summaryCard) summaryCard.style.display = isNowHidden ? 'none' : '';
-        // 同步 summary-section 欄位數
-        const summarySection = document.querySelector('.summary-section');
-        if (summarySection) {
-            summarySection.classList.toggle('hide-ppm', isNowHidden);
-        }
-    };
 
     async function loadCompanyLogo(companyId) {
         try {
