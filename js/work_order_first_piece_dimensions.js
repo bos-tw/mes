@@ -661,29 +661,51 @@
 
         // 刪除資料
         async function deleteData(id) {
+            if (!Number.isInteger(id) || id <= 0) {
+                showAlert('danger', '無效的資料 ID，無法刪除。');
+                return;
+            }
+
             if (!confirm('確定要刪除這筆首件檢驗資料嗎？此動作無法復原。')) return;
 
             try {
                 const response = await fetch('api/work_order_first_piece_dimensions/delete.php', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id })
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        _method: 'DELETE',
+                        id
+                    })
                 });
 
-                const result = await response.json();
+                const raw = await response.text();
+                if (!raw || raw.trim() === '') {
+                    throw new Error(`伺服器未回傳內容（HTTP ${response.status}）`);
+                }
 
-                if (result.success) {
+                let result = null;
+                try {
+                    result = JSON.parse(raw);
+                } catch (_parseError) {
+                    throw new Error(`伺服器回應格式錯誤（HTTP ${response.status}）`);
+                }
+
+                if (response.ok && result.success) {
                     showAlert('success', '刪除成功');
                     if (dataSyncHelper) {
                         dataSyncHelper.notifyDeleted({ id });
                     }
                     loadData();
                 } else {
-                    showAlert('danger', result.message || '刪除失敗');
+                    showAlert('danger', (result && result.message) || '刪除失敗');
                 }
             } catch (error) {
                 console.error('刪除錯誤:', error);
-                showAlert('danger', '系統發生錯誤');
+                showAlert('danger', `刪除失敗：${error.message || '系統發生錯誤'}`);
             }
         }
 

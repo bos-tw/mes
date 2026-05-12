@@ -943,6 +943,15 @@
         }
     }
 
+    function hasSubmittedValue(value) {
+        return value !== null && value !== undefined && String(value).trim() !== '';
+    }
+
+    function isMeaningfulProductionRecord(record) {
+        return ['weight_kg', 'production_date', 'production_time', 'machine_id', 'notes']
+            .some(field => hasSubmittedValue(record[field]));
+    }
+
     async function handleFormSubmit(e) {
         e.preventDefault();
 
@@ -1001,7 +1010,7 @@
             const notesInput = row.querySelector('[name="pr_notes[]"]');
 
             if (cardInput) {
-                productionRecords.push({
+                const record = {
                     card_number: cardInput.value,
                     weight_kg: weightInput ? weightInput.value : null,
                     production_date: dateInput ? dateInput.value : null,
@@ -1009,7 +1018,11 @@
                     machine_id: machineSelect ? machineSelect.value : null,
                     operator_name: operatorInput ? operatorInput.value : (state.currentUser?.name || ''),
                     notes: notesInput ? notesInput.value : null
-                });
+                };
+
+                if (hasSubmittedValue(record.card_number) && isMeaningfulProductionRecord(record)) {
+                    productionRecords.push(record);
+                }
             }
         });
 
@@ -1028,7 +1041,7 @@
 
         fpFields.forEach(field => {
             const value = formData.get(field);
-            if (value) {
+            if (hasSubmittedValue(value)) {
                 fpData[field.replace('fp_', '')] = value;
             }
         });

@@ -3,6 +3,9 @@
     const path = window.location.pathname;
     const basePath = path.substring(0, path.lastIndexOf('/') + 1);
     window.APP_BASE_PATH = basePath;
+    window.APP_ASSET_VERSION = window.APP_ASSET_VERSION
+        || document.documentElement.getAttribute('data-asset-version')
+        || '';
 })();
 
 // ──────────────────────────────────────────────
@@ -11,10 +14,35 @@
 window.AppVersionChecker = (function () {
     'use strict';
 
-    let _currentVersion = null;
+    let _currentVersion = window.APP_ASSET_VERSION || null;
     let _bannerShown    = false;
     let _enabled        = true;
     let _intervalId     = null;
+    let _lastCheckedAt  = 0;
+
+    function buildReloadUrl() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('_reload', Date.now().toString());
+        return url.toString();
+    }
+
+    async function clearBrowserRuntimeCaches() {
+        if (!('caches' in window)) {
+            return;
+        }
+
+        try {
+            const names = await caches.keys();
+            await Promise.all(names.map(name => caches.delete(name)));
+        } catch (_e) {
+            // Cache API 不是必要條件，失敗時仍繼續重整。
+        }
+    }
+
+    async function reloadNow() {
+        await clearBrowserRuntimeCaches();
+        window.location.replace(buildReloadUrl());
+    }
 
     function showUpdateBanner() {
         if (_bannerShown) { return; }
@@ -31,7 +59,7 @@ window.AppVersionChecker = (function () {
         ].join(';');
         banner.innerHTML = `
             <span>⚠️ 系統已更新，請重新整理頁面以載入最新版本</span>
-            <button onclick="window.location.reload()"
+            <button onclick="window.AppVersionChecker.reloadNow()"
                 style="background:#fff;color:#e74c3c;border:none;border-radius:4px;
                        padding:6px 18px;font-weight:700;cursor:pointer;font-size:14px;">
                 立即重整
@@ -39,8 +67,14 @@ window.AppVersionChecker = (function () {
         document.body.prepend(banner);
     }
 
-    async function checkVersion() {
+    async function checkVersion(options = {}) {
         if (!_enabled) { return; }
+        const now = Date.now();
+        if (!options.force && _lastCheckedAt > 0 && now - _lastCheckedAt < 30000) {
+            return;
+        }
+        _lastCheckedAt = now;
+
         try {
             const res = await fetch('api/version.php', { cache: 'no-store' });
             if (!res.ok) { return; }
@@ -59,24 +93,35 @@ window.AppVersionChecker = (function () {
 
     function startPolling(intervalMinutes) {
         if (_intervalId) { clearInterval(_intervalId); }
-        _intervalId = setInterval(checkVersion, (intervalMinutes || 60) * 60 * 1000);
+        const minutes = Math.max(1, Number.parseInt(intervalMinutes, 10) || 5);
+        _intervalId = setInterval(checkVersion, minutes * 60 * 1000);
     }
 
     // 公開 API，供安全設定模組呼叫
     function configure(enabled, intervalMinutes) {
         _enabled = !!enabled;
-        startPolling(intervalMinutes || 60);
+        startPolling(intervalMinutes || 5);
     }
 
     // 初始啟動（使用預設值，待安全設定載入後再重設）
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', checkVersion);
+        document.addEventListener('DOMContentLoaded', () => checkVersion({ force: true }));
     } else {
-        checkVersion();
+        checkVersion({ force: true });
     }
-    startPolling(60);
+    window.addEventListener('focus', () => checkVersion({ force: true }));
+    window.addEventListener('pageshow', () => checkVersion({ force: true }));
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            checkVersion({ force: true });
+        }
+    });
+    ['click', 'keydown', 'touchstart'].forEach(eventName => {
+        document.addEventListener(eventName, checkVersion, { passive: true });
+    });
+    startPolling(5);
 
-    return { configure, checkNow: checkVersion };
+    return { configure, checkNow: () => checkVersion({ force: true }), reloadNow };
 })();
 
 // ──────────────────────────────────────────────
@@ -210,7 +255,7 @@ window.AppSecurityManager = (function () {
             // 重新套用版本偵測設定
             window.AppVersionChecker.configure(
                 s['security.auto_refresh.enabled'].value === '1',
-                parseInt(s['security.auto_refresh.interval_minutes'].value, 10) || 60
+                parseInt(s['security.auto_refresh.interval_minutes'].value, 10) || 5
             );
             // 重新套用閒置登出設定
             configure(
@@ -395,6 +440,43 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.warn('Failed to load sidebar state from localStorage:', error);
             return false;
         }
+    }
+
+    function normalizeModuleContentUrl(contentUrl, moduleId = '') {
+        if (typeof contentUrl === 'string' && contentUrl.trim() !== '') {
+            return contentUrl.split('?')[0];
+        }
+
+        return moduleId ? `modules/${moduleId}.html` : '';
+    }
+
+    function withAssetVersion(url) {
+        const normalizedUrl = normalizeModuleContentUrl(url);
+        if (!normalizedUrl) {
+            return url;
+        }
+
+        const version = window.APP_ASSET_VERSION || document.documentElement.getAttribute('data-asset-version') || '';
+        if (!version) {
+            return normalizedUrl;
+        }
+
+        const parsed = new URL(normalizedUrl, window.location.href);
+        parsed.searchParams.set('v', version);
+        return parsed.toString();
+    }
+
+    function fetchFreshHtml(url) {
+        return fetch(withAssetVersion(url), {
+            method: 'GET',
+            credentials: 'include',
+            cache: 'no-store',
+            headers: {
+                'Accept': 'text/html',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
+            },
+        });
     }
 
     function isSidebarCollapsed() {
@@ -683,7 +765,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const s = data.data;
             window.AppVersionChecker.configure(
                 s['security.auto_refresh.enabled'].value === '1',
-                parseInt(s['security.auto_refresh.interval_minutes'].value, 10) || 60
+                parseInt(s['security.auto_refresh.interval_minutes'].value, 10) || 5
             );
             window.AppSecurityManager.configure(
                 s['security.auto_logout.enabled'].value === '1',
@@ -1207,6 +1289,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Function to open a new tab or switch to an existing one
     function openTab(pageId, title, contentUrl, options = {}) {
+        contentUrl = normalizeModuleContentUrl(contentUrl, pageId);
+
         // Check if tab already exists
         let existingTab = openTabs.find(tab => tab.id === pageId);
 
@@ -1370,7 +1454,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     // 從原 HTML 載入 Modal 部分
                     try {
-                        const response = await fetch(contentUrl);
+                        const response = await fetchFreshHtml(contentUrl);
                         if (response.ok) {
                             const html = await response.text();
                             const parser = new DOMParser();
@@ -1395,7 +1479,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             } else {
                 // 傳統方式：載入 HTML 檔案
-                const response = await fetch(contentUrl);
+                const response = await fetchFreshHtml(contentUrl);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }

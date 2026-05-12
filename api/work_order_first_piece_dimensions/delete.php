@@ -4,14 +4,16 @@
  *
  * 提供首件尺寸紀錄的實體刪除功能。
  *
- * @endpoint POST /api/work_order_first_piece_dimensions/delete.php
+ * @endpoint DELETE /api/work_order_first_piece_dimensions/delete.php?id={int}
+ * @method POST + _method=DELETE（表單或 JSON 模擬 DELETE）
  *
  * @auth 必須登入
  * @table work_order_first_piece_dimensions
  *
- * @input POST (JSON body)
+ * @input JSON body / POST data
  * | 參數 | 類型 | 必填 | 說明 |
  * |------|------|------|------|
+ * | _method | string | N | 方法覆蓋，值為 DELETE |
  * | id   | int  | Y    | 紀錄 ID |
  *
  * @output 成功回應

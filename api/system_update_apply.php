@@ -179,6 +179,8 @@ $executedMigrationFiles = [];
 $maintenanceEnabledByThisApply = false;
 $maintenanceWarning = '';
 $dbBackupInfo = null;
+$cacheVersionStamp = null;
+$runtimeCacheInfo = null;
 $healthCheck = null;
 $rollbackReport = null;
 
@@ -323,9 +325,12 @@ try {
             throw new RuntimeException('覆蓋檔案失敗：' . $relative);
         }
 
+        clearstatcache(true, $targetPath);
         $copiedRelativeFiles[] = $relative;
         $copiedFileCount++;
     }
+
+    $runtimeCacheInfo = invalidateSystemUpdateRuntimeCaches($copiedRelativeFiles);
 
     $executedMigrationFilesCount = 0;
     $executedMigrationStatements = 0;
@@ -346,6 +351,8 @@ try {
     if (!(bool)($healthCheck['passed'] ?? false)) {
         throw new RuntimeException('套用後健康檢查未通過：' . summarizeHealthCheckFailures($healthCheck));
     }
+
+    $cacheVersionStamp = writeSystemUpdateCacheVersionStamp($job);
 
     $updateLogWarning = '';
     try {
@@ -416,6 +423,8 @@ try {
         'migration_file_count' => $executedMigrationFilesCount,
         'migration_statement_count' => $executedMigrationStatements,
         'db_backup' => $dbBackupInfo,
+        'cache_version_stamp' => $cacheVersionStamp,
+        'runtime_cache' => $runtimeCacheInfo,
         'health_check_passed' => true,
     ]);
 
@@ -430,6 +439,8 @@ try {
             'migration_file_count' => $executedMigrationFilesCount,
             'migration_statement_count' => $executedMigrationStatements,
             'db_backup' => $dbBackupInfo,
+            'cache_version_stamp' => $cacheVersionStamp,
+            'runtime_cache' => $runtimeCacheInfo,
             'health_check' => $healthCheck,
             'maintenance' => getSystemUpdateMaintenanceState(),
         ],
@@ -512,6 +523,7 @@ try {
             'rollback_report' => $rollbackReport,
             'db_backup' => $dbBackupInfo,
             'health_check' => $healthCheck,
+            'runtime_cache' => $runtimeCacheInfo,
             'maintenance' => getSystemUpdateMaintenanceState(),
             'maintenance_warning' => $maintenanceWarning,
         ],

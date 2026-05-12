@@ -81,6 +81,7 @@ unset($payload['screening_defects']); // 從主 payload 中移除
 // 提取 production_records (如果存在)
 $productionRecords = $payload['production_records'] ?? [];
 unset($payload['production_records']); // 從主 payload 中移除
+$productionRecords = is_array($productionRecords) ? filterMeaningfulProductionRecords($productionRecords) : [];
 
 $validation = validateWorkOrderData($payload, true);
 
@@ -98,6 +99,9 @@ $data = $validation['data'];
 // 提取 first_piece_dimensions (如果存在)
 $firstPieceDimensions = $data['first_piece_dimensions'] ?? null;
 unset($data['first_piece_dimensions']); // 從主 data 中移除
+if (!is_array($firstPieceDimensions) || !isMeaningfulFirstPieceDimension($firstPieceDimensions)) {
+    $firstPieceDimensions = null;
+}
 
 if (empty($data) && empty($screeningDefects) && empty($firstPieceDimensions) && empty($productionRecords)) {
     jsonResponse(['success' => false, 'message' => '沒有可更新的資料。'], 400);

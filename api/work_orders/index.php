@@ -248,6 +248,7 @@ function handleCreateWorkOrder(PDO $pdo): void
     // 提取 production_records (如果存在)
     $productionRecords = $payload['production_records'] ?? [];
     unset($payload['production_records']); // 從主 payload 中移除
+    $productionRecords = is_array($productionRecords) ? filterMeaningfulProductionRecords($productionRecords) : [];
 
     $validation = validateWorkOrderData($payload, false);
 
@@ -265,6 +266,9 @@ function handleCreateWorkOrder(PDO $pdo): void
     // 提取 first_piece_dimensions (如果存在)
     $firstPieceDimensions = $data['first_piece_dimensions'] ?? null;
     unset($data['first_piece_dimensions']); // 從主 data 中移除，避免插入 WorkOrders 表失敗
+    if (!is_array($firstPieceDimensions) || !isMeaningfulFirstPieceDimension($firstPieceDimensions)) {
+        $firstPieceDimensions = null;
+    }
 
     // Check if order item exists
     $orderItemStmt = $pdo->prepare("SELECT id FROM order_items WHERE id = :id");

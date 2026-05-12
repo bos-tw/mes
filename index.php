@@ -1,56 +1,18 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/api/cache_version.php';
+
 // 禁止快取 index.php 本身，確保每次都取得最新版本
 header('Cache-Control: no-cache, no-store, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');
 
-// 計算靜態資源版本雜湊（與 api/version.php 相同邏輯）
-// 任何 JS/CSS 檔案修改後，雜湊值自動更新，強制瀏覽器下載最新資源
-$_base = __DIR__;
-$_scanTargets = [
-    $_base . '/js',
-    $_base . '/core',
-    $_base . '/api/common',
-    $_base . '/styles.css',
-    $_base . '/script.js',
-    $_base . '/index.php',
-    $_base . '/print.html',
-];
-
-$_latestMtime = 0;
-foreach ($_scanTargets as $_target) {
-    if (!file_exists($_target)) {
-        continue;
-    }
-    if (is_file($_target)) {
-        $_mtime = filemtime($_target);
-        if ($_mtime > $_latestMtime) {
-            $_latestMtime = $_mtime;
-        }
-    } elseif (is_dir($_target)) {
-        $_iter = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($_target, FilesystemIterator::SKIP_DOTS)
-        );
-        foreach ($_iter as $_file) {
-            if ($_file->isFile() && in_array($_file->getExtension(), ['js', 'css', 'html'], true)) {
-                $_mtime = $_file->getMTime();
-                if ($_mtime > $_latestMtime) {
-                    $_latestMtime = $_mtime;
-                }
-            }
-        }
-    }
-}
-
-$ver = $_latestMtime > 0 ? substr(dechex($_latestMtime), -8) : 'dev00000';
-
-// 清理暫用變數，避免污染後續 HTML 輸出
-unset($_base, $_scanTargets, $_target, $_latestMtime, $_iter, $_file, $_mtime);
+$cacheVersion = mesBuildFrontendCacheVersion(__DIR__);
+$ver = $cacheVersion['version'];
 ?>
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" data-asset-version="<?= htmlspecialchars($ver, ENT_QUOTES, 'UTF-8') ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -74,10 +36,10 @@ unset($_base, $_scanTargets, $_target, $_latestMtime, $_iter, $_file, $_mtime);
             </div>
             <div class="top-navbar-right">
                 <div class="top-icon-group">
-                    <a href="status_board.html" target="_blank" class="top-icon-item" title="現場狀態看板">
+                    <a href="status_board.html?v=<?= $ver ?>" target="_blank" class="top-icon-item" title="現場狀態看板">
                         <i class="fas fa-tv"></i> 現場狀態看板
                     </a>
-                    <a href="help/index.html" target="_blank" class="top-icon-item" title="系統使用指南">
+                    <a href="help/index.html?v=<?= $ver ?>" target="_blank" class="top-icon-item" title="系統使用指南">
                         <i class="fas fa-book"></i> 系統使用指南
                     </a>
                 </div>
@@ -431,7 +393,7 @@ unset($_base, $_scanTargets, $_target, $_latestMtime, $_iter, $_file, $_mtime);
                 </div>
 
                 <div class="version-links">
-                    <a href="help/index.html" target="_blank" class="btn primary">
+                    <a href="help/index.html?v=<?= $ver ?>" target="_blank" class="btn primary">
                         <i class="fas fa-book"></i> 系統使用指南
                     </a>
                 </div>
@@ -448,6 +410,9 @@ unset($_base, $_scanTargets, $_target, $_latestMtime, $_iter, $_file, $_mtime);
     </div>
 
     <!-- 模組配置系統 (必須在 script.js 之前載入) -->
+    <script>
+        window.APP_ASSET_VERSION = <?= json_encode($ver, JSON_UNESCAPED_SLASHES) ?>;
+    </script>
     <script defer src="core/module-config.js?v=<?= $ver ?>"></script>
     <script defer src="core/module-renderer.js?v=<?= $ver ?>"></script>
     <!-- 模組配置檔 -->

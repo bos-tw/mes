@@ -31,7 +31,7 @@ const SEC_SCHEMA = [
         'desc'  => '系統有新版本時顯示提示橫幅，建議使用者重新整理頁面',
     ],
     'security.auto_refresh.interval_minutes' => [
-        'type' => 'int', 'default' => '60', 'min' => 5, 'max' => 1440,
+        'type' => 'int', 'default' => '5', 'min' => 1, 'max' => 1440,
         'label' => '版本檢查間隔（分鐘）',
         'desc'  => '每隔幾分鐘向伺服器查詢一次系統版本',
     ],

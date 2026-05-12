@@ -65,16 +65,58 @@ try {
         jsonResponse(['success' => false, 'message' => '找不到該工單。'], 404);
     }
 
-    // 檢查是否有關聯資料
-    $relatedTables = [
-        ['table' => 'production_records', 'column' => 'work_order_id', 'label' => '生產紀錄'],
-        ['table' => 'work_order_images', 'column' => 'work_order_id', 'label' => '工單圖片', 'softDelete' => true],
-        ['table' => 'work_order_first_piece_dimensions', 'column' => 'work_order_id', 'label' => '首件尺寸'],
+    // Auto-generated card-number rows are planning placeholders, not production history.
+    // Clean up empty shells first, then only block deletion when real related data exists.
+    $meaningfulProductionSql = "
+        `weight_kg` IS NOT NULL
+        OR (`production_date` IS NOT NULL AND CAST(`production_date` AS CHAR) <> '0000-00-00')
+        OR (`production_time` IS NOT NULL AND CAST(`production_time` AS CHAR) <> '')
+        OR `machine_id` IS NOT NULL
+        OR TRIM(COALESCE(`notes`, '')) <> ''
+    ";
+    $cleanupProductionStmt = $pdo->prepare("
+        DELETE FROM production_records
+        WHERE work_order_id = ? AND NOT ({$meaningfulProductionSql})
+    ");
+    $cleanupProductionStmt->execute([$id]);
+
+    $meaningfulFirstPieceSql = "
+        `head_height` IS NOT NULL
+        OR `head_width` IS NOT NULL
+        OR `length` IS NOT NULL
+        OR `thread_outer_diameter` IS NOT NULL
+        OR `washer_diameter` IS NOT NULL
+        OR `outer_diameter` IS NOT NULL
+        OR `hole_diameter` IS NOT NULL
+        OR `thickness` IS NOT NULL
+        OR (`measured_at` IS NOT NULL AND CAST(`measured_at` AS CHAR) <> '0000-00-00 00:00:00')
+        OR `measured_by_employee_id` IS NOT NULL
+        OR TRIM(COALESCE(`notes`, '')) <> ''
+    ";
+    $cleanupFirstPieceStmt = $pdo->prepare("
+        DELETE FROM work_order_first_piece_dimensions
+        WHERE work_order_id = ? AND NOT ({$meaningfulFirstPieceSql})
+    ");
+    $cleanupFirstPieceStmt->execute([$id]);
+
+    // 檢查是否有真正的關聯資料
+    $relatedChecks = [
+        [
+            'label' => '生產紀錄',
+            'sql' => "SELECT COUNT(*) FROM production_records WHERE work_order_id = ? AND ({$meaningfulProductionSql})",
+        ],
+        [
+            'label' => '工單圖片',
+            'sql' => 'SELECT COUNT(*) FROM work_order_images WHERE work_order_id = ? AND deleted_at IS NULL',
+        ],
+        [
+            'label' => '首件尺寸',
+            'sql' => "SELECT COUNT(*) FROM work_order_first_piece_dimensions WHERE work_order_id = ? AND ({$meaningfulFirstPieceSql})",
+        ],
     ];
     $relatedLabels = [];
-    foreach ($relatedTables as $rel) {
-        $softDeleteCondition = isset($rel['softDelete']) && $rel['softDelete'] ? ' AND deleted_at IS NULL' : '';
-        $checkRelStmt = $pdo->prepare("SELECT COUNT(*) FROM {$rel['table']} WHERE {$rel['column']} = ?{$softDeleteCondition}");
+    foreach ($relatedChecks as $rel) {
+        $checkRelStmt = $pdo->prepare($rel['sql']);
         $checkRelStmt->execute([$id]);
         if ((int)$checkRelStmt->fetchColumn() > 0) {
             $relatedLabels[] = $rel['label'];

@@ -48,6 +48,92 @@ function readWorkOrderPayload(): array
 }
 
 /**
+ * Check whether a submitted value should be treated as actual user-entered data.
+ *
+ * @param mixed $value
+ */
+function hasFilledWorkOrderValue($value): bool
+{
+    if ($value === null) {
+        return false;
+    }
+
+    if (is_string($value)) {
+        return trim($value) !== '';
+    }
+
+    return $value !== '';
+}
+
+/**
+ * Production rows can be auto-generated as planning/card-number rows.
+ * Only rows with actual production data should be persisted or block deletion.
+ *
+ * @param array<string,mixed> $record
+ */
+function isMeaningfulProductionRecord(array $record): bool
+{
+    foreach (['weight_kg', 'production_date', 'production_time', 'machine_id', 'notes'] as $field) {
+        if (array_key_exists($field, $record) && hasFilledWorkOrderValue($record[$field])) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * @param array<int,array<string,mixed>>|array<mixed> $records
+ * @return array<int,array<string,mixed>>
+ */
+function filterMeaningfulProductionRecords(array $records): array
+{
+    $filtered = [];
+
+    foreach ($records as $record) {
+        if (!is_array($record)) {
+            continue;
+        }
+
+        if (empty($record['card_number']) || !isMeaningfulProductionRecord($record)) {
+            continue;
+        }
+
+        $filtered[] = $record;
+    }
+
+    return $filtered;
+}
+
+/**
+ * Empty first-piece shells should not be saved or treated as real inspection data.
+ *
+ * @param array<string,mixed> $data
+ */
+function isMeaningfulFirstPieceDimension(array $data): bool
+{
+    foreach ([
+        'head_height',
+        'head_width',
+        'length',
+        'thread_outer_diameter',
+        'washer_diameter',
+        'outer_diameter',
+        'hole_diameter',
+        'thickness',
+        'measured_at',
+        'measured_by_employee_id',
+        'notes',
+    ] as $field) {
+        if (array_key_exists($field, $data) && hasFilledWorkOrderValue($data[$field])) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * Validate and normalise work order input data.
  *
  * @param array<string,mixed> $payload
@@ -268,7 +354,13 @@ function validateWorkOrderData(array $payload, bool $isUpdate = false): array
         }
     }
 
-    if ($hasFpData) {
+    if (array_key_exists('fp_notes', $payload)) {
+        $hasFpData = true;
+        $notes = trim((string)($payload['fp_notes'] ?? ''));
+        $firstPieceData['notes'] = $notes === '' ? null : mb_substr($notes, 0, 255);
+    }
+
+    if ($hasFpData && isMeaningfulFirstPieceDimension($firstPieceData)) {
         $data['first_piece_dimensions'] = $firstPieceData;
     }
 

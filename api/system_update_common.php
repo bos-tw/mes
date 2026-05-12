@@ -492,6 +492,84 @@ function createSystemUpdateJob(PDO $pdo, array $payload): int
 }
 
 /**
+ * 寫入前端快取版本戳，確保更新包套用後即使檔案 mtime 未變，前端版本仍會改變。
+ *
+ * @return array{path: string, cache_token: string, applied_at: string}
+ */
+function writeSystemUpdateCacheVersionStamp(array $job): array
+{
+    $storageRoot = systemUpdateStorageRoot();
+    ensureDirectoryExists($storageRoot);
+
+    try {
+        $suffix = bin2hex(random_bytes(3));
+    } catch (Throwable $exception) {
+        $suffix = substr(str_replace('.', '', uniqid('', true)), -6);
+    }
+
+    $payload = [
+        'cache_token' => date('YmdHis') . '-' . $suffix,
+        'applied_at' => date('Y-m-d H:i:s'),
+        'job_id' => (int)($job['id'] ?? 0),
+        'version_number' => (string)($job['version_number'] ?? ''),
+        'file_version' => (string)($job['file_version'] ?? ''),
+    ];
+
+    $stampPath = $storageRoot . '/cache_version.json';
+    $encoded = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    if ($encoded === false || file_put_contents($stampPath, $encoded, LOCK_EX) === false) {
+        throw new RuntimeException('寫入前端快取版本戳失敗。');
+    }
+
+    clearstatcache(true, $stampPath);
+
+    return [
+        'path' => toProjectRelativePath($stampPath),
+        'cache_token' => (string)$payload['cache_token'],
+        'applied_at' => (string)$payload['applied_at'],
+    ];
+}
+
+/**
+ * 清除 PHP stat/opcache，降低更新後仍執行舊 PHP 程式碼的機率。
+ *
+ * @param array<int,string> $relativeFiles
+ * @return array{opcache_available: bool, attempted: int, invalidated: int}
+ */
+function invalidateSystemUpdateRuntimeCaches(array $relativeFiles): array
+{
+    $projectRoot = systemUpdateProjectRoot();
+    $opcacheAvailable = function_exists('opcache_invalidate');
+    $attempted = 0;
+    $invalidated = 0;
+
+    foreach ($relativeFiles as $relativePath) {
+        $relativePath = normalizeRelativePath((string)$relativePath);
+        if ($relativePath === '') {
+            continue;
+        }
+
+        $fullPath = $projectRoot . '/' . $relativePath;
+        clearstatcache(true, $fullPath);
+
+        if (strtolower(pathinfo($relativePath, PATHINFO_EXTENSION)) !== 'php') {
+            continue;
+        }
+
+        $attempted++;
+        if ($opcacheAvailable && @opcache_invalidate($fullPath, true)) {
+            $invalidated++;
+        }
+    }
+
+    return [
+        'opcache_available' => $opcacheAvailable,
+        'attempted' => $attempted,
+        'invalidated' => $invalidated,
+    ];
+}
+
+/**
  * 更新指定更新任務欄位。
  */
 function updateSystemUpdateJob(PDO $pdo, int $jobId, array $fields): void
