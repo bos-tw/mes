@@ -10,14 +10,7 @@
 # cp api/config.php.example api/config.php
 
 # ── 上傳檔案 ────────────────────────────────
-uploads/logos/*.jpg
-uploads/logos/*.jpeg
-uploads/logos/*.png
-uploads/logos/*.gif
-uploads/logos/*.webp
-uploads/**
-!uploads/_fixtures/
-!uploads/_fixtures/**
+# 目前開發需求：uploads 全面納入版控以支援跨機測試上傳功能
 export/**
 db_backups/**
 db_exports/**
