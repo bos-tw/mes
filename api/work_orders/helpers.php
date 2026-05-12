@@ -134,6 +134,32 @@ function isMeaningfulFirstPieceDimension(array $data): bool
 }
 
 /**
+ * Resolve a work order status lookup ID to its stable value key.
+ */
+function getWorkOrderStatusKey(PDO $pdo, ?int $statusLookupId): string
+{
+    if ($statusLookupId === null || $statusLookupId <= 0) {
+        return '';
+    }
+
+    $stmt = $pdo->prepare('SELECT value_key FROM lookup_values WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => $statusLookupId]);
+    $valueKey = $stmt->fetchColumn();
+
+    return strtolower(trim((string)($valueKey ?: '')));
+}
+
+/**
+ * Check if a work order status represents the completed lifecycle state.
+ */
+function isCompletedWorkOrderStatus(PDO $pdo, ?int $statusLookupId, ?string $legacyStatus = null, ?string $statusLabel = null): bool
+{
+    return getWorkOrderStatusKey($pdo, $statusLookupId) === 'completed'
+        || strtolower(trim((string)$legacyStatus)) === 'completed'
+        || trim((string)$statusLabel) === '已完成';
+}
+
+/**
  * Validate and normalise work order input data.
  *
  * @param array<string,mixed> $payload

@@ -921,6 +921,15 @@
             openModal(id);
         } else if (deleteButton) {
             const row = deleteButton.closest('tr');
+            if (
+                deleteButton.disabled
+                || deleteButton.getAttribute('aria-disabled') === 'true'
+                || row?.dataset.statusKey === 'completed'
+                || row?.dataset.statusLabel === '已完成'
+            ) {
+                showAlert(deleteButton.getAttribute('title') || '此工單目前不可刪除。', 'warning');
+                return;
+            }
             const id = row.dataset.id;
             deleteWorkOrder(id);
         } else if (convertButton) {
@@ -931,6 +940,20 @@
             const id = row.dataset.id;
             handleConvertToInventory(id);
         }
+    }
+
+    function isCompletedWorkOrder(item) {
+        const statusKey = String(item.status_key || '').trim().toLowerCase();
+        const legacyStatus = String(item.status || '').trim().toLowerCase();
+        const statusLabel = String(item.status_label || '').trim();
+        const lifecycleLocked = item.lifecycle_locked == 1
+            || item.lifecycle_locked === true
+            || Boolean(item.completed_at);
+
+        return lifecycleLocked
+            || statusKey === 'completed'
+            || legacyStatus === 'completed'
+            || statusLabel === '已完成';
     }
 
     function handlePaginationClick(e) {
@@ -1433,8 +1456,18 @@
             const statusClass = item.status_key ? item.status_key.toLowerCase().replace(/_/g, '-') : 'scheduled';
 
             // 只有完成狀態才顯示轉為庫存項目按鈕
-            const showConvertButton = item.status_key === 'completed';
+            const statusKey = String(item.status_key || '').trim().toLowerCase();
+            const statusLabel = String(item.status_label || '').trim();
+            const showConvertButton = statusKey === 'completed';
             const hasInventory = item.has_inventory == 1 || item.has_inventory === true;
+            const isCompleted = isCompletedWorkOrder(item);
+            const completedRowClass = isCompleted ? ' class="is-completed-work-order"' : '';
+            const statusKeyAttr = escapeHtml(statusKey);
+            const statusLabelAttr = escapeHtml(statusLabel);
+            const deleteButtonClass = isCompleted ? 'btn text' : 'btn text danger';
+            const deleteDisabledAttr = isCompleted
+                ? ' disabled aria-disabled="true" data-disabled-reason="completed" title="此工單已進入完成或追溯流程，無法刪除"'
+                : ' title="刪除"';
 
             // 客戶名稱處理（停用顯示）
             const customerIsActive = item.customer_is_active !== 0 && item.customer_is_active !== '0' && item.customer_is_active !== false;
@@ -1446,7 +1479,7 @@
             const isChecked = selectedWorkOrders.has(item.id) ? 'checked' : '';
 
             return `
-            <tr data-id="${item.id}">
+            <tr data-id="${item.id}" data-status-key="${statusKeyAttr}" data-status-label="${statusLabelAttr}"${completedRowClass}>
                 <td class="checkbox-col"><input type="checkbox" data-action="select-row" ${isChecked}></td>
                 <td>${escapeHtml(item.work_order_number)}</td>
                 <td>${escapeHtml(item.order_number || '')}</td>
@@ -1471,7 +1504,7 @@
                         <i class="fas fa-cogs"></i>
                     </button>
                     ` : ''}
-                    <button type="button" class="btn text danger" data-action="delete-work-order" title="刪除">
+                    <button type="button" class="${deleteButtonClass}" data-action="delete-work-order"${deleteDisabledAttr}>
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>

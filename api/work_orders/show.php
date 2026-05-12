@@ -87,6 +87,7 @@ try {
             lv.value_key AS status_key,
             lv.value_label AS status_label,
             ii_check.id AS inventory_item_id,
+            CASE WHEN wo.completed_at IS NOT NULL THEN 1 ELSE 0 END AS lifecycle_locked,
             CASE WHEN ii_check.id IS NOT NULL THEN 1 ELSE 0 END AS has_inventory
         FROM work_orders wo
         LEFT JOIN order_items oi ON wo.order_item_id = oi.id

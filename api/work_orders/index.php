@@ -183,6 +183,7 @@ function handleListWorkOrders(PDO $pdo): void
             wo.other_notes,
             wo.status,
             wo.status_lookup_id,
+            wo.completed_at,
             wo.is_printed,
             wo.created_at,
             wo.updated_at,
@@ -196,6 +197,7 @@ function handleListWorkOrders(PDO $pdo): void
             e2.name AS calibration_employee_name,
             lv.value_label AS status_label,
             lv.value_key AS status_key,
+            CASE WHEN wo.completed_at IS NOT NULL THEN 1 ELSE 0 END AS lifecycle_locked,
             CASE WHEN ii_check.id IS NOT NULL THEN 1 ELSE 0 END AS has_inventory
         FROM work_orders wo
         LEFT JOIN order_items oi ON wo.order_item_id = oi.id

@@ -121,6 +121,17 @@
 
         /* ---------- 下拉選單填充 ---------- */
         function populateDropdowns() {
+            function getMachineCode(machine) {
+                return machine.code || machine.machine_code || machine.machine_number || '';
+            }
+
+            function getMachineLabel(machine) {
+                const code = getMachineCode(machine);
+                const name = machine.name || machine.machine_name || '';
+                if (code && name) return `${code} - ${name}`;
+                return code || name || `機台 ${machine.id || ''}`.trim();
+            }
+
             // 機台
             const machineSelect = $form ? $form.querySelector('[name="machine_id"]') : null;
             if (machineSelect) {
@@ -128,7 +139,7 @@
                 state.machines.forEach(m => {
                     const opt = document.createElement('option');
                     opt.value = m.id;
-                    opt.textContent = `${m.code} - ${m.name}`;
+                    opt.textContent = getMachineLabel(m);
                     machineSelect.appendChild(opt);
                 });
             }
@@ -147,12 +158,23 @@
 
         /* ---------- 篩選器下拉填充 ---------- */
         function populateFilterDropdowns() {
+            function getMachineCode(machine) {
+                return machine.code || machine.machine_code || machine.machine_number || '';
+            }
+
+            function getMachineLabel(machine) {
+                const code = getMachineCode(machine);
+                const name = machine.name || machine.machine_name || '';
+                if (code && name) return `${code} - ${name}`;
+                return code || name || `機台 ${machine.id || ''}`.trim();
+            }
+
             const machineSelect = $filter ? $filter.querySelector('[name="machine_id"]') : null;
             if (machineSelect && machineSelect.options.length <= 1) {
                 state.machines.forEach(m => {
                     const opt = document.createElement('option');
                     opt.value = m.id;
-                    opt.textContent = `${m.code} - ${m.name}`;
+                    opt.textContent = getMachineLabel(m);
                     machineSelect.appendChild(opt);
                 });
             }

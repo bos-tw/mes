@@ -1581,6 +1581,29 @@ body.login-page {
     background: #a71d2a;
 }
 
+.btn.text.danger:disabled,
+.btn.text.danger[aria-disabled="true"],
+.is-completed-work-order .btn.text[data-action="delete-work-order"],
+tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"],
+.btn.text[data-action="delete-work-order"]:disabled,
+.btn.text[data-action="delete-work-order"][aria-disabled="true"] {
+    background: #6c757d !important;
+    color: #fff !important;
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn.text.danger:disabled:hover,
+.btn.text.danger[aria-disabled="true"]:hover,
+.is-completed-work-order .btn.text[data-action="delete-work-order"]:hover,
+tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover,
+.btn.text[data-action="delete-work-order"]:disabled:hover,
+.btn.text[data-action="delete-work-order"][aria-disabled="true"]:hover {
+    background: #6c757d !important;
+    transform: none;
+}
+
 .btn.text.success {
     background: #28a745;
 }

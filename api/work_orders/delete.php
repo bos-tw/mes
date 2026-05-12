@@ -56,13 +56,42 @@ $pdo = db();
 try {
     $pdo->beginTransaction();
 
-    // Check if work order exists
-    $checkStmt = $pdo->prepare("SELECT id, work_order_number FROM work_orders WHERE id = :id AND deleted_at IS NULL");
+    // Check if work order exists and whether its lifecycle allows deletion.
+    $checkStmt = $pdo->prepare("
+        SELECT
+            wo.id,
+            wo.work_order_number,
+            wo.status,
+            wo.completed_at,
+            wo.updated_at,
+            lv.value_key AS status_key,
+            lv.value_label AS status_label
+        FROM work_orders wo
+        LEFT JOIN lookup_values lv ON wo.status_lookup_id = lv.id
+        WHERE wo.id = :id AND wo.deleted_at IS NULL
+    ");
     $checkStmt->execute(['id' => $id]);
     $workOrder = $checkStmt->fetch(PDO::FETCH_ASSOC);
     if (!$workOrder) {
         $pdo->rollBack();
         jsonResponse(['success' => false, 'message' => '找不到該工單。'], 404);
+    }
+
+    $statusKey = strtolower(trim((string)($workOrder['status_key'] ?? '')));
+    $legacyStatus = strtolower(trim((string)($workOrder['status'] ?? '')));
+    $statusLabel = trim((string)($workOrder['status_label'] ?? ''));
+    if (!empty($workOrder['completed_at']) || $statusKey === 'completed' || $legacyStatus === 'completed' || $statusLabel === '已完成') {
+        if (empty($workOrder['completed_at']) && ($statusKey === 'completed' || $legacyStatus === 'completed' || $statusLabel === '已完成')) {
+            $lockStmt = $pdo->prepare('UPDATE work_orders SET completed_at = COALESCE(completed_at, updated_at, NOW()) WHERE id = :id');
+            $lockStmt->execute(['id' => $id]);
+            $pdo->commit();
+        } else {
+            $pdo->rollBack();
+        }
+        jsonResponse([
+            'success' => false,
+            'message' => '此工單已進入完成或追溯流程，無法刪除。若資料需更正，請使用退回狀態或作廢流程。',
+        ], 409);
     }
 
     // Auto-generated card-number rows are planning placeholders, not production history.

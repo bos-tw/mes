@@ -113,7 +113,7 @@ try {
     $pdo->beginTransaction();
 
     // Check if work order exists and get current status
-    $checkStmt = $pdo->prepare("SELECT id, status_lookup_id, order_item_id, total_units, total_weight_kg, weight_per_unit_g, tool_statistics FROM work_orders WHERE id = :id AND deleted_at IS NULL");
+    $checkStmt = $pdo->prepare("SELECT id, status, status_lookup_id, completed_at, order_item_id, total_units, total_weight_kg, weight_per_unit_g, tool_statistics FROM work_orders WHERE id = :id AND deleted_at IS NULL");
     $checkStmt->execute(['id' => $id]);
     $existingWorkOrder = $checkStmt->fetch(PDO::FETCH_ASSOC);
     if (!$existingWorkOrder) {
@@ -123,6 +123,14 @@ try {
 
     $oldStatusLookupId = (int)$existingWorkOrder['status_lookup_id'];
     $newStatusLookupId = isset($data['status_lookup_id']) ? (int)$data['status_lookup_id'] : $oldStatusLookupId;
+    $oldIsCompleted = isCompletedWorkOrderStatus($pdo, $oldStatusLookupId, $existingWorkOrder['status'] ?? null);
+    $newIsCompleted = isCompletedWorkOrderStatus($pdo, $newStatusLookupId, $data['status'] ?? $existingWorkOrder['status'] ?? null);
+    $hasCompletedAt = !empty($existingWorkOrder['completed_at']);
+
+    if ($newIsCompleted && !$hasCompletedAt) {
+        $data['completed_at'] = date('Y-m-d H:i:s');
+        $hasCompletedAt = true;
+    }
 
     // Build UPDATE query (只有在有工單欄位資料時才執行)
     if (!empty($data)) {
@@ -277,9 +285,8 @@ try {
     $deletedInventoryItemId = null;
 
     // ===== 工單完工 → 依使用者選擇建立庫存品項 =====
-    // status_lookup_id = 28 = completed (已完成)
-    $isCompletingNow = ($newStatusLookupId === 28 && $oldStatusLookupId !== 28);
-    $isReopeningCompleted = ($oldStatusLookupId === 28 && $newStatusLookupId !== 28);
+    $isCompletingNow = ($newIsCompleted && !$oldIsCompleted);
+    $isReopeningCompleted = ($oldIsCompleted && !$newIsCompleted);
 
     if ($isReopeningCompleted && $deleteInventoryOnReopen) {
         require_once __DIR__ . '/../inventory_items/helpers.php';

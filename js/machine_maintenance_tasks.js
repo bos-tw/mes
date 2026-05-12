@@ -60,6 +60,19 @@
             el.textContent = '';
         }
 
+        async function readJsonResponse(response, fallbackMessage) {
+            const raw = await response.text();
+            if (!raw || raw.trim() === '') {
+                throw new Error(`${fallbackMessage}（伺服器未回傳內容，HTTP ${response.status}）`);
+            }
+
+            try {
+                return JSON.parse(raw);
+            } catch (_error) {
+                throw new Error(`${fallbackMessage}（伺服器回應格式錯誤，HTTP ${response.status}）`);
+            }
+        }
+
         /* ---------- Modal ---------- */
         function openModal(editMode = false, data = null) {
             hideAlert($modalAlert);
@@ -215,8 +228,10 @@
                 if (state.dateTo) params.append('date_to', state.dateTo);
 
                 const resp = await fetch(`${API_BASE}/?${params}`);
-                const json = await resp.json();
-                if (!resp.ok) throw new Error(json.error || '載入失敗');
+                const json = await readJsonResponse(resp, '載入失敗');
+                if (!resp.ok || !json.success) {
+                    throw new Error(json.message || json.error || '載入失敗');
+                }
 
                 state.machines        = json.machines || [];
                 state.taskTypeOptions = json.taskTypeOptions || [];
@@ -279,7 +294,6 @@
         function renderPagination(json) {
             if (!$pagination) return;
 
-            let dataSyncHelper = null;
             const { page, totalPages, total } = json.pagination || json;
             if (totalPages <= 1) {
                 $pagination.innerHTML = `<span class="page-info">共 ${Number(total)} 筆</span>`;
@@ -293,16 +307,42 @@
 
         /* ---------- 新增/更新 ---------- */
         async function handleSubmit(formData) {
+            const machineIdRaw = String(formData.get('machine_id') || '').trim();
+            const taskType = String(formData.get('task_type') || '').trim();
+            const title = String(formData.get('title') || '').trim();
+            const scheduledStart = String(formData.get('scheduled_start') || '').trim();
+
+            if (!machineIdRaw) {
+                throw new Error('機台不可為空');
+            }
+            if (!taskType) {
+                throw new Error('任務類型不可為空');
+            }
+            if (!title) {
+                throw new Error('任務標題不可為空');
+            }
+            if (title.length > 150) {
+                throw new Error('任務標題不可超過 150 字');
+            }
+            if (!scheduledStart) {
+                throw new Error('預定開始時間不可為空');
+            }
+
+            const machineId = Number.parseInt(machineIdRaw, 10);
+            if (!Number.isInteger(machineId) || machineId <= 0) {
+                throw new Error('機台格式不正確');
+            }
+
             const payload = {
-                machine_id:      parseInt(formData.get('machine_id'), 10),
-                task_type:       formData.get('task_type'),
-                title:           formData.get('title'),
-                description:     formData.get('description'),
-                scheduled_start: formData.get('scheduled_start') ? formData.get('scheduled_start').replace('T', ' ') + ':00' : null,
+                machine_id:      machineId,
+                task_type:       taskType,
+                title,
+                description:     String(formData.get('description') || '').trim(),
+                scheduled_start: scheduledStart ? scheduledStart.replace('T', ' ') + ':00' : null,
                 scheduled_end:   formData.get('scheduled_end') ? formData.get('scheduled_end').replace('T', ' ') + ':00' : null,
                 actual_start:    formData.get('actual_start') ? formData.get('actual_start').replace('T', ' ') + ':00' : null,
                 actual_end:      formData.get('actual_end') ? formData.get('actual_end').replace('T', ' ') + ':00' : null,
-                status:          formData.get('status'),
+                status:          String(formData.get('status') || 'pending').trim() || 'pending',
                 next_due_date:   formData.get('next_due_date') || null,
             };
 
@@ -315,8 +355,10 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
-            const json = await resp.json();
-            if (!resp.ok) throw new Error(json.error || '操作失敗');
+            const json = await readJsonResponse(resp, '操作失敗');
+            if (!resp.ok || !json.success) {
+                throw new Error(json.message || json.error || '操作失敗');
+            }
 
             closeModal();
             showAlert($alert, isEdit ? '更新成功' : '新增成功', 'success');
@@ -335,8 +377,10 @@
         async function handleEdit(id) {
             try {
                 const resp = await fetch(`${API_BASE}/show.php?id=${id}`);
-                const json = await resp.json();
-                if (!resp.ok) throw new Error(json.error || '載入失敗');
+                const json = await readJsonResponse(resp, '載入失敗');
+                if (!resp.ok || !json.success) {
+                    throw new Error(json.message || json.error || '載入失敗');
+                }
                 openModal(true, json.data);
             } catch (err) {
                 showAlert($alert, err.message);
@@ -351,8 +395,10 @@
                 const resp = await fetch(`${API_BASE}/delete.php?id=${id}`, {
                     method: 'DELETE',
                 });
-                const json = await resp.json();
-                if (!resp.ok) throw new Error(json.error || '刪除失敗');
+                const json = await readJsonResponse(resp, '刪除失敗');
+                if (!resp.ok || !json.success) {
+                    throw new Error(json.message || json.error || '刪除失敗');
+                }
 
                 showAlert($alert, '刪除成功', 'success');
                 loadData();
