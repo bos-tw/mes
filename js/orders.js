@@ -249,6 +249,20 @@
             return params;
         }
 
+        async function readJsonResponse(response, fallbackMessage) {
+            const raw = await response.text();
+            if (!raw || raw.trim() === '') {
+                throw new Error(`${fallbackMessage}（伺服器未回傳內容，HTTP ${response.status}）`);
+            }
+
+            try {
+                return JSON.parse(raw);
+            } catch (error) {
+                console.error('orders: 非 JSON 回應內容', raw);
+                throw new Error(`${fallbackMessage}（伺服器回應格式錯誤，HTTP ${response.status}）`);
+            }
+        }
+
         function updateSortIndicators() {
             if (!tableElement) return;
 
@@ -846,14 +860,16 @@
 
             try {
                 const response = await fetch(`api/orders/delete.php?id=${id}`, {
-                    method: 'DELETE',
+                    method: 'POST',
                     credentials: 'include',
                     headers: {
                         'Accept': 'application/json',
+                        'Content-Type': 'application/json',
                     },
+                    body: JSON.stringify({ _method: 'DELETE' }),
                 });
 
-                const result = await response.json();
+                const result = await readJsonResponse(response, '刪除失敗，請稍後再試。');
                 if (!response.ok || !result.success) {
                     throw new Error(result.message || '刪除失敗，請稍後再試。');
                 }
@@ -1074,14 +1090,16 @@
 
             try {
                 const response = await fetch(`api/order_items/delete.php?id=${encodeURIComponent(orderItemId)}`, {
-                    method: 'DELETE',
+                    method: 'POST',
                     credentials: 'include',
                     headers: {
                         'Accept': 'application/json',
+                        'Content-Type': 'application/json',
                     },
+                    body: JSON.stringify({ _method: 'DELETE' }),
                 });
 
-                const result = await response.json();
+                const result = await readJsonResponse(response, '刪除訂單細項失敗。');
                 if (!response.ok || !result.success) {
                     throw new Error(result.message || '刪除訂單細項失敗。');
                 }

@@ -127,7 +127,9 @@ function handleUpdateMachine(int $id): void
     }
 
     if (array_key_exists('machine_number', $data)) {
-        $checkStmt = $pdo->prepare('SELECT id FROM machines WHERE machine_number = :machine_number AND id <> :id AND deleted_at IS NULL');
+        $checkStmt = $pdo->prepare(
+            'SELECT id FROM machines WHERE machine_number = :machine_number AND id <> :id' . machineActiveCondition($pdo)
+        );
         $checkStmt->execute([
             'machine_number' => $data['machine_number'],
             'id' => $id,

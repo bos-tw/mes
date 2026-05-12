@@ -236,6 +236,20 @@ function formatDecimal(value) {
             tableBody.innerHTML = html;
         }
 
+        async function readJsonResponse(response, fallbackMessage) {
+            const raw = await response.text();
+            if (!raw || raw.trim() === '') {
+                throw new Error(`${fallbackMessage}（伺服器未回傳內容，HTTP ${response.status}）`);
+            }
+
+            try {
+                return JSON.parse(raw);
+            } catch (error) {
+                console.error('machines: 非 JSON 回應內容', raw);
+                throw new Error(`${fallbackMessage}（伺服器回應格式錯誤，HTTP ${response.status}）`);
+            }
+        }
+
         async function fetchDepartments() {
             if (cachedDepartments !== null) {
                 return cachedDepartments;
@@ -254,7 +268,7 @@ function formatDecimal(value) {
                     throw new Error(`HTTP ${response.status}`);
                 }
 
-                const result = await response.json();
+                const result = await readJsonResponse(response, '載入部門列表失敗');
                 cachedDepartments = Array.isArray(result.data) ? result.data : [];
             } catch (error) {
                 console.error('載入部門列表時發生錯誤：', error);
@@ -308,7 +322,7 @@ function formatDecimal(value) {
                     throw new Error(`HTTP ${response.status}`);
                 }
 
-                const result = await response.json();
+                const result = await readJsonResponse(response, '載入查詢值失敗');
                 if (!result.success || !Array.isArray(result.data)) {
                     throw new Error('查詢值載入失敗');
                 }
@@ -415,7 +429,7 @@ function formatDecimal(value) {
                     throw new Error(`載入失敗（${response.status}）`);
                 }
 
-                const result = await response.json();
+                const result = await readJsonResponse(response, `載入失敗（${response.status}）`);
                 if (!result.success) {
                     throw new Error(result.message || '載入失敗，請稍後再試。');
                 }
@@ -571,7 +585,7 @@ function formatDecimal(value) {
                     throw new Error(`讀取機台資料失敗（${response.status}）`);
                 }
 
-                const result = await response.json();
+                const result = await readJsonResponse(response, `讀取機台資料失敗（${response.status}）`);
                 if (!result.success || !result.data) {
                     throw new Error(result.message || '讀取機台資料失敗。');
                 }
@@ -592,14 +606,16 @@ function formatDecimal(value) {
 
             try {
                 const response = await fetch(`api/machines/delete.php?id=${id}`, {
-                    method: 'DELETE',
+                    method: 'POST',
                     credentials: 'include',
                     headers: {
                         'Accept': 'application/json',
+                        'Content-Type': 'application/json',
                     },
+                    body: JSON.stringify({ _method: 'DELETE' }),
                 });
 
-                const result = await response.json();
+                const result = await readJsonResponse(response, '刪除失敗，請稍後再試。');
                 if (!response.ok || !result.success) {
                     throw new Error(result.message || '刪除失敗，請稍後再試。');
                 }
@@ -699,7 +715,8 @@ function formatDecimal(value) {
 
                 const isEdit = state.currentEditingId !== null;
                 const endpoint = isEdit ? `api/machines/update.php?id=${state.currentEditingId}` : 'api/machines/index.php';
-                const method = isEdit ? 'PUT' : 'POST';
+                const method = 'POST';
+                const requestPayload = isEdit ? { ...payload, _method: 'PUT' } : payload;
 
                 try {
                     const response = await fetch(endpoint, {
@@ -709,10 +726,10 @@ function formatDecimal(value) {
                             'Accept': 'application/json',
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify(payload),
+                        body: JSON.stringify(requestPayload),
                     });
 
-                    const result = await response.json();
+                    const result = await readJsonResponse(response, '儲存失敗，請稍後再試。');
                     if (!response.ok || !result.success) {
                         const message = result && result.message ? result.message : '儲存失敗，請稍後再試。';
                         const errors = result && result.errors ? Object.values(result.errors).join('、') : '';

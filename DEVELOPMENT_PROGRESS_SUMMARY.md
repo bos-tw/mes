@@ -1,87 +1,79 @@
-# 開發進度摘要
+# DEVELOPMENT_PROGRESS_SUMMARY
 
-最後更新：2026-05-12
+## 專案架構（目錄與技術棧）
 
-## 專案架構
-
-- 專案路徑：`C:/Apache24/htdocs/mes`
-- 技術棧：
-  - 後端：PHP 8+（Apache）+ MySQL
-  - 前端：Vanilla JS + HTML + CSS（無前端框架）
-  - 報表：`print/*.html` 動態渲染 + API 資料聚合
-  - 更新機制：一鍵更新（`tools/build-update-package.ps1` 產生 `dist/update_*.zip`，含 `manifest.json`）
-- 主要目錄：
-  - `api/`：業務 API、報表 API、靜態報表產生 API
-  - `print/`：列印版報表模板（含 QRCode 產生）
-  - `js/`、`modules/`：系統模組前端邏輯與畫面
-  - `tools/`：審計與打包工具（`audit-system-health.js`、`validate-config-modules.js`）
-  - `release-notes/`：版本更新說明
-  - `dist/`：更新包輸出
+- 核心後端：`api/`（PHP 8 + PDO + Session/Auth + JSON API）
+- 前端模組：`js/`（Vanilla JS、IIFE 模組化、事件委派、DataSync 跨分頁同步）
+- 頁面與配置：`modules/` + `core/configs/` + `core/module-renderer.js`
+- 列印模板：`print/`（A4/A5 專用 HTML + CSS）
+- DB 與版本：`migrations/`、`release-notes/`
+- 打包與檢查：`tools/`（`build-update-package.ps1`、`audit-system-health.js`）
+- 發佈輸出：`dist/update_*.zip`（系統一鍵更新上傳來源）
 
 ## 已完成功能（本輪）
 
-1. 篩分檢驗結果報表版面重構（A4 可讀性導向）
+1. 列印版面修正（A4）
 - 檔案：`print/screening_inspection_print.html`
-- 完成內容：
-  - 移除 PPM 摘要卡與明細表 PPM 欄位（含切換按鈕邏輯）
-  - 重新分組資訊區：客戶資訊 / 訂單資訊 / 生產資訊
-  - 欄位改為中英對照，並補齊：客戶名稱、圖號、受篩產品、客戶聯絡人、客戶訂單編號、料號、客戶批號、完工日期、操作人員
-  - 調整圖表尺寸與間距，縮小不良分布區塊以提高單頁容納率
-  - 標題與區塊字重提升，表頭與內容加入分隔線，資訊卡對齊優化
+- 修正螢幕與列印預覽在「客戶資訊/訂單資訊/生產資訊」區塊的排版差異。
+- 優化中英標題佈局（同列顯示）以回收垂直空間，避免內容擠出單頁。
 
-2. 報表資料補強
-- 檔案：`api/reports/screening_inspection.php`
-- 完成內容：
-  - 回傳 `work_order.assigned_employee_name` 供列印畫面顯示操作人員
-  - `qrcode_url` 改為可解析同站路徑 fallback（未設定 `REPORT_EXTERNAL_URL` 時不再使用示範網域）
+2. 機台設備管理儲存/更新異常修正
+- 檔案：`js/machines.js`、`api/machines/index.php`、`api/machines/update.php`、`api/machines/helpers.php`
+- 修正儲存時 `HTTP 500` + 前端 `Unexpected end of JSON input` 的相容性問題。
+- 前端改為更穩定的回應解析流程，並統一 method override 送法。
 
-3. QRCode 產生流程改為「先確保可開啟」
-- 檔案：`print/screening_inspection_print.html`、`api/reports/generate_static.php`
-- 完成內容：
-  - 列印頁在產生 QR 前，先呼叫 `POST /api/reports/generate_static.php`
-  - 成功時優先使用 `public_url`；若只有 `file_path` 則轉同站可存取 URL
-  - `generate_static.php` 在 `REPORT_EXTERNAL_URL` 未設定時，自動回退同站 URL（依當前 host/path 組裝）
+3. 機台維修任務 UI 資料顯示修正
+- 檔案：`js/machine_maintenance_tasks.js`
+- 修正新增任務時機台下拉顯示 `undefined - 光篩機` 的問題（欄位映射/顯示字串處理）。
 
-4. AI 協作規範文件補充
+4. 客戶批號刪除與訂單主表內嵌明細刪除修正
+- 檔案：`js/order_items.js`、`js/orders.js`、`api/order_items/delete.php`
+- 修正兩處刪除按鈕失效：
+  - 訂單主表展開明細刪除
+  - 客戶批號列表刪除
+- 前端改為 `POST + _method=DELETE`，避免部分環境直接 `DELETE` 失敗。
+- 補強 JSON 回應解析（空回應/非 JSON 給出可讀錯誤訊息）。
+- 後端刪除 API 加入 schema 容錯（資料表/欄位存在檢查），避免因環境差異直接 500。
+
+5. 更新打包規範補強（避免再發）
 - 檔案：`.github/copilot-instructions.md`
-- 完成內容：新增「QRCode 報表設計紀錄（2026-05-12）」章節，定義試作階段策略、路徑規劃、未來擴充與檢查清單
+- 新增強制規範：
+  - 一鍵更新包最終輸出只能在 `dist/`
+  - 禁止手動壓縮作為最終交付
+  - 必須使用 `tools/build-update-package.ps1`
+  - 上傳前需檢查 ZIP 內含 `manifest.json` 與 `files/`
 
-5. 測試用更新包已產生（未上線）
-- `release-notes/2026-05-12-v1.0.5.txt`
-- `dist/update_v1.0.5_20260512_121138.zip`
+6. 更新包產出
+- 版本：`v1.0.6`
+- 檔案：`dist/update_v1.0.6_20260512_164300.zip`
+- `manifest.json` 已確認存在且欄位完整。
 
 ## 待修 Bug（已知問題與重現條件）
 
-1. 系統健康審計存在既有高風險項（非本輪引入）
-- 重現步驟：
-  - 在專案根目錄執行 `node tools/audit-system-health.js`
-- 目前主要錯誤：
-  - `J-2`：多個 JS 模組存在 `innerHTML` 未經 `escapeHtml()` 的 XSS 風險
-  - `F-1`：`order_items.js`、`work_orders.js`、`shipping_orders.js` 檔案過大
-  - `M-1`：`modules/report_descriptions.html` 按鈕 class 規範不符
+1. 無「已確認可穩定重現」的阻斷性新 Bug。
+- 狀態：本輪主要錯誤（刪除 500、儲存 500、JSON parse fail）皆已修正。
 
-2. QRCODE 外部入口仍屬試作階段
-- 重現條件：
-  - 在未設定 `REPORT_EXTERNAL_URL` 的環境掃碼可開啟同站靜態頁，但尚未導入 token 化公開入口
-- 影響：
-  - 目前可用性已改善，但尚未完成「固定入口 + 可控授權 + 防枚舉」最終架構
+2. 需回歸驗證的高風險路徑（建議視為準待修）
+- 路徑 A：刪除客戶批號（含有/不含有關聯工單、庫存、出貨、退貨）。
+  - 重現方式：於 `訂單主表管理` 與 `客戶批號` 兩處各操作一次刪除。
+  - 預期：可刪除時回 200；有關聯時回 409 並顯示阻擋訊息；不得再出現空 500。
+- 路徑 B：機台管理儲存/更新。
+  - 重現方式：新增機台、編輯機台後儲存。
+  - 預期：不得再出現 `Unexpected end of JSON input` 或 `伺服器未回傳內容，HTTP 500`。
 
 ## 下一步任務（優先順序）
 
-1. 完成一鍵更新 UAT（本輪 `v1.0.5`）
-- 驗證項：上傳、初始化檢查、套用、版本資訊、回滾流程
-- 測試通過後再正式標記 release 與部署
+1. 立即回歸測試（P0）
+- 針對 `machines`、`machine_maintenance_tasks`、`orders/order_items` 跑完整 CRUD 與錯誤情境。
+- 確認所有寫入 API 回應均為有效 JSON。
 
-2. 修復 `J-2` XSS 風險（最高優先）
-- 依 `audit-system-health` 清單分批改寫 `innerHTML` 注入點，統一套用 `escapeHtml()` / 安全渲染
+2. 打包流程標準化落地（P0）
+- 僅使用 `tools/build-update-package.ps1` 發佈。
+- 上傳前固定執行 ZIP 內容自檢（`manifest.json` + `files/`）。
 
-3. QRCODE 公開頁架構升級
-- 規劃 `.../report/{token}` 固定入口（可撤銷、可過期、可權限控管）
-- 保持舊靜態連結向後相容
+3. 列印頁最終驗證（P1）
+- 針對 `screening_inspection_print.html` 做多筆資料、高缺陷數量、長字串場景列印預覽確認單頁穩定性。
 
-4. 報表線上資訊擴充（沿用既有 QR 入口）
-- 優先新增：異常說明、處置記錄、檢驗圖片/附件、修訂歷程
-- 原則：紙本快照固定，線上資訊可增量擴充
-
-5. 前端技術債收斂
-- 拆分大型 JS 模組與樣式規範修正，降低後續改動風險
+4. 清理與技術債（P2）
+- 依 `audit-system-health.js` 結果持續清理警告。
+- 評估將大型前端模組（如 `order_items.js`）拆分為 API/Render/Main 三層。

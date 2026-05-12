@@ -11,9 +11,18 @@
     <!-- Chart.js 圓餅圖 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
+        :root {
+            --a4-width: 210mm;
+            --a4-height: 297mm;
+            --page-margin: 5mm;
+            --content-padding: 6mm;
+            --printable-width: calc(var(--a4-width) - (var(--page-margin) * 2));
+            --printable-height: calc(var(--a4-height) - (var(--page-margin) * 2));
+        }
+
         @page {
             size: A4;
-            margin: 5mm;
+            margin: var(--page-margin);
         }
 
         * {
@@ -32,10 +41,10 @@
 
         .page-container {
             background-color: white;
-            width: 210mm;
-            min-height: 297mm;
+            width: var(--printable-width);
+            min-height: var(--printable-height);
             margin: 20px auto;
-            padding: 6mm;
+            padding: var(--content-padding);
             box-sizing: border-box;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             display: flex;
@@ -235,6 +244,19 @@
             line-height: 1.25;
         }
 
+        .field-title {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .field-title .title-en {
+            color: #777;
+            font-size: 6.6pt;
+            font-weight: 500;
+        }
+
         .meta-table tr + tr th,
         .meta-table tr + tr td {
             border-top: 1px dashed #d9d9d9;
@@ -432,27 +454,61 @@
                 print-color-adjust: exact;
             }
             .page-container {
-                margin: 0;
-                width: 100%;
+                margin: 0 auto;
+                width: var(--printable-width);
                 min-height: auto;
                 height: auto;
                 box-shadow: none;
-                padding: 2.5mm;
+                padding: var(--content-padding);
                 display: block;
             }
             .main-content {
                 flex: none;
             }
+            .info-groups {
+                grid-template-columns: 1fr 1fr;
+            }
+            .info-card.production {
+                grid-column: 1 / -1;
+            }
+            .meta-table th {
+                width: 38%;
+            }
+            .info-card-header {
+                padding-top: 3px;
+                padding-bottom: 3px;
+            }
+            .meta-table th,
+            .meta-table td {
+                padding-top: 2px;
+                padding-bottom: 2px;
+                line-height: 1.15;
+            }
+            .meta-table tr.empty-row th,
+            .meta-table tr.empty-row td {
+                padding-top: 5px;
+                padding-bottom: 5px;
+            }
+            .chart-section,
+            .report-description-section,
             footer {
-                margin-top: 8px;
-                page-break-inside: avoid;
+                break-inside: auto;
+                page-break-inside: auto;
+            }
+            footer {
+                margin-top: 6px;
                 padding-top: 6px;
                 gap: 8px;
             }
-            .footer-address,
-            .footer-contacts {
-                font-size: 7pt;
-                line-height: 1.25;
+            .chart-section {
+                margin: 4px 0 6px;
+            }
+            .pie-canvas-container {
+                width: 88%;
+            }
+            .report-description-section {
+                margin-top: 4px;
+                padding: 5px 8px;
             }
             .summary-card.good { background-color: #e8f5e9 !important; }
             .summary-card.defect { background-color: #ffebee !important; }
@@ -692,19 +748,19 @@
                     <div class="info-card-header">👤 客戶資訊 <span class="title-en">Customer Profile</span></div>
                     <table class="meta-table">
                         <tr>
-                            <th>客戶名稱<br><small>Customer Name</small></th>
+                            <th><span class="field-title">客戶名稱 <span class="title-en">Customer Name</span></span></th>
                             <td>${escapeHtml(customer.name) || '-'}</td>
                         </tr>
                         <tr>
-                            <th>聯絡人<br><small>Customer Contact</small></th>
+                            <th><span class="field-title">聯絡人 <span class="title-en">Customer Contact</span></span></th>
                             <td>${escapeHtml(customer.contact_person) || '-'}</td>
                         </tr>
                         <tr class="empty-row">
-                            <th>&nbsp;<br><small>&nbsp;</small></th>
+                            <th>&nbsp;</th>
                             <td>&nbsp;</td>
                         </tr>
                         <tr class="empty-row">
-                            <th>&nbsp;<br><small>&nbsp;</small></th>
+                            <th>&nbsp;</th>
                             <td>&nbsp;</td>
                         </tr>
                     </table>
@@ -713,19 +769,19 @@
                     <div class="info-card-header">📦 訂單資訊 <span class="title-en">Order Details</span></div>
                     <table class="meta-table">
                         <tr>
-                            <th>客戶訂單編號<br><small>Customer Order No.</small></th>
+                            <th><span class="field-title">客戶訂單編號 <span class="title-en">Customer Order No.</span></span></th>
                             <td>${escapeHtml(order.customer_po_number || order.order_number) || '-'}</td>
                         </tr>
                         <tr>
-                            <th>料號<br><small>Part No.</small></th>
+                            <th><span class="field-title">料號 <span class="title-en">Part No.</span></span></th>
                             <td>${escapeHtml(order_item.part_number) || '-'}</td>
                         </tr>
                         <tr>
-                            <th>圖號<br><small>Drawing No.</small></th>
+                            <th><span class="field-title">圖號 <span class="title-en">Drawing No.</span></span></th>
                             <td>${escapeHtml(order_item.drawing_number) || '-'}</td>
                         </tr>
                         <tr>
-                            <th>客戶批號<br><small>Customer Batch No.</small></th>
+                            <th><span class="field-title">客戶批號 <span class="title-en">Customer Batch No.</span></span></th>
                             <td>${escapeHtml(order_item.customer_batch_number) || '-'}</td>
                         </tr>
                     </table>
@@ -734,15 +790,15 @@
                     <div class="info-card-header">🏭 生產資訊 <span class="title-en">Production Details</span></div>
                     <table class="meta-table">
                         <tr>
-                            <th>受篩產品<br><small>Screened Product</small></th>
+                            <th><span class="field-title">受篩產品 <span class="title-en">Screened Product</span></span></th>
                             <td>${escapeHtml(screening_item.name) || '-'}</td>
                         </tr>
                         <tr>
-                            <th>完工日期<br><small>Completion Date</small></th>
+                            <th><span class="field-title">完工日期 <span class="title-en">Completion Date</span></span></th>
                             <td>${formatDate(work_order.actual_end_date)}</td>
                         </tr>
                         <tr>
-                            <th>操作人員<br><small>Assigned Operator</small></th>
+                            <th><span class="field-title">操作人員 <span class="title-en">Assigned Operator</span></span></th>
                             <td>${escapeHtml(work_order.assigned_employee_name) || '-'}</td>
                         </tr>
                     </table>

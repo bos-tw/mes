@@ -180,7 +180,9 @@ function handleCreateMachine(): void
 
     $data = $validated['data'];
 
-    $checkStmt = $pdo->prepare('SELECT id FROM machines WHERE machine_number = :machine_number AND deleted_at IS NULL');
+    $checkStmt = $pdo->prepare(
+        'SELECT id FROM machines WHERE machine_number = :machine_number' . machineActiveCondition($pdo)
+    );
     $checkStmt->execute(['machine_number' => $data['machine_number']]);
     if ($checkStmt->fetch()) {
         jsonResponse([

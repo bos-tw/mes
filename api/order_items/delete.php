@@ -43,6 +43,64 @@ requireAuth();
 
 requireMethod('DELETE');
 
+/**
+ * 檢查資料表是否存在（避免不同環境 schema 漂移時直接 500）。
+ */
+function orderItemDeleteTableExists(PDO $pdo, string $table): bool
+{
+    static $cache = [];
+    if (array_key_exists($table, $cache)) {
+        return $cache[$table];
+    }
+
+    // 僅允許英數與底線，避免 SQL identifier 風險
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+        $cache[$table] = false;
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->prepare('SHOW TABLES LIKE ?');
+        $stmt->execute([$table]);
+        $cache[$table] = $stmt->fetchColumn() !== false;
+    } catch (Throwable $exception) {
+        $cache[$table] = false;
+    }
+
+    return $cache[$table];
+}
+
+/**
+ * 檢查資料表欄位是否存在。
+ */
+function orderItemDeleteColumnExists(PDO $pdo, string $table, string $column): bool
+{
+    static $cache = [];
+    $cacheKey = $table . '.' . $column;
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $table) || !preg_match('/^[a-zA-Z0-9_]+$/', $column)) {
+        $cache[$cacheKey] = false;
+        return false;
+    }
+
+    if (!orderItemDeleteTableExists($pdo, $table)) {
+        $cache[$cacheKey] = false;
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
+        $cache[$cacheKey] = $stmt !== false && $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+    } catch (Throwable $exception) {
+        $cache[$cacheKey] = false;
+    }
+
+    return $cache[$cacheKey];
+}
+
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 if (!$id) {
     jsonResponse([
@@ -64,20 +122,36 @@ if (!$orderItem) {
 $orderId = (int)$orderItem['order_id'];
 
 // 檢查是否有關聯資料
+// order_item_tools / order_item_screening_details / drawings / attachments
+// 由資料庫外鍵 ON DELETE CASCADE 處理，不需阻擋刪除。
 $relatedTables = [
     ['table' => 'work_orders', 'column' => 'order_item_id', 'label' => '工單', 'softDelete' => true],
+    ['table' => 'inventory_items', 'column' => 'order_item_id', 'label' => '庫存'],
     ['table' => 'shipping_order_items', 'column' => 'order_item_id', 'label' => '出貨品項'],
     ['table' => 'return_order_items', 'column' => 'order_item_id', 'label' => '退貨品項'],
-    ['table' => 'order_item_screening_details', 'column' => 'order_item_id', 'label' => '篩分服務明細'],
-    ['table' => 'order_item_tools', 'column' => 'order_item_id', 'label' => '載具配置'],
 ];
 $relatedLabels = [];
 foreach ($relatedTables as $rel) {
-    $softDeleteCondition = isset($rel['softDelete']) && $rel['softDelete'] ? ' AND deleted_at IS NULL' : '';
-    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM {$rel['table']} WHERE {$rel['column']} = ?{$softDeleteCondition}");
+    $table = (string)$rel['table'];
+    $column = (string)$rel['column'];
+
+    if (!orderItemDeleteTableExists($pdo, $table) || !orderItemDeleteColumnExists($pdo, $table, $column)) {
+        continue;
+    }
+
+    $where = "`{$column}` = ?";
+    if (
+        isset($rel['softDelete'])
+        && $rel['softDelete']
+        && orderItemDeleteColumnExists($pdo, $table, 'deleted_at')
+    ) {
+        $where .= ' AND deleted_at IS NULL';
+    }
+
+    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM `{$table}` WHERE {$where}");
     $checkStmt->execute([$id]);
     if ((int)$checkStmt->fetchColumn() > 0) {
-        $relatedLabels[] = $rel['label'];
+        $relatedLabels[] = (string)$rel['label'];
     }
 }
 if (!empty($relatedLabels)) {

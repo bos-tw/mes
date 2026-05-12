@@ -2510,6 +2510,20 @@ function updateButtons() {
             }
         }
 
+        async function readJsonResponse(response, fallbackMessage) {
+            const raw = await response.text();
+            if (!raw || raw.trim() === '') {
+                throw new Error(`${fallbackMessage}（伺服器未回傳內容，HTTP ${response.status}）`);
+            }
+
+            try {
+                return JSON.parse(raw);
+            } catch (error) {
+                console.error('order_items: 非 JSON 回應內容', raw);
+                throw new Error(`${fallbackMessage}（伺服器回應格式錯誤，HTTP ${response.status}）`);
+            }
+        }
+
         async function handleDelete(id) {
             if (!state.orderContext) {
                 return;
@@ -2526,14 +2540,16 @@ function updateButtons() {
 
             try {
                 const response = await fetch(`api/order_items/delete.php?id=${encodeURIComponent(id)}`, {
-                    method: 'DELETE',
+                    method: 'POST',
                     credentials: 'include',
                     headers: {
                         'Accept': 'application/json',
+                        'Content-Type': 'application/json',
                     },
+                    body: JSON.stringify({ _method: 'DELETE' }),
                 });
 
-                const result = await response.json();
+                const result = await readJsonResponse(response, '刪除客戶批號失敗。');
 
                 if (!response.ok || !result.success) {
                     throw new Error(result?.message || `HTTP ${response.status}`);

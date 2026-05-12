@@ -25,6 +25,34 @@ require_once __DIR__ . '/../lookup_values/helpers.php';
 
 const MACHINE_ALLOWED_DECIMAL_FIELDS = ['length_mm', 'thread_outer_diameter_mm'];
 
+function machineHasDeletedAtColumn(PDO $pdo): bool
+{
+    static $hasDeletedAt = null;
+
+    if ($hasDeletedAt !== null) {
+        return $hasDeletedAt;
+    }
+
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM machines LIKE 'deleted_at'");
+        $hasDeletedAt = $stmt !== false && $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+    } catch (PDOException $exception) {
+        $hasDeletedAt = false;
+    }
+
+    return $hasDeletedAt;
+}
+
+function machineActiveCondition(PDO $pdo, string $alias = ''): string
+{
+    if (!machineHasDeletedAtColumn($pdo)) {
+        return '';
+    }
+
+    $prefix = $alias !== '' ? $alias . '.' : '';
+    return ' AND ' . $prefix . 'deleted_at IS NULL';
+}
+
 /**
  * Retrieve request payload supporting JSON and form submissions.
  *
@@ -237,7 +265,7 @@ function findMachine(PDO $pdo, int $id): ?array
         . 'FROM machines m '
         . 'LEFT JOIN departments d ON d.id = m.department_id '
         . 'LEFT JOIN lookup_values lv ON lv.id = m.status_lookup_id '
-        . 'WHERE m.id = :id AND m.deleted_at IS NULL LIMIT 1';
+        . 'WHERE m.id = :id' . machineActiveCondition($pdo, 'm') . ' LIMIT 1';
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['id' => $id]);
@@ -255,7 +283,7 @@ function findMachine(PDO $pdo, int $id): ?array
  */
 function machineExists(PDO $pdo, int $id): bool
 {
-    $stmt = $pdo->prepare('SELECT 1 FROM machines WHERE id = :id AND deleted_at IS NULL LIMIT 1');
+    $stmt = $pdo->prepare('SELECT 1 FROM machines WHERE id = :id' . machineActiveCondition($pdo) . ' LIMIT 1');
     $stmt->execute(['id' => $id]);
     return $stmt->fetchColumn() !== false;
 }

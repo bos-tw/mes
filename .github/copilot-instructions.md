@@ -186,6 +186,53 @@ $params = @{
 2. 以 `Get-ChildItem .\dist\update_vX.Y.Z_*.zip` 檢查最新檔案時間。
 3. 更新後在「關於系統」確認版本更新內容正常顯示。
 
+### 更新包輸出位置規範（2026-05-12 新增，強制）
+
+1. 所有提供給「系統一鍵更新」使用的更新包，**必須輸出在 `dist/`**。
+2. 檔名必須沿用既有慣例：`dist/update_vX.Y.Z_YYYYMMDD_HHMMSS.zip`。
+3. `updates/` 僅可作為工作暫存或中間產物，**不得作為最終交付路徑**。
+4. AI 助手在回報更新包時，必須優先提供 `dist/...zip` 路徑。
+
+### 打包工具與格式規範（2026-05-12 新增，強制）
+
+1. **禁止手動壓縮**（`Compress-Archive`、7-Zip、手動拖拉壓縮）作為一鍵更新最終交付包。
+2. 一鍵更新包**必須**使用 `tools/build-update-package.ps1` 產生，因系統更新器要求 ZIP 根目錄含 `manifest.json`。
+3. 若缺少 `manifest.json`，系統會出現：`上傳失敗：更新包缺少 manifest.json。`。
+4. AI 助手若先做臨時包測試，最終仍必須重跑官方打包腳本並回報 `dist/update_*.zip`。
+
+#### 標準打包方法（強制）
+
+```powershell
+Set-Location "C:\Apache24\htdocs\mes"
+
+$params = @{
+    VersionNumber     = "vX.Y.Z"
+    FileVersion       = "vX.Y.Z"
+    ReleaseDate       = "YYYY-MM-DD"
+    ChangeSummaryFile = "release-notes/YYYY-MM-DD-vX.Y.Z.txt"
+    Files             = @(
+        "js/example.js",
+        "api/example.php"
+    )
+    Migrations        = @()
+    OutputDir         = "dist"
+}
+
+& ".\tools\build-update-package.ps1" @params
+```
+
+#### 上傳前格式自檢（強制）
+
+```powershell
+# 1) 確認 ZIP 內有 manifest.json 與 files/ 目錄
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = "dist/update_vX.Y.Z_YYYYMMDD_HHMMSS.zip"
+[System.IO.Compression.ZipFile]::OpenRead($zip).Entries | Select-Object -ExpandProperty FullName
+
+# 2) 可選：解壓後檢查 manifest.json 內容欄位
+# version_number / file_version / release_date / files_root / migrations
+```
+
 ### 版本更新內容顯示規範（強制）
 
 - 系統端僅顯示最新三筆更新紀錄。
