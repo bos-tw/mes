@@ -3,12 +3,8 @@
 # =============================================
 
 # ⚠️ 重要：資料庫憑證設定檔 (S-1 安全修正)
-# 正式環境請透過環境變數注入，而非修改此檔案：
-#   SCREWSYSTEM_DB_HOST
-#   SCREWSYSTEM_DB_NAME
-#   SCREWSYSTEM_DB_USER
-#   SCREWSYSTEM_DB_PASSWORD
-api/config.php
+# 目前團隊決議：api/config.php 允許進版控以支援多機開發。
+# 若未來要回復安全模式，可改回忽略並改用環境變數注入。
 
 # 建議：使用範本複製後加入本機設定
 # cp api/config.php.example api/config.php
@@ -20,10 +16,15 @@ uploads/logos/*.png
 uploads/logos/*.gif
 uploads/logos/*.webp
 uploads/**
+!uploads/_fixtures/
+!uploads/_fixtures/**
 export/**
 db_backups/**
 db_exports/**
 old/**
+
+# ── 打包產物 ────────────────────────────────
+dist/*.zip
 
 # ── 相依套件 ────────────────────────────────
 vendor/

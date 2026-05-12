@@ -14,9 +14,9 @@ declare(strict_types=1);
 // Database configuration with environment variable overrides
 const DB_HOST = 'localhost';
 const DB_PORT = 3306;
-const DB_NAME = 'your_database_name';
-const DB_USER = 'your_database_user';
-const DB_PASSWORD = 'your_database_password';
+const DB_NAME = 'yucyuan';
+const DB_USER = 'root';
+const DB_PASSWORD = '1q2w3e4r';
 
 const DB_CHARSET = 'utf8mb4';
 
