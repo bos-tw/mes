@@ -1,0 +1,11 @@
+{
+  "version_number": "v1.0.2",
+  "file_version": "v1.0.2",
+  "release_date": "2026-05-09",
+  "change_summary": "1. 新增系統更新初始化檢查按鈕。\n2. 新增更新包上傳/套用/狀態 API。\n3. 補強缺表與錯誤訊息處理。",
+  "files_root": "files",
+  "migrations": [
+    "migrations/2026_05_09_create_system_update_jobs.sql",
+    "migrations/2026_05_09_create_system_update_logs.sql"
+  ]
+}

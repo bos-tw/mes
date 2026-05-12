@@ -1,0 +1,12 @@
+# 禁止執行 PHP 或腳本檔案
+<FilesMatch "\.(php|phtml|php3|php4|php5|phps|cgi|pl|py|sh|bat)$">
+    Require all denied
+</FilesMatch>
+
+# 禁止目錄列表
+Options -Indexes
+
+# 僅允許常見的安全檔案類型
+<FilesMatch "\.(?i)(jpg|jpeg|png|gif|bmp|webp|svg|pdf|doc|docx|xls|xlsx|csv|txt|zip)$">
+    Require all granted
+</FilesMatch>
