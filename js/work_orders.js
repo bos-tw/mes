@@ -1490,10 +1490,10 @@
                 <td>${formatDateTime(item.actual_end_date)}${item.actual_end_date ? ` <span class="weekday-text">${getWeekdayText(item.actual_end_date)}</span>` : ''}</td>
                 <td><span class="status-badge ${statusClass}">${escapeHtml(item.status_label || '')}</span></td>
                 <td class="table-actions">
-                    <button type="button" class="btn text" data-action="print-work-order" title="${item.is_printed ? '再次列印（已列印過）' : '列印工單'}">
+                    <button type="button" class="btn text op-action-btn op-role-print" data-action="print-work-order" title="${item.is_printed ? '再次列印（已列印過）' : '列印工單'}">
                         <i class="fas fa-print"></i>
                     </button>
-                    <button type="button" class="btn text" data-action="print-screening-report" title="列印篩分檢驗報表">
+                    <button type="button" class="btn text op-action-btn op-role-screening-report" data-action="print-screening-report" title="列印篩分檢驗結果報表" aria-label="列印篩分檢驗結果報表">
                         <i class="fas fa-file-medical-alt"></i>
                     </button>
                     <button type="button" class="btn text" data-action="edit-work-order" title="編輯">
@@ -2781,10 +2781,80 @@
         }
     }
 
+        function isModalVisible(modal) {
+            return modal && !modal.classList.contains('hidden');
+        }
+
+        async function refreshCreateModalSourcesForDataSync(sourceModule = null) {
+            if (!isModalVisible(elements.createModal)) {
+                return;
+            }
+
+            const customerSelect = elements.createModalForm.querySelector('[name="source_customer_id"]');
+            const orderSelect = elements.createModalForm.querySelector('[name="source_order_id"]');
+            const itemSelect = elements.createModalForm.querySelector('[name="order_item_id"]');
+            const currentCustomerId = customerSelect?.value || '';
+            const currentOrderId = orderSelect?.value || '';
+            const currentOrderItemId = itemSelect?.value || '';
+
+            if (sourceModule === 'customers') {
+                await loadCustomersForSelect();
+                if (customerSelect && currentCustomerId) {
+                    customerSelect.value = currentCustomerId;
+                }
+            }
+
+            if (currentCustomerId && ['customers', 'orders', 'order_items'].includes(sourceModule)) {
+                await loadOrdersForSelect(currentCustomerId);
+                if (orderSelect && currentOrderId) {
+                    orderSelect.value = currentOrderId;
+                }
+            }
+
+            if (currentOrderId && ['orders', 'order_items', 'work_orders'].includes(sourceModule)) {
+                await loadOrderItemsForSelect(currentOrderId);
+                if (itemSelect && currentOrderItemId) {
+                    itemSelect.value = currentOrderItemId;
+                }
+            }
+
+            const searchResults = elements.createModalForm.querySelector('[data-search-results]');
+            if (
+                searchResults &&
+                !searchResults.classList.contains('hidden') &&
+                ['orders', 'order_items', 'work_orders'].includes(sourceModule)
+            ) {
+                await performSearch();
+            }
+        }
+
+        async function refreshOpenWorkOrderModalForDataSync(sourceModule = null) {
+            if (isModalVisible(elements.editModal) && state.editingId) {
+                await loadWorkOrderData(state.editingId);
+            }
+
+            await refreshCreateModalSourcesForDataSync(sourceModule);
+        }
+
+        async function refreshWorkOrdersForDataSync(sourceModule = null) {
+            if (sourceModule === 'machines') {
+                await loadMachines();
+            }
+            if (sourceModule === 'employees') {
+                await loadEmployees();
+            }
+            if (sourceModule === 'lookup_values') {
+                await loadStatuses();
+            }
+            await loadWorkOrders();
+            await refreshOpenWorkOrderModalForDataSync(sourceModule);
+        }
+
         // 建立資料同步輔助器
         if (typeof DataSync !== 'undefined') {
             DataSync.createModuleHelper('work_orders', {
-                onRefresh: () => loadWorkOrders(),
+                onRefresh: () => refreshWorkOrdersForDataSync(),
+                onDependencyUpdate: (sourceModule) => refreshWorkOrdersForDataSync(sourceModule),
                 debounceMs: 300
             });
         }

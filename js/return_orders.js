@@ -1099,16 +1099,56 @@
             }
         }
 
+        function isModalVisible(modal) {
+            return modal && !modal.classList.contains('hidden');
+        }
+
+        async function refreshOpenReturnOrderFormForDataSync(sourceModule = null) {
+            if (!isModalVisible(elements.modal)) {
+                return;
+            }
+
+            if (state.editingId) {
+                await openEditModal(state.editingId);
+                return;
+            }
+
+            const currentCustomerId = elements.customerSelect?.value || '';
+            const currentShippingOrderId = elements.shippingOrderSelect?.value || '';
+
+            if (sourceModule === 'customers') {
+                await loadCustomerOptions();
+                if (elements.customerSelect && currentCustomerId) {
+                    elements.customerSelect.value = currentCustomerId;
+                }
+            }
+
+            if (currentCustomerId && ['customers', 'shipping_orders', 'shipping_order_items'].includes(sourceModule)) {
+                await loadShippingOrdersForCustomer(currentCustomerId, currentShippingOrderId || null);
+            } else if (currentShippingOrderId && ['shipping_orders', 'shipping_order_items'].includes(sourceModule)) {
+                await loadShippingOrderItems(currentShippingOrderId);
+            }
+        }
+
+        async function refreshReturnOrdersForDataSync(sourceModule = null) {
+            if (sourceModule === 'customers' || sourceModule === 'shipping_orders') {
+                await loadFilterOptions();
+            }
+
+            await loadData();
+
+            if (state.viewingId && isModalVisible(elements.detailModal)) {
+                await viewDetail(state.viewingId);
+            }
+
+            await refreshOpenReturnOrderFormForDataSync(sourceModule);
+        }
+
         // DataSync 訂閱
         if (typeof DataSync !== 'undefined') {
             dataSyncHelper = DataSync.createModuleHelper('return_orders', {
-                onRefresh: loadData,
-                onDependencyUpdate: (sourceModule) => {
-                    if (sourceModule === 'customers' || sourceModule === 'shipping_orders') {
-                        loadFilterOptions();
-                    }
-                    loadData();
-                }
+                onRefresh: () => refreshReturnOrdersForDataSync(),
+                onDependencyUpdate: (sourceModule) => refreshReturnOrdersForDataSync(sourceModule)
             });
         }
 

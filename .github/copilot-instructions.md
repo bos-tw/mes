@@ -114,7 +114,61 @@ node tools/validate-config-modules.js && node tools/audit-system-health.js
 
 ---
 
+#### 工具 3：DataSync 即時更新盤點（修改前端 CRUD / 狀態 / 按鈕時必跑）
+
+只要本輪修改涉及 `js/*.js` 的 CRUD、狀態切換、生命週期欄位、跨模組資料來源、列表按鈕可用/不可用判斷，必須執行：
+
+```bash
+node --check js/data-sync.js
+node --check tools/audit-data-sync.js
+node tools/audit-data-sync.js --write docs/data-sync-audit.md
+```
+
+強制通過標準：
+
+1. `P0` 必須為 `0`。
+2. `P1` 必須為 `0`。
+3. 若新增或修改相依關係，必須同步更新 `js/data-sync.js` 的 `MODULE_DEPENDENCIES` 與本文件的 DataSync 對照表。
+4. 若修改會影響雙頁同開的即時刷新，必須依 `docs/data-sync-regression-checklist.md` 做手動回歸。
+
+---
+
 ## 📦 更新安裝包打包規範（2026-05-09 新增）
+
+---
+
+## 🧱 Git 同步後本機資料庫 Schema 同步規範（2026-05-13 新增，強制）
+
+### 適用情境
+
+- 開發機執行 `git pull` 後，前端載入正常但 API 突然出現 `500`。
+- 常見徵兆：Console 顯示 `Unexpected end of JSON input`，Apache log 出現 `Unknown column ...`。
+
+### 強制流程（每次拉最新主分支後必做）
+
+```powershell
+Set-Location "C:\Apache24\htdocs\mes"
+powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1
+```
+
+### 腳本行為說明
+
+1. 讀取 `api/config.php`（並支援 `SCREWSYSTEM_DB_*` 環境變數覆蓋）。
+2. 逐一檢查 `migrations/` 對應 schema 是否已存在。
+3. 只套用「尚未到位」的 migration。
+4. 套用後再次驗證，失敗即停止並回報。
+
+### Dry Run（只檢查不寫入）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1 -DryRun
+```
+
+### 維護規則（強制）
+
+1. 新增 migration 檔案時，必須同步更新 `tools/sync-local-schema.ps1` 內的 `$migrationChecks`。
+2. 若腳本回報「未收錄 migration」，不得直接略過；需先補齊檢查規則再執行。
+3. 排查 API 500 時，先看 `C:\Apache24\logs\error.log`，再對照 migration。
 
 ### 適用範圍
 
@@ -366,20 +420,63 @@ actions: [
 
 | 用途 | data-action / class | 顏色 |
 |------|---------------------|------|
-| 檢視/明細/預覽 | `view`, `view-detail`, `view-details`, `detail`, `details`, `show`, `preview`, `preview-logo` | teal `#0f766e`，hover `#115e59` |
-| 列印 | `print`, `print-detail`, `print-single`, `print-work-order`, `print-screening-report` | purple `#7c3aed`，hover `#6d28d9` |
+| 檢視/明細/預覽 | `view`, `view-detail`, `view-details`, `detail`, `show`, `preview`, `preview-logo` | teal `#0f766e`，hover `#115e59` |
+| 列印 | `print`, `print-detail`, `print-single`, `print-work-order` | purple `#7c3aed`，hover `#6d28d9` |
+| 列印篩分檢驗結果報表 | `print-screening-report` | emerald `#059669`，hover `#047857` |
 | 編輯 | `edit`, `edit-from-detail`, `edit-order-item`, `edit-order-item-inline`, `edit-screening-item`, `edit-work-order`, `edit-draft` | blue `#2563eb`，hover `#1d4ed8` |
+| 展開/收合細項 | `details` | cyan `#0891b2`，hover `#0e7490` |
 | 客戶批號/訂單細項入口 | `open-order-items` | 銘黃色 `#f59e0b`，hover `#d97706` |
 | 複製 | `copy-order-item` | fuchsia `#c026d3`，hover `#a21caf` |
 | 建工單/轉庫存 | `create-work-order`, `convert-to-inventory` | brown-orange `#b45309`，hover `#92400e` |
 | 跳轉/前往關聯資料 | `goto-work-order`, `go-to-*` | slate `#475569`，hover `#334155` |
-| 回覆/標記/一般輔助 | `reply`, `mark-read`, 其他未列明 `.btn.text` | neutral blue-gray `#64748b`，hover `#475569` |
+| 回覆 | `reply` | indigo `#4f46e5`，hover `#4338ca` |
+| 標記已讀 | `mark-read` | lime `#65a30d`，hover `#4d7c0f` |
+| 一般輔助 | 其他未列明 `.btn.text` | neutral blue-gray `#64748b`，hover `#475569` |
 | 刪除/危險操作 | `.btn.text.danger`, `delete-*` | red `#dc3545`，hover `#a71d2a` |
-| 啟用/成功 | `.btn.text.success`, `add-to-shipping` | green `#28a745`，hover `#1e7e34` |
+| 加入出貨單/出貨操作 | `add-to-shipping` | green `#28a745`，hover `#1e7e34` |
+| 啟用/成功 | `.btn.text.success` | green `#28a745`，hover `#1e7e34` |
 | 停用/警告 | `.btn.text.warning` | orange `#f97316`，hover `#ea580c` |
 | 不可操作/已完成狀態 | `disabled`, `aria-disabled="true"` | gray `#6c757d` |
 
 列印按鈕不得與檢視按鈕同色；客戶批號不得與建工單/轉庫存同色；複製不得與編輯同色。若新增操作欄按鈕，優先沿用既有 `data-action` 命名以自動套用顏色，並同步更新此表與 `styles.css`。
+
+#### 操作欄按鈕跨模組統一規範（2026-05-13 新增，強制）
+
+為避免同一功能在不同模組出現不同顏色與不同名稱，系統已在 `script.js` 增加全域標準化機制（`OPERATION_ACTION_ROLE_MAP` / `OPERATION_ACTION_LABEL_MAP` + MutationObserver），會自動將操作欄按鈕套用統一語意樣式與名稱。
+
+##### 強制規則
+
+1. 操作欄容器統一使用：`td.table-actions`（舊模組可相容 `td.actions`、`td.actions-cell`、`td.actions-col`）。
+2. 操作按鈕必須有 `data-action`，並使用語意命名；禁止用顏色 class 代表功能。
+3. 禁止在操作欄按鈕寫 inline 色彩（`style="background:..."`、`style="color:..."`）。
+4. 禁止新增或回填舊樣式系統：`btn-icon`、`link icon-button`（僅允許既有歷史區塊維持相容，不得擴散）。
+5. 若同時有 `title` / `aria-label`，需符合下列統一命名；不得混用「查看 / 明細 / 詳情」等多種詞。
+
+##### 統一命名對照（title / aria-label）
+
+| data-action 群組 | 統一名稱 |
+|------------------|----------|
+| `view`, `view-detail`, `view-details`, `detail`, `show`, `preview`, `preview-logo` | `檢視` |
+| `details` | 依狀態使用 `展開細項` / `收合細項` |
+| `open-order-items` | `客戶批號` |
+| `edit`, `edit-draft`, `edit-from-detail`, `edit-order-item`, `edit-order-item-inline`, `edit-screening-item`, `edit-work-order` | `編輯` |
+| `delete`, `delete-*` | `刪除` |
+| `print`, `print-detail`, `print-single` | `列印` |
+| `print-work-order` | `列印工單` |
+| `print-screening-report` | `列印篩分檢驗結果報表` |
+| `reply` | `回覆` |
+| `mark-read` | `標記已讀` |
+
+##### 新增操作按鈕時的同步要求
+
+若新增了未收錄的 `data-action`：
+
+1. 先決定其語意角色（檢視 / 編輯 / 刪除 / 列印 / 流程 / 導向 / 中性）。
+2. 同步更新 `script.js`：
+   - `OPERATION_ACTION_ROLE_MAP`
+   - `OPERATION_ACTION_LABEL_MAP`（若需統一名稱）
+3. 若需要新增角色色系，再更新 `styles.css` 的 `.op-role-*` 區塊。
+4. 修改後至少手動驗證兩個以上模組同時開啟時，操作欄顏色與 tooltip 命名一致。
 
 #### modal 配置規則
 
@@ -1636,15 +1733,17 @@ A 分頁執行 CRUD
 | `employees` | `work_orders`, `orders`, `calendar_event_participants`, `calendar_event_reminders`, `work_order_first_piece_dimensions`, `messages`, `notifications`, `employee_roles`, `daily_machine_inspections`, `daily_machine_inspection_items`, `machine_maintenance_tasks`, `production_records`, `quality_issue_reports`, `shipping_quality_inspections` | 員工影響幾乎所有模組 |
 | `departments` | `employees`, `notifications`, `quality_issue_reports` | 部門影響員工/通知/品質報告 |
 | `roles` | `notifications`, `employee_roles`, `role_permissions` | 角色影響通知/員工角色/角色權限 |
+| `notifications` | `dashboard` | 公告/通知影響儀表板公告區 |
 | `permissions` | `role_permissions` | 權限影響角色權限 |
 | `machines` | `work_orders`, `machine_maintenance_tasks`, `daily_machine_inspections`, `production_records` | 機台影響工單/保養/檢驗/生產 |
 | `tools` | `work_orders`, `order_items` | 工具影響工單/訂單項目 |
 | `orders` | `order_items`, `work_orders`, `dashboard` | 訂單影響項目/工單/儀表板 |
-| `order_items` | `work_orders`, `inventory_items` | 訂單項目影響工單/庫存 |
-| `work_orders` | `work_order_images`, `work_order_first_piece_dimensions`, `inventory_items`, `inventory_transactions`, `dashboard`, `production_records` | 工單影響圖片/首件/庫存/儀表板/生產 |
+| `order_items` | `orders`, `work_orders`, `inventory_items` | 訂單項目影響訂單合計/工單/庫存 |
+| `work_orders` | `order_items`, `work_order_images`, `work_order_first_piece_dimensions`, `inventory_items`, `inventory_transactions`, `dashboard`, `production_records` | 工單影響訂單項目按鈕/圖片/首件/庫存/儀表板/生產 |
 | `shipping_orders` | `shipping_order_items`, `inventory_items`, `order_items`, `inventory_transactions`, `return_orders`, `dashboard`, `shipping_quality_inspections` | 出貨單影響出貨項目/庫存/退貨/儀表板/品質 |
-| `return_orders` | `inventory_items`, `inventory_transactions` | 退貨影響庫存 |
-| `inventory_items` | `inventory_transactions` | 庫存項目影響交易記錄 |
+| `shipping_order_items` | `shipping_orders`, `order_items`, `inventory_items`, `inventory_transactions`, `return_orders` | 出貨明細影響出貨單狀態/訂單項目/庫存/異動紀錄/退貨可選品項 |
+| `return_orders` | `inventory_items`, `inventory_transactions`, `shipping_orders`, `shipping_order_items` | 退貨影響庫存、異動紀錄與出貨/明細退貨狀態 |
+| `inventory_items` | `work_orders`, `inventory_transactions`, `shipping_orders`, `shipping_order_items` | 庫存項目影響工單轉庫存按鈕、出貨分配與交易記錄 |
 | `dashboard_calendar_events` | `calendar_event_participants`, `calendar_event_reminders`, `dashboard` | 行事曆事件影響參與者/提醒/儀表板 |
 | `daily_machine_inspections` | `daily_machine_inspection_items` | 檢驗單影響檢驗項目 |
 | `work_order_first_piece_dimensions` | `work_orders` | 首件尺寸影響工單（反向同步） |
@@ -1752,7 +1851,17 @@ dataSyncHelper = DataSync.createModuleHelper('orders', {
 
 ### 違規檢查
 
-執行 `node tools/audit-system-health.js` 後若看到以下問題，需立即修復：
+DataSync 相關修改後必須執行專用盤點：
+
+```bash
+node --check js/data-sync.js
+node --check tools/audit-data-sync.js
+node tools/audit-data-sync.js --write docs/data-sync-audit.md
+```
+
+若 `P0` 或 `P1` 大於 `0`，需立即修復，不能把問題留到下一輪。
+
+執行 `node tools/audit-system-health.js` 或 `node tools/audit-data-sync.js` 後若看到以下問題，需立即修復：
 
 ```
 ❌ [DataSync] work_order_first_piece_dimensions 未在 MODULE_DEPENDENCIES 中宣告反向依賴
@@ -1766,6 +1875,8 @@ dataSyncHelper = DataSync.createModuleHelper('orders', {
 - [ ] 所有 建立/更新/刪除 成功後呼叫對應的 `dataSyncHelper.notify*()`
 - [ ] `js/data-sync.js` 的 `MODULE_DEPENDENCIES` 已添加此模組的相依宣告
 - [ ] 若此模組的資料異動會影響其他已開啟的模組頁面，確認相關模組的 `onDependencyUpdate` 或 `onRefresh` 能正確處理
+- [ ] 若本輪修改會影響列表按鈕狀態，依 `docs/data-sync-regression-checklist.md` 進行雙頁/跨瀏覽器分頁回歸
+- [ ] 回報時附上 `node tools/audit-data-sync.js --write docs/data-sync-audit.md` 的 P0/P1 結果
 
 ---
 

@@ -1,133 +1,88 @@
-# 開發進度摘要
+# 開發進度摘要（更新：2026-05-13）
 
 ## 專案架構
 
-- 專案根目錄：`C:\Apache24\htdocs\mes`
-- 後端：PHP 8+ 原生 API，入口多位於 `api/**/index.php|show.php|update.php|delete.php`，共用啟動檔為 `api/bootstrap.php`。
-- 前端：原生 HTML/CSS/JavaScript，由 `index.php` 載入 `script.js`、`core/configs/*.config.js`、`modules/*.html` 與 `js/*.js`。
-- 資料庫：MySQL 8 / MariaDB 相容；本機測試 DB 為 `yucyuan`。軟刪除表格通常使用 `deleted_at` 與 `delete_token`。
-- 主要目錄：
-  - `api/`：REST-like API、系統更新、版本檢查、模組資料操作。
-  - `js/`：各功能頁前端控制器。
-  - `core/configs/`：配置化模組 UI 定義。
-  - `modules/`：傳統或混合模式 HTML 片段。
-  - `migrations/`：資料庫 schema 更新 SQL。
-  - `tools/`：維運工具，包含 `build-update-package.ps1`、`audit-system-health.js`。
-  - `release-notes/`：更新包摘要來源。
-  - `dist/`：一鍵更新 ZIP 輸出目錄，被 Git 忽略。
-- 發佈規範：一鍵更新包必須使用 `tools/build-update-package.ps1` 產出；ZIP 根目錄需包含 `manifest.json` 與 `files/`。
+- 根目錄：`C:\Apache24\htdocs\mes`
+- 後端技術棧：PHP（模組化 API，主要位於 `api/`，含 `index/show/update/delete` 端點）
+- 前端技術棧：Vanilla JS + HTML + CSS（核心入口 `script.js`、樣式 `styles.css`、模組腳本 `js/*.js`）
+- UI 配置層：`core/configs/*.config.js`（配置化渲染），部分頁面為混合模式（配置 + `modules/*.html`）
+- 資料庫：MySQL/MariaDB，相依 `migrations/` 進行 schema 升級
+- 維運/工具：
+  - `tools/build-update-package.ps1`（一鍵更新包產生）
+  - `tools/audit-system-health.js`（系統健康審計）
+  - `tools/audit-data-sync.js`（DataSync 盤點）
+  - `tools/sync-local-schema.ps1`（本機 schema 同步）
 
-## 已完成功能
+## 已完成功能（本輪）
 
-1. 生產工單完成生命週期鎖定
-- 新增 migration：`migrations/2026_05_12_add_work_orders_completed_at.sql`。
-- 新增欄位：`work_orders.completed_at`，記錄工單首次進入已完成狀態時間。
-- migration 會新增 `idx_work_orders_completed_at`，並回填目前已完成與稽核紀錄中曾完成的工單。
-- migration 已改成可重複執行：欄位與索引存在時不會中斷更新。
-- 本機已套用 migration，確認 `id=2` 工單目前為非完成狀態但已有 `completed_at`，可覆蓋「曾完成後退回」情境。
-- `api/work_orders/update.php`：工單進入完成狀態時寫入 `completed_at`；改用 `lookup_values.value_key='completed'` 判斷，不再硬依賴 `status_lookup_id=28`。
-- `api/work_orders/delete.php`：只要 `completed_at` 有值，或目前狀態為完成，即回 `409` 禁止刪除。
-- `api/work_orders/index.php` / `show.php`：回傳 `completed_at` 與 `lifecycle_locked` 供前端判斷。
-- `api/work_orders/helpers.php`：新增工單狀態 key 判斷 helper。
-- `js/work_orders.js`：已完成或曾完成工單的刪除按鈕改為 `disabled`、灰色、不可點；事件層也再次阻擋。
-- `styles.css`：補強停用刪除按鈕的灰色樣式。
+1. 全系統「操作欄按鈕」語意化標準化完成（跨模組）
+- 在 `script.js` 新增全域標準化機制：
+  - `OPERATION_ACTION_ROLE_MAP`
+  - `OPERATION_ACTION_LABEL_MAP`
+  - MutationObserver + 動態重繪再標準化
+- 針對操作欄容器（`table-actions/actions/actions-cell/actions-col`）自動套用語意 class 與 title/aria-label。
 
-2. 工單刪除使用者體驗修正
-- 已完成或曾完成工單的刪除按鈕不再消失，而是保留但灰化停用。
-- 前端 tooltip / 警告訊息改為「此工單已進入完成或追溯流程，無法刪除」。
-- 後端訊息改為「若資料需更正，請使用退回狀態或作廢流程」。
+2. 操作按鈕顏色語意分流（避免混色與誤判 disabled）
+- 新增/調整角色色系：`view/edit/delete/print/screening-report/expand/order-items/shipping/reply/mark-read/workflow/navigate/neutral`。
+- 重要拆分：
+  - `details`（展開/收合）獨立為 cyan，不再使用灰色。
+  - `open-order-items`（客戶批號入口）獨立為 amber。
+  - `print-work-order`（列印工單）與 `print-screening-report`（列印篩分檢驗結果報表）分色。
+  - `reply`、`mark-read` 不再是灰色，分別改為 indigo / lime。
+  - `add-to-shipping` 從 workflow 色系拆出，改為 shipping 綠色。
 
-3. 每日機台檢驗下拉修正
-- `js/daily_machine_inspections.js`：修正新增每日機台檢驗時機台下拉顯示 `undefined - 機台名稱`。
-- 原因：API 回傳 `machine_number`，前端使用不存在的 `m.code`。
-- 新增穩定 fallback：`code -> machine_code -> machine_number -> name -> 機台 {id}`。
+3. 模組級落地修正（維持既有 JS 事件行為）
+- `js/orders.js`：調整操作欄語意 class 與顯示文案（展開/客戶批號/編輯/刪除）。
+- `js/work_orders.js`：區分兩種列印按鈕語意與文案（工單 vs 篩分檢驗結果報表）。
+- `js/inventory_items.js`：補齊 `view/edit/delete` 的 `data-action` 與語意 class（保留原 `onclick`，不改既有呼叫路徑）。
+- `js/messages.js`：`reply` 套用回覆語意角色。
+- `js/notifications.js`：`mark-read` 套用已讀語意角色。
+- `modules/work_orders.html` / `styles.css`：配合版面與按鈕語意修正。
 
-4. 機台維修任務 400 錯誤可視化與驗證
-- `js/machine_maintenance_tasks.js`：新增 `readJsonResponse()`，正確讀取 API 的 `message` 欄位。
-- 新增前端必要欄位驗證：機台、任務類型、任務標題、預定開始時間、標題長度、機台 ID 格式。
-- 修正 400 時只顯示「操作失敗」而看不到實際原因的問題。
+4. 規範與文件同步
+- 更新 `.github/copilot-instructions.md`：
+  - 補充操作欄跨模組統一規範（強制）
+  - 更新色系表與命名對照（含 `details`、`open-order-items`、`print-screening-report`、`reply`、`mark-read`）
+- 新增/更新 DataSync 與流程文件：
+  - `docs/data-sync-audit.md`
+  - `docs/data-sync-regression-checklist.md`
+  - `docs/data-sync-remediation-plan.md`
+- 新增工具：
+  - `tools/audit-data-sync.js`
+  - `tools/sync-local-schema.ps1`
 
 5. 更新包產出
-- 已產出一鍵更新包：`dist/update_v1.0.8_20260512_203903.zip`
-- 版本：`v1.0.8`
-- 檔案數：9
-- Migrations：1
-- 已檢查 ZIP 包含 `manifest.json`、`files/`、`migrations/2026_05_12_add_work_orders_completed_at.sql`。
-- Release note：`release-notes/2026-05-12-v1.0.8.txt`
+- 已產出更新包：`dist/update_v1.0.9_20260513_184409.zip`
+- release note：`release-notes/2026-05-13-v1.0.9.txt`
 
-6. 已執行檢查
-- PHP syntax checks passed：
-  - `api/work_orders/delete.php`
-  - `api/work_orders/helpers.php`
-  - `api/work_orders/index.php`
-  - `api/work_orders/show.php`
-  - `api/work_orders/update.php`
-- JS syntax checks passed：
-  - `js/work_orders.js`
-  - `js/daily_machine_inspections.js`
-  - `js/machine_maintenance_tasks.js`
-- MySQL 本機確認：
-  - `work_orders.completed_at` 欄位存在。
-  - `idx_work_orders_completed_at` 索引存在。
-  - 本機已有 10 筆工單被回填追溯鎖定。
-- `node tools/audit-system-health.js` 已執行，但仍因既有全專案問題失敗，非本輪新增阻塞。
+## 待修 Bug（已知）
 
-## 待修 Bug
+1. `audit-system-health` 仍為失敗狀態（既有技術債）
+- 重現：執行 `node tools/audit-system-health.js`
+- 現況：報告包含大量既有項目（JS 體積、innerHTML XSS 掃描警告、部分模組 DataSync 警告、status_board 結構警告等）。
+- 影響：不阻斷本輪 UI 語意色修正，但影響整體健康度門檻。
 
-1. P0：遠端套用 `v1.0.8` 後需回歸確認工單鎖定
-- 重現條件：工單進入已完成後再退回非完成狀態，嘗試刪除。
-- 預期：列表刪除按鈕灰化停用；直接呼叫 delete API 回 `409`。
-- 注意：遠端需套用 migration 後才有 `completed_at` 欄位。
+2. 部分頁面仍可能存在舊樣式殘留（非 `data-action` 控制的按鈕）
+- 重現：切到低覆蓋率模組，若按鈕未帶 `data-action` 且無語意 class，可能退回預設色。
+- 影響：視覺一致性風險，功能通常不受影響。
 
-2. P0：遠端套用 `v1.0.8` 後需確認 migration 執行
-- 檢查：`work_orders.completed_at` 欄位與 `idx_work_orders_completed_at` 索引存在。
-- 檢查：既有目前已完成工單與稽核可辨識曾完成工單已回填。
-- 風險：若遠端 `audit_logs.details` 有非標準 JSON 或缺稽核資料，只有目前狀態為完成的工單能自動回填。
+3. 快取導致更新後顏色看似未生效
+- 重現：前端資源版本未刷新時（瀏覽器快取舊 `script.js/styles.css`）。
+- 建議：強制重整（Ctrl+F5）或依版本檢查機制刷新。
 
-3. P1：作廢流程尚未實作
-- 現況：完成或曾完成工單不可刪除，但尚無正式「作廢工單」流程。
-- 建議：新增 `voided_at`、`void_reason`、`voided_by_employee_id` 或建立獨立作廢紀錄表。
+## 下一步任務（優先順序）
 
-4. P1：系統健康審計既有問題
-- `node tools/audit-system-health.js` 仍失敗。
-- 主要既有項目：大型 JS（`work_orders.js`、`order_items.js`、`shipping_orders.js`）、多個 JS innerHTML XSS 掃描警告、`status_board` 缺標準端點、部分模組 DataSync 警告、`modules/report_descriptions.html` 按鈕 class 問題。
+1. P0：建立「操作欄按鈕覆蓋率清單」
+- 掃描 `js/*.js` 產生缺少 `data-action` / 缺少語意 class 的按鈕清單，補齊到全模組一致。
 
-5. P2：遠端快取與版本載入需留意
-- 若遠端頁面仍載入舊版 `work_orders.js?v=...`，需重新整理或依系統更新提示刷新。
-- 預期套用更新後 `api/version.php` 與前端資源版本會變動。
+2. P0：建立按鈕語意回歸測試腳本
+- 針對關鍵模組（orders/work_orders/inventory_items/messages/notifications）做色系與標題快照比對。
 
-## 下一步任務
+3. P1：修復 `audit-system-health` 中高風險項目
+- 優先處理可確認的 XSS 風險（innerHTML 寫入點）與核心 DataSync notify 缺漏模組。
 
-1. P0：遠端上傳並套用 `dist/update_v1.0.8_20260512_203903.zip`
-- 使用「安全設定 > 系統更新」套用。
-- 確認更新包摘要顯示 `v1.0.8`。
-- 確認 ZIP 中 migration 有被執行。
+4. P1：統一列印/流程/導向類 action 命名規則
+- 清理 `print-*`、`open-*`、`goto-*` 的語意邊界，降低未來誤映射。
 
-2. P0：回歸測試工單刪除鎖定
-- 新建工單，尚未完成且無關聯資料時可刪除。
-- 工單改為已完成後刪除按鈕灰化停用。
-- 已完成工單直接打 delete API 應回 `409`。
-- 已完成後退回非完成狀態，刪除按鈕仍灰化停用，delete API 仍回 `409`。
-
-3. P0：回歸測試完成狀態更新流程
-- 工單從非完成改成已完成時應寫入 `completed_at`。
-- 工單從已完成退回非完成時不清除 `completed_at`。
-- 若選擇同步建立庫存，原既有庫存建立流程仍需正常。
-- 若退回時選擇刪除庫存，原既有庫存刪除限制仍需正常。
-
-4. P1：回歸測試每日機台檢驗
-- 開啟新增每日機台檢驗。
-- 機台下拉應顯示 `machine_number - name`，不可再出現 `undefined`。
-
-5. P1：回歸測試機台維修任務
-- 新增時刻意缺必填欄位，前端應顯示具體錯誤。
-- 正常填寫新增/更新應成功。
-- API 400 時前端應顯示後端 `message`。
-
-6. P2：規劃工單作廢流程
-- 建議新增作廢欄位或作廢紀錄表。
-- 作廢應保留追溯資料、不可物理刪除，並記錄操作者與原因。
-
-7. P2：分批處理健康審計既有項目
-- 優先處理真實 XSS 風險與 `modules/report_descriptions.html` class 問題。
-- 大型 JS 拆分可排後續重構，不阻擋本輪更新測試。
+5. P2：持續拆分超大前端模組
+- 優先拆 `order_items.js`、`work_orders.js`、`shipping_orders.js`，降低耦合與回歸風險。

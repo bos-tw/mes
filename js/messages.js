@@ -292,7 +292,7 @@
                                 <i class="fas fa-eye"></i>
                             </button>
                             ${currentFolder === 'inbox' ? `
-                                <button type="button" class="btn text" data-action="reply" data-id="${m.id}" title="回覆">
+                                <button type="button" class="btn text op-action-btn op-role-reply" data-action="reply" data-id="${m.id}" title="回覆" aria-label="回覆">
                                     <i class="fas fa-reply"></i>
                                 </button>
                             ` : ''}

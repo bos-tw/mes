@@ -437,7 +437,7 @@
                         <div class="order-items-inline-panel">
                             <div class="order-items-inline-header">
                                 <strong>訂單細項</strong>
-                                <button type="button" class="btn text" data-action="open-order-items" data-order-id="${orderId}" title="開啟完整明細" aria-label="開啟完整明細">
+                                <button type="button" class="btn text op-action-btn op-role-order-items" data-action="open-order-items" data-order-id="${orderId}" title="客戶批號" aria-label="客戶批號">
                                     <i class="fas fa-external-link-alt"></i>
                                 </button>
                             </div>
@@ -497,11 +497,11 @@
                         <td class="text-right">$${formatCurrency(order.total_amount)} ${amountWarning}</td>
                         <td>${formatDateTime(order.created_at)}</td>
                         <td class="table-actions">
-                            <button type="button" class="btn text" data-action="print-single" title="列印"><i class="fas fa-print"></i></button>
-                            <button type="button" class="btn text" data-action="details" title="${detailsTitle}" aria-expanded="${isExpanded ? 'true' : 'false'}"><i class="fas ${detailsIcon}"></i></button>
-                            <button type="button" class="btn text" data-action="open-order-items" data-order-id="${orderId}" title="編輯客戶批號"><i class="fas fa-list-ul"></i></button>
-                            <button type="button" class="btn text" data-action="edit" title="修改"><i class="fas fa-edit"></i></button>
-                            <button type="button" class="btn text danger" data-action="delete" title="刪除"><i class="fas fa-trash"></i></button>
+                            <button type="button" class="btn text op-action-btn op-role-print" data-action="print-single" title="列印"><i class="fas fa-print"></i></button>
+                            <button type="button" class="btn text op-action-btn op-role-expand" data-action="details" title="${detailsTitle}" aria-label="${detailsTitle}" aria-expanded="${isExpanded ? 'true' : 'false'}"><i class="fas ${detailsIcon}"></i></button>
+                            <button type="button" class="btn text op-action-btn op-role-order-items" data-action="open-order-items" data-order-id="${orderId}" title="客戶批號" aria-label="客戶批號"><i class="fas fa-list-ul"></i></button>
+                            <button type="button" class="btn text op-action-btn op-role-edit" data-action="edit" title="編輯"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn text danger op-action-btn op-role-delete" data-action="delete" title="刪除"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>
                 `;
@@ -810,6 +810,76 @@
             } finally {
                 loadingOrderItemIds.delete(orderId);
                 renderCurrentOrders();
+            }
+        }
+
+        function getOrderIdsFromDataSyncPayload(sourceData) {
+            const orderIds = new Set();
+            const records = Array.isArray(sourceData) ? sourceData : [sourceData];
+
+            records.forEach((record) => {
+                if (!record || typeof record !== 'object') {
+                    return;
+                }
+
+                const rawOrderId = record.order_id ?? record.orderId ?? record.order?.id;
+                const orderId = Number.parseInt(rawOrderId, 10);
+                if (Number.isFinite(orderId) && orderId > 0) {
+                    orderIds.add(orderId);
+                }
+            });
+
+            return Array.from(orderIds);
+        }
+
+        function getVisibleExpandedOrderIds(candidateOrderIds = []) {
+            const visibleOrderIds = new Set(
+                state.currentRows
+                    .map((order) => Number.parseInt(order.id, 10))
+                    .filter((orderId) => Number.isFinite(orderId))
+            );
+            const candidateSet = candidateOrderIds.length > 0 ? new Set(candidateOrderIds) : null;
+
+            return Array.from(expandedOrderIds).filter((orderId) => {
+                if (!visibleOrderIds.has(orderId)) {
+                    return false;
+                }
+                return !candidateSet || candidateSet.has(orderId);
+            });
+        }
+
+        async function refreshExpandedOrderItems(candidateOrderIds = []) {
+            const targetOrderIds = getVisibleExpandedOrderIds(candidateOrderIds);
+            if (targetOrderIds.length === 0) {
+                return;
+            }
+
+            await Promise.all(targetOrderIds.map((orderId) => loadOrderItemsForOrder(orderId, true)));
+        }
+
+        async function refreshOrdersForDataSync(sourceModule = null, sourceAction = null, sourceData = null) {
+            if (sourceModule === 'customers') {
+                await loadCustomers();
+            }
+
+            let affectedOrderIds = [];
+            if (sourceModule === 'order_items') {
+                affectedOrderIds = getOrderIdsFromDataSyncPayload(sourceData);
+                if (affectedOrderIds.length > 0) {
+                    affectedOrderIds.forEach((orderId) => orderItemsCache.delete(orderId));
+                } else {
+                    orderItemsCache.clear();
+                }
+            }
+
+            await loadOrders(state.page);
+
+            if (sourceModule === 'order_items') {
+                await refreshExpandedOrderItems(affectedOrderIds);
+            }
+
+            if (modalOverlay && !modalOverlay.classList.contains('hidden') && state.currentEditingId) {
+                await openEditModal(state.currentEditingId);
             }
         }
 
@@ -1967,15 +2037,8 @@ ${pages}
         // 建立資料同步輔助器
         if (typeof DataSync !== 'undefined') {
             dataSyncHelper = DataSync.createModuleHelper('orders', {
-                onRefresh: () => loadOrders(state.page),
-                onDependencyUpdate: (sourceModule, sourceAction, sourceData) => {
-                    // 當客戶、供應商、員工等資料變更時，重新載入相關下拉選單
-                    if (sourceModule === 'customers') {
-                        loadCustomers();
-                    }
-                    // 重新載入訂單列表以顯示最新的關聯資料
-                    loadOrders(state.page);
-                },
+                onRefresh: () => refreshOrdersForDataSync(),
+                onDependencyUpdate: (sourceModule, sourceAction, sourceData) => refreshOrdersForDataSync(sourceModule, sourceAction, sourceData),
                 debounceMs: 300
             });
         }

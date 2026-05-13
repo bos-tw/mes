@@ -1555,14 +1555,20 @@ body.login-page {
     background: #334155;
 }
 
-.btn.text[data-action="reply"],
-.btn.text[data-action="mark-read"] {
-    background: #64748b;
+.btn.text[data-action="reply"] {
+    background: #4f46e5;
 }
 
-.btn.text[data-action="reply"]:hover,
+.btn.text[data-action="reply"]:hover {
+    background: #4338ca;
+}
+
+.btn.text[data-action="mark-read"] {
+    background: #65a30d;
+}
+
 .btn.text[data-action="mark-read"]:hover {
-    background: #475569;
+    background: #4d7c0f;
 }
 
 .btn.text.danger {
@@ -1631,17 +1637,23 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
 .btn.text[data-action="print"],
 .btn.text[data-action="print-detail"],
 .btn.text[data-action="print-single"],
-.btn.text[data-action="print-work-order"],
-.btn.text[data-action="print-screening-report"] {
+.btn.text[data-action="print-work-order"] {
     background: #7c3aed;
 }
 
 .btn.text[data-action="print"]:hover,
 .btn.text[data-action="print-detail"]:hover,
 .btn.text[data-action="print-single"]:hover,
-.btn.text[data-action="print-work-order"]:hover,
-.btn.text[data-action="print-screening-report"]:hover {
+.btn.text[data-action="print-work-order"]:hover {
     background: #6d28d9;
+}
+
+.btn.text[data-action="print-screening-report"] {
+    background: #059669;
+}
+
+.btn.text[data-action="print-screening-report"]:hover {
+    background: #047857;
 }
 
 /* 批次選取計數 badge */
@@ -2546,6 +2558,149 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     display: flex;
     gap: 8px;
     align-items: center;
+}
+
+td.actions,
+td.actions-cell,
+td.actions-col {
+    white-space: nowrap;
+}
+
+/* 操作欄位按鈕標準化（由 script.js 自動套用 .op-action-btn / .op-role-*） */
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn {
+    border: none;
+    background: #64748b;
+    color: #fff !important;
+    width: 30px;
+    height: 30px;
+    padding: 6px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease, opacity 0.2s ease;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn:hover {
+    background: #475569;
+    transform: translateY(-1px);
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn:disabled,
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn[aria-disabled="true"],
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.disabled {
+    background: #6c757d !important;
+    color: #fff !important;
+    opacity: 0.65;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-view {
+    background: #0f766e;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-view:hover {
+    background: #115e59;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-edit {
+    background: #2563eb;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-edit:hover {
+    background: #1d4ed8;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-delete {
+    background: var(--color-danger);
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-delete:hover {
+    background: #a71d2a;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-print {
+    background: #7c3aed;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-print:hover {
+    background: #6d28d9;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-screening-report {
+    background: #059669;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-screening-report:hover {
+    background: #047857;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-expand {
+    background: #0891b2;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-expand:hover {
+    background: #0e7490;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-order-items {
+    background: #f59e0b;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-order-items:hover {
+    background: #d97706;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-shipping {
+    background: #28a745;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-shipping:hover {
+    background: #1e7e34;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-reply {
+    background: #4f46e5;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-reply:hover {
+    background: #4338ca;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-mark-read {
+    background: #65a30d;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-mark-read:hover {
+    background: #4d7c0f;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-workflow {
+    background: #b45309;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-workflow:hover {
+    background: #92400e;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-navigate {
+    background: #475569;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-navigate:hover {
+    background: #334155;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-neutral {
+    background: #64748b;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-neutral:hover {
+    background: #475569;
 }
 
 /* 表格操作按鈕圖標樣式 */
@@ -4002,6 +4157,40 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     gap: 0;
 }
 
+.work-orders-section-layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 0.9fr) minmax(520px, 1.6fr);
+    gap: 12px;
+    align-items: stretch;
+    margin-bottom: 12px;
+}
+
+.work-orders-section-left {
+    display: grid;
+    grid-template-rows: auto auto;
+    gap: 12px;
+}
+
+.work-orders-section-layout .form-section {
+    margin-bottom: 0;
+}
+
+.work-orders-section-right {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+
+.work-orders-section-right .table-responsive {
+    flex: 1;
+    min-height: 280px;
+}
+
+/* 強制左側兩塊欄位改為直排，避免窄欄位擠壓 */
+.work-orders-force-vertical {
+    grid-template-columns: 1fr !important;
+}
+
 /* Metrics sidebar */
 .work-orders-metrics-sidebar {
     width: 300px;
@@ -4061,6 +4250,20 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
 
 .work-orders-metrics-sidebar .metric:last-child {
     border-bottom: none;
+}
+
+@media (max-width: 1400px) {
+    .work-orders-section-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .work-orders-section-left {
+        grid-template-rows: auto;
+    }
+
+    .work-orders-section-right .table-responsive {
+        min-height: 220px;
+    }
 }
 
 .work-orders-metrics-sidebar .metric .metric-label {

@@ -232,7 +232,7 @@
                     `;
                 } else if (isUnread) {
                     actionsHtml += `
-                        <button type="button" class="btn text" data-action="mark-read" data-id="${n.id}" title="標記已讀">
+                        <button type="button" class="btn text op-action-btn op-role-mark-read" data-action="mark-read" data-id="${n.id}" title="標記已讀" aria-label="標記已讀">
                             <i class="fas fa-check"></i>
                         </button>
                     `;

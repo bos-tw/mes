@@ -184,9 +184,10 @@
             const editButton = elements.detailModal.querySelector('[data-action="edit-from-detail"]');
             if (editButton) {
                 editButton.addEventListener('click', () => {
-                    if (state.editingId) {
+                    const inventoryItemId = normalizeInventoryItemId(state.editingId);
+                    if (inventoryItemId) {
                         closeDetailModal();
-                        openEditModal(state.editingId);
+                        openEditModal(inventoryItemId);
                     }
                 });
             }
@@ -390,12 +391,17 @@
     }
 
     async function loadInventoryItemDetails(id) {
+        const inventoryItemId = normalizeInventoryItemId(id);
+        if (!inventoryItemId) {
+            throw new Error('庫存項目 ID 無效');
+        }
+
         try {
             const [detailResponse, shippingResponse] = await Promise.all([
-                fetch(`api/inventory_items/show.php?id=${id}`, {
+                fetch(`api/inventory_items/show.php?id=${inventoryItemId}`, {
                     credentials: 'include'
                 }),
-                fetch(`api/shipping_order_items/index.php?inventory_item_id=${id}&perPage=100&sortField=so.shipping_date&sortDirection=DESC`, {
+                fetch(`api/shipping_order_items/index.php?inventory_item_id=${inventoryItemId}&perPage=100&sortField=so.shipping_date&sortDirection=DESC`, {
                     credentials: 'include'
                 })
             ]);
@@ -532,17 +538,17 @@ function renderTable(items) {
                 <td>${formatDateTime(item.received_at)}</td>
                 <td class="table-actions">
                     ${canShip ? `
-                    <button type="button" class="btn text" data-action="add-to-shipping" title="${shippingBtnTitle}" onclick="window.inventoryItemsModule.openShippingModal(${item.id})">
+                    <button type="button" class="btn text op-action-btn op-role-shipping" data-action="add-to-shipping" title="${shippingBtnTitle}" onclick="window.inventoryItemsModule.openShippingModal(${item.id})">
                         <i class="fas fa-shipping-fast"></i>
                     </button>
                     ` : ''}
-                    <button type="button" class="btn text" title="檢視" onclick="window.inventoryItemsModule.viewDetail(${item.id})">
+                    <button type="button" class="btn text op-action-btn op-role-view" data-action="view" title="檢視" aria-label="檢視" onclick="window.inventoryItemsModule.viewDetail(${item.id})">
                         <i class="fas fa-eye"></i>
                     </button>
-                    <button type="button" class="btn text" title="編輯" onclick="window.inventoryItemsModule.edit(${item.id})">
+                    <button type="button" class="btn text op-action-btn op-role-edit" data-action="edit" title="編輯" aria-label="編輯" onclick="window.inventoryItemsModule.edit(${item.id})">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button type="button" class="btn text danger" title="刪除" onclick="window.inventoryItemsModule.delete(${item.id})">
+                    <button type="button" class="btn text danger op-action-btn op-role-delete" data-action="delete" title="刪除" aria-label="刪除" onclick="window.inventoryItemsModule.delete(${item.id})">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
@@ -887,6 +893,74 @@ function renderTable(items) {
         if (currentValue) select.value = currentValue;
     }
 
+    function ensureWorkOrderOption(select, workOrderId, workOrderLabel = '') {
+        if (!select || !workOrderId) return;
+        const normalizedId = String(workOrderId);
+        let option = select.querySelector(`option[value="${normalizedId}"]`);
+        if (!option) {
+            option = document.createElement('option');
+            option.value = normalizedId;
+            option.textContent = workOrderLabel || `工單 #${normalizedId}`;
+            option.dataset.locked = 'true';
+            select.appendChild(option);
+        } else if (workOrderLabel) {
+            option.textContent = workOrderLabel;
+        }
+        select.value = normalizedId;
+    }
+
+    function getWorkOrderReadonlyDisplay(select) {
+        if (!select || !elements.modalForm) return null;
+        let displayInput = elements.modalForm.querySelector('[data-work-order-readonly-display]');
+        if (!displayInput) {
+            displayInput = document.createElement('input');
+            displayInput.type = 'text';
+            displayInput.readOnly = true;
+            displayInput.className = `${select.className || ''} readonly-field`;
+            displayInput.setAttribute('data-work-order-readonly-display', 'true');
+            displayInput.style.display = 'none';
+            select.insertAdjacentElement('afterend', displayInput);
+        }
+        return displayInput;
+    }
+
+    function setWorkOrderFieldMode(mode, item = null) {
+        const select = elements.modalForm?.querySelector('[name="work_order_id"]');
+        if (!select) return;
+        const readonlyDisplay = getWorkOrderReadonlyDisplay(select);
+
+        if (mode === 'edit') {
+            const workOrderId = normalizeInventoryItemId(item?.work_order_id || select.value);
+            const workOrderNumber = (item?.work_order_number || '').toString().trim();
+            const customerName = (item?.customer_name || '').toString().trim();
+            const workOrderLabel = workOrderNumber
+                ? `${workOrderNumber}${customerName ? ` - ${customerName}` : ''}`
+                : '';
+
+            if (workOrderId) {
+                ensureWorkOrderOption(select, workOrderId, workOrderLabel);
+            }
+
+            const selectedText = select.options[select.selectedIndex]?.textContent?.trim() || '';
+            if (readonlyDisplay) {
+                readonlyDisplay.value = workOrderLabel || selectedText || '-';
+                readonlyDisplay.style.display = '';
+            }
+
+            // 編輯模式防呆：顯示唯讀欄位，不提供下拉選單變更來源工單
+            select.style.display = 'none';
+            select.required = false;
+            return;
+        }
+
+        select.style.display = '';
+        select.required = true;
+        if (readonlyDisplay) {
+            readonlyDisplay.value = '';
+            readonlyDisplay.style.display = 'none';
+        }
+    }
+
     function populateEmployeeSelects() {
         const selects = [
             elements.modalForm?.querySelector('[name="inspector_employee_id"]'),
@@ -920,6 +994,7 @@ function renderTable(items) {
 
         elements.modalForm.reset();
         hideModalAlert();
+        setWorkOrderFieldMode('create');
 
         // Set default received_at to now
         const now = new Date();
@@ -968,9 +1043,15 @@ function renderTable(items) {
     }
 
     async function openEditModal(id) {
+        const inventoryItemId = normalizeInventoryItemId(id);
+        if (!inventoryItemId) {
+            showAlert('error', '無法編輯：庫存項目 ID 無效');
+            return;
+        }
+
         try {
-            state.editingId = id;
-            const data = await loadInventoryItemDetails(id);
+            state.editingId = inventoryItemId;
+            const data = await loadInventoryItemDetails(inventoryItemId);
 
             if (!data || !data.item) {
                 throw new Error('無法載入庫存項目詳情');
@@ -978,6 +1059,7 @@ function renderTable(items) {
 
             hideModalAlert();
             populateForm(data.item);
+            setWorkOrderFieldMode('edit', data.item);
             elements.modal.querySelector('[data-modal-title]').textContent = '編輯庫存項目';
             elements.modal.classList.remove('hidden');
         } catch (error) {
@@ -989,13 +1071,20 @@ function renderTable(items) {
         elements.modal.classList.add('hidden');
         elements.modalForm.reset();
         hideModalAlert();
+        setWorkOrderFieldMode('create');
         state.editingId = null;
     }
 
     async function openDetailModal(id) {
+        const inventoryItemId = normalizeInventoryItemId(id);
+        if (!inventoryItemId) {
+            showAlert('error', '無法檢視：庫存項目 ID 無效');
+            return;
+        }
+
         try {
-            state.editingId = id;
-            const data = await loadInventoryItemDetails(id);
+            state.editingId = inventoryItemId;
+            const data = await loadInventoryItemDetails(inventoryItemId);
 
             if (!data) {
                 throw new Error('無法載入庫存項目詳情');
@@ -1595,6 +1684,42 @@ function renderTable(items) {
         }
     }
 
+    function normalizeInventoryItemId(value) {
+        const id = Number.parseInt(value, 10);
+        if (!Number.isFinite(id) || id <= 0) {
+            return null;
+        }
+        return id;
+    }
+
+    function refreshInventoryItemsForDataSync(sourceModule = null) {
+        if (sourceModule === 'work_orders') {
+            loadWorkOrders();
+        }
+        if (sourceModule === 'screening_items') {
+            loadScreeningItems();
+        }
+
+        loadInventoryItems();
+
+        if (elements.modal && !elements.modal.classList.contains('hidden') && state.editingId) {
+            openEditModal(state.editingId);
+        }
+
+        if (elements.detailModal && !elements.detailModal.classList.contains('hidden') && state.editingId) {
+            openDetailModal(state.editingId);
+        }
+    }
+
+    // 建立資料同步輔助器
+    if (typeof DataSync !== 'undefined') {
+        DataSync.createModuleHelper('inventory_items', {
+            onRefresh: () => refreshInventoryItemsForDataSync(),
+            onDependencyUpdate: (sourceModule) => refreshInventoryItemsForDataSync(sourceModule),
+            debounceMs: 300
+        });
+    }
+
     // Public API
     window.inventoryItemsModule = {
         viewDetail: openDetailModal,
@@ -1621,18 +1746,6 @@ function renderTable(items) {
     };
 
     } // End of initializeInventoryItemsModule
-
-    // 建立資料同步輔助器
-    if (typeof DataSync !== 'undefined') {
-        DataSync.createModuleHelper('inventory_items', {
-            onRefresh: () => {
-                if (typeof loadInventoryItems === 'function') {
-                    loadInventoryItems();
-                }
-            },
-            debounceMs: 300
-        });
-    }
 
     // Export - 暴露到全域供 script.js 註冊
     window.initializeInventoryItemsModule = initializeInventoryItemsModule;

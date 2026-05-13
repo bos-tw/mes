@@ -373,6 +373,201 @@ document.addEventListener('DOMContentLoaded', async () => {
         ACTIVE_TAB: 'screwsystem_active_tab',
         SIDEBAR_COLLAPSED: 'screwsystem_sidebar_collapsed'
     };
+    const OPERATION_ACTION_CELL_SELECTOR = 'td.table-actions, td.actions, td.actions-cell, td.actions-col';
+    const OPERATION_ACTION_SELECTOR = 'button[data-action], a[data-action]';
+    const OPERATION_ACTION_ROLE_CLASSES = [
+        'op-role-view',
+        'op-role-edit',
+        'op-role-delete',
+        'op-role-print',
+        'op-role-screening-report',
+        'op-role-expand',
+        'op-role-order-items',
+        'op-role-shipping',
+        'op-role-reply',
+        'op-role-mark-read',
+        'op-role-workflow',
+        'op-role-navigate',
+        'op-role-neutral',
+    ];
+    const OPERATION_ACTION_ROLE_MAP = Object.freeze({
+        view: 'view',
+        'view-detail': 'view',
+        'view-details': 'view',
+        detail: 'view',
+        details: 'expand',
+        show: 'view',
+        preview: 'view',
+        'preview-logo': 'view',
+        'open-order-items': 'order-items',
+        edit: 'edit',
+        'edit-draft': 'edit',
+        'edit-from-detail': 'edit',
+        'edit-order-item': 'edit',
+        'edit-order-item-inline': 'edit',
+        'edit-screening-item': 'edit',
+        'edit-work-order': 'edit',
+        delete: 'delete',
+        'delete-order-item': 'delete',
+        'delete-order-item-inline': 'delete',
+        'delete-screening-item': 'delete',
+        'delete-work-order': 'delete',
+        'delete-selected': 'delete',
+        'delete-image': 'delete',
+        'delete-logo': 'delete',
+        print: 'print',
+        'print-detail': 'print',
+        'print-single': 'print',
+        'print-work-order': 'print',
+        'print-screening-report': 'screening-report',
+        'create-work-order': 'workflow',
+        'convert-to-inventory': 'workflow',
+        'add-to-shipping': 'shipping',
+        'goto-work-order': 'navigate',
+        'go-work-order': 'navigate',
+        reply: 'reply',
+        'mark-read': 'mark-read',
+    });
+    const OPERATION_ACTION_LABEL_MAP = Object.freeze({
+        view: '檢視',
+        'view-detail': '檢視',
+        'view-details': '檢視',
+        detail: '檢視',
+        show: '檢視',
+        preview: '檢視',
+        'preview-logo': '檢視',
+        'open-order-items': '客戶批號',
+        edit: '編輯',
+        'edit-draft': '編輯',
+        'edit-from-detail': '編輯',
+        'edit-order-item': '編輯',
+        'edit-order-item-inline': '編輯',
+        'edit-screening-item': '編輯',
+        'edit-work-order': '編輯',
+        delete: '刪除',
+        'delete-order-item': '刪除',
+        'delete-order-item-inline': '刪除',
+        'delete-screening-item': '刪除',
+        'delete-work-order': '刪除',
+        'delete-selected': '刪除',
+        'delete-image': '刪除',
+        'delete-logo': '刪除',
+        print: '列印',
+        'print-detail': '列印',
+        'print-single': '列印',
+        'print-work-order': '列印工單',
+        'print-screening-report': '列印篩分檢驗結果報表',
+        reply: '回覆',
+        'mark-read': '標記已讀',
+    });
+    const pendingActionNormalizationScopes = new Set();
+    let isActionNormalizationScheduled = false;
+
+    function normalizeOperationActionElement(actionElement) {
+        if (!(actionElement instanceof Element)) {
+            return;
+        }
+
+        const action = (actionElement.getAttribute('data-action') || '').trim();
+        if (!action) {
+            return;
+        }
+
+        actionElement.classList.add('op-action-btn');
+        OPERATION_ACTION_ROLE_CLASSES.forEach(roleClass => actionElement.classList.remove(roleClass));
+
+        const role = OPERATION_ACTION_ROLE_MAP[action] || 'neutral';
+        actionElement.classList.add(`op-role-${role}`);
+
+        if (Object.prototype.hasOwnProperty.call(OPERATION_ACTION_LABEL_MAP, action)) {
+            const label = OPERATION_ACTION_LABEL_MAP[action];
+            actionElement.setAttribute('title', label);
+            actionElement.setAttribute('aria-label', label);
+        }
+    }
+
+    function collectOperationActionCells(scope) {
+        if (!scope) {
+            return [];
+        }
+
+        const cells = [];
+
+        if (scope instanceof Element) {
+            if (scope.matches(OPERATION_ACTION_CELL_SELECTOR)) {
+                cells.push(scope);
+            }
+            cells.push(...scope.querySelectorAll(OPERATION_ACTION_CELL_SELECTOR));
+            return cells;
+        }
+
+        if (scope instanceof Document || scope instanceof DocumentFragment) {
+            cells.push(...scope.querySelectorAll(OPERATION_ACTION_CELL_SELECTOR));
+        }
+
+        return cells;
+    }
+
+    function normalizeOperationActionButtons(scope = document) {
+        const actionCells = collectOperationActionCells(scope);
+        if (actionCells.length === 0) {
+            return;
+        }
+
+        actionCells.forEach(cell => {
+            cell.querySelectorAll(OPERATION_ACTION_SELECTOR).forEach(normalizeOperationActionElement);
+        });
+    }
+
+    function scheduleOperationActionButtonNormalization(scope = document) {
+        pendingActionNormalizationScopes.add(scope);
+        if (isActionNormalizationScheduled) {
+            return;
+        }
+
+        isActionNormalizationScheduled = true;
+        window.requestAnimationFrame(() => {
+            isActionNormalizationScheduled = false;
+            const scopes = Array.from(pendingActionNormalizationScopes);
+            pendingActionNormalizationScopes.clear();
+            scopes.forEach(currentScope => normalizeOperationActionButtons(currentScope));
+        });
+    }
+
+    function observeOperationActionButtons() {
+        if (!tabContentArea || typeof MutationObserver === 'undefined') {
+            return;
+        }
+
+        const observer = new MutationObserver((mutations) => {
+            let shouldNormalize = false;
+            for (const mutation of mutations) {
+                for (const node of mutation.addedNodes) {
+                    if (!(node instanceof Element)) {
+                        continue;
+                    }
+
+                    if (node.matches(OPERATION_ACTION_CELL_SELECTOR)
+                        || node.matches(OPERATION_ACTION_SELECTOR)
+                        || node.querySelector(OPERATION_ACTION_CELL_SELECTOR)
+                        || node.querySelector(OPERATION_ACTION_SELECTOR)) {
+                        shouldNormalize = true;
+                        break;
+                    }
+                }
+
+                if (shouldNormalize) {
+                    break;
+                }
+            }
+
+            if (shouldNormalize) {
+                scheduleOperationActionButtonNormalization(tabContentArea);
+            }
+        });
+
+        observer.observe(tabContentArea, { childList: true, subtree: true });
+    }
 
     function registerModuleInitializer(moduleId, initializer) {
         moduleInitializers[moduleId] = initializer;
@@ -1383,6 +1578,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (moduleRoot && moduleRoot.dataset.initialised === 'true') {
                 runModuleInitializer(tabId, activeTabContent, moduleContexts.get(tabId));
             }
+            scheduleOperationActionButtonNormalization(activeTabContent);
         }
     }
 
@@ -1510,6 +1706,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }));
                 }
             }
+            scheduleOperationActionButtonNormalization(tabContentElement);
         } catch (error) {
             console.error('Error loading tab content:', error);
             tabContentElement.innerHTML = `<p style="color: red;">無法載入內容: ${error.message}</p>`;
@@ -1652,6 +1849,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize tab state restoration
     restoreTabsState();
+    observeOperationActionButtons();
+    scheduleOperationActionButtonNormalization(tabContentArea || document);
 
     // 暴露 openTab 函數到全域,供其他模組使用
     window.openTab = openTab;

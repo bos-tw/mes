@@ -23,7 +23,8 @@
             date_from: '',
             date_to: ''
         },
-        editingId: null
+        editingId: null,
+        viewingId: null
     };
 
     let dataSyncHelper = null;
@@ -283,14 +284,14 @@
     }
 
     function openDetailModal(record) {
-        state.editingId = record.id;
+        state.viewingId = record.id;
         renderDetail(record);
         dom.detailModal.classList.remove('hidden');
     }
 
     function closeDetailModal() {
         dom.detailModal.classList.add('hidden');
-        state.editingId = null;
+        state.viewingId = null;
     }
 
     /* =======================
@@ -402,7 +403,8 @@
     function subscribeToChanges() {
         if (window.DataSync) {
             dataSyncHelper = DataSync.createModuleHelper(MODULE_NAME, {
-                onRefresh: loadData
+                onRefresh: () => refreshDataForDataSync(),
+                onDependencyUpdate: () => refreshDataForDataSync()
             });
         }
     }
@@ -420,6 +422,28 @@
             renderFilters();
         } catch (err) {
             showAlert(err.message, 'error');
+        }
+    }
+
+    async function refreshDataForDataSync() {
+        await loadData();
+
+        if (state.viewingId && dom.detailModal && !dom.detailModal.classList.contains('hidden')) {
+            try {
+                const record = await fetchOne(state.viewingId);
+                openDetailModal(record);
+            } catch (err) {
+                showAlert(err.message, 'error');
+            }
+        }
+
+        if (state.editingId && dom.modal && !dom.modal.classList.contains('hidden')) {
+            try {
+                const record = await fetchOne(state.editingId);
+                openModal(record);
+            } catch (err) {
+                showAlert(err.message, 'error');
+            }
         }
     }
 

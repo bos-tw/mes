@@ -90,6 +90,7 @@
             customers: [],
             orders: [],
             inventoryItems: [],
+            addItemContext: null,
             shippingStatuses: [],
         };
         const selectedShippingOrderIds = new Set();
@@ -1029,6 +1030,7 @@ function renderTable(items) {
         async function openAddItemModal(shippingOrderId, customerId) {
             elements.addItemForm.reset();
             elements.addItemForm.querySelector('[name="shipping_order_id"]').value = shippingOrderId;
+            state.addItemContext = { shippingOrderId, customerId };
 
             // Load available inventory items for this customer
             await loadAvailableInventoryItems(customerId);
@@ -1039,6 +1041,7 @@ function renderTable(items) {
 
         function closeAddItemModal() {
             elements.addItemModal.classList.add('hidden');
+            state.addItemContext = null;
         }
 
         async function loadAvailableInventoryItems(customerId) {
@@ -1991,11 +1994,53 @@ function renderTable(items) {
             }
         }
 
-        function refreshCurrentShippingOrderView() {
-            loadShippingOrders();
-            if (state.editingId && elements.detailModal && !elements.detailModal.classList.contains('hidden')) {
-                openDetailModal(state.editingId);
+        async function refreshOpenShippingModalsForDataSync() {
+            if (
+                state.addItemContext &&
+                elements.addItemModal &&
+                !elements.addItemModal.classList.contains('hidden')
+            ) {
+                const selectedItemId = elements.addItemForm?.querySelector('[name="inventory_item_id"]')?.value || '';
+                await loadAvailableInventoryItems(state.addItemContext.customerId);
+                const itemSelect = elements.addItemForm?.querySelector('[name="inventory_item_id"]');
+                if (itemSelect && selectedItemId) {
+                    itemSelect.value = selectedItemId;
+                    handleInventoryItemChange();
+                }
             }
+
+            const returnElems = returnModalElements || initReturnModalElements();
+            if (
+                returnElems.createReturnModal &&
+                !returnElems.createReturnModal.classList.contains('hidden')
+            ) {
+                const shippingOrderId = returnElems.createReturnForm?.querySelector('[name="shipping_order_id"]')?.value;
+                if (shippingOrderId) {
+                    await openCreateReturnModal(shippingOrderId);
+                }
+            }
+
+            if (
+                returnElems.quickReturnModal &&
+                !returnElems.quickReturnModal.classList.contains('hidden')
+            ) {
+                const shippingOrderId = returnElems.quickReturnForm?.querySelector('[name="shipping_order_id"]')?.value;
+                const itemId = returnElems.quickReturnForm?.querySelector('[name="shipping_order_item_id"]')?.value;
+                if (shippingOrderId && itemId) {
+                    await openQuickReturnModal(shippingOrderId, itemId);
+                }
+            }
+        }
+
+        async function refreshCurrentShippingOrderView() {
+            await loadShippingOrders();
+            if (state.editingId && elements.modal && !elements.modal.classList.contains('hidden')) {
+                await openEditModal(state.editingId);
+            }
+            if (state.editingId && elements.detailModal && !elements.detailModal.classList.contains('hidden')) {
+                await openDetailModal(state.editingId);
+            }
+            await refreshOpenShippingModalsForDataSync();
         }
 
         if (typeof DataSync !== 'undefined') {

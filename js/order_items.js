@@ -2558,7 +2558,10 @@ function updateButtons() {
                 showAlert('success', result.message || '客戶批號已刪除。');
                 // 通知 DataSync 資料已刪除
                 if (typeof DataSync !== 'undefined') {
-                    DataSync.notifyWithDependencies('order_items', DataSync.EVENT_TYPES.DELETED, { id });
+                    DataSync.notifyWithDependencies('order_items', DataSync.EVENT_TYPES.DELETED, {
+                        id,
+                        order_id: item?.order_id ?? state.orderContext.orderId
+                    });
                 }
                 await loadItems();
             } catch (error) {
@@ -3172,10 +3175,33 @@ function updateButtons() {
             renderEmptyTable('尚未選擇訂單，表格將於載入訂單後顯示。');
         }
 
+        async function refreshOrderItemsForDataSync(sourceModule = null) {
+            if (['screening_items', 'screening_services', 'tools'].includes(sourceModule)) {
+                state.optionsLoaded = false;
+                await loadOptionsIfNeeded();
+            }
+            if (sourceModule === 'orders' && state.orderContext) {
+                await loadOrderDetails(state.orderContext.orderId);
+                updateBanner();
+            }
+
+            await loadItems();
+
+            if (
+                modalOverlay &&
+                !modalOverlay.classList.contains('hidden') &&
+                state.currentMode === 'edit' &&
+                state.currentEditingId
+            ) {
+                await openEditModal(state.currentEditingId);
+            }
+        }
+
         // 建立資料同步輔助器
         if (typeof DataSync !== 'undefined') {
             DataSync.createModuleHelper('order_items', {
-                onRefresh: () => loadItems(),
+                onRefresh: () => refreshOrderItemsForDataSync(),
+                onDependencyUpdate: (sourceModule) => refreshOrderItemsForDataSync(sourceModule),
                 debounceMs: 300
             });
 

@@ -1147,6 +1147,13 @@ function getEventTypeName(type) {
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: item.id })
+            }).then(response => {
+                if (response.ok && window.DataSync) {
+                    DataSync.notifyWithDependencies('notifications', DataSync.EVENT_TYPES.UPDATED, {
+                        id: item.id,
+                        is_read: true
+                    });
+                }
             }).catch(() => {});
             item.is_read = true;
         }

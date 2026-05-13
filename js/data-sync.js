@@ -283,11 +283,11 @@ const DataSync = (function() {
         // 出貨單變更
         'shipping_orders': ['shipping_order_items', 'inventory_items', 'order_items', 'inventory_transactions', 'return_orders', 'dashboard', 'shipping_quality_inspections'],
         // 出貨單項目變更（會影響出貨單狀態、客戶批號出貨狀態與庫存紀錄）
-        'shipping_order_items': ['shipping_orders', 'order_items', 'inventory_items', 'inventory_transactions'],
-        // 退貨單變更（會影響出貨單退貨狀態與按鈕）
-        'return_orders': ['inventory_items', 'inventory_transactions', 'shipping_orders'],
-        // 庫存項目變更（會影響工單轉庫存按鈕與庫存異動紀錄）
-        'inventory_items': ['work_orders', 'inventory_transactions'],
+        'shipping_order_items': ['shipping_orders', 'order_items', 'inventory_items', 'inventory_transactions', 'return_orders'],
+        // 退貨單變更（會影響出貨單/出貨明細退貨狀態、庫存與異動紀錄）
+        'return_orders': ['inventory_items', 'inventory_transactions', 'shipping_orders', 'shipping_order_items'],
+        // 庫存項目變更（會影響工單轉庫存按鈕、出貨可分配狀態與庫存異動紀錄）
+        'inventory_items': ['work_orders', 'inventory_transactions', 'shipping_orders', 'shipping_order_items'],
         // 行事曆事件變更
         'dashboard_calendar_events': ['calendar_event_participants', 'calendar_event_reminders', 'dashboard'],
         // 每日機台檢驗變更
