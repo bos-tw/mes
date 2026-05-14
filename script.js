@@ -1791,6 +1791,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     registerModuleInitializer('audit_logs', window.initializeAuditLogsModule);
     registerModuleInitializer('lookup_values', window.initializeLookupValuesModule);
     registerModuleInitializer('work_orders', window.initializeWorkOrdersModule);
+    registerModuleInitializer('production_work_order_schedule', window.initializeProductionWorkOrderScheduleModule);
     registerModuleInitializer('work_order_first_piece_dimensions', window.initializeWorkOrderFirstPieceDimensionsModule);
     registerModuleInitializer('work_order_images', window.initializeWorkOrderImagesModule);
     registerModuleInitializer('inventory_items', window.initializeInventoryItemsModule);

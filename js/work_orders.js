@@ -45,7 +45,8 @@
         imagesRows: moduleRoot.querySelector('[data-images-rows]'),
         editImagesRows: moduleRoot.querySelector('[data-edit-images-rows]'),
         screeningServicesTable: moduleRoot.querySelector('[data-screening-services-table]'),
-        screeningServicesBody: moduleRoot.querySelector('[data-screening-services-body]')
+        screeningServicesBody: moduleRoot.querySelector('[data-screening-services-body]'),
+        liveTimeLabel: moduleRoot.querySelector('[data-work-orders-live-time]')
     };
 
     const createModalAlertBox = elements.createModal?.querySelector('[data-work-orders-create-modal-alert]');
@@ -71,7 +72,8 @@
         images: [],
         productionRecords: [],
         machines: [],
-        currentUser: null
+        currentUser: null,
+        liveTimeIntervalId: null
     };
 
     // Initialize
@@ -104,6 +106,32 @@
         loadStatuses();
         loadWorkOrders();
         attachEventListeners();
+        setupMirroredFormFields(elements.createModalForm, ['machine_id', 'assigned_employee_id', 'calibration_employee_id']);
+        setupMirroredFormFields(elements.editModalForm, ['machine_id', 'assigned_employee_id', 'calibration_employee_id']);
+    }
+
+    function setupMirroredFormFields(form, fieldNames) {
+        if (!form) {
+            return;
+        }
+
+        fieldNames.forEach((fieldName) => {
+            const fields = Array.from(form.querySelectorAll(`[name="${fieldName}"]`));
+            if (fields.length < 2) {
+                return;
+            }
+
+            fields.forEach((field) => {
+                field.addEventListener('change', () => {
+                    const value = field.value;
+                    fields.forEach((target) => {
+                        if (target !== field && target.value !== value) {
+                            target.value = value;
+                        }
+                    });
+                });
+            });
+        });
     }
 
     // 輔助函數: 星期顯示
@@ -127,6 +155,36 @@
         ['scheduled_start_date', 'scheduled_end_date', 'actual_start_date', 'actual_end_date'].forEach(name => {
             updateWorkOrderWeekday(form, prefix, name);
         });
+    }
+
+    function formatLiveTimestamp(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hour = String(date.getHours()).padStart(2, '0');
+        const minute = String(date.getMinutes()).padStart(2, '0');
+        const second = String(date.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+    }
+
+    function updateLiveTimeLabel() {
+        if (!elements.liveTimeLabel) {
+            return;
+        }
+        elements.liveTimeLabel.textContent = formatLiveTimestamp(new Date());
+    }
+
+    function startLiveTimeTicker() {
+        stopLiveTimeTicker();
+        updateLiveTimeLabel();
+        state.liveTimeIntervalId = window.setInterval(updateLiveTimeLabel, 1000);
+    }
+
+    function stopLiveTimeTicker() {
+        if (state.liveTimeIntervalId) {
+            clearInterval(state.liveTimeIntervalId);
+            state.liveTimeIntervalId = null;
+        }
     }
 
     // 輔助函數: 取得當前活動的 modal 和 form
@@ -1629,6 +1687,7 @@
         await loadWorkOrderData(id);
 
         elements.editModal.classList.remove('hidden');
+        startLiveTimeTicker();
     }
 
     function closeCreateModal() {
@@ -1647,6 +1706,7 @@
         elements.editModal.classList.add('hidden');
         hideModalAlert(true);
         elements.editModalForm.reset();
+        stopLiveTimeTicker();
         state.editingId = null;
         state.editingStatusLookupId = null;
         state.editingHasInventory = false;
@@ -1735,18 +1795,36 @@
         }
 
         for (const [key, value] of Object.entries(data)) {
-            const input = form.querySelector(`[name="${key}"]`);
-            if (input) {
+            const inputs = form.querySelectorAll(`[name="${key}"]`);
+            if (!inputs.length) {
+                continue;
+            }
+
+            inputs.forEach((input) => {
                 if (input.type === 'checkbox') {
                     input.checked = !!value;
-                } else if (input.tagName === 'SELECT') {
-                    input.value = value || '';
-                } else if (input.type === 'datetime-local' && value) {
+                    return;
+                }
+
+                if (input.tagName === 'SELECT') {
+                    const normalizedValue = value || '';
+                    input.value = normalizedValue;
+
+                    // 選項尚未載入完成時，暫存目標值，待 populateSelect 後套用。
+                    if (normalizedValue !== '' && input.value !== String(normalizedValue)) {
+                        input.dataset.pendingValue = String(normalizedValue);
+                    } else {
+                        delete input.dataset.pendingValue;
+                    }
+                    return;
+                }
+
+                if (input.type === 'datetime-local' && value) {
                     input.value = value.substring(0, 16);
                 } else {
                     input.value = value || '';
                 }
-            }
+            });
         }
 
         // 更新排程日期星期顯示
@@ -2345,6 +2423,7 @@
         const selects = moduleRoot.querySelectorAll(selector);
         selects.forEach(select => {
             const currentValue = select.value;
+            const pendingValue = select.dataset.pendingValue || '';
             const defaultOption = select.querySelector('option[value=""]');
             select.innerHTML = defaultOption ? defaultOption.outerHTML : '<option value="">-- 請選擇 --</option>';
 
@@ -2355,7 +2434,11 @@
                 select.appendChild(option);
             });
 
-            select.value = currentValue;
+            const restoreValue = pendingValue || currentValue;
+            select.value = restoreValue;
+            if (pendingValue && select.value === pendingValue) {
+                delete select.dataset.pendingValue;
+            }
         });
     }
 

@@ -1,0 +1,216 @@
+<div data-module="production_work_order_schedule">
+<div class="content-header with-actions">
+    <div>
+        <h2>生產工單排程</h2>
+        <p class="subtitle">依機台與預定時間管理工單順序，支援拖拉調度與衝突提醒</p>
+    </div>
+    <div class="header-actions">
+        <button type="button" class="btn outline" data-action="refresh-schedule">
+            <i class="fas fa-sync-alt"></i> 重新整理
+        </button>
+    </div>
+</div>
+
+<div class="content-area">
+    <div class="module-alert hidden" data-production-work-order-schedule-alert></div>
+
+    <section class="module-toolbar compact">
+        <div class="production-schedule-toolbar">
+            <div class="production-schedule-toolbar-item">
+                <span class="label">系統即時時間</span>
+                <strong data-schedule-live-time>--</strong>
+            </div>
+            <div class="production-schedule-toolbar-item text-muted">
+                提示：拖拉工單後若預定時間重疊或不合理，系統會以紅框標示並跳出警告。
+            </div>
+        </div>
+    </section>
+
+    <section class="sidebar-tabs-layout production-schedule-tabs">
+        <nav class="sidebar-tabs-nav" data-schedule-tab-nav>
+            <button type="button" class="sidebar-tab-btn active" data-action="switch-schedule-tab" data-tab-value="machine">
+                <i class="fas fa-industry"></i>
+                <span>生產機台</span>
+                <span class="tab-badge" data-schedule-machine-tab-count>0</span>
+            </button>
+            <button type="button" class="sidebar-tab-btn" data-action="switch-schedule-tab" data-tab-value="time">
+                <i class="fas fa-clock"></i>
+                <span>生產時間</span>
+                <span class="tab-badge" data-schedule-time-tab-count>0</span>
+            </button>
+        </nav>
+
+        <div class="sidebar-tabs-content">
+            <section class="production-schedule-tab-panel" data-schedule-tab-panel="machine">
+                <section class="module-toolbar compact production-machine-toolbar">
+                    <form class="filter-form production-machine-filter" data-schedule-machine-filter>
+                        <div class="filter-row">
+                            <label class="inline-label">
+                                <span>指定機台</span>
+                                <select data-schedule-machine-select>
+                                    <option value="">-- 請選擇機台 --</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn outline small" data-action="prev-machine">
+                                <i class="fas fa-chevron-left"></i> 上一台
+                            </button>
+                            <button type="button" class="btn outline small" data-action="next-machine">
+                                下一台 <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="production-machine-layout">
+                    <section class="production-schedule-column queue-column">
+                        <header class="production-schedule-column-header">
+                            <h4>待排程工單</h4>
+                            <span class="badge pending" data-queue-count>0</span>
+                        </header>
+                        <div class="table-responsive">
+                            <table class="data-table compact production-schedule-table production-queue-table">
+                                <thead>
+                                    <tr>
+                                        <th class="col-50">順序</th>
+                                        <th>工單號碼</th>
+                                        <th class="col-150">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody data-schedule-queue-body data-schedule-list-type="queue" data-machine-id=""></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="production-schedule-column machine-column">
+                        <header class="production-schedule-column-header">
+                            <h4>
+                                機台排程：<span data-selected-machine-name>-- 請選擇機台 --</span>
+                            </h4>
+                            <span class="badge active" data-selected-machine-count>0</span>
+                        </header>
+                        <div class="table-responsive">
+                            <table class="data-table compact production-schedule-table">
+                                <thead>
+                                    <tr>
+                                        <th class="col-50">順序</th>
+                                        <th>工單號碼</th>
+                                        <th>客戶名稱</th>
+                                        <th>預定時段</th>
+                                        <th class="col-120">狀態</th>
+                                        <th class="col-150">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody data-schedule-machine-body data-schedule-list-type="machine" data-machine-id=""></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </section>
+            </section>
+
+            <section class="production-schedule-tab-panel hidden" data-schedule-tab-panel="time">
+                <section class="module-content production-time-content">
+                    <div class="table-responsive">
+                        <table class="data-table compact production-time-table">
+                            <thead>
+                                <tr>
+                                    <th>機台</th>
+                                    <th>工單號碼</th>
+                                    <th>客戶名稱</th>
+                                    <th>目前生產時段</th>
+                                    <th class="col-120">剩餘時間</th>
+                                    <th class="col-150">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody data-schedule-time-body></tbody>
+                        </table>
+                    </div>
+                </section>
+            </section>
+        </div>
+    </section>
+</div>
+
+<div class="modal-overlay hidden" data-schedule-work-order-modal>
+    <div class="modal-window medium">
+        <button type="button" class="modal-close" data-action="close-schedule-modal" aria-label="關閉">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3 data-schedule-modal-title>工單排程檢視</h3>
+        <div class="modal-alert hidden" data-schedule-modal-alert role="alert"></div>
+
+        <form data-schedule-work-order-form novalidate>
+            <input type="hidden" name="id">
+
+            <section class="form-section">
+                <h4>即時資訊</h4>
+                <div class="schedule-live-time-row">
+                    <span>即時更新時間</span>
+                    <strong data-schedule-modal-live-time>--</strong>
+                </div>
+                <div class="form-grid">
+                    <label class="inline-label">
+                        <span>工單號碼</span>
+                        <input type="text" name="work_order_number" readonly class="readonly-field">
+                    </label>
+                    <label class="inline-label">
+                        <span>客戶名稱</span>
+                        <input type="text" name="customer_name" readonly class="readonly-field">
+                    </label>
+                    <label class="inline-label">
+                        <span>訂單號碼</span>
+                        <input type="text" name="order_number" readonly class="readonly-field">
+                    </label>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h4>排程時間</h4>
+                <div class="form-grid">
+                    <label class="inline-label">
+                        <span>機台</span>
+                        <select name="machine_id">
+                            <option value="">-- 未排機台 --</option>
+                        </select>
+                    </label>
+                    <label class="inline-label">
+                        <span>預定開始日期</span>
+                        <input type="datetime-local" name="scheduled_start_date">
+                    </label>
+                    <label class="inline-label">
+                        <span>預定結束日期</span>
+                        <input type="datetime-local" name="scheduled_end_date">
+                    </label>
+                    <label class="inline-label">
+                        <span>實際開始日期</span>
+                        <input type="datetime-local" name="actual_start_date">
+                    </label>
+                    <label class="inline-label">
+                        <span>實際結束日期</span>
+                        <input type="datetime-local" name="actual_end_date">
+                    </label>
+                </div>
+            </section>
+
+            <div class="form-actions align-right">
+                <button type="button" class="outline" data-action="close-schedule-modal">關閉</button>
+                <button type="submit" class="primary" data-action="save-schedule">儲存排程</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" data-schedule-warning-modal>
+    <div class="modal-window small">
+        <button type="button" class="modal-close" data-action="close-warning-modal" aria-label="關閉">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3><i class="fas fa-exclamation-triangle"></i> 排程衝突提醒</h3>
+        <div class="modal-alert alert alert-warning" data-schedule-warning-message role="alert"></div>
+        <div class="form-actions align-right">
+            <button type="button" class="primary" data-action="close-warning-modal">我知道了</button>
+        </div>
+    </div>
+</div>
+</div>

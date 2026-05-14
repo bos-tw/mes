@@ -271,7 +271,7 @@ const DataSync = (function() {
         // 權限變更
         'permissions': ['role_permissions'],
         // 機台變更
-        'machines': ['work_orders', 'machine_maintenance_tasks', 'daily_machine_inspections', 'production_records'],
+        'machines': ['work_orders', 'machine_maintenance_tasks', 'daily_machine_inspections', 'production_records', 'production_work_order_schedule'],
         // 工具變更
         'tools': ['work_orders', 'order_items'],
         // 訂單變更
@@ -279,7 +279,7 @@ const DataSync = (function() {
         // 訂單項目變更
         'order_items': ['orders', 'work_orders', 'inventory_items'],
         // 工單變更
-        'work_orders': ['order_items', 'work_order_images', 'work_order_first_piece_dimensions', 'inventory_items', 'inventory_transactions', 'dashboard', 'production_records'],
+        'work_orders': ['order_items', 'orders', 'work_order_images', 'work_order_first_piece_dimensions', 'inventory_items', 'inventory_transactions', 'dashboard', 'production_records', 'production_work_order_schedule'],
         // 出貨單變更
         'shipping_orders': ['shipping_order_items', 'inventory_items', 'order_items', 'inventory_transactions', 'return_orders', 'dashboard', 'shipping_quality_inspections'],
         // 出貨單項目變更（會影響出貨單狀態、客戶批號出貨狀態與庫存紀錄）

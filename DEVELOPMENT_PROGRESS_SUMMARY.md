@@ -1,88 +1,101 @@
-# 開發進度摘要（更新：2026-05-13）
+# 開發進度摘要（更新：2026-05-14）
 
 ## 專案架構
 
-- 根目錄：`C:\Apache24\htdocs\mes`
-- 後端技術棧：PHP（模組化 API，主要位於 `api/`，含 `index/show/update/delete` 端點）
-- 前端技術棧：Vanilla JS + HTML + CSS（核心入口 `script.js`、樣式 `styles.css`、模組腳本 `js/*.js`）
-- UI 配置層：`core/configs/*.config.js`（配置化渲染），部分頁面為混合模式（配置 + `modules/*.html`）
-- 資料庫：MySQL/MariaDB，相依 `migrations/` 進行 schema 升級
-- 維運/工具：
-  - `tools/build-update-package.ps1`（一鍵更新包產生）
-  - `tools/audit-system-health.js`（系統健康審計）
-  - `tools/audit-data-sync.js`（DataSync 盤點）
-  - `tools/sync-local-schema.ps1`（本機 schema 同步）
+- 根目錄：C:/Apache24/htdocs/mes
+- 後端：PHP（api/* 模組化端點，常見 index/show/update/delete）
+- 前端：Vanilla JS + HTML + CSS（入口 script.js，模組在 js/* 與 modules/*）
+- 配置化系統：core/module-config.js + core/module-renderer.js + core/configs/*.config.js
+- 同步機制：js/data-sync.js（createModuleHelper + notifyWithDependencies + MODULE_DEPENDENCIES）
+- 資料庫：MySQL/MariaDB，schema 由 migrations/* 管理
+- 工具鏈：
+  - tools/audit-system-health.js（系統健康審計）
+  - tools/audit-data-sync.js（DataSync 盤點）
+  - tools/sync-local-schema.ps1（本機 schema 同步）
+  - tools/build-update-package.ps1（一鍵更新包）
 
-## 已完成功能（本輪）
+## 已完成功能（本輪新增/修改）
 
-1. 全系統「操作欄按鈕」語意化標準化完成（跨模組）
-- 在 `script.js` 新增全域標準化機制：
-  - `OPERATION_ACTION_ROLE_MAP`
-  - `OPERATION_ACTION_LABEL_MAP`
-  - MutationObserver + 動態重繪再標準化
-- 針對操作欄容器（`table-actions/actions/actions-cell/actions-col`）自動套用語意 class 與 title/aria-label。
+1. 生產工單排程模組上線（新頁）
+- 新增頁面與腳本：
+  - modules/production_work_order_schedule.html
+  - js/production_work_order_schedule.js
+- 入口掛載完成：index.php、index.html、腳本載入鏈
+- UI 改為左側雙分頁（生產機台 / 生產時間），支援拖拉調度與衝突提示
 
-2. 操作按鈕顏色語意分流（避免混色與誤判 disabled）
-- 新增/調整角色色系：`view/edit/delete/print/screening-report/expand/order-items/shipping/reply/mark-read/workflow/navigate/neutral`。
-- 重要拆分：
-  - `details`（展開/收合）獨立為 cyan，不再使用灰色。
-  - `open-order-items`（客戶批號入口）獨立為 amber。
-  - `print-work-order`（列印工單）與 `print-screening-report`（列印篩分檢驗結果報表）分色。
-  - `reply`、`mark-read` 不再是灰色，分別改為 indigo / lime。
-  - `add-to-shipping` 從 workflow 色系拆出，改為 shipping 綠色。
+2. machine_sequence 完整後端化（穩定階段）
+- 新增 migration：migrations/2026_05_14_add_work_orders_machine_sequence.sql
+- 已同步本機 schema 檢查清單：tools/sync-local-schema.ps1
+- work_orders API 已整合 machine_sequence 規則：
+  - api/work_orders/helpers.php
+  - api/work_orders/index.php
+  - api/work_orders/update.php
+- 規則涵蓋：同機台重排、跨機台移動、序號正規化與回寫
 
-3. 模組級落地修正（維持既有 JS 事件行為）
-- `js/orders.js`：調整操作欄語意 class 與顯示文案（展開/客戶批號/編輯/刪除）。
-- `js/work_orders.js`：區分兩種列印按鈕語意與文案（工單 vs 篩分檢驗結果報表）。
-- `js/inventory_items.js`：補齊 `view/edit/delete` 的 `data-action` 與語意 class（保留原 `onclick`，不改既有呼叫路徑）。
-- `js/messages.js`：`reply` 套用回覆語意角色。
-- `js/notifications.js`：`mark-read` 套用已讀語意角色。
-- `modules/work_orders.html` / `styles.css`：配合版面與按鈕語意修正。
+3. 跨分頁即時同步修正（訂單主表/客戶批號/工單）
+- 調整 orders 刷新流程，補齊展開細項快取失效與重抓
+- DataSync 依賴補齊 work_orders -> orders
+- 對應檔案：
+  - js/orders.js
+  - js/data-sync.js
 
-4. 規範與文件同步
-- 更新 `.github/copilot-instructions.md`：
-  - 補充操作欄跨模組統一規範（強制）
-  - 更新色系表與命名對照（含 `details`、`open-order-items`、`print-screening-report`、`reply`、`mark-read`）
-- 新增/更新 DataSync 與流程文件：
-  - `docs/data-sync-audit.md`
-  - `docs/data-sync-regression-checklist.md`
-  - `docs/data-sync-remediation-plan.md`
-- 新增工具：
-  - `tools/audit-data-sync.js`
-  - `tools/sync-local-schema.ps1`
+4. 排程頁快捷操作優化
+- 待排程區改為精簡欄位：只顯示工單號碼 + 操作
+- 工單號碼 hover 顯示詳情（tooltip）
+- 新增前往工單按鈕，並可直接切到生產工單頁開啟該工單詳情
+- 三區塊一致化：待排程、機台排程、生產時間皆可前往工單
 
-5. 更新包產出
-- 已產出更新包：`dist/update_v1.0.9_20260513_184409.zip`
-- release note：`release-notes/2026-05-13-v1.0.9.txt`
+5. 操作按鈕配色規範統一（避免撞色）
+- open-order-items 與 goto-work-order 完成分色：
+  - open-order-items：sky（#0369a1 / #075985）
+  - goto-work-order：slate（#475569 / #334155）
+- 全域語意映射調整：script.js（open-order-items 回到 order-items 角色）
+- 規範文件同步：.github/copilot-instructions.md
 
-## 待修 Bug（已知）
+6. 更新包已產生（可遠端測試）
+- dist/update_v1.0.10_20260514_164823.zip
+- release-notes/2026-05-14-v1.0.10.txt
+- ZIP 自檢通過：含 manifest.json 與 files/，且含 migration
 
-1. `audit-system-health` 仍為失敗狀態（既有技術債）
-- 重現：執行 `node tools/audit-system-health.js`
-- 現況：報告包含大量既有項目（JS 體積、innerHTML XSS 掃描警告、部分模組 DataSync 警告、status_board 結構警告等）。
-- 影響：不阻斷本輪 UI 語意色修正，但影響整體健康度門檻。
+## 待修 Bug（已知問題與重現）
 
-2. 部分頁面仍可能存在舊樣式殘留（非 `data-action` 控制的按鈕）
-- 重現：切到低覆蓋率模組，若按鈕未帶 `data-action` 且無語意 class，可能退回預設色。
-- 影響：視覺一致性風險，功能通常不受影響。
+1. 系統健康審計仍非全綠（既有技術債）
+- 重現：node tools/audit-system-health.js
+- 現象：35 errors / 28 warnings（F-1、J-2、DS-1 等多屬歷史問題）
+- 影響：不阻斷本輪功能使用，但影響整體健康度門檻
 
-3. 快取導致更新後顏色看似未生效
-- 重現：前端資源版本未刷新時（瀏覽器快取舊 `script.js/styles.css`）。
-- 建議：強制重整（Ctrl+F5）或依版本檢查機制刷新。
+2. JS 模組過大風險（可維護性）
+- 重現：audit-system-health [F-1]
+- 主要檔案：js/order_items.js、js/work_orders.js、js/orders.js、js/shipping_orders.js
+- 影響：修改成本高、回歸風險高
+
+3. 多處 innerHTML XSS 掃描告警（歷史分布）
+- 重現：audit-system-health [J-2]
+- 含本輪新增模組在內，仍有多檔待系統性修復
+- 影響：安全基線需補強
+
+4. DataSync 覆蓋率不一致（部分模組）
+- 重現：audit-system-health [DS-1]
+- 現象：部分 CRUD 模組仍被判定 notify 呼叫不足
+- 影響：跨頁資料可能出現延遲或不一致
 
 ## 下一步任務（優先順序）
 
-1. P0：建立「操作欄按鈕覆蓋率清單」
-- 掃描 `js/*.js` 產生缺少 `data-action` / 缺少語意 class 的按鈕清單，補齊到全模組一致。
+1. P0：完成遠端更新包驗證
+- 上傳並套用 update_v1.0.10
+- 驗證 migration 套用、排程拖拉持久化、跨頁同步、按鈕配色
 
-2. P0：建立按鈕語意回歸測試腳本
-- 針對關鍵模組（orders/work_orders/inventory_items/messages/notifications）做色系與標題快照比對。
+2. P0：修復 production_work_order_schedule 的 M-1 樣式規範警告
+- 檢查 modules/production_work_order_schedule.html 按鈕 class 是否全符合 btn 前綴規範
 
-3. P1：修復 `audit-system-health` 中高風險項目
-- 優先處理可確認的 XSS 風險（innerHTML 寫入點）與核心 DataSync notify 缺漏模組。
+3. P1：處理高風險 J-2（XSS）
+- 先修核心模組：orders、order_items、work_orders、production_work_order_schedule
+- 建立 innerHTML 安全輸出統一策略（escapeHtml / textContent）
 
-4. P1：統一列印/流程/導向類 action 命名規則
-- 清理 `print-*`、`open-*`、`goto-*` 的語意邊界，降低未來誤映射。
+4. P1：提升 DataSync 覆蓋率
+- 補齊被 DS-1 點名模組的 notify 路徑
+- 以 docs/data-sync-audit.md 持續追蹤 P0/P1=0
 
-5. P2：持續拆分超大前端模組
-- 優先拆 `order_items.js`、`work_orders.js`、`shipping_orders.js`，降低耦合與回歸風險。
+5. P2：拆分超大前端模組
+- 優先拆 js/order_items.js、js/work_orders.js
+- 建議分層：api 層 / render 層 / state-event 層

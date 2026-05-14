@@ -1527,12 +1527,12 @@ body.login-page {
 }
 
 .btn.text[data-action="open-order-items"] {
-    background: #f59e0b;
+    background: #0369a1;
     color: #fff;
 }
 
 .btn.text[data-action="open-order-items"]:hover {
-    background: #d97706;
+    background: #075985;
 }
 
 .btn.text[data-action="create-work-order"],
@@ -2648,11 +2648,11 @@ td.actions-col {
 }
 
 :is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-order-items {
-    background: #f59e0b;
+    background: #0369a1;
 }
 
 :is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-order-items:hover {
-    background: #d97706;
+    background: #075985;
 }
 
 :is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-shipping {
@@ -7251,6 +7251,219 @@ select option:disabled {
 
     .system-update-meta {
         grid-template-columns: 1fr;
+    }
+}
+
+/* ================================================================
+   生產工單排程模組
+   ================================================================ */
+
+.production-schedule-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+}
+
+.production-schedule-toolbar-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--font-sm);
+}
+
+.production-schedule-toolbar-item .label {
+    color: var(--color-text-secondary);
+}
+
+.production-schedule-tabs {
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    background: #fff;
+}
+
+.production-schedule-tab-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 520px;
+}
+
+.production-machine-toolbar {
+    border-bottom: 1px solid var(--color-border-light);
+    margin-bottom: 0;
+}
+
+.production-machine-filter {
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.production-machine-filter .filter-row {
+    width: 100%;
+}
+
+.production-machine-layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 360px) 1fr;
+    gap: 14px;
+    padding: 12px;
+}
+
+.production-schedule-column-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.production-schedule-column-header h4 {
+    font-size: var(--font-base);
+    color: var(--color-text);
+}
+
+.production-schedule-column {
+    border: 1px solid var(--color-border-light);
+    background: #fff;
+    border-radius: var(--radius-md);
+    padding: 10px;
+    min-height: 440px;
+}
+
+.production-schedule-table {
+    table-layout: fixed;
+}
+
+.production-queue-table {
+    table-layout: auto;
+}
+
+.production-queue-table .schedule-work-order-code {
+    display: inline-block;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #0f172a;
+    font-weight: 600;
+    border-bottom: 1px dotted #94a3b8;
+    cursor: help;
+}
+
+.production-queue-table .schedule-work-order-code:focus {
+    outline: 2px solid rgba(37, 99, 235, 0.25);
+    outline-offset: 2px;
+    border-bottom-color: #2563eb;
+}
+
+.production-queue-table .table-actions {
+    white-space: nowrap;
+}
+
+.production-schedule-table .table-actions,
+.production-time-table .table-actions {
+    white-space: nowrap;
+}
+
+.production-schedule-table tbody tr.schedule-row {
+    cursor: move;
+    transition: background-color 0.15s ease;
+}
+
+.production-schedule-table tbody tr.schedule-row:hover {
+    background: #f8fbff;
+}
+
+.production-schedule-table tbody tr.schedule-row.dragging {
+    opacity: 0.55;
+}
+
+.production-schedule-table tbody tr.schedule-row-conflict td,
+.production-time-table tbody tr.schedule-row-conflict td {
+    background: #fff1f2;
+    border-top-color: #fecdd3;
+    border-bottom-color: #fecdd3;
+}
+
+.schedule-sequence {
+    color: var(--color-text-secondary);
+    font-size: var(--font-sm);
+}
+
+.schedule-status-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border: 1px solid #d6e9df;
+    border-radius: 999px;
+    background: #edf9f1;
+    color: #0f766e;
+    font-size: var(--font-xs);
+    font-weight: 600;
+}
+
+.production-time-content {
+    padding: 12px;
+}
+
+.schedule-empty {
+    border: 1px dashed #cbd5e1;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: var(--font-sm);
+    text-align: center;
+    padding: 18px 10px;
+    background: #fff;
+}
+
+.schedule-live-time-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-light);
+    font-size: var(--font-sm);
+}
+
+.schedule-live-time-row strong {
+    color: #1d4ed8;
+}
+
+.schedule-field-conflict {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15) !important;
+}
+
+@media (max-width: 1200px) {
+    .production-machine-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .production-schedule-toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .production-machine-filter {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .production-machine-filter .form-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .production-schedule-column {
+        min-height: auto;
     }
 }
 

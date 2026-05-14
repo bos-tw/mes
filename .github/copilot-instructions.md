@@ -425,7 +425,7 @@ actions: [
 | 列印篩分檢驗結果報表 | `print-screening-report` | emerald `#059669`，hover `#047857` |
 | 編輯 | `edit`, `edit-from-detail`, `edit-order-item`, `edit-order-item-inline`, `edit-screening-item`, `edit-work-order`, `edit-draft` | blue `#2563eb`，hover `#1d4ed8` |
 | 展開/收合細項 | `details` | cyan `#0891b2`，hover `#0e7490` |
-| 客戶批號/訂單細項入口 | `open-order-items` | 銘黃色 `#f59e0b`，hover `#d97706` |
+| 客戶批號/訂單細項入口 | `open-order-items` | sky `#0369a1`，hover `#075985` |
 | 複製 | `copy-order-item` | fuchsia `#c026d3`，hover `#a21caf` |
 | 建工單/轉庫存 | `create-work-order`, `convert-to-inventory` | brown-orange `#b45309`，hover `#92400e` |
 | 跳轉/前往關聯資料 | `goto-work-order`, `go-to-*` | slate `#475569`，hover `#334155` |
@@ -438,7 +438,7 @@ actions: [
 | 停用/警告 | `.btn.text.warning` | orange `#f97316`，hover `#ea580c` |
 | 不可操作/已完成狀態 | `disabled`, `aria-disabled="true"` | gray `#6c757d` |
 
-列印按鈕不得與檢視按鈕同色；客戶批號不得與建工單/轉庫存同色；複製不得與編輯同色。若新增操作欄按鈕，優先沿用既有 `data-action` 命名以自動套用顏色，並同步更新此表與 `styles.css`。
+列印按鈕不得與檢視按鈕同色；客戶批號與跳轉按鈕不得同色；兩者皆不得使用橘色；複製不得與編輯同色。若新增操作欄按鈕，優先沿用既有 `data-action` 命名以自動套用顏色，並同步更新此表與 `styles.css`。
 
 #### 操作欄按鈕跨模組統一規範（2026-05-13 新增，強制）
 
@@ -1735,11 +1735,11 @@ A 分頁執行 CRUD
 | `roles` | `notifications`, `employee_roles`, `role_permissions` | 角色影響通知/員工角色/角色權限 |
 | `notifications` | `dashboard` | 公告/通知影響儀表板公告區 |
 | `permissions` | `role_permissions` | 權限影響角色權限 |
-| `machines` | `work_orders`, `machine_maintenance_tasks`, `daily_machine_inspections`, `production_records` | 機台影響工單/保養/檢驗/生產 |
+| `machines` | `work_orders`, `machine_maintenance_tasks`, `daily_machine_inspections`, `production_records`, `production_work_order_schedule` | 機台影響工單/保養/檢驗/生產/排程看板 |
 | `tools` | `work_orders`, `order_items` | 工具影響工單/訂單項目 |
 | `orders` | `order_items`, `work_orders`, `dashboard` | 訂單影響項目/工單/儀表板 |
 | `order_items` | `orders`, `work_orders`, `inventory_items` | 訂單項目影響訂單合計/工單/庫存 |
-| `work_orders` | `order_items`, `work_order_images`, `work_order_first_piece_dimensions`, `inventory_items`, `inventory_transactions`, `dashboard`, `production_records` | 工單影響訂單項目按鈕/圖片/首件/庫存/儀表板/生產 |
+| `work_orders` | `order_items`, `orders`, `work_order_images`, `work_order_first_piece_dimensions`, `inventory_items`, `inventory_transactions`, `dashboard`, `production_records`, `production_work_order_schedule` | 工單影響訂單主表細項、訂單項目按鈕/圖片/首件/庫存/儀表板/生產/排程看板 |
 | `shipping_orders` | `shipping_order_items`, `inventory_items`, `order_items`, `inventory_transactions`, `return_orders`, `dashboard`, `shipping_quality_inspections` | 出貨單影響出貨項目/庫存/退貨/儀表板/品質 |
 | `shipping_order_items` | `shipping_orders`, `order_items`, `inventory_items`, `inventory_transactions`, `return_orders` | 出貨明細影響出貨單狀態/訂單項目/庫存/異動紀錄/退貨可選品項 |
 | `return_orders` | `inventory_items`, `inventory_transactions`, `shipping_orders`, `shipping_order_items` | 退貨影響庫存、異動紀錄與出貨/明細退貨狀態 |

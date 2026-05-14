@@ -34,6 +34,7 @@
  * |------------------------|----------|-----|----------------------|
  * | order_item_id          | int      | 是  | 訂單品項 ID            |
  * | machine_id             | int      | 否  | 機台 ID               |
+ * | machine_sequence       | int      | 否  | 機台內排序序號         |
  * | assigned_employee_id   | int      | 否  | 指定員工 ID           |
  * | calibration_employee_id| int      | 否  | 校機人員 ID           |
  * | scheduled_start_date   | datetime | 否  | 預定開始日期            |
@@ -139,6 +140,7 @@ function handleListWorkOrders(PDO $pdo): void
         'customer_name' => 'c.name',
         'screening_item' => 'si.name',
         'machine_name' => 'm.name',
+        'machine_sequence' => 'wo.machine_sequence',
         'actual_start_date' => 'wo.actual_start_date',
         'actual_end_date' => 'wo.actual_end_date',
         'status_label' => 'lv.value_label'
@@ -171,6 +173,7 @@ function handleListWorkOrders(PDO $pdo): void
             wo.work_order_number,
             wo.order_item_id,
             wo.machine_id,
+            wo.machine_sequence,
             wo.assigned_employee_id,
             wo.calibration_employee_id,
             wo.scheduled_start_date,
@@ -321,6 +324,18 @@ function handleCreateWorkOrder(PDO $pdo): void
         $stmt->execute($data);
 
         $workOrderId = (int)$pdo->lastInsertId();
+        $machineIdForSequence = isset($data['machine_id']) && $data['machine_id'] !== null
+            ? (int)$data['machine_id']
+            : null;
+        $requestedMachineSequence = isset($data['machine_sequence']) && $data['machine_sequence'] !== null
+            ? (int)$data['machine_sequence']
+            : null;
+        $machineSequence = placeWorkOrderInMachineSequence(
+            $pdo,
+            $workOrderId,
+            $machineIdForSequence,
+            $requestedMachineSequence
+        );
 
         // 處理首件尺寸檢驗 (First Piece Dimensions)
         if (!empty($firstPieceDimensions)) {
@@ -433,7 +448,8 @@ function handleCreateWorkOrder(PDO $pdo): void
             'success' => true,
             'message' => '工單新增成功。',
             'id' => $workOrderId,
-            'work_order_number' => $workOrderNumber
+            'work_order_number' => $workOrderNumber,
+            'machine_sequence' => $machineSequence,
         ], 201);
 
     } catch (Throwable $t) {

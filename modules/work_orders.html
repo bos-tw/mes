@@ -1,4 +1,4 @@
-<!-- 
+<!--
 ╔════════════════════════════════════════════════════════════════════════════╗
 ║  ⚠️  警告：此模組已配置化（混合模式）                                         ║
 ╚════════════════════════════════════════════════════════════════════════════╝
@@ -23,7 +23,7 @@
 ⚠️ 仍使用 HTML（修改此檔案會生效）：
    - 複雜的 Modal 表單
    - 特殊的 HTML 區塊（如 customHtml）
-   
+
 請查看配置檔中的註解，了解哪些部分由配置控制。
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@
 📝 修改指引：
 ─────────────
 
-1. 修改頁面標題、按鈕、篩選、表格 
+1. 修改頁面標題、按鈕、篩選、表格
    → 編輯配置檔: core/configs/work_orders.config.js
 
 2. 修改 Modal 表單（如配置檔有 requiresHtmlModal: true）
@@ -756,6 +756,10 @@
 
             <!-- Modal 內部錯誤訊息顯示區 -->
             <div class="modal-alert hidden" data-work-orders-edit-modal-alert role="alert"></div>
+            <div class="schedule-live-time-row work-order-live-time-row">
+                <span>即時更新時間</span>
+                <strong data-work-orders-live-time>--</strong>
+            </div>
 
             <form data-work-orders-edit-form novalidate>
                 <div class="work-orders-modal-main">

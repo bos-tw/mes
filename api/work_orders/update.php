@@ -17,6 +17,7 @@
  * | 參數                    | 類型     | 必填 | 說明                  |
  * |------------------------|----------|-----|----------------------|
  * | machine_id             | int      | 否  | 機台 ID               |
+ * | machine_sequence       | int      | 否  | 機台內排序序號         |
  * | assigned_employee_id   | int      | 否  | 指定員工 ID           |
  * | actual_start_date      | datetime | 否  | 實際開始日期            |
  * | actual_end_date        | datetime | 否  | 實際結束日期            |
@@ -113,7 +114,7 @@ try {
     $pdo->beginTransaction();
 
     // Check if work order exists and get current status
-    $checkStmt = $pdo->prepare("SELECT id, status, status_lookup_id, completed_at, order_item_id, total_units, total_weight_kg, weight_per_unit_g, tool_statistics FROM work_orders WHERE id = :id AND deleted_at IS NULL");
+    $checkStmt = $pdo->prepare("SELECT id, status, status_lookup_id, completed_at, order_item_id, total_units, total_weight_kg, weight_per_unit_g, tool_statistics, machine_id, machine_sequence FROM work_orders WHERE id = :id AND deleted_at IS NULL");
     $checkStmt->execute(['id' => $id]);
     $existingWorkOrder = $checkStmt->fetch(PDO::FETCH_ASSOC);
     if (!$existingWorkOrder) {
@@ -148,6 +149,28 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute(array_merge($data, ['id' => $id]));
     }
+
+    $oldMachineId = isset($existingWorkOrder['machine_id']) && $existingWorkOrder['machine_id'] !== null
+        ? (int)$existingWorkOrder['machine_id']
+        : null;
+    $newMachineId = array_key_exists('machine_id', $data)
+        ? ($data['machine_id'] !== null ? (int)$data['machine_id'] : null)
+        : $oldMachineId;
+    $requestedMachineSequence = array_key_exists('machine_sequence', $data)
+        ? ($data['machine_sequence'] !== null ? (int)$data['machine_sequence'] : null)
+        : null;
+    $machineIdWasUpdated = array_key_exists('machine_id', $data);
+    $sequenceWasUpdated = array_key_exists('machine_sequence', $data);
+
+    $resolvedMachineSequence = syncWorkOrderMachineSequence(
+        $pdo,
+        $id,
+        $oldMachineId,
+        $newMachineId,
+        $requestedMachineSequence,
+        $machineIdWasUpdated,
+        $sequenceWasUpdated
+    );
 
     // 處理首件尺寸檢驗 (First Piece Dimensions)
     if ($firstPieceDimensions !== null && !empty($firstPieceDimensions)) {
@@ -456,6 +479,8 @@ try {
         'message' => '工單更新成功。',
         'data' => [
             'id' => $id,
+            'machine_id' => $newMachineId,
+            'machine_sequence' => $resolvedMachineSequence,
             'status_lookup_id' => $newStatusLookupId,
             'inventory_created' => $createdInventoryItemId !== null,
             'inventory_deleted' => $deletedInventoryItemId !== null,

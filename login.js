@@ -37,10 +37,10 @@
         }
 
         if (reason === 'idle_timeout' || reason === 'session_expired') {
-            noticeEl.innerHTML = '你已經登入，請再次登入系統。 <a href="login.html">LOGIN</a>';
+            noticeEl.textContent = '你已經登出，請再次登入系統。';
             noticeEl.style.display = 'block';
         } else if (reason === 'manual_logout') {
-            noticeEl.innerHTML = '你已成功登出。 <a href="login.html">LOGIN</a>';
+            noticeEl.textContent = '你已經登出，請再次登入系統。';
             noticeEl.style.display = 'block';
         }
 

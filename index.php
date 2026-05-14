@@ -124,6 +124,7 @@ $ver = $cacheVersion['version'];
                             </a>
                             <ul class="submenu">
                                 <li><a href="#" data-page="work_orders" data-title="生產工單"><i class="fas fa-clipboard"></i> 生產工單</a></li>
+                                <li><a href="#" data-page="production_work_order_schedule" data-title="生產工單排程"><i class="fas fa-calendar-alt"></i> 生產工單排程</a></li>
                                 <li><a href="#" data-page="work_order_first_piece_dimensions" data-title="首件尺寸檢驗"><i class="fas fa-ruler-combined"></i> 首件尺寸檢驗</a></li>
                                 <li><a href="#" data-page="work_order_images" data-title="工單圖片"><i class="fas fa-images"></i> 工單圖片</a></li>
                                 <li><a href="#" data-page="production_records" data-title="生產紀錄"><i class="fas fa-clipboard-list"></i> 生產紀錄</a></li>
@@ -485,6 +486,7 @@ $ver = $cacheVersion['version'];
     <script defer src="js/order_items.js?v=<?= $ver ?>"></script>
     <script defer src="js/departments.js?v=<?= $ver ?>"></script>
     <script defer src="js/work_orders.js?v=<?= $ver ?>"></script>
+    <script defer src="js/production_work_order_schedule.js?v=<?= $ver ?>"></script>
     <script defer src="js/work_order_first_piece_dimensions.js?v=<?= $ver ?>"></script>
     <script defer src="js/work_order_images.js?v=<?= $ver ?>"></script>
     <script defer src="js/inventory_items.js?v=<?= $ver ?>"></script>

@@ -1,15 +1,15 @@
 # DataSync Audit Report
 
-Generated at: 2026-05-13T09:32:08.521Z
+Generated at: 2026-05-14T08:47:42.852Z
 
 ## Summary
 
 - P0: 0
 - P1: 0
-- P2: 9
+- P2: 10
 - OK: 35
 - Dependency sources: 33
-- Stateful refresh review: 33
+- Stateful refresh review: 34
 
 ## Module Matrix
 
@@ -21,6 +21,7 @@ Generated at: 2026-05-13T09:32:08.521Z
 | P2 | domain_event_outbox | domain_event_outbox | DELETE | (helper) | - | - | crud_module_without_dependents |
 | P2 | messages | messages | POST, DELETE | (helper) | - | employees | crud_module_without_dependents |
 | P2 | number_sequences | number_sequences | DELETE | (helper) | - | - | crud_module_without_dependents |
+| P2 | production_work_order_schedule | production_work_order_schedule | PUT | (helper), work_orders | - | machines, work_orders | crud_module_without_dependents |
 | P2 | report_descriptions | report_descriptions | DELETE | (helper) | - | - | crud_module_without_dependents |
 | P2 | security_settings | security_settings | POST | (helper) | - | - | crud_module_without_dependents |
 | P2 | system_parameters | system_parameters | DELETE | (helper) | - | - | crud_module_without_dependents |
@@ -38,10 +39,10 @@ Generated at: 2026-05-13T09:32:08.521Z
 | OK | lookup_domains | lookup_domains | DELETE | (helper) | lookup_values | - | - |
 | OK | lookup_values | lookup_values | - | - | orders, customers, suppliers, employees, work_orders, screening_items | lookup_domains | - |
 | OK | machine_maintenance_tasks | machine_maintenance_tasks | DELETE | (helper) | machines | employees, machines | - |
-| OK | machines | machines | POST, PUT, DELETE | machines | work_orders, machine_maintenance_tasks, daily_machine_inspections, production_records | machine_maintenance_tasks | - |
+| OK | machines | machines | POST, PUT, DELETE | machines | work_orders, machine_maintenance_tasks, daily_machine_inspections, production_records, production_work_order_schedule | machine_maintenance_tasks | - |
 | OK | notifications | notifications | POST, DELETE | (helper) | dashboard | departments, employees, roles | - |
 | OK | order_items | order_items | POST, DELETE | order_items | orders, work_orders, inventory_items | orders, screening_items, screening_services, shipping_order_items, shipping_orders, tools, work_orders | - |
-| OK | orders | orders | POST, DELETE | (helper), order_items | order_items, work_orders, dashboard | customers, employees, lookup_values, order_items, screening_services, suppliers | - |
+| OK | orders | orders | POST, DELETE | (helper), order_items | order_items, work_orders, dashboard | customers, employees, lookup_values, order_items, screening_services, suppliers, work_orders | - |
 | OK | permissions | permissions | DELETE | (helper) | role_permissions | role_permissions | - |
 | OK | production_quality_records | production_quality_records | POST, DELETE | production_quality_records | work_orders | - | - |
 | OK | production_records | production_records | - | - | - | employees, machines, work_orders | - |
@@ -58,7 +59,7 @@ Generated at: 2026-05-13T09:32:08.521Z
 | OK | tools | tools | DELETE | tools | work_orders, order_items | - | - |
 | OK | work_order_first_piece_dimensions | work_order_first_piece_dimensions | POST, DELETE | (helper) | work_orders | employees, work_orders | - |
 | OK | work_order_images | work_order_images | - | - | work_orders | work_orders | - |
-| OK | work_orders | work_orders | POST, DELETE | inventory_items, work_orders | order_items, work_order_images, work_order_first_piece_dimensions, inventory_items, inventory_transactions, dashboard, production_records | employees, inventory_items, lookup_values, machines, order_items, orders, production_quality_records, tools, work_order_first_piece_dimensions, work_order_images | - |
+| OK | work_orders | work_orders | POST, DELETE | inventory_items, work_orders | order_items, orders, work_order_images, work_order_first_piece_dimensions, inventory_items, inventory_transactions, dashboard, production_records, production_work_order_schedule | employees, inventory_items, lookup_values, machines, order_items, orders, production_quality_records, tools, work_order_first_piece_dimensions, work_order_images | - |
 
 ## Recommended Order
 
@@ -68,6 +69,7 @@ Generated at: 2026-05-13T09:32:08.521Z
 - P2 domain_event_outbox: crud_module_without_dependents
 - P2 messages: crud_module_without_dependents
 - P2 number_sequences: crud_module_without_dependents
+- P2 production_work_order_schedule: crud_module_without_dependents
 - P2 report_descriptions: crud_module_without_dependents
 - P2 security_settings: crud_module_without_dependents
 - P2 system_parameters: crud_module_without_dependents
@@ -95,9 +97,10 @@ These modules keep local UI state such as caches, expanded rows, open detail mod
 | messages | detail_modal, edit_modal, button_state | employees | yes | verify open state refresh path |
 | notifications | detail_modal, edit_modal, button_state | departments, employees, roles | no | uses generic onRefresh; inspect open state manually |
 | order_items | edit_modal, button_state | orders, screening_items, screening_services, shipping_order_items, shipping_orders, tools, work_orders | yes | verify open state refresh path |
-| orders | cache, expanded_row, edit_modal, button_state | customers, employees, lookup_values, order_items, screening_services, suppliers | yes | verify open state refresh path |
+| orders | cache, expanded_row, edit_modal, button_state | customers, employees, lookup_values, order_items, screening_services, suppliers, work_orders | yes | verify open state refresh path |
 | permissions | cache, edit_modal, button_state | role_permissions | no | uses generic onRefresh; inspect open state manually |
 | production_records | cache, detail_modal, edit_modal, button_state | employees, machines, work_orders | yes | verify open state refresh path |
+| production_work_order_schedule | edit_modal, button_state | machines, work_orders | yes | verify open state refresh path |
 | quality_issue_reports | detail_modal, edit_modal, button_state | departments, employees | no | uses generic onRefresh; inspect open state manually |
 | return_orders | detail_modal, edit_modal, button_state | customers, shipping_order_items, shipping_orders | yes | verify open state refresh path |
 | role_permissions | edit_modal, button_state | permissions, roles | no | uses generic onRefresh; inspect open state manually |

@@ -826,10 +826,58 @@
                 const orderId = Number.parseInt(rawOrderId, 10);
                 if (Number.isFinite(orderId) && orderId > 0) {
                     orderIds.add(orderId);
+                    return;
                 }
+
+                const rawOrderItemId = record.order_item_id ?? record.orderItemId ?? record.order_item?.id;
+                const orderItemId = Number.parseInt(rawOrderItemId, 10);
+                if (!Number.isFinite(orderItemId) || orderItemId <= 0) {
+                    return;
+                }
+
+                orderItemsCache.forEach((items, cachedOrderId) => {
+                    if (!Array.isArray(items)) {
+                        return;
+                    }
+
+                    const matched = items.some((item) => Number.parseInt(item.id, 10) === orderItemId);
+                    if (matched) {
+                        orderIds.add(cachedOrderId);
+                    }
+                });
             });
 
             return Array.from(orderIds);
+        }
+
+        function isOrderItemsRelatedSource(sourceModule) {
+            return sourceModule === 'order_items' || sourceModule === 'work_orders';
+        }
+
+        async function refreshOrdersForDataSync(sourceModule = null, sourceAction = null, sourceData = null) {
+            if (sourceModule === 'customers') {
+                await loadCustomers();
+            }
+
+            let affectedOrderIds = [];
+            if (isOrderItemsRelatedSource(sourceModule)) {
+                affectedOrderIds = getOrderIdsFromDataSyncPayload(sourceData);
+                if (affectedOrderIds.length > 0) {
+                    affectedOrderIds.forEach((orderId) => orderItemsCache.delete(orderId));
+                } else {
+                    orderItemsCache.clear();
+                }
+            }
+
+            await loadOrders(state.page);
+
+            if (isOrderItemsRelatedSource(sourceModule)) {
+                await refreshExpandedOrderItems(affectedOrderIds);
+            }
+
+            if (modalOverlay && !modalOverlay.classList.contains('hidden') && state.currentEditingId) {
+                await openEditModal(state.currentEditingId);
+            }
         }
 
         function getVisibleExpandedOrderIds(candidateOrderIds = []) {
@@ -855,32 +903,6 @@
             }
 
             await Promise.all(targetOrderIds.map((orderId) => loadOrderItemsForOrder(orderId, true)));
-        }
-
-        async function refreshOrdersForDataSync(sourceModule = null, sourceAction = null, sourceData = null) {
-            if (sourceModule === 'customers') {
-                await loadCustomers();
-            }
-
-            let affectedOrderIds = [];
-            if (sourceModule === 'order_items') {
-                affectedOrderIds = getOrderIdsFromDataSyncPayload(sourceData);
-                if (affectedOrderIds.length > 0) {
-                    affectedOrderIds.forEach((orderId) => orderItemsCache.delete(orderId));
-                } else {
-                    orderItemsCache.clear();
-                }
-            }
-
-            await loadOrders(state.page);
-
-            if (sourceModule === 'order_items') {
-                await refreshExpandedOrderItems(affectedOrderIds);
-            }
-
-            if (modalOverlay && !modalOverlay.classList.contains('hidden') && state.currentEditingId) {
-                await openEditModal(state.currentEditingId);
-            }
         }
 
         async function toggleOrderItems(orderId) {

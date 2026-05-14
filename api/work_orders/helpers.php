@@ -14,6 +14,7 @@
  * ## 驗證欄位說明
  * - order_item_id:              訂單品項 ID，新增時必填
  * - machine_id:                 機台 ID，可選
+ * - machine_sequence:           機台內排序序號，可選
  * - assigned_employee_id:       指定員工 ID，可選
  * - calibration_employee_id:    校機人員 ID，可選
  * - scheduled_start_date:       預定開始日期 (Y-m-d\TH:i)
@@ -201,6 +202,21 @@ function validateWorkOrderData(array $payload, bool $isUpdate = false): array
                 $errors['machine_id'] = '機台ID必須為正整數。';
             } else {
                 $data['machine_id'] = $machineIdInt;
+            }
+        }
+    }
+
+    // 機台排序序號 - 可選
+    if (array_key_exists('machine_sequence', $payload)) {
+        $machineSequence = $payload['machine_sequence'] ?? null;
+        if ($machineSequence === null || $machineSequence === '') {
+            $data['machine_sequence'] = null;
+        } else {
+            $machineSequenceInt = filter_var($machineSequence, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($machineSequenceInt === false) {
+                $errors['machine_sequence'] = '機台排序序號必須為正整數。';
+            } else {
+                $data['machine_sequence'] = $machineSequenceInt;
             }
         }
     }
@@ -422,6 +438,141 @@ function generateWorkOrderNumber(PDO $pdo): string
     }
 
     return $prefix . str_pad((string)$newSequence, 4, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Normalize machine sequence ordering for a specific machine group.
+ *
+ * @param PDO      $pdo
+ * @param int|null $machineId Null represents queue (machine_id IS NULL).
+ * @param int|null $pinnedWorkOrderId Optional work order ID to insert into sequence.
+ * @param int|null $preferredSequence Optional preferred position (1-based).
+ */
+function normalizeWorkOrderMachineSequence(PDO $pdo, ?int $machineId, ?int $pinnedWorkOrderId = null, ?int $preferredSequence = null): void
+{
+    $baseSql = "
+        SELECT id
+        FROM work_orders
+        WHERE deleted_at IS NULL
+    ";
+
+    $params = [];
+    if ($machineId === null) {
+        $baseSql .= ' AND machine_id IS NULL';
+    } else {
+        $baseSql .= ' AND machine_id = :machine_id';
+        $params['machine_id'] = $machineId;
+    }
+
+    if ($pinnedWorkOrderId !== null) {
+        $baseSql .= ' AND id != :pinned_id';
+        $params['pinned_id'] = $pinnedWorkOrderId;
+    }
+
+    $baseSql .= ' ORDER BY COALESCE(machine_sequence, 2147483647), scheduled_start_date IS NULL, scheduled_start_date, id';
+
+    $stmt = $pdo->prepare($baseSql);
+    $stmt->execute($params);
+    $orderedIds = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+    if ($pinnedWorkOrderId !== null) {
+        $targetPosition = $preferredSequence ?? (count($orderedIds) + 1);
+        $targetPosition = max(1, min($targetPosition, count($orderedIds) + 1));
+        array_splice($orderedIds, $targetPosition - 1, 0, [$pinnedWorkOrderId]);
+    }
+
+    if (empty($orderedIds)) {
+        return;
+    }
+
+    $updateStmt = $pdo->prepare('UPDATE work_orders SET machine_sequence = :machine_sequence WHERE id = :id');
+    foreach ($orderedIds as $index => $id) {
+        $updateStmt->execute([
+            'machine_sequence' => $index + 1,
+            'id' => $id,
+        ]);
+    }
+}
+
+/**
+ * Fetch current machine sequence value for one work order.
+ *
+ * @param PDO $pdo
+ * @param int $workOrderId
+ * @return int|null
+ */
+function getWorkOrderMachineSequence(PDO $pdo, int $workOrderId): ?int
+{
+    $stmt = $pdo->prepare('SELECT machine_sequence FROM work_orders WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => $workOrderId]);
+    $value = $stmt->fetchColumn();
+
+    if ($value === false || $value === null || $value === '') {
+        return null;
+    }
+
+    return (int)$value;
+}
+
+/**
+ * Place a newly created work order into machine sequence.
+ *
+ * @param PDO      $pdo
+ * @param int      $workOrderId
+ * @param int|null $machineId
+ * @param int|null $requestedSequence
+ * @return int|null
+ */
+function placeWorkOrderInMachineSequence(PDO $pdo, int $workOrderId, ?int $machineId, ?int $requestedSequence): ?int
+{
+    normalizeWorkOrderMachineSequence($pdo, $machineId, $workOrderId, $requestedSequence);
+    return getWorkOrderMachineSequence($pdo, $workOrderId);
+}
+
+/**
+ * Apply machine sequence sync rules for work order updates.
+ *
+ * Rules:
+ * 1) If machine changed, re-index old machine and insert into new machine sequence.
+ * 2) If sequence specified on same machine, reposition then re-index.
+ * 3) If machine changed but sequence omitted, append to tail of new machine sequence.
+ *
+ * @param PDO      $pdo
+ * @param int      $workOrderId
+ * @param int|null $oldMachineId
+ * @param int|null $newMachineId
+ * @param int|null $requestedSequence
+ * @param bool     $machineIdWasUpdated
+ * @param bool     $sequenceWasUpdated
+ * @return int|null
+ */
+function syncWorkOrderMachineSequence(
+    PDO $pdo,
+    int $workOrderId,
+    ?int $oldMachineId,
+    ?int $newMachineId,
+    ?int $requestedSequence,
+    bool $machineIdWasUpdated,
+    bool $sequenceWasUpdated
+): ?int {
+    if (!$machineIdWasUpdated && !$sequenceWasUpdated) {
+        return getWorkOrderMachineSequence($pdo, $workOrderId);
+    }
+
+    $machineChanged = $oldMachineId !== $newMachineId;
+
+    if ($machineChanged) {
+        normalizeWorkOrderMachineSequence($pdo, $oldMachineId);
+        normalizeWorkOrderMachineSequence($pdo, $newMachineId, $workOrderId, $requestedSequence);
+        return getWorkOrderMachineSequence($pdo, $workOrderId);
+    }
+
+    if ($sequenceWasUpdated) {
+        normalizeWorkOrderMachineSequence($pdo, $newMachineId, $workOrderId, $requestedSequence);
+        return getWorkOrderMachineSequence($pdo, $workOrderId);
+    }
+
+    return getWorkOrderMachineSequence($pdo, $workOrderId);
 }
 
 /**
