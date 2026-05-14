@@ -4,7 +4,7 @@
 (function () {
     'use strict';
 
-    function initializeDashboardCalendarEventsModule(container) {
+    function initializeDashboardCalendarEventsModule(container, initialContext = null) {
         const moduleRoot = container.querySelector('[data-module="dashboard_calendar_events"]');
         if (!moduleRoot || moduleRoot.dataset.initialised === 'true') {
             return;
@@ -39,6 +39,71 @@
         };
 
         let dataSyncHelper = null;
+
+        function parseContextEventId(context) {
+            if (!context || typeof context !== 'object') {
+                return null;
+            }
+
+            const rawId = context.calendarEventId ?? context.eventId ?? context.highlightId ?? null;
+            if (rawId === null || rawId === undefined || rawId === '') {
+                return null;
+            }
+
+            const parsedId = Number.parseInt(rawId, 10);
+            if (Number.isNaN(parsedId) || parsedId <= 0) {
+                return null;
+            }
+
+            return parsedId;
+        }
+
+        function findEventFromCurrentData(eventId) {
+            return state.data.find(item => Number.parseInt(item.id, 10) === eventId) || null;
+        }
+
+        function scrollToEventRow(eventId) {
+            if (!tableBody) {
+                return;
+            }
+
+            const row = tableBody.querySelector(`tr[data-id="${eventId}"]`);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        async function openEventFromContext(eventId) {
+            const cached = findEventFromCurrentData(eventId);
+            if (cached) {
+                openModal('edit', cached);
+                scrollToEventRow(eventId);
+                return;
+            }
+
+            try {
+                const response = await fetch(`api/dashboard_calendar_events/show.php?id=${encodeURIComponent(eventId)}`);
+                const json = await response.json();
+
+                if (!json.success || !json.data) {
+                    showAlert('error', json.message || '找不到指定的行事曆事件。');
+                    return;
+                }
+
+                openModal('edit', json.data);
+            } catch (error) {
+                showAlert('error', '載入行事曆事件詳情失敗：' + error.message);
+            }
+        }
+
+        function handleIncomingContext(context) {
+            const eventId = parseContextEventId(context);
+            if (!eventId) {
+                return;
+            }
+
+            openEventFromContext(eventId);
+        }
 
         // 工具函式
         function showAlert(type, message, isModal = false) {
@@ -436,6 +501,10 @@
             });
         }
 
+        container.addEventListener('module:context', (event) => {
+            handleIncomingContext(event?.detail?.context ?? null);
+        });
+
         if (typeof DataSync !== 'undefined') {
             dataSyncHelper = DataSync.createModuleHelper('dashboard_calendar_events', {
                 onRefresh: fetchData
@@ -443,7 +512,9 @@
         }
 
         // 初始載入
-        fetchData();
+        fetchData().finally(() => {
+            handleIncomingContext(initialContext);
+        });
     }
 
     window.initializeDashboardCalendarEventsModule = initializeDashboardCalendarEventsModule;

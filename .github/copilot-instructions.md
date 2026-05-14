@@ -25,6 +25,17 @@
    - 已順手改善
    - 建議後續處理
 
+### 🧭 首頁入口雙檔同步規範（2026-05-14 新增，強制）
+
+1. 只要修改主系統入口頁的側邊欄選單、群組順序、模組連結或文案，`index.html` 與 `index.php` 必須同步修改。
+2. 禁止只改其中一個檔案，避免本機入口與伺服器入口顯示不一致。
+3. 驗收時至少執行：
+    - `git diff -- index.html index.php`
+    - 確認兩檔的主選單區塊順序一致（`<ul class="main-menu">` 內容一致）。
+4. 回報變更時需明確標註：
+    - 已同步更新 `index.html`
+    - 已同步更新 `index.php`
+
 ---
 
 ## 🚨 開始工作前必讀（2026-02-04 新增，2026-03-01 更新）
@@ -275,6 +286,28 @@ $params = @{
 & ".\tools\build-update-package.ps1" @params
 ```
 
+#### 防漏檔自動打包方法（建議預設使用）
+
+為避免人工整理 `-Files` 漏檔，建議優先使用：`tools/build-update-package-safe.ps1`
+
+```powershell
+Set-Location "C:\Apache24\htdocs\mes"
+
+& ".\tools\build-update-package-safe.ps1" `
+    -VersionNumber "vX.Y.Z" `
+    -FileVersion "vX.Y.Z" `
+    -ReleaseDate "YYYY-MM-DD" `
+    -ChangeSummaryFile "release-notes/YYYY-MM-DD-vX.Y.Z.txt" `
+    -FromRef "vX.Y.Z-1"
+```
+
+此腳本會自動：
+
+1. 由 `FromRef..HEAD` + 目前工作樹變更彙整檔案清單。
+2. 自動排除 `uploads/export/backup/db_backups/db_exports/old/vendor/dist/updates`。
+3. 自動清除同版舊包（避免同版本多個 ZIP 混淆）。
+4. 打包後驗證 ZIP 是否完整覆蓋差異清單（含 migration 檔案）。
+
 #### 上傳前格式自檢（強制）
 
 ```powershell
@@ -308,6 +341,46 @@ $zip = "dist/update_vX.Y.Z_YYYYMMDD_HHMMSS.zip"
   - `git diff --name-only update-base-2026-05-11..HEAD`
 - 打包與覆蓋時必須避開以下路徑（避免覆蓋使用者資料與環境相依內容）：
   - `uploads/**`, `export/**`, `backup/**`, `db_backups/**`, `db_exports/**`, `old/**`, `vendor/**`
+
+### 一鍵更新打包漏檔防呆規範（2026-05-14 新增，強制）
+
+#### 規則 1：先確認「升版起點」再整理檔案清單
+
+1. 打包前必須明確指定本次升版起點（例如：`v1.0.10` 或 `update-base-2026-05-11`）。
+2. 禁止只看 `git status` 手動挑檔；必須以差異指令產生主清單：
+
+```bash
+git diff --name-only <升版起點>..HEAD
+```
+
+#### 規則 2：`-Files` 必須覆蓋差異清單
+
+1. `build-update-package.ps1 -Files` 內容必須覆蓋上一步 diff 清單（排除 `uploads/**`, `export/**`, `backup/**`, `db_backups/**`, `db_exports/**`, `old/**`, `vendor/**` 後）。
+2. 若 `-Files` 缺少任何差異檔案，禁止出包。
+
+#### 規則 3：打包後必做 ZIP 覆蓋驗證
+
+1. 除了檢查 `manifest.json` 與 `files/`，還要驗證「差異清單中的每個檔案」都存在於 ZIP 的 `files/` 內。
+2. 若有任一差異檔不在 ZIP 內，視為打包失敗，必須重跑。
+
+#### 規則 4：入口頁與登入頁強制檢查（高風險漏檔）
+
+只要本輪涉及入口或登入相關 UI，打包後必須額外確認 ZIP 內存在：
+
+- `files/index.html`
+- `files/index.php`
+- `files/login.html`
+- `files/login.js`
+- `files/login-fui.css`
+
+#### 規則 5：回報格式（強制）
+
+回報更新包時必須一併提供：
+
+1. 升版起點（例如：`v1.0.10`）。
+2. diff 清單總數與實際打包檔案數。
+3. ZIP 覆蓋驗證結果（是否全數命中）。
+4. 最終交付路徑：`dist/update_vX.Y.Z_YYYYMMDD_HHMMSS.zip`。
 
 #### 強制規則範例
 

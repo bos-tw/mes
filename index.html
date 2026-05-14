@@ -91,6 +91,40 @@
                             </ul>
                         </li>
 
+                        <!-- 設備管理 -->
+                        <li class="menu-item has-submenu">
+                            <a href="#" class="menu-link" data-menu-id="equipment_management">
+                                <i class="fas fa-tools menu-icon"></i>
+                                <span class="menu-text">設備管理</span>
+                            </a>
+                            <ul class="submenu">
+                                <li><a href="#" data-page="machines" data-title="機台設備管理"><i class="fas fa-cog"></i> 機台設備管理</a></li>
+                                <li><a href="#" data-page="machine_maintenance_tasks" data-title="機台維修任務"><i class="fas fa-wrench"></i> 機台維修任務</a></li>
+                                <li><a href="#" data-page="daily_machine_inspections" data-title="每日機台檢驗"><i class="fas fa-clipboard-check"></i> 每日機台檢驗</a></li>
+                                <li><a href="#" data-page="daily_machine_inspection_items" data-title="機台檢驗項目明細設定"><i class="fas fa-tasks"></i> 機台檢驗項目明細設定</a></li>
+                            </ul>
+                        </li>
+
+                        <!-- 系統設定 -->
+                        <li class="menu-item has-submenu">
+                            <a href="#" class="menu-link" data-menu-id="system_settings">
+                                <i class="fas fa-cog menu-icon"></i>
+                                <span class="menu-text">系統設定</span>
+                            </a>
+                            <ul class="submenu">
+                                <li><a href="#" data-page="lookup_domains" data-title="代碼領域"><i class="fas fa-tag"></i> 代碼領域</a></li>
+                                <li><a href="#" data-page="lookup_values" data-title="代碼值"><i class="fas fa-tags"></i> 代碼值</a></li>
+                                <li><a href="#" data-page="number_sequences" data-title="流水號管理"><i class="fas fa-sort-numeric-up"></i> 流水號管理</a></li>
+                                <li><a href="#" data-page="system_parameters" data-title="系統參數"><i class="fas fa-sliders-h"></i> 系統參數</a></li>
+                                <li><a href="#" data-page="security_settings" data-title="安全設定"><i class="fas fa-shield-alt"></i> 安全設定</a></li>
+                                <li><a href="#" data-page="report_descriptions" data-title="列印報表說明"><i class="fas fa-file-alt"></i> 列印報表說明</a></li>
+                                <li><a href="#" data-page="audit_logs" data-title="操作日誌"><i class="fas fa-history"></i> 操作日誌</a></li>
+                                <li><a href="#" data-page="domain_event_outbox" data-title="領域事件Outbox"><i class="fas fa-inbox"></i> 領域事件Outbox</a></li>
+                                <li class="menu-divider"></li>
+                                <li><a href="#" data-action="show-version-info"><i class="fas fa-info-circle"></i> 關於系統</a></li>
+                            </ul>
+                        </li>
+
                         <!-- 訂單管理 -->
                         <li class="menu-item has-submenu">
                             <a href="#" class="menu-link" data-menu-id="order_management">
@@ -113,22 +147,8 @@
                                 <li><a href="#" data-page="work_orders" data-title="生產工單"><i class="fas fa-clipboard"></i> 生產工單</a></li>
                                 <li><a href="#" data-page="production_work_order_schedule" data-title="生產工單排程"><i class="fas fa-calendar-alt"></i> 生產工單排程</a></li>
                                 <li><a href="#" data-page="work_order_first_piece_dimensions" data-title="首件尺寸檢驗"><i class="fas fa-ruler-combined"></i> 首件尺寸檢驗</a></li>
-                                <li><a href="#" data-page="work_order_images" data-title="工單圖片"><i class="fas fa-images"></i> 工單圖片</a></li>
                                 <li><a href="#" data-page="production_records" data-title="生產紀錄"><i class="fas fa-clipboard-list"></i> 生產紀錄</a></li>
-                            </ul>
-                        </li>
-
-                        <!-- 設備管理 -->
-                        <li class="menu-item has-submenu">
-                            <a href="#" class="menu-link" data-menu-id="equipment_management">
-                                <i class="fas fa-tools menu-icon"></i>
-                                <span class="menu-text">設備管理</span>
-                            </a>
-                            <ul class="submenu">
-                                <li><a href="#" data-page="machines" data-title="機台設備管理"><i class="fas fa-cog"></i> 機台設備管理</a></li>
-                                <li><a href="#" data-page="machine_maintenance_tasks" data-title="機台維修任務"><i class="fas fa-wrench"></i> 機台維修任務</a></li>
-                                <li><a href="#" data-page="daily_machine_inspections" data-title="每日機台檢驗"><i class="fas fa-clipboard-check"></i> 每日機台檢驗</a></li>
-                                <li><a href="#" data-page="daily_machine_inspection_items" data-title="機台檢驗項目明細設定"><i class="fas fa-tasks"></i> 機台檢驗項目明細設定</a></li>
+                                <li><a href="#" data-page="work_order_images" data-title="工單圖片"><i class="fas fa-images"></i> 工單圖片</a></li>
                             </ul>
                         </li>
 
@@ -140,8 +160,21 @@
                             </a>
                             <ul class="submenu">
                                 <li><a href="#" data-page="production_quality_records" data-title="生產品質檢驗"><i class="fas fa-microscope"></i> 生產品質檢驗</a></li>
-                                <li><a href="#" data-page="quality_issue_reports" data-title="品質異常報告"><i class="fas fa-exclamation-triangle"></i> 品質異常報告</a></li>
                                 <li><a href="#" data-page="shipping_quality_inspections" data-title="出貨品質檢驗"><i class="fas fa-search"></i> 出貨品質檢驗</a></li>
+                                <li><a href="#" data-page="quality_issue_reports" data-title="品質異常報告"><i class="fas fa-exclamation-triangle"></i> 品質異常報告</a></li>
+                            </ul>
+                        </li>
+
+                        <!-- 庫存管理 -->
+                        <li class="menu-item has-submenu">
+                            <a href="#" class="menu-link" data-menu-id="inventory_management">
+                                <i class="fas fa-warehouse menu-icon"></i>
+                                <span class="menu-text">庫存管理</span>
+                            </a>
+                            <ul class="submenu">
+                                <li><a href="#" data-page="inventory_items" data-title="庫存項目"><i class="fas fa-boxes"></i> 庫存項目</a></li>
+                                <li><a href="#" data-page="inventory_transactions" data-title="庫存異動紀錄"><i class="fas fa-exchange-alt"></i> 庫存異動紀錄</a></li>
+                                <li><a href="#" data-page="tools" data-title="載具管理"><i class="fas fa-dolly"></i> 載具管理</a></li>
                             </ul>
                         </li>
 
@@ -169,33 +202,6 @@
                             </ul>
                         </li>
 
-                        <!-- 庫存管理 -->
-                        <li class="menu-item has-submenu">
-                            <a href="#" class="menu-link" data-menu-id="inventory_management">
-                                <i class="fas fa-warehouse menu-icon"></i>
-                                <span class="menu-text">庫存管理</span>
-                            </a>
-                            <ul class="submenu">
-                                <li><a href="#" data-page="inventory_items" data-title="庫存項目"><i class="fas fa-boxes"></i> 庫存項目</a></li>
-                                <li><a href="#" data-page="inventory_transactions" data-title="庫存異動紀錄"><i class="fas fa-exchange-alt"></i> 庫存異動紀錄</a></li>
-                                <li><a href="#" data-page="tools" data-title="載具管理"><i class="fas fa-dolly"></i> 載具管理</a></li>
-                            </ul>
-                        </li>
-
-                        <!-- 權限管理 -->
-                        <li class="menu-item has-submenu">
-                            <a href="#" class="menu-link" data-menu-id="permission_management">
-                                <i class="fas fa-user-shield menu-icon"></i>
-                                <span class="menu-text">權限管理</span>
-                            </a>
-                            <ul class="submenu">
-                                <li><a href="#" data-page="roles" data-title="角色設定"><i class="fas fa-user-tag"></i> 角色設定</a></li>
-                                <li><a href="#" data-page="permissions" data-title="權限設定"><i class="fas fa-key"></i> 權限設定</a></li>
-                                <li><a href="#" data-page="role_permissions" data-title="角色權限關聯"><i class="fas fa-lock"></i> 角色權限關聯</a></li>
-                                <li><a href="#" data-page="employee_roles" data-title="員工角色關聯"><i class="fas fa-users-cog"></i> 員工角色關聯</a></li>
-                            </ul>
-                        </li>
-
                         <!-- 公告與行事曆 -->
                         <li class="menu-item has-submenu">
                             <a href="#" class="menu-link" data-menu-id="notification_calendar">
@@ -210,23 +216,17 @@
                             </ul>
                         </li>
 
-                        <!-- 系統設定 -->
+                        <!-- 權限管理 -->
                         <li class="menu-item has-submenu">
-                            <a href="#" class="menu-link" data-menu-id="system_settings">
-                                <i class="fas fa-cog menu-icon"></i>
-                                <span class="menu-text">系統設定</span>
+                            <a href="#" class="menu-link" data-menu-id="permission_management">
+                                <i class="fas fa-user-shield menu-icon"></i>
+                                <span class="menu-text">權限管理</span>
                             </a>
                             <ul class="submenu">
-                                <li><a href="#" data-page="lookup_domains" data-title="代碼領域"><i class="fas fa-tag"></i> 代碼領域</a></li>
-                                <li><a href="#" data-page="lookup_values" data-title="代碼值"><i class="fas fa-tags"></i> 代碼值</a></li>
-                                <li><a href="#" data-page="number_sequences" data-title="流水號管理"><i class="fas fa-sort-numeric-up"></i> 流水號管理</a></li>
-                                <li><a href="#" data-page="system_parameters" data-title="系統參數"><i class="fas fa-sliders-h"></i> 系統參數</a></li>
-                                <li><a href="#" data-page="security_settings" data-title="安全設定"><i class="fas fa-shield-alt"></i> 安全設定</a></li>
-                                <li><a href="#" data-page="report_descriptions" data-title="列印報表說明"><i class="fas fa-file-alt"></i> 列印報表說明</a></li>
-                                <li><a href="#" data-page="audit_logs" data-title="操作日誌"><i class="fas fa-history"></i> 操作日誌</a></li>
-                                <li><a href="#" data-page="domain_event_outbox" data-title="領域事件Outbox"><i class="fas fa-inbox"></i> 領域事件Outbox</a></li>
-                                <li class="menu-divider"></li>
-                                <li><a href="#" data-action="show-version-info"><i class="fas fa-info-circle"></i> 關於系統</a></li>
+                                <li><a href="#" data-page="roles" data-title="角色設定"><i class="fas fa-user-tag"></i> 角色設定</a></li>
+                                <li><a href="#" data-page="permissions" data-title="權限設定"><i class="fas fa-key"></i> 權限設定</a></li>
+                                <li><a href="#" data-page="role_permissions" data-title="角色權限關聯"><i class="fas fa-lock"></i> 角色權限關聯</a></li>
+                                <li><a href="#" data-page="employee_roles" data-title="員工角色關聯"><i class="fas fa-users-cog"></i> 員工角色關聯</a></li>
                             </ul>
                         </li>
                     </ul>

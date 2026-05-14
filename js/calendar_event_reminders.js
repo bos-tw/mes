@@ -69,11 +69,11 @@
             return d.toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
         }
 
-        function getSentBadge(isSent) {
+        function getSentStatusInfo(isSent) {
             if (isSent) {
-                return '<span class="status-badge completed">已發送</span>';
+                return { className: 'completed', label: '已發送' };
             }
-            return '<span class="status-badge pending">待發送</span>';
+            return { className: 'pending', label: '待發送' };
         }
 
         // 載入下拉選項
@@ -102,15 +102,39 @@
         function updateEventDropdown() {
             const select = modalForm?.querySelector('select[name="event_id"]');
             if (!select) return;
-            select.innerHTML = '<option value="">請選擇事件</option>' +
-                state.events.map(e => `<option value="${e.id}">${escapeHtml(e.title)}</option>`).join('');
+
+            select.innerHTML = '';
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = '請選擇事件';
+            select.appendChild(defaultOption);
+
+            state.events.forEach((eventItem) => {
+                const option = document.createElement('option');
+                option.value = String(eventItem.id ?? '');
+                option.textContent = String(eventItem.title ?? '');
+                select.appendChild(option);
+            });
         }
 
         function updateEmployeeDropdown() {
             const select = modalForm?.querySelector('select[name="employee_id"]');
             if (!select) return;
-            select.innerHTML = '<option value="">請選擇員工</option>' +
-                state.employees.map(e => `<option value="${e.id}">${escapeHtml(e.name)} (${escapeHtml(e.employee_number)})</option>`).join('');
+
+            select.innerHTML = '';
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = '請選擇員工';
+            select.appendChild(defaultOption);
+
+            state.employees.forEach((employee) => {
+                const option = document.createElement('option');
+                option.value = String(employee.id ?? '');
+                const employeeName = String(employee.name ?? '');
+                const employeeNumber = String(employee.employee_number ?? '');
+                option.textContent = employeeNumber ? `${employeeName} (${employeeNumber})` : employeeName;
+                select.appendChild(option);
+            });
         }
 
         // API 請求
@@ -158,23 +182,69 @@
                 return;
             }
 
-            tableBody.innerHTML = state.data.map(item => `
-                <tr data-id="${item.id}">
-                    <td>${escapeHtml(item.event_title)}</td>
-                    <td>${escapeHtml(item.employee_name ?? '-')}</td>
-                    <td>${formatDateTime(item.reminder_datetime)}</td>
-                    <td>${escapeHtml(item.reminder_type ?? '-')}</td>
-                    <td>${getSentBadge(item.is_sent)}</td>
-                    <td class="actions">
-                        <button type="button" class="btn text" data-action="edit" data-id="${item.id}" title="編輯">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button type="button" class="btn text danger" data-action="delete" data-id="${item.id}" title="刪除">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
+            tableBody.innerHTML = '';
+
+            state.data.forEach((item) => {
+                const sentInfo = getSentStatusInfo(item.is_sent);
+                const itemId = Number.parseInt(item.id, 10);
+
+                const row = document.createElement('tr');
+                if (Number.isFinite(itemId) && itemId > 0) {
+                    row.dataset.id = String(itemId);
+                }
+
+                const titleCell = document.createElement('td');
+                titleCell.textContent = item.event_title || '';
+                row.appendChild(titleCell);
+
+                const employeeCell = document.createElement('td');
+                employeeCell.textContent = item.employee_name || '-';
+                row.appendChild(employeeCell);
+
+                const datetimeCell = document.createElement('td');
+                datetimeCell.textContent = formatDateTime(item.reminder_datetime);
+                row.appendChild(datetimeCell);
+
+                const typeCell = document.createElement('td');
+                typeCell.textContent = item.reminder_type || '-';
+                row.appendChild(typeCell);
+
+                const sentCell = document.createElement('td');
+                const sentBadge = document.createElement('span');
+                sentBadge.className = `status-badge ${sentInfo.className}`;
+                sentBadge.textContent = sentInfo.label;
+                sentCell.appendChild(sentBadge);
+                row.appendChild(sentCell);
+
+                const actionsCell = document.createElement('td');
+                actionsCell.className = 'table-actions';
+
+                const editButton = document.createElement('button');
+                editButton.type = 'button';
+                editButton.className = 'btn text';
+                editButton.dataset.action = 'edit';
+                editButton.dataset.id = Number.isFinite(itemId) && itemId > 0 ? String(itemId) : '';
+                editButton.title = '編輯';
+                const editIcon = document.createElement('i');
+                editIcon.className = 'fas fa-edit';
+                editButton.appendChild(editIcon);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.className = 'btn text danger';
+                deleteButton.dataset.action = 'delete';
+                deleteButton.dataset.id = Number.isFinite(itemId) && itemId > 0 ? String(itemId) : '';
+                deleteButton.title = '刪除';
+                const deleteIcon = document.createElement('i');
+                deleteIcon.className = 'fas fa-trash';
+                deleteButton.appendChild(deleteIcon);
+
+                actionsCell.appendChild(editButton);
+                actionsCell.appendChild(deleteButton);
+                row.appendChild(actionsCell);
+
+                tableBody.appendChild(row);
+            });
         }
 
         function renderPagination() {
@@ -208,6 +278,7 @@
         // Modal 操作
         function openModal(mode, data = null) {
             if (!modal || !modalForm) return;
+            const sentStatusField = modalForm.querySelector('[name="is_sent"]');
 
             // 安全的欄位設定函數
             function setFieldValue(name, value) {
@@ -230,6 +301,10 @@
                 state.editingId = null;
                 if (modalTitle) modalTitle.textContent = '新增提醒';
                 setFieldValue('id', '');
+                setFieldValue('is_sent', '0');
+                if (sentStatusField) {
+                    sentStatusField.disabled = true;
+                }
             } else if (mode === 'edit' && data) {
                 state.editingId = data.id;
                 if (modalTitle) modalTitle.textContent = '編輯提醒';
@@ -238,6 +313,10 @@
                 setFieldValue('employee_id', data.employee_id);
                 setFieldValue('reminder_datetime', data.reminder_datetime ? data.reminder_datetime.slice(0, 16) : '');
                 setFieldValue('reminder_type', data.reminder_type);
+                setFieldValue('is_sent', data.is_sent ? '1' : '0');
+                if (sentStatusField) {
+                    sentStatusField.disabled = false;
+                }
             }
 
             modal.classList.remove('hidden');
@@ -254,6 +333,7 @@
             clearAlert(true);
 
             const formData = new FormData(modalForm);
+            const isEdit = state.editingId !== null;
             const payload = {
                 event_id: parseInt(formData.get('event_id'), 10),
                 employee_id: parseInt(formData.get('employee_id'), 10),
@@ -261,7 +341,10 @@
                 reminder_type: formData.get('reminder_type'),
             };
 
-            const isEdit = state.editingId !== null;
+            if (isEdit) {
+                payload.is_sent = formData.get('is_sent') === '1';
+            }
+
             const url = isEdit
                 ? `api/calendar_event_reminders/update.php?id=${state.editingId}`
                 : 'api/calendar_event_reminders/';

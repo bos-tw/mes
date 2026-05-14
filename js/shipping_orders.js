@@ -98,6 +98,24 @@
         // Initialize
         init();
 
+        function handleIncomingContext(context) {
+            if (!context || typeof context !== 'object') {
+                return;
+            }
+
+            const rawId = context.shippingOrderId ?? context.highlightId ?? null;
+            if (rawId === null || rawId === undefined || rawId === '') {
+                return;
+            }
+
+            const shippingOrderId = Number.parseInt(rawId, 10);
+            if (!Number.isInteger(shippingOrderId) || shippingOrderId <= 0) {
+                return;
+            }
+
+            openDetailModal(shippingOrderId);
+        }
+
         function init() {
             loadCustomers();
             loadOrders();
@@ -106,11 +124,14 @@
             attachEventListeners();
 
             // Handle initial context
-            if (initialContext && initialContext.shippingOrderId) {
-                setTimeout(() => {
-                    openDetailModal(initialContext.shippingOrderId);
-                }, 500);
-            }
+            setTimeout(() => {
+                handleIncomingContext(initialContext);
+            }, 500);
+
+            // Handle context updates for already-open tabs
+            container.addEventListener('module:context', (event) => {
+                handleIncomingContext(event?.detail?.context ?? null);
+            });
         }
 
         function attachEventListeners() {
@@ -534,7 +555,7 @@
         }
 
         // Render Functions
-    
+
 function renderTable(items) {
             if (!elements.tbody) return;
 

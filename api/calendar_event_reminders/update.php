@@ -70,6 +70,17 @@ foreach ($data as $column => $value) {
     $params[$column] = $value;
 }
 
+if (array_key_exists('is_sent', $data)) {
+    $existingIsSent = isset($existing['is_sent']) ? (int)$existing['is_sent'] : 0;
+    $newIsSent = (int)$data['is_sent'];
+
+    if ($newIsSent === 1 && $existingIsSent !== 1) {
+        $setClauses[] = 'sent_at = NOW()';
+    } elseif ($newIsSent === 0) {
+        $setClauses[] = 'sent_at = NULL';
+    }
+}
+
 $setClauses[] = 'updated_at = NOW()';
 $sql = 'UPDATE calendar_event_reminders SET ' . implode(', ', $setClauses) . ' WHERE id = :id';
 

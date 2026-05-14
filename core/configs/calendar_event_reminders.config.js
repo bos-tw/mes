@@ -60,7 +60,16 @@ ModuleConfig.register('calendar_event_reminders', {
                         title: '提醒設定',
                         fields: [
                             { name: 'reminder_datetime', type: 'datetime-local', label: '提醒時間', required: true },
-                            { name: 'reminder_type', type: 'select', label: '提醒方式', options: [{ value: '', label: '請選擇' }, { value: 'email', label: 'Email' }, { value: 'system', label: '系統通知' }, { value: 'sms', label: '簡訊' }] }
+                            { name: 'reminder_type', type: 'select', label: '提醒方式', options: [{ value: '', label: '請選擇' }, { value: 'email', label: 'Email' }, { value: 'system', label: '系統通知' }, { value: 'sms', label: '簡訊' }] },
+                            {
+                                name: 'is_sent',
+                                type: 'select',
+                                label: '發送狀態',
+                                options: [
+                                    { value: '0', label: '待發送' },
+                                    { value: '1', label: '已發送' }
+                                ]
+                            }
                         ]
                     }
                 ]

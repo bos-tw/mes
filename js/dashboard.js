@@ -988,6 +988,7 @@ function getEventTypeName(type) {
 
     function openDetailPage(dataType, itemId) {
         let pageId, pageTitle, pageUrl;
+        let context = { highlightId: itemId };
         switch (dataType) {
             case 'recent-orders':
             case 'order':
@@ -1001,15 +1002,17 @@ function getEventTypeName(type) {
             case 'recent-shipping':
             case 'shipping':
                 pageId = 'shipping_orders'; pageTitle = '出貨單管理'; pageUrl = 'modules/shipping_orders.html';
+                context = { shippingOrderId: itemId, highlightId: itemId };
                 break;
             case 'calendar_event':
                 pageId = 'dashboard_calendar_events'; pageTitle = '行事曆事件'; pageUrl = 'modules/dashboard_calendar_events.html';
+                context = { calendarEventId: itemId, highlightId: itemId };
                 break;
             default:
                 return;
         }
         if (typeof window.openTab === 'function') {
-            window.openTab(pageId, pageTitle, pageUrl, { context: { highlightId: itemId } });
+            window.openTab(pageId, pageTitle, pageUrl, { context });
         }
     }
 

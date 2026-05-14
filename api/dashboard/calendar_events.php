@@ -175,6 +175,65 @@ function handleCalendarEvents(): void
             ];
         }
 
+        // 取得出貨事件（出貨日期）
+        $shippingOrdersQuery = "
+            SELECT
+                so.id,
+                so.shipping_order_number,
+                so.shipping_date,
+                so.status,
+                c.name AS customer_name
+            FROM shipping_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            WHERE so.deleted_at IS NULL
+                AND so.status != 'cancelled'
+                AND so.shipping_date BETWEEN :start AND :end
+            ORDER BY so.shipping_date
+        ";
+
+        $stmt = $pdo->prepare($shippingOrdersQuery);
+        $stmt->execute([
+            ':start' => $start,
+            ':end' => $end,
+        ]);
+        $shippingOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($shippingOrders as $shippingOrder) {
+            $bgColor = '#00bcd4';
+            $borderColor = '#0891b2';
+
+            if ($shippingOrder['status'] === 'draft') {
+                $bgColor = '#9aa0a6';
+                $borderColor = '#80868b';
+            } elseif (in_array((string)$shippingOrder['status'], ['confirmed', 'preparing', 'packed'], true)) {
+                $bgColor = '#f9ab00';
+                $borderColor = '#e37400';
+            } elseif (in_array((string)$shippingOrder['status'], ['shipped', 'delivered'], true)) {
+                $bgColor = '#34a853';
+                $borderColor = '#2d8f47';
+            }
+
+            $title = '出貨: ' . $shippingOrder['shipping_order_number'];
+            if (!empty($shippingOrder['customer_name'])) {
+                $title .= ' - ' . $shippingOrder['customer_name'];
+            }
+
+            $events[] = [
+                'id' => 'shipping-' . $shippingOrder['id'],
+                'title' => $title,
+                'start' => $shippingOrder['shipping_date'],
+                'allDay' => true,
+                'backgroundColor' => $bgColor,
+                'borderColor' => $borderColor,
+                'textColor' => '#ffffff',
+                'extendedProps' => [
+                    'type' => 'shipping',
+                    'sourceId' => (int)$shippingOrder['id'],
+                    'status' => $shippingOrder['status'],
+                ]
+            ];
+        }
+
         // 取得使用者自訂行事曆事件
         $calendarEventsQuery = "
             SELECT
@@ -218,7 +277,7 @@ function handleCalendarEvents(): void
             // 內部事件預設使用 Google 綠色以便與生產事件區分
             $bgColor = $event['color'] ?: '#34a853';
             $borderColor = adjustColorBrightness($bgColor, -20);
-            
+
             // 根據優先級調整顏色
             if ($event['priority'] === 'high' || $event['priority'] === 'urgent') {
                 $bgColor = '#ea4335';
@@ -246,12 +305,12 @@ function handleCalendarEvents(): void
                     'createdBy' => $event['created_by_name']
                 ]
             ];
-            
+
             // 如果有結束時間，加入 end 欄位
             if ($event['end_datetime']) {
                 $eventData['end'] = $event['is_all_day'] ? substr($event['end_datetime'], 0, 10) : $event['end_datetime'];
             }
-            
+
             $events[] = $eventData;
         }
 
@@ -279,21 +338,21 @@ function adjustColorBrightness(string $hex, int $steps): string
 {
     // 移除 # 符號
     $hex = ltrim($hex, '#');
-    
+
     // 確保是 6 位數
     if (strlen($hex) === 3) {
         $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
     }
-    
+
     // 轉換為 RGB
     $r = hexdec(substr($hex, 0, 2));
     $g = hexdec(substr($hex, 2, 2));
     $b = hexdec(substr($hex, 4, 2));
-    
+
     // 調整亮度
     $r = max(0, min(255, $r + $steps));
     $g = max(0, min(255, $g + $steps));
     $b = max(0, min(255, $b + $steps));
-    
+
     return '#' . sprintf('%02x%02x%02x', $r, $g, $b);
 }
