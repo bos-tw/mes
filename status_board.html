@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>現場狀態看板</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="status_board.css?v=20260508-5rows">
+    <link rel="stylesheet" href="status_board.css?v=20260515-flightboard-7">
 </head>
 <body>
     <main class="board-shell">
         <header class="board-header">
-            <div>
-                <div class="board-kicker">MES LIVE BOARD</div>
+            <div class="board-title-line">
                 <h1>現場狀態看板</h1>
+                <div class="board-kicker">MES LIVE BOARD</div>
             </div>
             <div class="board-meta">
                 <span data-refresh-status>每 30 秒更新</span>
@@ -21,48 +21,62 @@
             </div>
         </header>
 
-        <section class="board-main">
-            <section class="schedule-panel" aria-labelledby="work-orders-title">
+        <section class="board-layout">
+            <section class="production-panel" aria-labelledby="work-orders-title">
                 <div class="panel-title">
-                    <h2 id="work-orders-title">生產工單</h2>
-                    <span data-work-count>0 筆</span>
+                    <h2 id="work-orders-title">生產工單排程</h2>
+                    <div class="panel-meta">
+                        <span data-machine-index>0 / 0 機台</span>
+                        <span data-work-count>0 筆</span>
+                    </div>
                 </div>
-                <div class="schedule-table">
-                    <div class="schedule-head">
-                        <span>時間</span>
-                        <span>工單</span>
+
+                <div class="machine-banner">
+                    <div class="machine-name" data-machine-name>未指定機台</div>
+                    <div class="machine-note" data-machine-note>機台輪播中。</div>
+                </div>
+
+                <div class="timetable">
+                    <div class="timetable-head">
+                        <span>預計生產</span>
+                        <span>實際生產</span>
+                        <span>工單號碼</span>
                         <span>客戶 / 產品</span>
+                        <span class="text-right">淨重</span>
+                        <span class="text-right">數量</span>
                         <span>狀態</span>
+                        <span>操作員</span>
                     </div>
-                    <div data-work-orders class="schedule-body ticker-host"></div>
+                    <div data-work-orders class="timetable-body ticker-host"></div>
                 </div>
             </section>
 
-            <section class="schedule-panel" aria-labelledby="shipping-orders-title">
-                <div class="panel-title">
-                    <h2 id="shipping-orders-title">出貨單</h2>
-                    <span data-shipping-count>0 筆</span>
-                </div>
-                <div class="schedule-table">
-                    <div class="schedule-head">
-                        <span>日期</span>
-                        <span>出貨單</span>
-                        <span>客戶 / 數量</span>
-                        <span>狀態</span>
+            <section class="completed-band" aria-labelledby="completed-orders-title">
+                <div class="completed-title">
+                    <h2 id="completed-orders-title">三日內已完成工單</h2>
+                    <div class="completed-meta">
+                        <span data-completed-count>0 筆</span>
+                        <span data-completed-today>今日 0 筆</span>
                     </div>
-                    <div data-shipping-orders class="schedule-body ticker-host"></div>
                 </div>
+                <div class="completed-head">
+                    <span>完成時間</span>
+                    <span>工單號碼</span>
+                    <span>客戶 / 產品</span>
+                    <span>完成機台</span>
+                </div>
+                <div data-completed-orders class="completed-body ticker-host"></div>
             </section>
-        </section>
 
-        <section class="announcement-band" aria-labelledby="announcements-title">
-            <div class="announcement-title">
+            <section class="announcement-panel" aria-labelledby="announcements-title">
+                <div class="announcement-title">
                 <h2 id="announcements-title">最新公告</h2>
-            </div>
-            <div data-announcements class="announcement-list ticker-host"></div>
+                </div>
+                <div data-announcements class="announcement-list ticker-host"></div>
+            </section>
         </section>
     </main>
 
-    <script src="status_board.js?v=20260508-5rows"></script>
+    <script src="status_board.js?v=20260515-flightboard-7"></script>
 </body>
 </html>

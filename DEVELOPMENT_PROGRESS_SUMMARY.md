@@ -1,81 +1,74 @@
-# 開發進度摘要（更新：2026-05-14，本輪對話收斂版）
+# 開發進度摘要（更新：2026-05-15）
 
 ## 專案架構
 
 - 根目錄：C:/Apache24/htdocs/mes
-- 後端：PHP（api/* 模組化端點，採 requireAuth + requireMethod + jsonResponse 風格）
-- 前端：Vanilla JS + HTML + CSS（入口 script.js，模組邏輯在 js/*，頁面在 modules/*）
-- 配置渲染：core/module-config.js、core/module-renderer.js、core/configs/*.config.js
-- 跨頁同步：js/data-sync.js（createModuleHelper、notifyWithDependencies、MODULE_DEPENDENCIES）
-- 資料庫：MySQL/MariaDB，schema 由 migrations/* 管理
-- 打包/驗證工具：
-  - tools/validate-config-modules.js
+- 後端：PHP（api/* 模組化 API，session 驗證 + JSON 回應）
+- 前端：Vanilla JS + HTML + CSS（status_board.* 為獨立即時看板頁）
+- 核心渲染：core/module-config.js、core/module-renderer.js、core/configs/*.config.js
+- 同步機制：js/data-sync.js（跨分頁事件通知）
+- 資料庫：MySQL/MariaDB（migrations/* 管理 schema）
+- 打包與驗證：
   - tools/audit-system-health.js
-  - tools/audit-data-sync.js
   - tools/build-update-package.ps1
-  - tools/build-update-package-safe.ps1（本輪新增，防漏檔）
+  - tools/build-update-package-safe.ps1
 
 ## 已完成功能
 
-1. 儀表板行事曆整合補強
-- api/dashboard/calendar_events.php 已補齊出貨事件資料來源與事件欄位輸出。
-- js/dashboard.js、js/dashboard_calendar_events.js、js/shipping_orders.js 完成跨模組 context 導頁與開單定位。
+1. 現場狀態看板重構完成（status_board）
+- 看板版面改為 3:2:1 區塊：生產工單排程 / 三日內已完成工單 / 最新公告。
+- 生產工單排程：每頁顯示 5 筆，超過 5 筆採分頁輪播。
+- 三日內已完成工單：每頁顯示 3 筆，依完成時間倒序輪播。
+- 最新公告：每次顯示 1 筆。
+- 標題與主視覺字級下修，提升小螢幕可視內容高度。
 
-2. 行事曆提醒狀態可編輯化
-- core/configs/calendar_event_reminders.config.js 新增提醒狀態欄位（is_sent）配置。
-- js/calendar_event_reminders.js 完成新增/編輯流程與狀態欄位控制。
-- api/calendar_event_reminders/update.php 完成 is_sent 與 sent_at 同步更新邏輯。
+2. 看板資料 API 擴充與補強
+- api/status_board/index.php 新增 completed_orders 資料集。
+- completed_orders 篩選條件：三日內完成，並依 completion_time DESC。
+- 新增 api/status_board/update.php、api/status_board/delete.php 結構檔（供模組完整性檢查）。
 
-3. 側邊欄流程重排與雙入口同步
-- index.html 依生管流程重排主選單。
-- index.php 完整同步同一份順序，避免本機入口與伺服器入口不一致。
+3. 顯示密度與欄位可讀性優化
+- 生產排程欄寬調整，淨重欄位加寬並強制不換行，避免二行撐高列高。
+- JS 讀取 CSS 變數列高，避免 ticker 與實際列高不一致造成裁切。
 
-4. 打包規範補強（防再發）
-- .github/copilot-instructions.md 新增：
-  - 首頁入口雙檔同步規範。
-  - 一鍵更新打包漏檔防呆規範。
-  - 防漏檔自動打包方法。
-- 新增 tools/build-update-package-safe.ps1：
-  - 自動彙整 FromRef 差異 + 工作樹變更。
-  - 自動排除不應打包目錄。
-  - 自動清同版舊包。
-  - 打包後逐檔覆蓋驗證。
-
-5. 更新包產出狀態（本輪）
-- 最終可用包：dist/update_v1.0.11_20260514_192610.zip
-- 已確認包含：index.html、index.php、login.html、login.js、login-fui.css 與本輪 API/JS/規範更新。
-- 本輪無新增 DB migration（manifest.migrations 為空）。
+4. 更新包產出（大版本）
+- 版本：v2.0.0
+- 更新說明：release-notes/2026-05-15-v2.0.0.txt
+- 更新包：dist/update_v2.0.0_20260515_121252.zip
+- 已驗證 zip 含 manifest.json、files/ 與本輪 6 個變更檔。
+- 本輪資料庫無 migration（Migrations = 空陣列）。
 
 ## 待修 Bug
 
-1. 系統健康審計仍有歷史錯誤/警告
+1. 系統健康審計存在既有歷史問題
 - 重現：node tools/audit-system-health.js
-- 現象：仍有既有 J-2（innerHTML XSS）、F-1（檔案過大）、DS-1（DataSync 覆蓋）等告警。
+- 現象：其他模組仍有既有告警（如大型 JS、XSS 風險點、架構一致性警示）。
+- 影響：不阻斷本輪 status_board 交付，但持續影響整體健康度。
 
-2. 同版多包造成選錯風險（流程問題）
-- 重現：同一版號重跑 build-update-package.ps1 會新增多個 dist/update_vX.Y.Z_*.zip。
-- 狀態：已用 build-update-package-safe.ps1 與文件規範降風險，但既有歷史包仍在 dist。
+2. status_board update/delete 端點仍被審計標示方法策略問題
+- 重現：node tools/audit-system-health.js（搜尋 status_board）
+- 現象：api/status_board/update.php、api/status_board/delete.php 有 HTTP 方法策略警示。
+- 影響：功能可用，但需後續與專案 API 規範對齊。
 
-3. 先前 v1.0.10 包未含登入頁（已定位原因）
-- 重現：檢視 dist/update_v1.0.10_20260514_164823.zip entries。
-- 現象：manifest/files 清單無 login.*，遠端登入頁不會更新。
-- 狀態：流程與規範已補強，後續需以新包重新驗證遠端。
+3. 超低解析度下仍可能出現看板擁擠
+- 重現：在較低高度顯示器（含系統縮放）開啟 status_board.html
+- 現象：雖已縮小字級與列高，極端環境仍可能接近邊界。
+- 影響：需再做最小高度保底策略或斷點專用壓縮樣式。
 
 ## 下一步任務（優先順序）
 
-1. P0：遠端驗證最新 v1.0.11 包
-- 套用 dist/update_v1.0.11_20260514_192610.zip。
-- 驗證登入頁、側邊欄順序、行事曆提醒狀態編輯與跨模組導頁。
+1. P0：遠端套用並驗證 v2.0.0 更新包
+- 驗證三區塊比例、5/3/1 顯示筆數、已完成工單輪播與公告輪播。
+- 驗證不同螢幕解析度下生產區可完整顯示 5 行。
 
-2. P0：將打包流程切換為 safe 腳本
-- 團隊預設改用 tools/build-update-package-safe.ps1。
-- 發版流程加入 FromRef 與 ZIP 覆蓋驗證結果回報。
+2. P0：修正 status_board update/delete API 審計警示
+- 對齊專案 API 方法規範，消除方法策略警示。
 
-3. P1：清理 dist 歷史同版包
-- 每次發版保留最後可交付包，移除同版舊包以降低誤上傳機率。
+3. P1：收斂 audit-system-health 既有高風險項
+- 優先處理 XSS 熱點與過大 JS 模組（F-1/J-2 類）。
 
-4. P1：持續收斂審計高風險項
-- 優先處理 J-2（XSS）與 DS-1（notify 覆蓋）在核心模組的告警。
+4. P1：建立看板視覺回歸清單
+- 固定驗證字級、列高、欄寬、輪播節奏與資料空態。
 
-5. P2：拆分超大 JS 模組
-- 先拆 js/order_items.js、js/work_orders.js、js/shipping_orders.js 以降低回歸風險。
+5. P2：清理本地臨時產物
+- 清理 audit_output.txt、dist/verify_v200 等驗證中間檔，避免干擾版本管理。
