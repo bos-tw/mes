@@ -1,74 +1,90 @@
-# 開發進度摘要（更新：2026-05-15）
+# 開發進度摘要（更新：2026-05-16）
 
 ## 專案架構
 
 - 根目錄：C:/Apache24/htdocs/mes
-- 後端：PHP（api/* 模組化 API，session 驗證 + JSON 回應）
-- 前端：Vanilla JS + HTML + CSS（status_board.* 為獨立即時看板頁）
-- 核心渲染：core/module-config.js、core/module-renderer.js、core/configs/*.config.js
-- 同步機制：js/data-sync.js（跨分頁事件通知）
-- 資料庫：MySQL/MariaDB（migrations/* 管理 schema）
+- 技術棧：
+  - 後端：PHP 8（api/* 模組化 REST API，bootstrap 權限檢查）
+  - 前端：Vanilla JS + HTML + CSS（IIFE 模組 + data-action 事件委派）
+  - UI 組裝：core/module-config.js + core/module-renderer.js + core/configs/*.config.js
+  - 跨分頁同步：js/data-sync.js（module helper + dependency broadcast）
+  - 資料庫：MySQL（migrations/*.sql 管理結構與資料修正）
 - 打包與驗證：
+  - tools/validate-config-modules.js
   - tools/audit-system-health.js
   - tools/build-update-package.ps1
-  - tools/build-update-package-safe.ps1
+  - tools/sync-local-schema.ps1
 
 ## 已完成功能
 
-1. 現場狀態看板重構完成（status_board）
-- 看板版面改為 3:2:1 區塊：生產工單排程 / 三日內已完成工單 / 最新公告。
-- 生產工單排程：每頁顯示 5 筆，超過 5 筆採分頁輪播。
-- 三日內已完成工單：每頁顯示 3 筆，依完成時間倒序輪播。
-- 最新公告：每次顯示 1 筆。
-- 標題與主視覺字級下修，提升小螢幕可視內容高度。
+1. RBAC 權限顯示與授權相容層
+- 權限名稱改為中文顯示後，前後端皆加入 alias 相容。
+- 已完成檔案：
+  - api/bootstrap.php（權限候選與自動授權判斷支援中英文）
+  - script.js（前端 hasPermission/hasAnyPermission/canAccessModule 支援中英文）
 
-2. 看板資料 API 擴充與補強
-- api/status_board/index.php 新增 completed_orders 資料集。
-- completed_orders 篩選條件：三日內完成，並依 completion_time DESC。
-- 新增 api/status_board/update.php、api/status_board/delete.php 結構檔（供模組完整性檢查）。
+2. 權限管理流程重構（權限主軸）
+- role_permissions 由「角色 -> 權限」調整為「權限 -> 角色」。
+- 新增編輯流程，可一次增減角色並同步資料。
+- Modal 改為左右雙區穿梭（未加入/已加入）+ 中間箭頭與雙擊移動。
+- 已完成檔案：
+  - core/configs/role_permissions.config.js
+  - js/role_permissions.js
+  - api/role_permissions/index.php
+  - api/role_permissions/helpers.php
 
-3. 顯示密度與欄位可讀性優化
-- 生產排程欄寬調整，淨重欄位加寬並強制不換行，避免二行撐高列高。
-- JS 讀取 CSS 變數列高，避免 ticker 與實際列高不一致造成裁切。
+3. employee_roles 409 錯誤體驗修正
+- 前端改為優先顯示 API message，避免只顯示 generic error。
+- 建立前先做前端重複關聯檢查，降低衝突頻率。
+- 已完成檔案：
+  - js/employee_roles.js
 
-4. 更新包產出（大版本）
-- 版本：v2.0.0
-- 更新說明：release-notes/2026-05-15-v2.0.0.txt
-- 更新包：dist/update_v2.0.0_20260515_121252.zip
-- 已驗證 zip 含 manifest.json、files/ 與本輪 6 個變更檔。
-- 本輪資料庫無 migration（Migrations = 空陣列）。
+4. 權限資料中文化與可部署化
+- permissions 26 筆資料完成中文名稱與描述修正。
+- DB 變更已落地為 migration，並加入本機 schema 同步檢查規則。
+- 已完成檔案：
+  - migrations/2026_05_16_update_permissions_display_names.sql
+  - tools/sync-local-schema.ps1
+
+5. 更新包已產出（可一鍵更新）
+- 版本：v2.0.1
+- 更新說明：release-notes/2026-05-16-v2.0.1.txt
+- 輸出：dist/update_v2.0.1_20260516_151226.zip
+- 驗證：manifest.json / files/ / migration 皆存在，期望檔案覆蓋 18/18。
 
 ## 待修 Bug
 
-1. 系統健康審計存在既有歷史問題
+1. 系統健康審計仍未過（歷史問題）
 - 重現：node tools/audit-system-health.js
-- 現象：其他模組仍有既有告警（如大型 JS、XSS 風險點、架構一致性警示）。
-- 影響：不阻斷本輪 status_board 交付，但持續影響整體健康度。
+- 現象：目前仍有 34 錯誤、27 警告（以前端 XSS 與大型 JS 模組為主）。
+- 代表檔案：
+  - XSS 熱點：js/customers.js、js/orders.js、js/order_items.js、js/work_orders.js 等
+  - 模組過大：js/order_items.js、js/work_orders.js、js/shipping_orders.js、js/orders.js
 
-2. status_board update/delete 端點仍被審計標示方法策略問題
-- 重現：node tools/audit-system-health.js（搜尋 status_board）
-- 現象：api/status_board/update.php、api/status_board/delete.php 有 HTTP 方法策略警示。
-- 影響：功能可用，但需後續與專案 API 規範對齊。
+2. status_board API 方法策略警示
+- 重現：node tools/audit-system-health.js
+- 現象：api/status_board/update.php、api/status_board/delete.php 仍有 POST fallback 警示（A-3）。
 
-3. 超低解析度下仍可能出現看板擁擠
-- 重現：在較低高度顯示器（含系統縮放）開啟 status_board.html
-- 現象：雖已縮小字級與列高，極端環境仍可能接近邊界。
-- 影響：需再做最小高度保底策略或斷點專用壓縮樣式。
+3. DataSync 覆蓋不完整（多模組）
+- 重現：node tools/audit-system-health.js
+- 現象：多個 CRUD 模組缺少 dataSyncHelper.notify* 呼叫，跨分頁資料可能不同步。
 
 ## 下一步任務（優先順序）
 
-1. P0：遠端套用並驗證 v2.0.0 更新包
-- 驗證三區塊比例、5/3/1 顯示筆數、已完成工單輪播與公告輪播。
-- 驗證不同螢幕解析度下生產區可完整顯示 5 行。
+1. P0：遠端套用並驗收 v2.0.1 更新包
+- 驗證 RBAC：側邊欄可見性、tab 存取、API 寫入授權。
+- 驗證權限管理：權限對應角色穿梭編輯、批次儲存、回填正確。
+- 驗證 migration：permissions 中文名稱與描述在遠端一致。
 
-2. P0：修正 status_board update/delete API 審計警示
-- 對齊專案 API 方法規範，消除方法策略警示。
+2. P0：處理安全性高風險（J-2）
+- 先從高使用量模組修正 innerHTML 未 escapeHtml 問題（orders/order_items/work_orders/customers）。
 
-3. P1：收斂 audit-system-health 既有高風險項
-- 優先處理 XSS 熱點與過大 JS 模組（F-1/J-2 類）。
+3. P1：拆分過大 JS 模組（F-1）
+- 優先拆分 js/order_items.js 與 js/work_orders.js（API 層 / render 層 / controller 層）。
 
-4. P1：建立看板視覺回歸清單
-- 固定驗證字級、列高、欄寬、輪播節奏與資料空態。
+4. P1：補齊 DataSync notify
+- 對所有有 CRUD 的模組補上 notifyCreated/Updated/Deleted，並再次跑 data-sync 審計。
 
-5. P2：清理本地臨時產物
-- 清理 audit_output.txt、dist/verify_v200 等驗證中間檔，避免干擾版本管理。
+5. P2：收斂架構警示與前端規範
+- 修正 status_board POST fallback 策略。
+- 修正 modules/*.html 既有按鈕 class 與 inline style 規範違反項。
