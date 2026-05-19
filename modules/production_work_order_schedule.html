@@ -38,6 +38,11 @@
                 <span>生產時間</span>
                 <span class="tab-badge" data-schedule-time-tab-count>0</span>
             </button>
+            <button type="button" class="sidebar-tab-btn" data-action="switch-schedule-tab" data-tab-value="status">
+                <i class="fas fa-list-ul"></i>
+                <span>機台排程狀態</span>
+                <span class="tab-badge" data-schedule-status-tab-count>0</span>
+            </button>
         </nav>
 
         <div class="sidebar-tabs-content">
@@ -124,6 +129,25 @@
                                 </tr>
                             </thead>
                             <tbody data-schedule-time-body></tbody>
+                        </table>
+                    </div>
+                </section>
+            </section>
+
+            <section class="production-schedule-tab-panel hidden" data-schedule-tab-panel="status">
+                <section class="module-content production-status-content">
+                    <div class="table-responsive">
+                        <table class="data-table compact machine-status-table">
+                            <thead>
+                                <tr>
+                                    <th>機台</th>
+                                    <th class="col-120">排隊工單數</th>
+                                    <th>首筆工單</th>
+                                    <th>最早預定開始</th>
+                                    <th class="col-120">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody data-schedule-status-body></tbody>
                         </table>
                     </div>
                 </section>

@@ -7510,6 +7510,40 @@ select option:disabled {
     padding: 12px;
 }
 
+.production-status-content {
+    padding: 12px;
+}
+
+.machine-status-table .table-actions {
+    white-space: nowrap;
+}
+
+.machine-status-detail-row td {
+    background: #f8fafc;
+    border-top: 0;
+}
+
+.machine-status-detail-wrap {
+    padding: 10px;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+    background: #fff;
+}
+
+.machine-status-detail-table {
+    margin-top: 0;
+}
+
+.machine-status-detail-empty {
+    border: 1px dashed #cbd5e1;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: var(--font-sm);
+    text-align: center;
+    padding: 12px 10px;
+    background: #fff;
+}
+
 .schedule-empty {
     border: 1px dashed #cbd5e1;
     border-radius: var(--radius-sm);

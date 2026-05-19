@@ -1,6 +1,6 @@
 # DataSync Audit Report
 
-Generated at: 2026-05-17T02:10:52.704Z
+Generated at: 2026-05-19T08:06:16.172Z
 
 ## Summary
 
@@ -100,7 +100,7 @@ These modules keep local UI state such as caches, expanded rows, open detail mod
 | orders | cache, expanded_row, edit_modal, button_state | customers, employees, lookup_values, order_items, screening_services, suppliers, work_orders | yes | verify open state refresh path |
 | permissions | cache, edit_modal, button_state | role_permissions | no | uses generic onRefresh; inspect open state manually |
 | production_records | cache, detail_modal, edit_modal, button_state | employees, machines, work_orders | yes | verify open state refresh path |
-| production_work_order_schedule | edit_modal, button_state | machines, work_orders | yes | verify open state refresh path |
+| production_work_order_schedule | expanded_row, edit_modal, button_state | machines, work_orders | yes | verify open state refresh path |
 | quality_issue_reports | detail_modal, edit_modal, button_state | departments, employees | no | uses generic onRefresh; inspect open state manually |
 | return_orders | detail_modal, edit_modal, button_state | customers, shipping_order_items, shipping_orders | yes | verify open state refresh path |
 | role_permissions | edit_modal, button_state | permissions, roles | no | uses generic onRefresh; inspect open state manually |

@@ -16,6 +16,7 @@
             tabPanels: moduleRoot.querySelectorAll('[data-schedule-tab-panel]'),
             machineTabCount: moduleRoot.querySelector('[data-schedule-machine-tab-count]'),
             timeTabCount: moduleRoot.querySelector('[data-schedule-time-tab-count]'),
+            statusTabCount: moduleRoot.querySelector('[data-schedule-status-tab-count]'),
             machineFilterForm: moduleRoot.querySelector('[data-schedule-machine-filter]'),
             machineSelect: moduleRoot.querySelector('[data-schedule-machine-select]'),
             queueCount: moduleRoot.querySelector('[data-queue-count]'),
@@ -24,6 +25,7 @@
             queueBody: moduleRoot.querySelector('[data-schedule-queue-body]'),
             machineBody: moduleRoot.querySelector('[data-schedule-machine-body]'),
             timeBody: moduleRoot.querySelector('[data-schedule-time-body]'),
+            statusBody: moduleRoot.querySelector('[data-schedule-status-body]'),
             scheduleModal: moduleRoot.querySelector('[data-schedule-work-order-modal]'),
             scheduleModalTitle: moduleRoot.querySelector('[data-schedule-modal-title]'),
             scheduleModalAlert: moduleRoot.querySelector('[data-schedule-modal-alert]'),
@@ -42,7 +44,8 @@
             dataSyncHelper: null,
             activeTab: 'machine',
             selectedMachineId: null,
-            conflictOrderIds: new Set()
+            conflictOrderIds: new Set(),
+            expandedMachineStatusIds: new Set()
         };
 
         init();
@@ -118,6 +121,17 @@
                     return;
                 }
 
+                if (action === 'details') {
+                    const statusRow = actionElement.closest('[data-machine-status-row]');
+                    if (statusRow) {
+                        const machineId = parseInt(statusRow.dataset.machineId || '', 10);
+                        if (machineId > 0) {
+                            toggleMachineStatusDetails(machineId);
+                        }
+                        return;
+                    }
+                }
+
                 if (action === 'prev-machine') {
                     shiftSelectedMachine(-1);
                     return;
@@ -136,6 +150,17 @@
                     }
 
                     await openScheduleModal(workOrderId, action === 'edit-work-order' ? 'edit' : 'view');
+                    return;
+                }
+
+                if (action === 'remove-from-machine-schedule') {
+                    const row = actionElement.closest('[data-work-order-id]');
+                    const workOrderId = row ? parseInt(row.dataset.workOrderId || '', 10) : 0;
+                    if (!workOrderId) {
+                        return;
+                    }
+
+                    await removeFromMachineSchedule(workOrderId);
                     return;
                 }
 
@@ -180,18 +205,74 @@
         }
 
         async function loadMachinesOnly() {
-            const response = await fetch('api/machines/index.php', { credentials: 'include' });
-            const result = await response.json();
-            if (!result.success) {
-                throw new Error(result.message || '載入機台資料失敗。');
-            }
-            state.machines = Array.isArray(result.data) ? result.data : [];
+            state.machines = await fetchAllMachines();
 
             applyMachineOptions(elements.machineSelect, '-- 請選擇機台 --');
             if (elements.scheduleModalForm) {
                 const machineSelect = elements.scheduleModalForm.querySelector('[name="machine_id"]');
                 applyMachineOptions(machineSelect, '-- 未排機台 --');
             }
+        }
+
+        async function fetchAllMachines() {
+            const perPage = 100;
+            let page = 1;
+            let totalPages = 1;
+            const machines = [];
+
+            while (page <= totalPages) {
+                const params = new URLSearchParams({
+                    page: String(page),
+                    perPage: String(perPage)
+                });
+
+                const response = await fetch(`api/machines/index.php?${params.toString()}`, { credentials: 'include' });
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.message || '載入機台資料失敗。');
+                }
+
+                const rows = Array.isArray(result.data) ? result.data : [];
+                machines.push(...rows);
+
+                const pageCount = parseInt(result.pagination && result.pagination.totalPages ? result.pagination.totalPages : '1', 10);
+                totalPages = Number.isFinite(pageCount) && pageCount > 0 ? pageCount : 1;
+                page += 1;
+            }
+
+            const deduped = new Map();
+            machines.forEach((machine) => {
+                const machineId = parseInt(machine && machine.id ? machine.id : '', 10);
+                if (machineId > 0) {
+                    deduped.set(machineId, machine);
+                }
+            });
+
+            return Array.from(deduped.values()).sort((a, b) => {
+                const codeA = String(a.machine_number || '');
+                const codeB = String(b.machine_number || '');
+                const codeCompare = codeA.localeCompare(codeB, 'zh-Hant');
+                if (codeCompare !== 0) {
+                    return codeCompare;
+                }
+
+                return String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant');
+            });
+        }
+
+        function formatMachineLabel(machine) {
+            const code = String(machine && machine.machine_number ? machine.machine_number : '').trim();
+            const name = String(machine && machine.name ? machine.name : '').trim();
+            if (code && name) {
+                return `${code} - ${name}`;
+            }
+            if (code) {
+                return code;
+            }
+            if (name) {
+                return name;
+            }
+            return `機台 #${machine && machine.id ? machine.id : '-'}`;
         }
 
         function applyMachineOptions(selectElement, emptyLabel) {
@@ -210,7 +291,7 @@
             state.machines.forEach((machine) => {
                 const option = document.createElement('option');
                 option.value = String(machine.id);
-                option.textContent = machine.name || `機台 #${machine.id}`;
+                option.textContent = formatMachineLabel(machine);
                 selectElement.appendChild(option);
             });
 
@@ -297,10 +378,13 @@
         function renderAllViews() {
             renderMachineTab();
             renderTimeTab();
+            renderStatusTab();
         }
 
         function switchTab(tabValue) {
-            const targetTab = tabValue === 'time' ? 'time' : 'machine';
+            const targetTab = tabValue === 'time'
+                ? 'time'
+                : (tabValue === 'status' ? 'status' : 'machine');
             state.activeTab = targetTab;
 
             if (elements.tabNav) {
@@ -316,6 +400,11 @@
 
             if (targetTab === 'time') {
                 renderTimeTab();
+                return;
+            }
+
+            if (targetTab === 'status') {
+                renderStatusTab();
             }
         }
 
@@ -441,6 +530,9 @@
                     </button>
                     <button type="button" class="btn text" data-action="edit-work-order" title="編輯" aria-label="編輯">
                         <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn text danger" data-action="remove-from-machine-schedule" title="移回待排程" aria-label="移回待排程">
+                        <i class="fas fa-reply"></i>
                     </button>
                     <button type="button" class="btn text" data-action="goto-work-order" title="前往工單" aria-label="前往工單">
                         <i class="fas fa-external-link-alt"></i>
@@ -579,6 +671,128 @@
             applyConflictMarks();
         }
 
+        function toggleMachineStatusDetails(machineId) {
+            if (state.expandedMachineStatusIds.has(machineId)) {
+                state.expandedMachineStatusIds.delete(machineId);
+            } else {
+                state.expandedMachineStatusIds.add(machineId);
+            }
+            renderStatusTab();
+        }
+
+        function renderStatusTab() {
+            if (!elements.statusBody) {
+                return;
+            }
+
+            const machines = state.machines.slice().sort((a, b) => {
+                const codeA = String(a.machine_number || '');
+                const codeB = String(b.machine_number || '');
+                const codeCompare = codeA.localeCompare(codeB, 'zh-Hant');
+                if (codeCompare !== 0) {
+                    return codeCompare;
+                }
+                return String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant');
+            });
+
+            if (elements.statusTabCount) {
+                elements.statusTabCount.textContent = String(machines.length);
+                elements.statusTabCount.dataset.count = String(machines.length);
+            }
+
+            elements.statusBody.innerHTML = '';
+
+            if (!machines.length) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.className = 'schedule-empty-row';
+                emptyRow.innerHTML = '<td colspan="5" class="schedule-empty">目前沒有可用機台。</td>';
+                elements.statusBody.appendChild(emptyRow);
+                return;
+            }
+
+            machines.forEach((machine) => {
+                const machineId = parseInt(machine.id, 10);
+                if (!machineId) {
+                    return;
+                }
+
+                const queueOrders = state.workOrders
+                    .filter((order) => parseInt(order.machine_id || 0, 10) === machineId)
+                    .sort((a, b) => compareByRank(a, b, 'machine_rank'));
+                const firstOrder = queueOrders[0] || null;
+                const isExpanded = state.expandedMachineStatusIds.has(machineId);
+                const detailsTitle = isExpanded ? '收合細項' : '展開細項';
+
+                const summaryRow = document.createElement('tr');
+                summaryRow.dataset.machineStatusRow = 'true';
+                summaryRow.dataset.machineId = String(machineId);
+                summaryRow.innerHTML = `
+                    <td>${escapeHtmlSafe(formatMachineLabel(machine))}</td>
+                    <td>${queueOrders.length}</td>
+                    <td>${firstOrder ? escapeHtmlSafe(firstOrder.work_order_number || `#${firstOrder.id}`) : '-'}</td>
+                    <td>${firstOrder ? formatDateTime(firstOrder.scheduled_start_date) : '-'}</td>
+                    <td class="table-actions">
+                        <button type="button" class="btn text" data-action="details" title="${detailsTitle}" aria-label="${detailsTitle}">
+                            <i class="fas ${isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>
+                        </button>
+                    </td>
+                `;
+                elements.statusBody.appendChild(summaryRow);
+
+                if (!isExpanded) {
+                    return;
+                }
+
+                const detailsRow = document.createElement('tr');
+                detailsRow.className = 'machine-status-detail-row';
+                detailsRow.innerHTML = `
+                    <td colspan="5">
+                        ${renderMachineQueueDetailsHtml(queueOrders)}
+                    </td>
+                `;
+                elements.statusBody.appendChild(detailsRow);
+            });
+        }
+
+        function renderMachineQueueDetailsHtml(queueOrders) {
+            if (!Array.isArray(queueOrders) || queueOrders.length === 0) {
+                return '<div class="machine-status-detail-empty">此機台目前沒有排程工單。</div>';
+            }
+
+            const rowsHtml = queueOrders.map((order, index) => {
+                const scheduledText = `${formatDateTime(order.scheduled_start_date)} ~ ${formatDateTime(order.scheduled_end_date)}`;
+                const statusText = escapeHtmlSafe(order.status_label || '未設定');
+                return `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${escapeHtmlSafe(order.work_order_number || `#${order.id}`)}</td>
+                        <td>${escapeHtmlSafe(order.customer_name || '-')}</td>
+                        <td>${scheduledText}</td>
+                        <td><span class="schedule-status-chip">${statusText}</span></td>
+                    </tr>
+                `;
+            }).join('');
+
+            return `
+                <div class="machine-status-detail-wrap">
+                    <table class="data-table compact machine-status-detail-table">
+                        <thead>
+                            <tr>
+                                <th class="col-50">順序</th>
+                                <th>工單號碼</th>
+                                <th>客戶名稱</th>
+                                <th>預定時段</th>
+                                <th class="col-120">狀態</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
         function handleDragStart(event) {
             const row = event.target.closest('tr.schedule-row');
             const list = row ? row.closest('tbody[data-schedule-list-type]') : null;
@@ -681,7 +895,7 @@
             }
         }
 
-        async function persistScheduleSequences(changedWorkOrderId, oldMachineId, newMachineId) {
+        async function persistScheduleSequences(changedWorkOrderId, oldMachineId, newMachineId, successMessage) {
             const targets = collectOrdersForPersist(changedWorkOrderId, oldMachineId, newMachineId);
             if (!targets.length) {
                 return;
@@ -716,7 +930,7 @@
                     state.dataSyncHelper.notifyBulkUpdated({ ids: targets.map((order) => order.id) });
                 }
 
-                showAlert('success', '排程順序已儲存。');
+                showAlert('success', successMessage || '排程順序已儲存。');
             } catch (error) {
                 console.error('[production_work_order_schedule] persistScheduleSequences error:', error);
                 showAlert('error', `排程儲存失敗：${error.message}`);
@@ -897,6 +1111,62 @@
             } catch (error) {
                 console.error('[production_work_order_schedule] handleScheduleSubmit error:', error);
                 showModalAlert('error', `儲存失敗：${error.message}`);
+            }
+        }
+
+        async function removeFromMachineSchedule(workOrderId) {
+            const order = getOrderById(workOrderId);
+            if (!order) {
+                showAlert('error', '找不到工單資料，請重新整理後再試。');
+                return;
+            }
+
+            const oldMachineId = order.machine_id ? parseInt(order.machine_id, 10) : null;
+            if (!oldMachineId) {
+                showAlert('warning', '此工單目前未指定機台。');
+                return;
+            }
+
+            const workOrderNumber = order.work_order_number
+                ? order.work_order_number
+                : `#${workOrderId}`;
+
+            if (!window.confirm(`確定將工單 ${workOrderNumber} 從機台排程移除，並回到待排程清單嗎？`)) {
+                return;
+            }
+
+            try {
+                const maxQueueRank = state.workOrders.reduce((maxRank, item) => {
+                    if (parseInt(item.id, 10) === workOrderId) {
+                        return maxRank;
+                    }
+                    const itemMachineId = item.machine_id ? parseInt(item.machine_id, 10) : null;
+                    if (itemMachineId) {
+                        return maxRank;
+                    }
+                    const rank = Number.isFinite(parseInt(item.queue_rank, 10)) ? parseInt(item.queue_rank, 10) : 0;
+                    return Math.max(maxRank, rank);
+                }, 0);
+
+                order.machine_id = null;
+                order.machine_rank = null;
+                order.queue_rank = maxQueueRank + 1;
+                order.machine_sequence = order.queue_rank;
+
+                await persistScheduleSequences(
+                    workOrderId,
+                    oldMachineId,
+                    null,
+                    `工單 ${workOrderNumber} 已移回待排程。`
+                );
+
+                if (state.activeTab === 'time') {
+                    renderTimeTab();
+                }
+            } catch (error) {
+                console.error('[production_work_order_schedule] removeFromMachineSchedule error:', error);
+                showAlert('error', `移除機台排程失敗：${error.message}`);
+                await loadBoardData();
             }
         }
 
@@ -1148,7 +1418,7 @@
                 return '';
             }
             const machine = state.machines.find((item) => parseInt(item.id, 10) === parseInt(machineId, 10));
-            return machine ? (machine.name || `機台 #${machine.id}`) : `機台 #${machineId}`;
+            return machine ? formatMachineLabel(machine) : `機台 #${machineId}`;
         }
 
         function compareByScheduledStart(a, b) {
