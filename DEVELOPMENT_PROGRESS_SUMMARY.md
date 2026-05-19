@@ -1,90 +1,87 @@
-# 開發進度摘要（更新：2026-05-17）
+# 開發進度摘要（更新：2026-05-19）
 
 ## 專案架構
 
 - 根目錄：C:/Apache24/htdocs/mes
+- 主要目錄：
+  - api/：PHP API（模組化端點、權限驗證、RBAC）
+  - js/：前端模組（IIFE、data-action 事件委派）
+  - core/configs/：配置化模組定義
+  - modules/：非配置化或混合模式 HTML 模組
+  - migrations/：資料庫 migration
+  - tools/：審計、schema 同步、更新包打包腳本
+  - dist/：一鍵更新包輸出
 - 技術棧：
-  - 後端：PHP 8（api/* 模組化端點，`bootstrap.php` 權限/驗證）
-  - 前端：Vanilla JS + HTML + CSS（IIFE 模組、`data-action` 事件委派）
-  - 配置化 UI：`core/module-config.js` + `core/module-renderer.js` + `core/configs/*.config.js`
-  - 跨分頁同步：`js/data-sync.js`（module helper + dependency broadcast）
-  - 資料庫：MySQL（`migrations/*.sql`）
-- 工具鏈：
-  - 驗證：`tools/validate-config-modules.js`、`tools/audit-system-health.js`、`tools/audit-data-sync.js`
-  - 打包：`tools/build-update-package.ps1`、`tools/build-update-package-safe.ps1`
-  - 本機 schema 同步：`tools/sync-local-schema.ps1`
+  - 後端：PHP 8 + PDO/MySQL
+  - 前端：Vanilla JS + HTML + CSS
+  - 配置化渲染：core/module-config.js + core/module-renderer.js
+  - 資料同步：js/data-sync.js
+  - 自動化：node tools/audit-system-health.js、node tools/audit-data-sync.js、powershell tools/sync-local-schema.ps1
 
 ## 已完成功能
 
-1. 事件/提醒個人化權限模型完成（行事曆）
-- `dashboard_calendar_events` 與 `calendar_event_reminders` API 全面改為「本人資料本人可見/可改」。
-- create/update/delete 與查詢皆加上 employee ownership 條件。
-- 影響檔：`api/dashboard_calendar_events/*.php`、`api/calendar_event_reminders/*.php`、`api/dashboard/calendar_events.php`
+1. 新增側邊欄新功能納管規範（強制）
+- 已寫入 .github/copilot-instructions.md，明確要求「選單 + 權限 + 相容 + migration + 驗收」五件事同輪完成。
 
-2. 提醒模組前端改為完全個人模式
-- 移除員工選擇欄位，提醒預設與綁定當前登入者。
-- 影響檔：`core/configs/calendar_event_reminders.config.js`、`js/calendar_event_reminders.js`
+2. 修正生產工單排程權限缺口
+- 前端側邊欄權限判斷補齊模組對應與別名：
+  - script.js：MODULE_LEGACY_PERMISSION_MAP 新增 production_work_order_schedule -> manage_work_orders
+  - script.js：PERMISSION_ALIAS_MAP 新增 production_work_order_schedule.read -> 生產工單排程
+- 後端權限別名與 legacy 映射補齊：
+  - api/bootstrap.php：getPermissionAliasMap 與 legacyPermissionMap 同步新增對應。
 
-3. Dashboard 行事曆改版（節點化）
-- 篩選改為下拉：訂單 / 工單 / 交貨 / 全部（預設訂單）。
-- 事件改為關鍵節點顯示，不再呈現跨度長條。
-- 同一事件起訖節點同色（穩定 hash 調色），點任一節點開同一詳情流程。
-- 影響檔：`core/configs/dashboard.config.js`、`js/dashboard.js`、`styles.css`
+3. 權限資料與資料庫同步落地
+- 新增 migration：migrations/2026_05_18_add_production_work_order_schedule_permission.sql
+  - 建立 production_work_order_schedule.read
+  - 自動複製既有 manage_work_orders 角色到新權限（向後相容）
+- tools/sync-local-schema.ps1 已新增對應 migration check。
 
-4. ICON 規範落地與文件化
-- 行事曆圖例/節點由 emoji 改為 Font Awesome。
-- 新增強制規範：禁止 emoji、`core/configs` 用 `fa-*`、動態渲染用 `fas fa-*`，並定義 Dashboard 節點 icon 對照。
-- 影響檔：`.github/copilot-instructions.md`、`.github/instructions/ui-style.instructions.md`
+4. 角色權限關聯顯示優化
+- api/role_permissions/helpers.php：權限顯示名稱改由 bootstrap alias map 解析。
+- production_work_order_schedule.read 會顯示為「生產工單排程」。
 
-5. 權限系統延續改善（本輪仍在工作樹）
-- RBAC alias 相容、role_permissions 權限主軸流程、employee_roles 錯誤訊息改善。
-- 權限中文化 migration 與 schema 同步規則已就位。
-
-6. 更新包已產出（可一鍵更新）
-- 版本：`v2.0.2`
-- 變更摘要：`release-notes/2026-05-17-v2.0.2.txt`
-- 輸出：`dist/update_v2.0.2_20260517_101233.zip`
-- 打包統計：主檔 39、migration 1
-- 覆蓋驗證：`MISSING_MAIN=0`、`MISSING_MIG=0`
+5. 更新包已產出（可一鍵更新遠端）
+- 版本：v2.0.3
+- 變更摘要：release-notes/2026-05-19-v2.0.3.txt
+- 輸出：dist/update_v2.0.3_20260519_132202.zip
+- 打包統計：主檔 40、migration 2
+- 覆蓋驗證：MISSING_MAIN=0、MISSING_MIG=0、manifest.json 存在
 
 ## 待修 Bug
 
-1. 健康審計基線仍未過（歷史技術債）
-- 重現：`node tools/audit-system-health.js`
-- 現況：Errors 34 / Warnings 27 / Hints 8
-- 主因：
-  - J-2：多模組 `innerHTML` 未 `escapeHtml`
-  - F-1：`orders/order_items/work_orders/shipping_orders` 檔案過大
+1. 系統健康審計基線仍未清零（歷史技術債）
+- 重現：node tools/audit-system-health.js
+- 現況：仍有 Errors（非本輪新增）
+- 主要類型：
+  - J-2：部分模組 innerHTML 未完全 escapeHtml
+  - F-1：大型 JS 模組仍超過建議行數
+  - A-3：部分 API 仍有 POST fallback 警示
 
-2. 架構警示：status_board 仍有 POST fallback
-- 重現：`node tools/audit-system-health.js`
-- 現象：`api/status_board/update.php`、`api/status_board/delete.php`（A-3）
+2. 權限更新後的 UI 可見性需要重新登入
+- 重現：修改角色權限後不重新登入，側邊欄可能維持舊 session 權限快照。
+- 臨時解法：登出再登入後驗證可見性。
 
-3. DataSync 覆蓋仍有 P2 項
-- 重現：`node tools/audit-data-sync.js --write docs/data-sync-audit.md`
-- 現況：P0=0、P1=0、P2=10（crud_module_without_dependents）
+3. 開發環境缺少 rg 指令
+- 重現：PowerShell 執行 rg 失敗（command not found）。
+- 影響：搜尋流程需退回 Select-String，效率較低。
 
 ## 下一步任務（優先順序）
 
-1. P0：遠端套用並驗收 `v2.0.2`
-- 驗收重點：
-  - 事件/提醒個人化存取是否符合預期
-  - Dashboard 節點化與下拉篩選
-  - ICON 規範視覺一致性
-  - migration `2026_05_16_update_permissions_display_names.sql` 生效
+1. P0：遠端套用並驗收 v2.0.3 更新包
+- 驗收點：
+  - 生產工單排程可在角色權限關聯中搜尋與編輯
+  - 有權限角色看得到側邊欄，無權限角色看不到
+  - migration 2026_05_16、2026_05_18 皆成功執行
 
-2. P0：處理 J-2 安全風險（XSS）
-- 優先模組：`orders`、`order_items`、`work_orders`、`customers`
-- 目標：健康審計錯誤數顯著下降
+2. P0：收斂健康審計 Errors（先清安全與阻斷項）
+- 優先清理 J-2（XSS 風險）與 A-3（方法相容警示）。
 
-3. P1：拆分大型 JS 模組（F-1）
-- 優先：`js/order_items.js`、`js/work_orders.js`
-- 拆分策略：api layer / render layer / controller layer
+3. P1：整理權限體系遷移策略
+- 逐步從 legacy manage_* 過渡到 module.read/module.edit/module.delete。
+- 建立 migration 模板，統一新模組權限建立與角色複製流程。
 
-4. P1：補齊 DataSync notify 與相依表
-- 針對 CRUD 模組補 `notifyCreated/Updated/Deleted`
-- 回歸：`tools/audit-data-sync.js` 與雙分頁即時刷新清單
+4. P1：清理大型模組技術債
+- 拆分 order_items.js、work_orders.js（api/render/controller 分層）。
 
-5. P2：收斂規範警示
-- 移除 `status_board` POST fallback
-- 修正 modules 按鈕 class 與 inline style 遺留項
+5. P2：工具鏈體驗改善
+- 補齊 rg 工具或在文件加註 PowerShell fallback 搜尋方案。
