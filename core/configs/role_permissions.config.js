@@ -3,12 +3,10 @@
  */
 ModuleConfig.register('role_permissions', {
     title: '角色權限關聯',
-    subtitle: '設定角色可使用的功能權限',
+    subtitle: '檢視各權限可瀏覽的角色並快速調整',
 
     // 標題區按鈕
-    actions: [
-        { label: '新增關聯', icon: 'fa-plus', action: 'create', style: 'primary' }
-    ],
+    actions: [],
 
     hasColumnSelector: true,
     tableHeaderActions: true,
@@ -19,10 +17,10 @@ ModuleConfig.register('role_permissions', {
     // 篩選工具列
     filters: [
         {
-            name: 'role_id',
-            label: '角色',
+            name: 'permission_id',
+            label: '權限',
             type: 'select',
-            options: [{ value: '', label: '全部角色' }]
+            options: [{ value: '', label: '全部權限' }]
         },
         {
             name: 'perPage',
@@ -38,26 +36,55 @@ ModuleConfig.register('role_permissions', {
 
     // 資料表格欄位
     columns: [
-        { key: 'role_name', label: '角色名稱', sortable: false, selectable: true },
         { key: 'permission_name', label: '權限名稱', sortable: false, selectable: true },
+        { key: 'roles_summary', label: '可瀏覽角色', sortable: false, selectable: true },
         { key: 'actions', label: '操作', sortable: false, selectable: false }
     ],
 
     // Modal 配置
     modal: {
-        size: 'small',
-        createTitle: '新增角色權限',
-        editTitle: '編輯角色權限',
-        hiddenFields: ['id'],
-        formRows: [
+        size: 'medium',
+        createTitle: '編輯權限可瀏覽角色',
+        editTitle: '編輯權限可瀏覽角色',
+        hiddenFields: ['id', 'permission_id'],
+        sections: [
             {
-                sections: [
+                title: '權限設定',
+                fields: [
+                    { name: 'permission_name', label: '權限名稱', type: 'text', readonly: true, disabled: true, fullWidth: true }
+                ]
+            },
+            {
+                title: '角色調整',
+                className: 'role-permission-transfer-section',
+                gridColumns: 3,
+                fields: [
                     {
-                        title: '指派權限',
-                        fields: [
-                            { name: 'role_id', label: '角色', type: 'select', required: true, options: [{ value: '', label: '請選擇角色' }] },
-                            { name: 'permission_id', label: '權限', type: 'select', required: true, options: [{ value: '', label: '請選擇權限' }] }
-                        ]
+                        name: 'available_role_ids',
+                        label: '未加入',
+                        type: 'select',
+                        required: false,
+                        multiple: true,
+                        attributes: { size: '12' },
+                        options: [],
+                        containerDataAttr: 'data-role-permissions-available-container'
+                    },
+                    {
+                        name: 'transfer_controls',
+                        label: '調整',
+                        type: 'static',
+                        value: '',
+                        containerDataAttr: 'data-role-permissions-transfer-controls'
+                    },
+                    {
+                        name: 'role_ids',
+                        label: '已加入',
+                        type: 'select',
+                        required: false,
+                        multiple: true,
+                        attributes: { size: '12' },
+                        options: [],
+                        containerDataAttr: 'data-role-permissions-selected-container'
                     }
                 ]
             }

@@ -17,6 +17,7 @@ require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
 
 requireAuth();
+requireCsrfForWrite();
 
 $method = requireMethod(['GET', 'POST']);
 
@@ -37,6 +38,7 @@ switch ($method) {
 function handleListCalendarEvents(): void
 {
     $pdo = db();
+    $currentEmployeeId = getCurrentEmployeeIdOrFail();
 
     $page = max(1, (int)($_GET['page'] ?? 1));
     $perPage = (int)($_GET['perPage'] ?? 10);
@@ -51,8 +53,8 @@ function handleListCalendarEvents(): void
     $startDate = trim((string)($_GET['start_date'] ?? ''));
     $endDate = trim((string)($_GET['end_date'] ?? ''));
 
-    $conditions = ['e.deleted_at IS NULL'];
-    $params = [];
+    $conditions = ['e.deleted_at IS NULL', 'e.created_by_employee_id = :current_employee_id'];
+    $params = ['current_employee_id' => $currentEmployeeId];
 
     if ($keyword !== '') {
         $conditions[] = '(e.title LIKE :keyword OR e.description LIKE :keyword_desc)';
@@ -126,6 +128,7 @@ function handleListCalendarEvents(): void
 function handleCreateCalendarEvent(): void
 {
     $pdo = db();
+    $currentEmployeeId = getCurrentEmployeeIdOrFail();
     $payload = getJsonInput();
 
     // 調試：記錄收到的資料
@@ -135,7 +138,7 @@ function handleCreateCalendarEvent(): void
     if ($validated['errors'] !== []) {
         // 調試：記錄驗證錯誤
         error_log('dashboard_calendar_events validation errors: ' . json_encode($validated['errors']));
-        
+
         jsonResponse([
             'success' => false,
             'message' => '欄位驗證失敗。',
@@ -148,9 +151,6 @@ function handleCreateCalendarEvent(): void
     // 取得新 ID
     $maxIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM dashboard_calendar_events');
     $newId = (int)$maxIdStmt->fetchColumn();
-
-    // 取得目前登入的員工 ID
-    $currentEmployeeId = getCurrentEmployeeId();
 
     $columns = ['id', 'created_by_employee_id', 'created_at', 'updated_at'];
     $placeholders = [':id', ':created_by_employee_id', 'NOW()', 'NOW()'];
@@ -184,13 +184,4 @@ function handleCreateCalendarEvent(): void
         'message' => '行事曆事件已新增。',
         'data' => ['id' => $newId],
     ], 201);
-}
-
-function getCurrentEmployeeId(): ?int
-{
-    // 從 session 取得目前登入的員工 ID
-    if (isset($_SESSION['user']['employee_id'])) {
-        return (int)$_SESSION['user']['employee_id'];
-    }
-    return null;
 }

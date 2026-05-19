@@ -27,7 +27,6 @@ ModuleConfig.register('dashboard_calendar_events', {
                 { value: 'meeting', label: '會議' },
                 { value: 'maintenance', label: '維護' },
                 { value: 'order', label: '訂單節點' },
-                { value: 'reminder', label: '提醒' },
                 { value: 'other', label: '其他' }
             ]
         },
@@ -76,7 +75,6 @@ ModuleConfig.register('dashboard_calendar_events', {
                                     { value: 'meeting', label: '會議' },
                                     { value: 'maintenance', label: '維護' },
                                     { value: 'order', label: '訂單節點' },
-                                    { value: 'reminder', label: '提醒' },
                                     { value: 'other', label: '其他' }
                                 ]
                             },

@@ -86,10 +86,31 @@ th, td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
 tr:hover td { background: rgba(37, 99, 235, 0.04); }
 ```
 
+## ICON 規範（強制）
+
+### 使用原則
+
+- 使用者可見圖示一律使用 Font Awesome，禁止 emoji / Unicode 圖案字元（例如：`📦`、`🚚`、`🛠`）。
+- 在 `core/configs/*.config.js` 的 `icon` 欄位使用短格式：`fa-*`（例：`icon: 'fa-plus'`）。
+- 在 HTML 或 JS 動態渲染時使用完整 class：`fas fa-*`（例：`<i class="fas fa-truck"></i>`）。
+- 同一語意在不同頁面/模組必須使用同一 icon，不可混用 emoji 與 FA icon。
+- icon 僅為輔助語意，必要文字標籤不得省略。
+
+### Dashboard 行事曆節點對照
+
+| 節點語意 | 指定 icon |
+|---------|-----------|
+| 訂單建立 | `fa-file-alt` |
+| 工單開始 | `fa-industry` |
+| 工單結束 | `fa-flag-checkered` |
+| 交期節點 | `fa-truck` |
+| 出貨節點 | `fa-shipping-fast` |
+
 ## 禁止事項
 
 - ❌ `style="color: red"` — 使用 CSS class
 - ❌ 自定義 `btn-primary`、`btn-danger` 等連字號類別
 - ❌ `font-size: 10px` — 字體最小 12px
 - ❌ 僅用顏色傳遞資訊（需同時有文字/圖示）
+- ❌ 使用 emoji 作為正式 UI icon（例如列表圖例、日曆節點、工具列圖示）
 - ❌ 動畫時間超過 300ms

@@ -205,6 +205,14 @@ $migrationChecks = [ordered]@{
         CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'work_orders' AND column_name = 'machine_sequence') AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'work_orders' AND index_name = 'idx_work_orders_machine_sequence'), 1, 0);"
         Description = 'work_orders.machine_sequence column and index'
     }
+    '2026_05_16_update_permissions_display_names.sql' = @{
+        CheckSql = "SELECT IF((SELECT HEX(name) FROM permissions WHERE id = 1 LIMIT 1) = 'E585ACE58FB8E59FBAE69CACE8B387E69699' AND (SELECT HEX(name) FROM permissions WHERE id = 20 LIMIT 1) = 'E6AC8AE99990E8A8ADE5AE9A' AND (SELECT HEX(name) FROM permissions WHERE id = 26 LIMIT 1) = 'E58897E58DB0E5A0B1E8A1A8E8AAAAE6988E', 1, 0);"
+        Description = 'permissions display names migration applied'
+    }
+    '2026_05_18_add_production_work_order_schedule_permission.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM permissions WHERE name = 'production_work_order_schedule.read'), 1, 0);"
+        Description = 'production_work_order_schedule.read permission exists'
+    }
 }
 
 $migrationFiles = Get-ChildItem -LiteralPath $migrationsDir -File | Sort-Object Name

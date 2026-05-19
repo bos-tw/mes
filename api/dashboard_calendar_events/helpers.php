@@ -18,6 +18,35 @@
 declare(strict_types=1);
 
 /**
+ * 取得目前登入員工 ID，若不存在則回傳 401。
+ */
+function getCurrentEmployeeIdOrFail(): int
+{
+    $employee = $_SESSION['employee'] ?? null;
+    if (is_array($employee)) {
+        $employeeId = (int)($employee['id'] ?? 0);
+        if ($employeeId > 0) {
+            return $employeeId;
+        }
+    }
+
+    $legacyEmployeeId = $_SESSION['user']['employee_id'] ?? null;
+    if ($legacyEmployeeId !== null) {
+        $employeeId = (int)$legacyEmployeeId;
+        if ($employeeId > 0) {
+            return $employeeId;
+        }
+    }
+
+    jsonResponse([
+        'success' => false,
+        'message' => '尚未登入或登入已過期。',
+    ], 401);
+
+    return 0;
+}
+
+/**
  * 驗證並正規化行事曆事件輸入資料
  */
 function validateCalendarEventData(array $payload, bool $isUpdate = false): array
@@ -129,16 +158,24 @@ function validateCalendarEventData(array $payload, bool $isUpdate = false): arra
 /**
  * 查詢單筆行事曆事件
  */
-function findCalendarEvent(int $id): ?array
+function findCalendarEvent(int $id, ?int $ownerEmployeeId = null): ?array
 {
     $pdo = db();
-    $stmt = $pdo->prepare('
-        SELECT e.*, emp.name AS creator_name 
-        FROM dashboard_calendar_events e 
-        LEFT JOIN employees emp ON emp.id = e.created_by_employee_id 
+    $sql = '
+        SELECT e.*, emp.name AS creator_name
+        FROM dashboard_calendar_events e
+        LEFT JOIN employees emp ON emp.id = e.created_by_employee_id
         WHERE e.id = :id AND e.deleted_at IS NULL
-    ');
-    $stmt->execute(['id' => $id]);
+    ';
+
+    $params = ['id' => $id];
+    if ($ownerEmployeeId !== null) {
+        $sql .= ' AND e.created_by_employee_id = :owner_employee_id';
+        $params['owner_employee_id'] = $ownerEmployeeId;
+    }
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $row = $stmt->fetch();
     return $row ?: null;
 }

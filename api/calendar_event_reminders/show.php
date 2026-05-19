@@ -19,6 +19,8 @@ requireAuth();
 
 requireMethod('GET');
 
+$currentEmployeeId = getCurrentEmployeeIdOrFail();
+
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
     jsonResponse([
@@ -27,7 +29,7 @@ if ($id <= 0) {
     ], 400);
 }
 
-$reminder = findReminder($id);
+$reminder = findReminder($id, $currentEmployeeId);
 if ($reminder === null) {
     jsonResponse([
         'success' => false,

@@ -1,6 +1,6 @@
 # DataSync Audit Report
 
-Generated at: 2026-05-14T11:24:16.537Z
+Generated at: 2026-05-17T02:10:52.704Z
 
 ## Summary
 
@@ -48,7 +48,7 @@ Generated at: 2026-05-14T11:24:16.537Z
 | OK | production_records | production_records | - | - | - | employees, machines, work_orders | - |
 | OK | quality_issue_reports | quality_issue_reports | DELETE | (helper) | dashboard | departments, employees | - |
 | OK | return_orders | return_orders | DELETE | (helper) | inventory_items, inventory_transactions, shipping_orders, shipping_order_items | customers, shipping_order_items, shipping_orders | - |
-| OK | role_permissions | role_permissions | POST, DELETE | (helper) | roles, permissions | permissions, roles | - |
+| OK | role_permissions | role_permissions | PUT | (helper) | roles, permissions | permissions, roles | - |
 | OK | roles | roles | DELETE | (helper) | notifications, employee_roles, role_permissions | employee_roles, role_permissions | - |
 | OK | screening_items | screening_items | DELETE | screening_items | order_items, screening_services, inventory_items | lookup_values | - |
 | OK | screening_services | screening_services | POST, DELETE | screening_services | orders, order_items | customers, screening_items | - |

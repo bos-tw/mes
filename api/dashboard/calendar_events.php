@@ -53,6 +53,7 @@ handleCalendarEvents();
 function handleCalendarEvents(): void
 {
     $pdo = db();
+    $currentEmployeeId = getCurrentEmployeeIdOrFail();
 
     // 取得日期範圍參數
     $start = isset($_GET['start']) ? trim($_GET['start']) : date('Y-m-01');
@@ -251,6 +252,7 @@ function handleCalendarEvents(): void
             FROM dashboard_calendar_events dce
             LEFT JOIN employees e ON dce.created_by_employee_id = e.id
             WHERE dce.deleted_at IS NULL
+                AND dce.created_by_employee_id = :current_employee_id
                 AND (
                     (DATE(dce.start_datetime) BETWEEN :start1 AND :end1)
                     OR (DATE(dce.end_datetime) BETWEEN :start2 AND :end2)
@@ -262,6 +264,7 @@ function handleCalendarEvents(): void
 
         $stmt = $pdo->prepare($calendarEventsQuery);
         $stmt->execute([
+            ':current_employee_id' => $currentEmployeeId,
             ':start1' => $start,
             ':end1' => $end,
             ':start2' => $start,
@@ -326,6 +329,35 @@ function handleCalendarEvents(): void
             'message' => '查詢行事曆事件時發生錯誤。'
         ], 500);
     }
+}
+
+/**
+ * 取得目前登入員工 ID，若不存在則回傳 401。
+ */
+function getCurrentEmployeeIdOrFail(): int
+{
+    $employee = $_SESSION['employee'] ?? null;
+    if (is_array($employee)) {
+        $employeeId = (int)($employee['id'] ?? 0);
+        if ($employeeId > 0) {
+            return $employeeId;
+        }
+    }
+
+    $legacyEmployeeId = $_SESSION['user']['employee_id'] ?? null;
+    if ($legacyEmployeeId !== null) {
+        $employeeId = (int)$legacyEmployeeId;
+        if ($employeeId > 0) {
+            return $employeeId;
+        }
+    }
+
+    jsonResponse([
+        'success' => false,
+        'message' => '尚未登入或登入已過期。',
+    ], 401);
+
+    return 0;
 }
 
 /**

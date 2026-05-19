@@ -36,6 +36,53 @@
     - 已同步更新 `index.html`
     - 已同步更新 `index.php`
 
+### 🧭 側邊欄新功能納管規範（2026-05-18 新增，強制）
+
+只要新增可從側邊欄進入的功能模組，必須同步完成「選單 + 權限 + 相容 + migration + 驗收」五件事，禁止只加選單不加權限。
+
+#### A. 命名與入口（必做）
+
+1. 新模組代號一律使用 snake_case（例如：`production_work_order_schedule`）。
+2. 側邊欄入口必須同時更新 `index.html` 與 `index.php`，`data-page` 必須與模組代號一致。
+3. 若屬既有功能拆分出的子模組，需先定義是否沿用舊權限（見 D 節）。
+
+#### B. 權限資料（必做）
+
+1. 必須新增對應權限鍵：`{module}.read`（例如：`production_work_order_schedule.read`）。
+2. 權限新增必須透過 migration 寫入 `permissions`，禁止手動改正式資料庫。
+3. migration 必須具備可重複執行安全性（`WHERE NOT EXISTS` 或等價寫法）。
+
+#### C. 本機 schema 同步維護（必做）
+
+1. 新增 migration 後，必須同步更新 `tools/sync-local-schema.ps1` 的 `$migrationChecks`。
+2. 若未更新 `$migrationChecks`，視為流程未完成，不可交付。
+
+#### D. 新舊權限相容（必做）
+
+1. 前端 `script.js`：
+    - `MODULE_LEGACY_PERMISSION_MAP` 補上新模組對應（如需沿用舊角色）。
+    - `PERMISSION_ALIAS_MAP` 補上 technical key 與中文顯示名對照。
+2. 後端 `api/bootstrap.php`：
+    - `getPermissionAliasMap()` 補上同一組權限別名。
+    - `autoEnforcePermission()` 的 `$legacyPermissionMap` 補上同一組模組映射。
+3. 前後端映射必須一致，禁止只改單邊。
+
+#### E. 角色預設授權策略（建議，非阻斷）
+
+1. 若新模組屬於舊模組拆分，建議在 migration 將既有舊權限角色自動複製到新權限，避免上線後功能突然消失。
+2. 後續再逐步把角色改為獨立控管。
+
+#### F. 驗收清單（必做）
+
+1. `git diff -- index.html index.php` 確認雙入口一致。
+2. 執行：
+    - `powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1`
+    - `node tools/audit-system-health.js`
+3. 以至少兩種角色驗證：
+    - 有權限：看得到側邊欄功能。
+    - 無權限：看不到側邊欄功能。
+4. 在「角色權限關聯」可搜尋到該權限並可編輯角色。
+
 ---
 
 ## 🚨 開始工作前必讀（2026-02-04 新增，2026-03-01 更新）
@@ -477,6 +524,44 @@ actions: [
 | `dataAction: 'create'` | `action: 'create'` |
 | `icon: 'fas fa-plus'` | `icon: 'fa-plus'` |
 | `class: 'btn primary'` | `style: 'primary'` |
+
+### ICON 使用與選擇規範（2026-05-17 新增，強制）
+
+#### 統一原則
+
+1. 使用者可見圖示一律使用 Font Awesome，**禁止使用 emoji / Unicode 圖案字元**（例如：`📦`、`🚚`、`🛠`）。
+2. `core/configs/*.config.js` 的 `icon` 欄位維持短格式：`fa-*`（例如：`icon: 'fa-plus'`）。
+3. HTML 或 JS 動態渲染圖示時，使用完整 class 格式：`fas fa-*`（例如：`<i class="fas fa-truck"></i>`）。
+4. 同一語意在不同區塊必須使用相同 icon，不可同時混用 emoji 與 FA icon。
+5. icon 僅作為輔助語意，不可只靠顏色或 icon 傳遞資訊；必要文字標籤必須保留。
+
+#### Dashboard 行事曆節點 ICON 對照（強制）
+
+| 節點語意 | 指定 icon |
+|---------|-----------|
+| 訂單建立 | `fa-file-alt` |
+| 工單開始 | `fa-industry` |
+| 工單結束 | `fa-flag-checkered` |
+| 交期節點 | `fa-truck` |
+| 出貨節點 | `fa-shipping-fast` |
+
+#### 禁止與正確範例
+
+```html
+<!-- ❌ 禁止：使用 emoji -->
+<span class="legend-icon">🚚</span>
+
+<!-- ✅ 正確：使用 Font Awesome -->
+<i class="fas fa-truck legend-icon" aria-hidden="true"></i>
+```
+
+```javascript
+// ✅ core/configs 內使用短格式
+icon: 'fa-search'
+
+// ✅ JS/HTML 動態渲染使用完整 class
+iconClass: 'fas fa-search'
+```
 
 ### 列印尺寸與操作按鈕顏色規範（2026-05-05 新增）
 

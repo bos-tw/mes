@@ -36,7 +36,6 @@
             data: [],
             editingId: null,
             events: [],
-            employees: [],
         };
 
         let dataSyncHelper = null;
@@ -79,20 +78,12 @@
         // 載入下拉選項
         async function loadDropdownOptions() {
             try {
-                const [eventsRes, employeesRes] = await Promise.all([
-                    fetch('api/dashboard_calendar_events/?perPage=100'),
-                    fetch('api/employees/?perPage=100'),
-                ]);
+                const eventsRes = await fetch('api/dashboard_calendar_events/?perPage=100');
                 const eventsJson = await eventsRes.json();
-                const employeesJson = await employeesRes.json();
 
                 if (eventsJson.success) {
                     state.events = eventsJson.data || [];
                     updateEventDropdown();
-                }
-                if (employeesJson.success) {
-                    state.employees = employeesJson.data || [];
-                    updateEmployeeDropdown();
                 }
             } catch (error) {
                 console.error('載入下拉選項失敗', error);
@@ -113,26 +104,6 @@
                 const option = document.createElement('option');
                 option.value = String(eventItem.id ?? '');
                 option.textContent = String(eventItem.title ?? '');
-                select.appendChild(option);
-            });
-        }
-
-        function updateEmployeeDropdown() {
-            const select = modalForm?.querySelector('select[name="employee_id"]');
-            if (!select) return;
-
-            select.innerHTML = '';
-            const defaultOption = document.createElement('option');
-            defaultOption.value = '';
-            defaultOption.textContent = '請選擇員工';
-            select.appendChild(defaultOption);
-
-            state.employees.forEach((employee) => {
-                const option = document.createElement('option');
-                option.value = String(employee.id ?? '');
-                const employeeName = String(employee.name ?? '');
-                const employeeNumber = String(employee.employee_number ?? '');
-                option.textContent = employeeNumber ? `${employeeName} (${employeeNumber})` : employeeName;
                 select.appendChild(option);
             });
         }
@@ -178,7 +149,7 @@
             if (!tableBody) return;
 
             if (state.data.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="7" class="text-center">目前沒有資料</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="5" class="text-center">目前沒有資料</td></tr>`;
                 return;
             }
 
@@ -196,10 +167,6 @@
                 const titleCell = document.createElement('td');
                 titleCell.textContent = item.event_title || '';
                 row.appendChild(titleCell);
-
-                const employeeCell = document.createElement('td');
-                employeeCell.textContent = item.employee_name || '-';
-                row.appendChild(employeeCell);
 
                 const datetimeCell = document.createElement('td');
                 datetimeCell.textContent = formatDateTime(item.reminder_datetime);
@@ -278,7 +245,6 @@
         // Modal 操作
         function openModal(mode, data = null) {
             if (!modal || !modalForm) return;
-            const sentStatusField = modalForm.querySelector('[name="is_sent"]');
 
             // 安全的欄位設定函數
             function setFieldValue(name, value) {
@@ -301,22 +267,13 @@
                 state.editingId = null;
                 if (modalTitle) modalTitle.textContent = '新增提醒';
                 setFieldValue('id', '');
-                setFieldValue('is_sent', '0');
-                if (sentStatusField) {
-                    sentStatusField.disabled = true;
-                }
             } else if (mode === 'edit' && data) {
                 state.editingId = data.id;
                 if (modalTitle) modalTitle.textContent = '編輯提醒';
                 setFieldValue('id', data.id);
                 setFieldValue('event_id', data.event_id);
-                setFieldValue('employee_id', data.employee_id);
                 setFieldValue('reminder_datetime', data.reminder_datetime ? data.reminder_datetime.slice(0, 16) : '');
                 setFieldValue('reminder_type', data.reminder_type);
-                setFieldValue('is_sent', data.is_sent ? '1' : '0');
-                if (sentStatusField) {
-                    sentStatusField.disabled = false;
-                }
             }
 
             modal.classList.remove('hidden');
@@ -336,14 +293,9 @@
             const isEdit = state.editingId !== null;
             const payload = {
                 event_id: parseInt(formData.get('event_id'), 10),
-                employee_id: parseInt(formData.get('employee_id'), 10),
                 reminder_datetime: formData.get('reminder_datetime'),
                 reminder_type: formData.get('reminder_type'),
             };
-
-            if (isEdit) {
-                payload.is_sent = formData.get('is_sent') === '1';
-            }
 
             const url = isEdit
                 ? `api/calendar_event_reminders/update.php?id=${state.editingId}`

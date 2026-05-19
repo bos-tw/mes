@@ -144,10 +144,11 @@
 
             const html = rows.map((permission) => {
                 permissionsCache.set(permission.id, permission);
+                const displayName = permission.display_name || permission.name || '-';
 
                 return `
                     <tr data-id="${permission.id}">
-                        <td>${escapeHtml(permission.name)}</td>
+                        <td>${escapeHtml(displayName)}</td>
                         <td>${escapeHtml(permission.description) || '-'}</td>
                         <td>${formatDateTime(permission.created_at)}</td>
                         <td class="table-actions">

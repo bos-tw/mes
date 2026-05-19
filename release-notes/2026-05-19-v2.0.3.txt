@@ -1,0 +1,3 @@
+1. 新增「側邊欄新功能納管規範」，明確規定選單、權限、相容、migration 與驗收流程。
+2. 新增 production_work_order_schedule.read 權限與 migration，並補齊本機 schema 同步檢查規則。
+3. 修正前後端權限映射與角色權限關聯顯示，讓生產工單排程可在角色權限關聯中設定並正確顯示側邊欄。

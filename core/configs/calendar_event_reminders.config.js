@@ -33,7 +33,6 @@ ModuleConfig.register('calendar_event_reminders', {
     // 表格欄位
     columns: [
         { key: 'event_title', label: '事件標題', selectable: true },
-        { key: 'employee_name', label: '提醒員工', selectable: true },
         { key: 'reminder_datetime', label: '提醒時間', selectable: true },
         { key: 'reminder_type', label: '提醒方式', selectable: true },
         { key: 'is_sent', label: '發送狀態', selectable: true },
@@ -52,24 +51,14 @@ ModuleConfig.register('calendar_event_reminders', {
                     {
                         title: '事件設定',
                         fields: [
-                            { name: 'event_id', type: 'select', label: '事件', required: true, options: [{ value: '', label: '請選擇事件' }] },
-                            { name: 'employee_id', type: 'select', label: '提醒員工', required: true, options: [{ value: '', label: '請選擇員工' }] }
+                            { name: 'event_id', type: 'select', label: '事件', required: true, options: [{ value: '', label: '請選擇事件' }] }
                         ]
                     },
                     {
                         title: '提醒設定',
                         fields: [
                             { name: 'reminder_datetime', type: 'datetime-local', label: '提醒時間', required: true },
-                            { name: 'reminder_type', type: 'select', label: '提醒方式', options: [{ value: '', label: '請選擇' }, { value: 'email', label: 'Email' }, { value: 'system', label: '系統通知' }, { value: 'sms', label: '簡訊' }] },
-                            {
-                                name: 'is_sent',
-                                type: 'select',
-                                label: '發送狀態',
-                                options: [
-                                    { value: '0', label: '待發送' },
-                                    { value: '1', label: '已發送' }
-                                ]
-                            }
+                            { name: 'reminder_type', type: 'select', label: '提醒方式', options: [{ value: '', label: '請選擇' }, { value: 'email', label: 'Email' }, { value: 'system', label: '系統通知' }, { value: 'sms', label: '簡訊' }] }
                         ]
                     }
                 ]

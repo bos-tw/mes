@@ -729,6 +729,90 @@ function validateSessionToken(array $employee): void
 }
 
 /**
+ * 取得權限名稱別名映射。
+ *
+ * @return array<string, string>
+ */
+function getPermissionAliasMap(): array
+{
+    static $aliasMap = [
+        'manage_companies' => '公司基本資料',
+        'manage_customers' => '客戶基本資料',
+        'manage_suppliers' => '供應商基本資料',
+        'manage_departments' => '部門基本資料',
+        'manage_employees' => '員工基本資料',
+        'manage_machines' => '機台設備管理',
+        'manage_tools' => '載具管理',
+        'manage_screening_items' => '受篩產品',
+        'manage_screening_services' => '篩分服務項目',
+        'manage_orders' => '訂單主表管理',
+        'manage_work_orders' => '生產工單',
+        'production_work_order_schedule.read' => '生產工單排程',
+        'manage_production_records' => '生產紀錄',
+        'manage_shipping_orders' => '出貨單',
+        'manage_return_orders' => '退貨單',
+        'manage_daily_inspections' => '每日機台檢驗',
+        'manage_production_quality' => '生產品質檢驗',
+        'manage_shipping_quality' => '出貨品質檢驗',
+        'manage_quality_issues' => '品質異常報告',
+        'manage_roles' => '角色設定',
+        'manage_permissions' => '權限設定',
+        'manage_system_parameters' => '系統參數',
+        'view_audit_logs' => '操作日誌',
+        'manage_calendar_events' => '行事曆事件',
+        'manage_inventory' => '庫存項目',
+        'manage_maintenance_tasks' => '機台維修任務',
+        'view_reports' => '列印報表說明',
+    ];
+
+    return $aliasMap;
+}
+
+/**
+ * 取得權限名稱的等價名稱（技術代碼 <-> 中文名稱）。
+ *
+ * @param string $permissionName
+ * @return array<int, string>
+ */
+function getPermissionCandidates(string $permissionName): array
+{
+    $aliasMap = getPermissionAliasMap();
+    $candidates = [$permissionName];
+
+    if (isset($aliasMap[$permissionName])) {
+        $candidates[] = $aliasMap[$permissionName];
+    }
+
+    foreach ($aliasMap as $technical => $displayName) {
+        if ($displayName === $permissionName) {
+            $candidates[] = $technical;
+            break;
+        }
+    }
+
+    return array_values(array_unique($candidates));
+}
+
+/**
+ * 檢查使用者權限清單是否包含指定權限（含中文別名）。
+ *
+ * @param array<int, string> $permissions
+ * @param string $permissionName
+ * @return bool
+ */
+function hasPermissionInList(array $permissions, string $permissionName): bool
+{
+    $candidates = getPermissionCandidates($permissionName);
+    foreach ($candidates as $candidate) {
+        if (in_array($candidate, $permissions, true)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * 依據請求 URL 與 HTTP 方法自動檢查模組權限。
  *
  * 規則：
@@ -780,7 +864,7 @@ function autoEnforcePermission(array $employee): void
 
     // 檢查是否擁有所需權限
     // 支援新格式 (module.action) 與舊格式 (manage_*) 向後相容
-    if (in_array($permissionName, $permissions, true)) {
+    if (hasPermissionInList($permissions, $permissionName)) {
         return; // 新格式權限匹配
     }
 
@@ -796,6 +880,7 @@ function autoEnforcePermission(array $employee): void
         'orders'                        => 'manage_orders',
         'order_items'                   => 'manage_orders',
         'work_orders'                   => 'manage_work_orders',
+        'production_work_order_schedule'=> 'manage_work_orders',
         'work_order_first_piece_dimensions' => 'manage_work_orders',
         'work_order_images'             => 'manage_work_orders',
         'machines'                      => 'manage_machines',
@@ -833,7 +918,7 @@ function autoEnforcePermission(array $employee): void
     ];
 
     $legacyPermission = $legacyPermissionMap[$module] ?? null;
-    if ($legacyPermission && in_array($legacyPermission, $permissions, true)) {
+    if ($legacyPermission && hasPermissionInList($permissions, $legacyPermission)) {
         return; // 舊格式權限匹配
     }
 
@@ -857,7 +942,7 @@ function hasPermission(string $permissionName): bool
         return false;
     }
 
-    return in_array($permissionName, $employee['permissions'], true);
+    return hasPermissionInList((array)$employee['permissions'], $permissionName);
 }
 
 /**

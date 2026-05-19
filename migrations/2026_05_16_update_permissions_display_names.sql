@@ -1,0 +1,30 @@
+START TRANSACTION;
+
+UPDATE permissions SET name = '公司基本資料', description = '功能代碼：manage_companies；實際功能：公司基本資料（companies）。', updated_at = NOW() WHERE id = 1;
+UPDATE permissions SET name = '客戶基本資料', description = '功能代碼：manage_customers；實際功能：客戶基本資料（customers）。', updated_at = NOW() WHERE id = 2;
+UPDATE permissions SET name = '供應商基本資料', description = '功能代碼：manage_suppliers；實際功能：供應商基本資料（suppliers）。', updated_at = NOW() WHERE id = 3;
+UPDATE permissions SET name = '部門基本資料', description = '功能代碼：manage_departments；實際功能：部門基本資料（departments）。', updated_at = NOW() WHERE id = 4;
+UPDATE permissions SET name = '員工基本資料', description = '功能代碼：manage_employees；實際功能：員工基本資料（employees）。', updated_at = NOW() WHERE id = 5;
+UPDATE permissions SET name = '機台設備管理', description = '功能代碼：manage_machines；實際功能：機台設備管理（machines）。', updated_at = NOW() WHERE id = 6;
+UPDATE permissions SET name = '載具管理', description = '功能代碼：manage_tools；實際功能：載具管理（tools）。', updated_at = NOW() WHERE id = 7;
+UPDATE permissions SET name = '受篩產品', description = '功能代碼：manage_screening_items；實際功能：受篩產品（screening_items）。', updated_at = NOW() WHERE id = 8;
+UPDATE permissions SET name = '篩分服務項目', description = '功能代碼：manage_screening_services；實際功能：篩分服務項目（screening_services）。', updated_at = NOW() WHERE id = 9;
+UPDATE permissions SET name = '訂單主表管理', description = '功能代碼：manage_orders；實際功能：訂單主表管理（orders/order_items）。', updated_at = NOW() WHERE id = 10;
+UPDATE permissions SET name = '生產工單', description = '功能代碼：manage_work_orders；實際功能：生產工單（work_orders/work_order_first_piece_dimensions/work_order_images）。', updated_at = NOW() WHERE id = 11;
+UPDATE permissions SET name = '生產紀錄', description = '功能代碼：manage_production_records；實際功能：生產紀錄（production_records）。', updated_at = NOW() WHERE id = 12;
+UPDATE permissions SET name = '出貨單', description = '功能代碼：manage_shipping_orders；實際功能：出貨單（shipping_orders/shipping_order_items）。', updated_at = NOW() WHERE id = 13;
+UPDATE permissions SET name = '退貨單', description = '功能代碼：manage_return_orders；實際功能：退貨單（return_orders/return_order_items）。', updated_at = NOW() WHERE id = 14;
+UPDATE permissions SET name = '每日機台檢驗', description = '功能代碼：manage_daily_inspections；實際功能：每日機台檢驗（daily_machine_inspections/daily_machine_inspection_items）。', updated_at = NOW() WHERE id = 15;
+UPDATE permissions SET name = '生產品質檢驗', description = '功能代碼：manage_production_quality；實際功能：生產品質檢驗（production_quality_records）。', updated_at = NOW() WHERE id = 16;
+UPDATE permissions SET name = '出貨品質檢驗', description = '功能代碼：manage_shipping_quality；實際功能：出貨品質檢驗（shipping_quality_inspections）。', updated_at = NOW() WHERE id = 17;
+UPDATE permissions SET name = '品質異常報告', description = '功能代碼：manage_quality_issues；實際功能：品質異常報告（quality_issue_reports）。', updated_at = NOW() WHERE id = 18;
+UPDATE permissions SET name = '角色設定', description = '功能代碼：manage_roles；實際功能：角色設定（roles/role_permissions/employee_roles）。', updated_at = NOW() WHERE id = 19;
+UPDATE permissions SET name = '權限設定', description = '功能代碼：manage_permissions；實際功能：權限設定（permissions）。', updated_at = NOW() WHERE id = 20;
+UPDATE permissions SET name = '系統參數', description = '功能代碼：manage_system_parameters；實際功能：系統參數與進階設定（system_parameters/lookup_domains/lookup_values/number_sequences/domain_event_outbox/security_settings/notifications/messages）。', updated_at = NOW() WHERE id = 21;
+UPDATE permissions SET name = '操作日誌', description = '功能代碼：view_audit_logs；實際功能：操作日誌（audit_logs）。', updated_at = NOW() WHERE id = 22;
+UPDATE permissions SET name = '行事曆事件', description = '功能代碼：manage_calendar_events；實際功能：行事曆事件（dashboard_calendar_events/calendar_event_participants/calendar_event_reminders）。', updated_at = NOW() WHERE id = 23;
+UPDATE permissions SET name = '庫存項目', description = '功能代碼：manage_inventory；實際功能：庫存項目（inventory_items/inventory_transactions）。', updated_at = NOW() WHERE id = 24;
+UPDATE permissions SET name = '機台維修任務', description = '功能代碼：manage_maintenance_tasks；實際功能：機台維修任務（machine_maintenance_tasks）。', updated_at = NOW() WHERE id = 25;
+UPDATE permissions SET name = '列印報表說明', description = '功能代碼：view_reports；實際功能：列印報表說明（report_descriptions）。', updated_at = NOW() WHERE id = 26;
+
+COMMIT;

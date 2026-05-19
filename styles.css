@@ -3040,6 +3040,67 @@ td.actions-col {
     }
 }
 
+/* 角色權限關聯：左右穿梭清單 */
+.role-permission-transfer-section .form-grid {
+    grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr) !important;
+    align-items: start;
+}
+
+.role-permission-transfer-section label.inline-label {
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 0;
+}
+
+.role-permission-transfer-section label.inline-label span {
+    justify-content: flex-start;
+    min-width: 0;
+    max-width: none;
+    border-right: 1px solid #ced4da;
+    margin-bottom: 4px;
+}
+
+.role-permission-transfer-section label.inline-label select {
+    width: 100%;
+    min-height: 260px;
+    padding: 6px 8px;
+}
+
+[data-role-permissions-transfer-controls] .static-value {
+    display: block;
+    width: 100%;
+}
+
+.role-permission-transfer-controls-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 260px;
+}
+
+.role-permission-transfer-controls-box .btn {
+    width: 44px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 768px) {
+    .role-permission-transfer-section .form-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .role-permission-transfer-controls-box {
+        flex-direction: row;
+        justify-content: flex-start;
+        min-height: auto;
+    }
+}
+
 .form-address {
     margin-top: 8px;
 }
@@ -5665,6 +5726,16 @@ select option:disabled {
     transition: opacity 0.2s, transform 0.1s;
 }
 
+.dashboard-calendar .fc-event.dashboard-node-event {
+    border-radius: 999px !important;
+    padding: 1px 8px !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-calendar .fc-event.dashboard-node-event .fc-event-title {
+    font-weight: 600;
+}
+
 .dashboard-calendar .fc-event:hover {
     opacity: 0.85;
     transform: scale(1.02);
@@ -6344,16 +6415,28 @@ select option:disabled {
     min-height: 500px;
 }
 
-/* 行事曆篩選按鈕 */
-.calendar-filter-buttons {
+/* 行事曆篩選選單 */
+.calendar-filter-control {
     display: flex;
-    gap: 4px;
+    align-items: center;
+    gap: 8px;
 }
 
-.calendar-filter-buttons .btn.active {
-    background: var(--color-info);
-    color: #fff;
-    border-color: var(--color-info);
+.calendar-filter-control label {
+    font-size: var(--font-sm);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+.calendar-filter-select {
+    min-width: 150px;
+    height: 32px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0 10px;
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    font-size: var(--font-sm);
 }
 
 /* 行事曆圖例 */
@@ -6371,10 +6454,27 @@ select option:disabled {
     gap: 4px;
 }
 
-.legend-color {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
+.legend-icon {
+    width: 14px;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1;
+    color: var(--color-text-secondary);
+}
+
+.dashboard-node-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dashboard-node-icon {
+    font-size: 11px;
+    line-height: 1;
+}
+
+.dashboard-node-text {
+    line-height: 1.2;
 }
 
 /* 響應式 */
@@ -6411,11 +6511,12 @@ select option:disabled {
         align-items: flex-start;
     }
 
-    .calendar-filter-buttons {
+    .calendar-filter-control {
         width: 100%;
+        justify-content: space-between;
     }
 
-    .calendar-filter-buttons .btn {
+    .calendar-filter-select {
         flex: 1;
     }
 }

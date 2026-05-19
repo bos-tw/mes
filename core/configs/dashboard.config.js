@@ -222,16 +222,21 @@ ModuleConfig.register('dashboard', {
         <div class="section-header">
             <h3><i class="fas fa-calendar-alt"></i> 行事曆</h3>
             <div class="section-header-actions">
-                <div class="calendar-filter-buttons">
-                    <button type="button" class="btn outline small active" data-filter="all">全部</button>
-                    <button type="button" class="btn outline small" data-filter="internal">內部</button>
-                    <button type="button" class="btn outline small" data-filter="production">生產</button>
+                <div class="calendar-filter-control">
+                    <label for="dashboard-calendar-filter-select">顯示</label>
+                    <select id="dashboard-calendar-filter-select" class="calendar-filter-select" data-dashboard-calendar-filter-select>
+                        <option value="order" selected>訂單</option>
+                        <option value="work_order">工單</option>
+                        <option value="delivery">交貨</option>
+                        <option value="all">全部顯示</option>
+                    </select>
                 </div>
                 <div class="calendar-legend">
-                    <span class="legend-item"><span class="legend-color" style="background:#1a73e8"></span>訂單</span>
-                    <span class="legend-item"><span class="legend-color" style="background:#ea4335"></span>交貨</span>
-                    <span class="legend-item"><span class="legend-color" style="background:#f9ab00"></span>工單</span>
-                    <span class="legend-item"><span class="legend-color" style="background:#34a853"></span>內部</span>
+                    <span class="legend-item"><i class="fas fa-file-alt legend-icon" aria-hidden="true"></i>訂單建立</span>
+                    <span class="legend-item"><i class="fas fa-industry legend-icon" aria-hidden="true"></i>工單開始</span>
+                    <span class="legend-item"><i class="fas fa-flag-checkered legend-icon" aria-hidden="true"></i>工單結束</span>
+                    <span class="legend-item"><i class="fas fa-truck legend-icon" aria-hidden="true"></i>交期節點</span>
+                    <span class="legend-item"><i class="fas fa-shipping-fast legend-icon" aria-hidden="true"></i>出貨節點</span>
                 </div>
             </div>
         </div>

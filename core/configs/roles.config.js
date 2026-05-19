@@ -7,7 +7,7 @@
     ModuleConfig.register('roles', {
         title: '角色設定',
         subtitle: '管理系統角色與權限群組',
-        
+
         // 標題列動作按鈕
         actions: [
             { action: 'create', label: '新增角色', icon: 'fa-plus', style: 'primary' }
@@ -21,15 +21,15 @@
 
         // 篩選欄位
         filters: [
-            { 
-                name: 'keyword', 
-                label: '關鍵字', 
-                type: 'text', 
-                placeholder: '搜尋角色名稱、描述...' 
+            {
+                name: 'keyword',
+                label: '關鍵字',
+                type: 'text',
+                placeholder: '搜尋角色名稱、描述...'
             },
-            { 
-                name: 'perPage', 
-                label: '每頁筆數', 
+            {
+                name: 'perPage',
+                label: '每頁筆數',
                 type: 'select',
                 options: [
                     { value: '10', label: '10' },
@@ -51,16 +51,12 @@
         modal: {
             title: '新增角色',
             size: 'small',
-            formRows: [
+            sections: [
                 {
-                    sections: [
-                        {
-                            title: '角色資訊',
-                            fields: [
-                                { name: 'name', label: '角色名稱', type: 'text', required: true, maxlength: 50, placeholder: '請輸入角色名稱' },
-                                { name: 'description', label: '描述', type: 'textarea', rows: 3, maxlength: 255, placeholder: '請輸入角色描述' }
-                            ]
-                        }
+                    title: '角色資訊',
+                    fields: [
+                        { name: 'name', label: '角色名稱', type: 'text', required: true, maxlength: 50, placeholder: '請輸入角色名稱', fullWidth: true },
+                        { name: 'description', label: '描述', type: 'textarea', rows: 3, maxlength: 255, placeholder: '請輸入角色描述', fullWidth: true }
                     ]
                 }
             ],

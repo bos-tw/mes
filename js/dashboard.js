@@ -5,9 +5,22 @@
     let calendar = null;
     let moduleRoot = null;
     let isInitialized = false;
-    let currentCalendarFilter = 'all';
+    let currentCalendarFilter = 'order';
     let allCalendarEvents = [];
     let dataSyncHelper = null;
+
+    const CALENDAR_NODE_COLOR_PALETTE = [
+        '#1d4ed8',
+        '#0369a1',
+        '#0f766e',
+        '#b45309',
+        '#be123c',
+        '#7c3aed',
+        '#0ea5e9',
+        '#16a34a',
+        '#d97706',
+        '#4338ca'
+    ];
 
     // 公告跳馬燈狀態
     let announcementList = [];
@@ -233,8 +246,8 @@
         if (yearSelect) yearSelect.addEventListener('change', updateDateRange);
         if (monthSelect) monthSelect.addEventListener('change', updateDateRange);
 
-        // 行事曆篩選按鈕
-        bindCalendarFilterButtons();
+        // 行事曆篩選選單
+        bindCalendarFilterSelect();
 
         // 事件彈出卡片
         bindEventPopup();
@@ -268,15 +281,16 @@
         }
     }
 
-    function bindCalendarFilterButtons() {
-        const filterBtns = moduleRoot.querySelectorAll('.calendar-filter-buttons .btn');
-        filterBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                filterBtns.forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                currentCalendarFilter = this.dataset.filter;
-                if (calendar) calendar.refetchEvents();
-            });
+    function bindCalendarFilterSelect() {
+        const filterSelect = moduleRoot.querySelector('[data-dashboard-calendar-filter-select]');
+        if (!filterSelect) return;
+
+        filterSelect.value = currentCalendarFilter;
+        filterSelect.addEventListener('change', function() {
+            currentCalendarFilter = this.value || 'order';
+            if (calendar) {
+                calendar.refetchEvents();
+            }
         });
     }
 
@@ -815,9 +829,11 @@
             events: (info, successCallback, failureCallback) => {
                 loadCalendarEvents(info.start, info.end, successCallback, failureCallback);
             },
+            eventContent: info => renderCalendarEventContent(info),
             eventClick: info => handleEventClick(info),
             eventDidMount: info => {
                 info.el.style.cursor = 'pointer';
+                info.el.style.setProperty('--dashboard-node-color', info.event.backgroundColor || '#1d4ed8');
             }
         });
 
@@ -833,7 +849,7 @@
             if (!response.ok) throw new Error('載入失敗');
 
             const data = await response.json();
-            allCalendarEvents = data.events || [];
+            allCalendarEvents = buildCalendarNodeEvents(data.events || []);
 
             const filteredEvents = filterCalendarEvents(allCalendarEvents);
             successCallback(filteredEvents);
@@ -847,26 +863,242 @@
         if (currentCalendarFilter === 'all') return events;
 
         return events.filter(event => {
-            const type = event.extendedProps?.type || '';
-            if (currentCalendarFilter === 'internal') {
-                return type === 'calendar_event';
-            } else if (currentCalendarFilter === 'production') {
-                return ['order', 'order_delivery', 'work_order', 'shipping'].includes(type);
-            }
-            return true;
+            const category = event.extendedProps?.category || '';
+            return category === currentCalendarFilter;
         });
+    }
+
+    function buildCalendarNodeEvents(events) {
+        if (!Array.isArray(events)) return [];
+
+        const nodeEvents = [];
+
+        events.forEach(event => {
+            const type = event?.extendedProps?.type || '';
+            const sourceId = event?.extendedProps?.sourceId;
+            const status = event?.extendedProps?.status;
+            const rangeStart = normalizeCalendarDate(event?.start);
+            const rangeEnd = normalizeCalendarDate(event?.end);
+
+            if (!sourceId || !rangeStart) {
+                return;
+            }
+
+            if (type === 'order') {
+                const nodeColor = getNodeColorByKey(`order:${sourceId}`);
+                const hasRangeEnd = Boolean(rangeEnd && rangeEnd !== rangeStart);
+
+                nodeEvents.push(createNodeEvent({
+                    id: `order-start-${sourceId}-${rangeStart}`,
+                    title: `訂單建立 ${sourceId}`,
+                    start: rangeStart,
+                    type: 'order',
+                    category: 'order',
+                    sourceId,
+                    status,
+                    iconClass: 'fas fa-file-alt',
+                    popupTitle: event.title || `訂單 ${sourceId}`,
+                    rangeStart,
+                    rangeEnd: rangeEnd || rangeStart,
+                    hasRangeEnd,
+                    nodeType: 'start',
+                    nodeColor
+                }));
+
+                if (hasRangeEnd) {
+                    nodeEvents.push(createNodeEvent({
+                        id: `order-end-${sourceId}-${rangeEnd}`,
+                        title: `交期 ${sourceId}`,
+                        start: rangeEnd,
+                        type: 'order_delivery',
+                        category: 'delivery',
+                        sourceId,
+                        status,
+                        iconClass: 'fas fa-truck',
+                        popupTitle: event.title || `訂單 ${sourceId}`,
+                        rangeStart,
+                        rangeEnd,
+                        hasRangeEnd,
+                        nodeType: 'end',
+                        nodeColor
+                    }));
+                }
+
+                return;
+            }
+
+            if (type === 'work_order') {
+                const nodeColor = getNodeColorByKey(`work_order:${sourceId}`);
+                const hasRangeEnd = Boolean(rangeEnd && rangeEnd !== rangeStart);
+
+                nodeEvents.push(createNodeEvent({
+                    id: `work-order-start-${sourceId}-${rangeStart}`,
+                    title: `工單開始 ${sourceId}`,
+                    start: rangeStart,
+                    type: 'work_order',
+                    category: 'work_order',
+                    sourceId,
+                    status,
+                    iconClass: 'fas fa-industry',
+                    popupTitle: event.title || `工單 ${sourceId}`,
+                    rangeStart,
+                    rangeEnd: rangeEnd || rangeStart,
+                    hasRangeEnd,
+                    nodeType: 'start',
+                    nodeColor
+                }));
+
+                if (hasRangeEnd) {
+                    nodeEvents.push(createNodeEvent({
+                        id: `work-order-end-${sourceId}-${rangeEnd}`,
+                        title: `工單結束 ${sourceId}`,
+                        start: rangeEnd,
+                        type: 'work_order',
+                        category: 'work_order',
+                        sourceId,
+                        status,
+                        iconClass: 'fas fa-flag-checkered',
+                        popupTitle: event.title || `工單 ${sourceId}`,
+                        rangeStart,
+                        rangeEnd,
+                        hasRangeEnd,
+                        nodeType: 'end',
+                        nodeColor
+                    }));
+                }
+
+                return;
+            }
+
+            if (type === 'shipping') {
+                const nodeColor = getNodeColorByKey(`shipping:${sourceId}`);
+                nodeEvents.push(createNodeEvent({
+                    id: `shipping-${sourceId}-${rangeStart}`,
+                    title: `出貨 ${extractShippingNumber(event.title, sourceId)}`,
+                    start: rangeStart,
+                    type: 'shipping',
+                    category: 'delivery',
+                    sourceId,
+                    status,
+                    iconClass: 'fas fa-shipping-fast',
+                    popupTitle: event.title || `出貨單 ${sourceId}`,
+                    rangeStart,
+                    rangeEnd: rangeStart,
+                    hasRangeEnd: false,
+                    nodeType: 'single',
+                    nodeColor
+                }));
+            }
+        });
+
+        return nodeEvents;
+    }
+
+    function createNodeEvent(options) {
+        return {
+            id: options.id,
+            title: options.title,
+            start: options.start,
+            allDay: true,
+            backgroundColor: options.nodeColor,
+            borderColor: options.nodeColor,
+            textColor: '#ffffff',
+            classNames: [
+                'dashboard-node-event',
+                `dashboard-node-${options.category}`,
+                `dashboard-node-${options.nodeType}`
+            ],
+            extendedProps: {
+                type: options.type,
+                category: options.category,
+                sourceId: options.sourceId,
+                status: options.status,
+                iconClass: options.iconClass,
+                popupTitle: options.popupTitle,
+                rangeStart: options.rangeStart,
+                rangeEnd: options.rangeEnd,
+                hasRangeEnd: options.hasRangeEnd,
+                nodeType: options.nodeType
+            }
+        };
+    }
+
+    function renderCalendarEventContent(info) {
+        const wrapper = document.createElement('span');
+        wrapper.className = 'dashboard-node-content';
+
+        const iconClass = info.event.extendedProps?.iconClass;
+        if (iconClass) {
+            const icon = document.createElement('i');
+            icon.className = `${iconClass} dashboard-node-icon`;
+            icon.setAttribute('aria-hidden', 'true');
+            wrapper.appendChild(icon);
+        }
+
+        const text = document.createElement('span');
+        text.className = 'dashboard-node-text';
+        text.textContent = info.event.title;
+        wrapper.appendChild(text);
+
+        return { domNodes: [wrapper] };
+    }
+
+    function extractShippingNumber(title, fallbackId) {
+        if (typeof title !== 'string') {
+            return String(fallbackId || '');
+        }
+
+        const numberPart = title.replace(/^出貨\s*[:：]\s*/u, '').split(' - ')[0].trim();
+        if (numberPart) {
+            return numberPart;
+        }
+
+        return String(fallbackId || '');
+    }
+
+    function normalizeCalendarDate(value) {
+        if (!value) return null;
+
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function getNodeColorByKey(key) {
+        const hash = hashString(key);
+        const index = Math.abs(hash) % CALENDAR_NODE_COLOR_PALETTE.length;
+        return CALENDAR_NODE_COLOR_PALETTE[index];
+    }
+
+    function hashString(value) {
+        let hash = 0;
+        for (let i = 0; i < value.length; i += 1) {
+            hash = ((hash << 5) - hash) + value.charCodeAt(i);
+            hash |= 0;
+        }
+        return hash;
     }
 
     let currentPopupEvent = null;
 
     function handleEventClick(info) {
         const event = info.event;
+        const rangeStart = event.extendedProps.rangeStart || event.start;
+        const rangeEnd = event.extendedProps.rangeEnd || event.end;
+        const hasRangeEnd = Boolean(event.extendedProps.hasRangeEnd && rangeEnd);
+
         currentPopupEvent = {
             type: event.extendedProps.type,
             id: event.extendedProps.sourceId,
-            title: event.title,
-            start: event.start,
-            end: event.end,
+            title: event.extendedProps.popupTitle || event.title,
+            start: rangeStart,
+            end: hasRangeEnd ? rangeEnd : null,
             status: event.extendedProps.status,
             backgroundColor: event.backgroundColor
         };
@@ -875,17 +1107,17 @@
         const popup = getElement('event-popup');
         if (!overlay || !popup) return;
 
-        popup.querySelector('[data-dashboard-event-popup-title]').textContent = event.title;
+        popup.querySelector('[data-dashboard-event-popup-title]').textContent = currentPopupEvent.title;
 
         const badge = popup.querySelector('[data-dashboard-event-popup-badge]');
         badge.textContent = getEventTypeName(event.extendedProps.type);
         badge.style.backgroundColor = event.backgroundColor || '#3788d8';
 
-        popup.querySelector('[data-dashboard-event-popup-start]').textContent = formatDateTime(event.start);
+        popup.querySelector('[data-dashboard-event-popup-start]').textContent = formatDateTime(rangeStart);
 
         const endWrapper = popup.querySelector('[data-dashboard-event-popup-end-wrapper]');
-        if (event.end) {
-            popup.querySelector('[data-dashboard-event-popup-end]').textContent = formatDateTime(event.end);
+        if (hasRangeEnd) {
+            popup.querySelector('[data-dashboard-event-popup-end]').textContent = formatDateTime(rangeEnd);
             endWrapper.style.display = '';
         } else {
             endWrapper.style.display = 'none';
@@ -961,10 +1193,10 @@
     }
 
 
-function getEventTypeName(type) {
+    function getEventTypeName(type) {
         const names = {
             'order': '訂單',
-            'order_delivery': '交貨日',
+            'order_delivery': '交貨',
             'work_order': '工單',
             'shipping': '出貨',
             'calendar_event': '內部事件'

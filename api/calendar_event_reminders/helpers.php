@@ -18,6 +18,57 @@
 declare(strict_types=1);
 
 /**
+ * 取得目前登入員工 ID，若不存在則回傳 401。
+ */
+function getCurrentEmployeeIdOrFail(): int
+{
+    $employee = $_SESSION['employee'] ?? null;
+    if (is_array($employee)) {
+        $employeeId = (int)($employee['id'] ?? 0);
+        if ($employeeId > 0) {
+            return $employeeId;
+        }
+    }
+
+    $legacyEmployeeId = $_SESSION['user']['employee_id'] ?? null;
+    if ($legacyEmployeeId !== null) {
+        $employeeId = (int)$legacyEmployeeId;
+        if ($employeeId > 0) {
+            return $employeeId;
+        }
+    }
+
+    jsonResponse([
+        'success' => false,
+        'message' => '尚未登入或登入已過期。',
+    ], 401);
+
+    return 0;
+}
+
+/**
+ * 查詢目前登入者是否擁有指定行事曆事件。
+ */
+function findOwnedCalendarEvent(int $eventId, int $ownerEmployeeId): ?array
+{
+    $pdo = db();
+    $stmt = $pdo->prepare('
+        SELECT id, created_by_employee_id
+        FROM dashboard_calendar_events
+        WHERE id = :id
+            AND deleted_at IS NULL
+            AND created_by_employee_id = :owner_employee_id
+        LIMIT 1
+    ');
+    $stmt->execute([
+        'id' => $eventId,
+        'owner_employee_id' => $ownerEmployeeId,
+    ]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+/**
  * 驗證提醒輸入資料
  */
 function validateReminderData(array $payload, bool $isUpdate = false): array
@@ -35,12 +86,12 @@ function validateReminderData(array $payload, bool $isUpdate = false): array
         }
     }
 
-    // employee_id - 必填
-    if (!$isUpdate || isset($payload['employee_id'])) {
+    // employee_id - 個人模式下由後端自動帶入，若有傳入則驗證格式
+    if (array_key_exists('employee_id', $payload)) {
         $employeeId = (int)($payload['employee_id'] ?? 0);
-        if ($employeeId <= 0 && !$isUpdate) {
-            $errors['employee_id'] = '員工 ID 為必填欄位。';
-        } elseif ($employeeId > 0) {
+        if ($employeeId <= 0) {
+            $errors['employee_id'] = '員工 ID 格式無效。';
+        } else {
             $data['employee_id'] = $employeeId;
         }
     }
@@ -78,17 +129,25 @@ function validateReminderData(array $payload, bool $isUpdate = false): array
 /**
  * 查詢單筆提醒
  */
-function findReminder(int $id): ?array
+function findReminder(int $id, ?int $employeeId = null): ?array
 {
     $pdo = db();
-    $stmt = $pdo->prepare('
-        SELECT r.*, e.title AS event_title, e.start_datetime AS event_start, emp.name AS employee_name 
-        FROM calendar_event_reminders r 
-        INNER JOIN dashboard_calendar_events e ON e.id = r.event_id AND e.deleted_at IS NULL 
-        LEFT JOIN employees emp ON emp.id = r.employee_id 
+    $sql = '
+        SELECT r.*, e.title AS event_title, e.start_datetime AS event_start, emp.name AS employee_name
+        FROM calendar_event_reminders r
+        INNER JOIN dashboard_calendar_events e ON e.id = r.event_id AND e.deleted_at IS NULL
+        LEFT JOIN employees emp ON emp.id = r.employee_id
         WHERE r.id = :id
-    ');
-    $stmt->execute(['id' => $id]);
+    ';
+
+    $params = ['id' => $id];
+    if ($employeeId !== null) {
+        $sql .= ' AND r.employee_id = :employee_id';
+        $params['employee_id'] = $employeeId;
+    }
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $row = $stmt->fetch();
     return $row ?: null;
 }

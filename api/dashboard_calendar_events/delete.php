@@ -16,8 +16,11 @@ require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
 
 requireAuth();
+requireCsrfForWrite();
 
 requireMethod('DELETE');
+
+$currentEmployeeId = getCurrentEmployeeIdOrFail();
 
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
@@ -27,7 +30,7 @@ if ($id <= 0) {
     ], 400);
 }
 
-$existing = findCalendarEvent($id);
+$existing = findCalendarEvent($id, $currentEmployeeId);
 if ($existing === null) {
     jsonResponse([
         'success' => false,
@@ -39,8 +42,11 @@ $pdo = db();
 
 try {
     // 軟刪除
-    $stmt = $pdo->prepare('UPDATE dashboard_calendar_events SET deleted_at = NOW() WHERE id = :id');
-    $stmt->execute(['id' => $id]);
+    $stmt = $pdo->prepare('UPDATE dashboard_calendar_events SET deleted_at = NOW() WHERE id = :id AND created_by_employee_id = :current_employee_id');
+    $stmt->execute([
+        'id' => $id,
+        'current_employee_id' => $currentEmployeeId,
+    ]);
 
     // 同時刪除關聯的參與者和提醒
     $pdo->prepare('DELETE FROM calendar_event_participants WHERE event_id = :event_id')->execute(['event_id' => $id]);

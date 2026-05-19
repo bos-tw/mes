@@ -70,7 +70,7 @@ function handleWorkOrdersStats(): void
     // 建立查詢條件
     $whereConditions = ["deleted_at IS NULL"];
     $params = [];
-    
+
     if ($startDate && $endDate) {
         $whereConditions[] = "scheduled_start_date >= :start_date";
         $whereConditions[] = "scheduled_start_date <= :end_date";
@@ -85,7 +85,7 @@ function handleWorkOrdersStats(): void
         $whereConditions[] = "YEAR(scheduled_start_date) = :year";
         $params[':year'] = $year;
     }
-    
+
     $whereClause = implode(' AND ', $whereConditions);
 
     try {
@@ -104,7 +104,7 @@ function handleWorkOrdersStats(): void
 
         // 計算狀態分佈
         $statusQuery = "
-            SELECT 
+            SELECT
                 status,
                 COUNT(*) as count
             FROM work_orders
@@ -112,14 +112,15 @@ function handleWorkOrdersStats(): void
             GROUP BY status
             ORDER BY count DESC
         ";
-        
+
         $stmt = $pdo->prepare($statusQuery);
         $stmt->execute($params);
         $statusDistribution = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $status = isset($row['status']) ? (string)$row['status'] : null;
             $statusDistribution[] = [
-                'status' => $row['status'],
-                'label' => translateWorkOrderStatus($row['status']),
+                'status' => $status,
+                'label' => translateWorkOrderStatus($status),
                 'count' => (int)$row['count']
             ];
         }
@@ -138,7 +139,7 @@ function handleWorkOrdersStats(): void
             LEFT JOIN orders o ON oi.order_id = o.id
             WHERE wo.deleted_at IS NULL
         ";
-        
+
         // 加入日期篩選條件
         if ($startDate && $endDate) {
             $recentQuery .= " AND wo.scheduled_start_date >= :start_date AND wo.scheduled_start_date <= :end_date";
@@ -147,7 +148,7 @@ function handleWorkOrdersStats(): void
         } else {
             $recentQuery .= " AND YEAR(wo.scheduled_start_date) = :year";
         }
-        
+
         $recentQuery .= " ORDER BY wo.scheduled_start_date DESC, wo.created_at DESC LIMIT 5";
 
         $stmt = $pdo->prepare($recentQuery);
@@ -157,7 +158,7 @@ function handleWorkOrdersStats(): void
         // 處理狀態顯示
         foreach ($recentWorkOrders as &$wo) {
             $wo['id'] = (int)$wo['id'];
-            $wo['status_label'] = translateWorkOrderStatus($wo['status']);
+            $wo['status_label'] = translateWorkOrderStatus(isset($wo['status']) ? (string)$wo['status'] : null);
         }
 
         jsonResponse([
@@ -170,7 +171,7 @@ function handleWorkOrdersStats(): void
             'recent_work_orders' => $recentWorkOrders
         ]);
 
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
         error_log('工單統計查詢錯誤: ' . $e->getMessage());
         jsonResponse([
             'success' => false,
@@ -182,8 +183,12 @@ function handleWorkOrdersStats(): void
 /**
  * 翻譯工單狀態
  */
-function translateWorkOrderStatus(string $status): string
+function translateWorkOrderStatus(?string $status): string
 {
+    if ($status === null || $status === '') {
+        return '未設定';
+    }
+
     $statusMap = [
         'pending' => '待開始',
         'in_progress' => '進行中',

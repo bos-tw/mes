@@ -16,15 +16,11 @@ require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
 
 requireAuth();
+requireCsrfForWrite();
 
-$method = requireMethod('PUT');
+requireMethod('PUT');
 
-if ($method !== 'PUT' && $method !== 'POST') {
-    jsonResponse([
-        'success' => false,
-        'message' => '不支援的請求方法。',
-    ], 405);
-}
+$currentEmployeeId = getCurrentEmployeeIdOrFail();
 
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
@@ -34,7 +30,7 @@ if ($id <= 0) {
     ], 400);
 }
 
-$existing = findReminder($id);
+$existing = findReminder($id, $currentEmployeeId);
 if ($existing === null) {
     jsonResponse([
         'success' => false,
@@ -61,9 +57,29 @@ if (empty($data)) {
     ], 400);
 }
 
+if (array_key_exists('employee_id', $data) && (int)$data['employee_id'] !== $currentEmployeeId) {
+    jsonResponse([
+        'success' => false,
+        'message' => '只能修改自己的提醒資料。',
+    ], 403);
+}
+
+if (array_key_exists('event_id', $data)) {
+    $targetEvent = findOwnedCalendarEvent((int)$data['event_id'], $currentEmployeeId);
+    if ($targetEvent === null) {
+        jsonResponse([
+            'success' => false,
+            'message' => '找不到可操作的行事曆事件。',
+        ], 404);
+    }
+}
+
 $pdo = db();
 $setClauses = [];
-$params = ['id' => $id];
+$params = [
+    'id' => $id,
+    'current_employee_id' => $currentEmployeeId,
+];
 
 foreach ($data as $column => $value) {
     $setClauses[] = $column . ' = :' . $column;
@@ -82,7 +98,8 @@ if (array_key_exists('is_sent', $data)) {
 }
 
 $setClauses[] = 'updated_at = NOW()';
-$sql = 'UPDATE calendar_event_reminders SET ' . implode(', ', $setClauses) . ' WHERE id = :id';
+$sql = 'UPDATE calendar_event_reminders SET ' . implode(', ', $setClauses)
+    . ' WHERE id = :id AND employee_id = :current_employee_id';
 
 try {
     $stmt = $pdo->prepare($sql);

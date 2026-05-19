@@ -17,6 +17,7 @@ require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
 
 requireAuth();
+requireCsrfForWrite();
 
 $method = requireMethod(['GET', 'POST']);
 
@@ -37,6 +38,7 @@ switch ($method) {
 function handleListReminders(): void
 {
     $pdo = db();
+    $currentEmployeeId = getCurrentEmployeeIdOrFail();
 
     $page = max(1, (int)($_GET['page'] ?? 1));
     $perPage = (int)($_GET['perPage'] ?? 10);
@@ -49,8 +51,8 @@ function handleListReminders(): void
     $employeeId = (int)($_GET['employee_id'] ?? 0);
     $isSent = isset($_GET['is_sent']) ? ((int)$_GET['is_sent']) : null;
 
-    $conditions = ['1 = 1'];
-    $params = [];
+    $conditions = ['r.employee_id = :current_employee_id'];
+    $params = ['current_employee_id' => $currentEmployeeId];
 
     if ($eventId > 0) {
         $conditions[] = 'r.event_id = :event_id';
@@ -58,8 +60,12 @@ function handleListReminders(): void
     }
 
     if ($employeeId > 0) {
-        $conditions[] = 'r.employee_id = :employee_id';
-        $params['employee_id'] = $employeeId;
+        if ($employeeId !== $currentEmployeeId) {
+            jsonResponse([
+                'success' => false,
+                'message' => '只能查詢自己的提醒資料。',
+            ], 403);
+        }
     }
 
     if ($isSent !== null) {
@@ -116,6 +122,7 @@ function handleListReminders(): void
 function handleCreateReminder(): void
 {
     $pdo = db();
+    $currentEmployeeId = getCurrentEmployeeIdOrFail();
     $payload = getJsonInput();
 
     $validated = validateReminderData($payload, false);
@@ -129,23 +136,22 @@ function handleCreateReminder(): void
 
     $data = $validated['data'];
 
-    // 檢查事件是否存在
-    $eventStmt = $pdo->prepare('SELECT id FROM dashboard_calendar_events WHERE id = :id AND deleted_at IS NULL');
-    $eventStmt->execute(['id' => $data['event_id']]);
-    if (!$eventStmt->fetch()) {
+    $requestedEmployeeId = isset($data['employee_id']) ? (int)$data['employee_id'] : $currentEmployeeId;
+    if ($requestedEmployeeId !== $currentEmployeeId) {
         jsonResponse([
             'success' => false,
-            'message' => '找不到指定的行事曆事件。',
-        ], 404);
+            'message' => '只能建立自己的提醒資料。',
+        ], 403);
     }
 
-    // 檢查員工是否存在
-    $empStmt = $pdo->prepare('SELECT id FROM employees WHERE id = :id AND deleted_at IS NULL');
-    $empStmt->execute(['id' => $data['employee_id']]);
-    if (!$empStmt->fetch()) {
+    $data['employee_id'] = $currentEmployeeId;
+
+    // 檢查事件是否存在且屬於目前登入者
+    $event = findOwnedCalendarEvent((int)$data['event_id'], $currentEmployeeId);
+    if ($event === null) {
         jsonResponse([
             'success' => false,
-            'message' => '找不到指定的員工。',
+            'message' => '找不到可操作的行事曆事件。',
         ], 404);
     }
 

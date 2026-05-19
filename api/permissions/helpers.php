@@ -12,6 +12,7 @@
  * - validatePermissionData(): 驗證並正規化權限資料
  * - findPermission(): 依 ID 查詢權限資料
  * - transformPermission(): 轉換為 API 回應格式
+ * - resolvePermissionDisplayName(): 取得權限顯示名稱
  * - permissionExists(): 檢查權限是否存在
  * - permissionNameExists(): 檢查權限名稱是否已存在（排重）
  * - canDeletePermission(): 檢查權限是否可刪除
@@ -93,13 +94,25 @@ function findPermission(PDO $pdo, int $id): ?array
  */
 function transformPermission(array $row): array
 {
+    $name = (string)($row['name'] ?? '');
+    $description = isset($row['description']) ? (string)$row['description'] : null;
+
     return [
         'id' => (int)$row['id'],
-        'name' => $row['name'],
-        'description' => $row['description'] ?? null,
+        'name' => $name,
+        'display_name' => resolvePermissionDisplayName($name),
+        'description' => $description,
         'created_at' => $row['created_at'],
         'updated_at' => $row['updated_at'],
     ];
+}
+
+/**
+ * 取得權限顯示名稱（由資料庫欄位控制）
+ */
+function resolvePermissionDisplayName(string $name): string
+{
+    return $name;
 }
 
 /**

@@ -67,6 +67,26 @@
             }
         }
 
+        function getApiMessage(json, fallback) {
+            if (json && typeof json === 'object') {
+                if (typeof json.message === 'string' && json.message.trim()) {
+                    return json.message.trim();
+                }
+                if (typeof json.error === 'string' && json.error.trim()) {
+                    return json.error.trim();
+                }
+            }
+            return fallback;
+        }
+
+        async function parseJsonSafe(response) {
+            try {
+                return await response.json();
+            } catch (error) {
+                return {};
+            }
+        }
+
         /* ---------- Modal ---------- */
         function openModal() {
             hideAlert($modalAlert);
@@ -129,8 +149,10 @@
                 if (state.roleId) params.append('role_id', state.roleId);
 
                 const resp = await fetch(`${API_BASE}/?${params}`);
-                const json = await resp.json();
-                if (!resp.ok) throw new Error(json.error || '載入失敗');
+                const json = await parseJsonSafe(resp);
+                if (!resp.ok) {
+                    throw new Error(getApiMessage(json, '載入失敗'));
+                }
 
                 state.employees = json.employees || [];
                 state.roles     = json.roles || [];
@@ -178,19 +200,42 @@
         }
 
         /* ---------- 新增 ---------- */
+        async function employeeRoleExists(employeeId, roleId) {
+            const params = new URLSearchParams({
+                page: '1',
+                perPage: '1',
+                employee_id: String(employeeId),
+                role_id: String(roleId),
+            });
+
+            const resp = await fetch(`${API_BASE}/?${params}`);
+            const json = await parseJsonSafe(resp);
+            if (!resp.ok) {
+                throw new Error(getApiMessage(json, '檢查角色關聯失敗'));
+            }
+
+            return Array.isArray(json.data) && json.data.length > 0;
+        }
+
         async function handleCreate(formData) {
             const payload = {
                 employee_id: parseInt(formData.get('employee_id'), 10),
                 role_id:     parseInt(formData.get('role_id'), 10),
             };
 
+            if (await employeeRoleExists(payload.employee_id, payload.role_id)) {
+                throw new Error('此員工已擁有該角色');
+            }
+
             const resp = await fetch(`${API_BASE}/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
-            const json = await resp.json();
-            if (!resp.ok) throw new Error(json.error || '新增失敗');
+            const json = await parseJsonSafe(resp);
+            if (!resp.ok) {
+                throw new Error(getApiMessage(json, '新增失敗'));
+            }
 
             closeModal();
             showAlert($alert, '員工角色新增成功', 'success');
@@ -209,8 +254,10 @@
                 const resp = await fetch(`${API_BASE}/delete.php?employee_id=${employeeId}&role_id=${roleId}`, {
                     method: 'DELETE',
                 });
-                const json = await resp.json();
-                if (!resp.ok) throw new Error(json.error || '刪除失敗');
+                const json = await parseJsonSafe(resp);
+                if (!resp.ok) {
+                    throw new Error(getApiMessage(json, '刪除失敗'));
+                }
 
                 showAlert($alert, '員工角色刪除成功', 'success');
                 loadData();

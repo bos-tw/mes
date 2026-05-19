@@ -16,8 +16,11 @@ require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
 
 requireAuth();
+requireCsrfForWrite();
 
 requireMethod('DELETE');
+
+$currentEmployeeId = getCurrentEmployeeIdOrFail();
 
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
@@ -27,7 +30,7 @@ if ($id <= 0) {
     ], 400);
 }
 
-$existing = findReminder($id);
+$existing = findReminder($id, $currentEmployeeId);
 if ($existing === null) {
     jsonResponse([
         'success' => false,
@@ -38,8 +41,11 @@ if ($existing === null) {
 $pdo = db();
 
 try {
-    $stmt = $pdo->prepare('DELETE FROM calendar_event_reminders WHERE id = :id');
-    $stmt->execute(['id' => $id]);
+    $stmt = $pdo->prepare('DELETE FROM calendar_event_reminders WHERE id = :id AND employee_id = :current_employee_id');
+    $stmt->execute([
+        'id' => $id,
+        'current_employee_id' => $currentEmployeeId,
+    ]);
 } catch (PDOException $exception) {
     jsonResponse([
         'success' => false,

@@ -16,15 +16,11 @@ require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
 
 requireAuth();
+requireCsrfForWrite();
 
-$method = requireMethod('PUT');
+requireMethod('PUT');
 
-if ($method !== 'PUT' && $method !== 'POST') {
-    jsonResponse([
-        'success' => false,
-        'message' => '不支援的請求方法。',
-    ], 405);
-}
+$currentEmployeeId = getCurrentEmployeeIdOrFail();
 
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) {
@@ -34,7 +30,7 @@ if ($id <= 0) {
     ], 400);
 }
 
-$existing = findCalendarEvent($id);
+$existing = findCalendarEvent($id, $currentEmployeeId);
 if ($existing === null) {
     jsonResponse([
         'success' => false,
@@ -63,7 +59,10 @@ if (empty($data)) {
 
 $pdo = db();
 $setClauses = [];
-$params = ['id' => $id];
+$params = [
+    'id' => $id,
+    'current_employee_id' => $currentEmployeeId,
+];
 
 foreach ($data as $column => $value) {
     $setClauses[] = $column . ' = :' . $column;
@@ -71,7 +70,8 @@ foreach ($data as $column => $value) {
 }
 
 $setClauses[] = 'updated_at = NOW()';
-$sql = 'UPDATE dashboard_calendar_events SET ' . implode(', ', $setClauses) . ' WHERE id = :id AND deleted_at IS NULL';
+$sql = 'UPDATE dashboard_calendar_events SET ' . implode(', ', $setClauses)
+    . ' WHERE id = :id AND deleted_at IS NULL AND created_by_employee_id = :current_employee_id';
 
 try {
     $stmt = $pdo->prepare($sql);

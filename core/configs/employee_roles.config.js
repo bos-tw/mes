@@ -49,16 +49,12 @@ ModuleConfig.register('employee_roles', {
         createTitle: '新增員工角色',
         editTitle: '編輯員工角色',
         hiddenFields: ['id'],
-        formRows: [
+        sections: [
             {
-                sections: [
-                    {
-                        title: '指派角色',
-                        fields: [
-                            { name: 'employee_id', label: '員工', type: 'select', required: true, options: [{ value: '', label: '請選擇員工' }] },
-                            { name: 'role_id', label: '角色', type: 'select', required: true, options: [{ value: '', label: '請選擇角色' }] }
-                        ]
-                    }
+                title: '指派角色',
+                fields: [
+                    { name: 'employee_id', label: '員工', type: 'select', required: true, options: [{ value: '', label: '請選擇員工' }], fullWidth: true },
+                    { name: 'role_id', label: '角色', type: 'select', required: true, options: [{ value: '', label: '請選擇角色' }], fullWidth: true }
                 ]
             }
         ]

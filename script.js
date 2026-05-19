@@ -919,7 +919,13 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {boolean}
      */
     function hasPermission(permissionName) {
-        return currentUser?.permissions?.includes(permissionName) || false;
+        const permissions = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+        if (permissions.length === 0) {
+            return false;
+        }
+
+        const candidates = getPermissionCandidates(permissionName);
+        return candidates.some(candidate => permissions.includes(candidate));
     }
 
     /**
@@ -928,8 +934,8 @@ document.addEventListener('DOMContentLoaded', async () => {
      * @returns {boolean}
      */
     function hasAnyPermission(permissionNames) {
-        if (!currentUser?.permissions) return false;
-        return permissionNames.some(p => currentUser.permissions.includes(p));
+        if (!Array.isArray(permissionNames)) return false;
+        return permissionNames.some(hasPermission);
     }
 
     /**
@@ -942,11 +948,175 @@ document.addEventListener('DOMContentLoaded', async () => {
         return currentUser.roles.some(r => r.name === roleName);
     }
 
+    const MODULE_LEGACY_PERMISSION_MAP = Object.freeze({
+        companies: 'manage_companies',
+        customers: 'manage_customers',
+        suppliers: 'manage_suppliers',
+        employees: 'manage_employees',
+        departments: 'manage_departments',
+        screening_items: 'manage_screening_items',
+        screening_services: 'manage_screening_services',
+        orders: 'manage_orders',
+        order_items: 'manage_orders',
+        work_orders: 'manage_work_orders',
+        production_work_order_schedule: 'manage_work_orders',
+        work_order_first_piece_dimensions: 'manage_work_orders',
+        work_order_images: 'manage_work_orders',
+        machines: 'manage_machines',
+        machine_maintenance_tasks: 'manage_maintenance_tasks',
+        daily_machine_inspections: 'manage_daily_inspections',
+        daily_machine_inspection_items: 'manage_daily_inspections',
+        inventory_items: 'manage_inventory',
+        inventory_transactions: 'manage_inventory',
+        tools: 'manage_tools',
+        shipping_orders: 'manage_shipping_orders',
+        shipping_order_items: 'manage_shipping_orders',
+        shipping_quality_inspections: 'manage_shipping_quality',
+        return_orders: 'manage_return_orders',
+        return_order_items: 'manage_return_orders',
+        production_records: 'manage_production_records',
+        production_quality_records: 'manage_production_quality',
+        quality_issue_reports: 'manage_quality_issues',
+        roles: 'manage_roles',
+        permissions: 'manage_permissions',
+        role_permissions: 'manage_roles',
+        employee_roles: 'manage_roles',
+        lookup_domains: 'manage_system_parameters',
+        lookup_values: 'manage_system_parameters',
+        number_sequences: 'manage_system_parameters',
+        system_parameters: 'manage_system_parameters',
+        report_descriptions: 'manage_system_parameters',
+        audit_logs: 'view_audit_logs',
+        domain_event_outbox: 'manage_system_parameters',
+        security_settings: 'manage_system_parameters',
+        dashboard_calendar_events: 'manage_calendar_events',
+        calendar_event_participants: 'manage_calendar_events',
+        calendar_event_reminders: 'manage_calendar_events',
+        notifications: 'manage_system_parameters',
+        messages: 'manage_system_parameters',
+    });
+
+    const PERMISSION_ALIAS_MAP = Object.freeze({
+        manage_companies: '公司基本資料',
+        manage_customers: '客戶基本資料',
+        manage_suppliers: '供應商基本資料',
+        manage_departments: '部門基本資料',
+        manage_employees: '員工基本資料',
+        manage_machines: '機台設備管理',
+        manage_tools: '載具管理',
+        manage_screening_items: '受篩產品',
+        manage_screening_services: '篩分服務項目',
+        manage_orders: '訂單主表管理',
+        manage_work_orders: '生產工單',
+        'production_work_order_schedule.read': '生產工單排程',
+        manage_production_records: '生產紀錄',
+        manage_shipping_orders: '出貨單',
+        manage_return_orders: '退貨單',
+        manage_daily_inspections: '每日機台檢驗',
+        manage_production_quality: '生產品質檢驗',
+        manage_shipping_quality: '出貨品質檢驗',
+        manage_quality_issues: '品質異常報告',
+        manage_roles: '角色設定',
+        manage_permissions: '權限設定',
+        manage_system_parameters: '系統參數',
+        view_audit_logs: '操作日誌',
+        manage_calendar_events: '行事曆事件',
+        manage_inventory: '庫存項目',
+        manage_maintenance_tasks: '機台維修任務',
+        view_reports: '列印報表說明',
+    });
+
+    function getPermissionCandidates(permissionName) {
+        const candidates = [permissionName];
+        const alias = PERMISSION_ALIAS_MAP[permissionName];
+        if (alias) {
+            candidates.push(alias);
+        }
+
+        const technical = Object.keys(PERMISSION_ALIAS_MAP).find(key => PERMISSION_ALIAS_MAP[key] === permissionName);
+        if (technical) {
+            candidates.push(technical);
+        }
+
+        return [...new Set(candidates)];
+    }
+
+    const ACTION_MODULE_MAP = Object.freeze({
+        'open-notifications': 'notifications',
+        'open-messages': 'messages',
+    });
+
+    function canAccessModule(moduleId) {
+        if (!moduleId || moduleId === 'dashboard') {
+            return true;
+        }
+
+        const permissions = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
+        if (permissions.length === 0) {
+            // 向後相容：尚未建立權限資料時預設放行
+            return true;
+        }
+
+        const readPermission = `${moduleId}.read`;
+        if (hasPermission(readPermission)) {
+            return true;
+        }
+
+        const legacyPermission = MODULE_LEGACY_PERMISSION_MAP[moduleId];
+        return legacyPermission ? hasPermission(legacyPermission) : false;
+    }
+
+    function canAccessAction(action) {
+        const moduleId = ACTION_MODULE_MAP[action];
+        return moduleId ? canAccessModule(moduleId) : true;
+    }
+
+    function applySidebarPermissionVisibility() {
+        if (!sidebarElement) {
+            return;
+        }
+
+        sidebarSubmenuLinks.forEach(link => {
+            const pageId = link.dataset.page || '';
+            const action = link.dataset.action || '';
+
+            const allowed = pageId ? canAccessModule(pageId) : canAccessAction(action);
+            const listItem = link.closest('li');
+            const target = listItem || link;
+            target.classList.toggle('hidden', !allowed);
+        });
+
+        sidebarMenuLinks.forEach(link => {
+            const parentMenuItem = link.closest('.menu-item');
+            if (!parentMenuItem) {
+                return;
+            }
+
+            if (parentMenuItem.classList.contains('has-submenu')) {
+                const hasVisibleChildren = parentMenuItem.querySelector('.submenu li:not(.hidden)') !== null;
+                parentMenuItem.classList.toggle('hidden', !hasVisibleChildren);
+                return;
+            }
+
+            const moduleId = link.dataset.menuId || '';
+            parentMenuItem.classList.toggle('hidden', !canAccessModule(moduleId));
+        });
+
+        document.querySelectorAll('.user-dropdown-menu [data-action]').forEach(actionLink => {
+            const action = actionLink.dataset.action || '';
+            const allowed = canAccessAction(action);
+            actionLink.classList.toggle('hidden', !allowed);
+        });
+    }
+
     // 暴露權限檢查函數到全域
     window.hasPermission = hasPermission;
     window.hasAnyPermission = hasAnyPermission;
     window.hasRole = hasRole;
+    window.canAccessModule = canAccessModule;
     window.currentUser = currentUser;
+
+    applySidebarPermissionVisibility();
 
     // ====== 安全管理器初始化（閒置登出 + 版本偵測設定載入）======
     window.AppSecurityManager.init(performLogout);
@@ -1484,6 +1654,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Function to open a new tab or switch to an existing one
     function openTab(pageId, title, contentUrl, options = {}) {
+        if (!options.skipPermissionCheck && !canAccessModule(pageId)) {
+            if (!options.silentDenied) {
+                window.alert('您沒有瀏覽此功能的權限。');
+            }
+            return;
+        }
+
         contentUrl = normalizeModuleContentUrl(contentUrl, pageId);
 
         // Check if tab already exists
@@ -1756,6 +1933,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             // 支援 data-action 連結（如公告通知中心、我的留言）
             const action = this.dataset.action;
             if (action) {
+                if (!canAccessAction(action)) {
+                    return;
+                }
+
                 switch (action) {
                     case 'open-notifications':
                         openTab('notifications', '公告通知中心', 'modules/notifications.html');
@@ -1831,15 +2012,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     function restoreTabsState() {
         const savedTabs = loadOpenTabs();
         const savedActiveTab = loadActiveTab();
+        const accessibleTabs = savedTabs.filter(tab => canAccessModule(tab.id));
 
-        if (savedTabs.length > 0) {
+        if (accessibleTabs.length > 0) {
             // Restore all saved tabs
-            savedTabs.forEach(tab => {
-                openTab(tab.id, tab.title, tab.contentUrl);
+            accessibleTabs.forEach(tab => {
+                openTab(tab.id, tab.title, tab.contentUrl, { silentDenied: true });
             });
 
             // Restore active tab if it exists
-            if (savedActiveTab && savedTabs.some(tab => tab.id === savedActiveTab)) {
+            if (savedActiveTab && accessibleTabs.some(tab => tab.id === savedActiveTab)) {
                 switchTab(savedActiveTab);
             }
         } else {

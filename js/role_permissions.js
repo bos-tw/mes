@@ -12,7 +12,6 @@
         }
         moduleRoot.dataset.initialised = 'true';
 
-        // ===== DOM 元素快取 =====
         const alertBox = moduleRoot.querySelector('[data-role-permissions-alert]');
         const filterForm = moduleRoot.querySelector('[data-role-permissions-filter]');
         const tableElement = moduleRoot.querySelector('[data-role-permissions-table]');
@@ -26,14 +25,14 @@
         const modalCloseButton = modalOverlay ? modalOverlay.querySelector('[data-action="close-modal"]') : null;
         const cancelButton = modalOverlay ? modalOverlay.querySelector('[data-action="cancel"]') : null;
 
-        const headerCreateButton = moduleRoot.querySelector('.content-header [data-action="create"]');
         const resetFilterButton = moduleRoot.querySelector('[data-action="reset-filter"]');
+        const availableRoleMultiSelect = modalForm ? modalForm.querySelector('select[name="available_role_ids"]') : null;
+        const roleMultiSelect = modalForm ? modalForm.querySelector('select[name="role_ids"]') : null;
+        const transferControlsContainer = modalForm ? modalForm.querySelector('[data-role-permissions-transfer-controls]') : null;
+        const permissionNameInput = modalForm ? modalForm.querySelector('[name="permission_name"]') : null;
+        const permissionIdInput = modalForm ? modalForm.querySelector('[name="permission_id"]') : null;
+        const filterPermissionSelect = filterForm ? filterForm.querySelector('[name="permission_id"]') : null;
 
-        const roleSelect = modalForm ? modalForm.querySelector('select[name="role_id"]') : null;
-        const permissionSelect = modalForm ? modalForm.querySelector('select[name="permission_id"]') : null;
-        const filterRoleSelect = filterForm ? filterForm.querySelector('select[name="role_id"]') : null;
-
-        // ===== 狀態管理 =====
         const state = {
             page: 1,
             perPage: 10,
@@ -41,11 +40,11 @@
             total: 0,
             roles: [],
             permissions: [],
+            rows: [],
         };
 
         let dataSyncHelper = null;
 
-        // ===== Alert 函式 =====
         function showAlert(type, message) {
             if (!alertBox) return;
             alertBox.textContent = message;
@@ -65,14 +64,19 @@
                 showAlert(type, message);
                 return;
             }
+
             modalAlertBox.textContent = message;
             modalAlertBox.classList.remove('hidden', 'success', 'error', 'warning', 'info');
             modalAlertBox.classList.add(type === 'success' ? 'success' : 'error');
+
             if (autoHide && type === 'success') {
                 setTimeout(() => hideModalAlert(), 3000);
             }
+
             const modalWindow = modalOverlay?.querySelector('.modal-window');
-            if (modalWindow) modalWindow.scrollTop = 0;
+            if (modalWindow) {
+                modalWindow.scrollTop = 0;
+            }
         }
 
         function hideModalAlert() {
@@ -95,12 +99,40 @@
             }
         }
 
-        // ===== 輔助函式 =====
-        // ===== 渲染函式 =====
-        function renderLoadingRow() {
-            if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="4" class="text-center">資料載入中...</td></tr>';
+        function getApiMessage(result, fallback) {
+            if (!result || typeof result !== 'object') {
+                return fallback;
             }
+
+            if (typeof result.message === 'string' && result.message.trim()) {
+                return result.message.trim();
+            }
+
+            if (typeof result.error === 'string' && result.error.trim()) {
+                return result.error.trim();
+            }
+
+            if (result.errors && typeof result.errors === 'object') {
+                const messages = Object.values(result.errors).filter(Boolean);
+                if (messages.length > 0) {
+                    return messages.join('、');
+                }
+            }
+
+            return fallback;
+        }
+
+        async function parseJsonSafe(response) {
+            try {
+                return await response.json();
+            } catch (error) {
+                return {};
+            }
+        }
+
+        function renderLoadingRow() {
+            if (!tableBody) return;
+            tableBody.innerHTML = '<tr><td colspan="3" class="text-center">資料載入中...</td></tr>';
         }
 
         function renderTableRows(rows) {
@@ -111,14 +143,18 @@
                 return;
             }
 
-            const html = rows.map((rp) => {
+            const html = rows.map((item) => {
+                const permissionDisplayName = item.permission_display_name || item.permission_name || '-';
+                const rolesSummary = item.roles_summary || '尚未指派角色';
+                const permissionId = Number(item.permission_id) || 0;
+
                 return `
-                    <tr data-role-id="${rp.role_id}" data-permission-id="${rp.permission_id}">
-                        <td>${escapeHtml(rp.role_name) || '-'}</td>
-                        <td>${escapeHtml(rp.permission_name) || '-'}</td>
+                    <tr data-permission-id="${permissionId}">
+                        <td>${escapeHtml(permissionDisplayName)}</td>
+                        <td>${escapeHtml(rolesSummary)}</td>
                         <td class="table-actions">
-                            <button type="button" class="btn text danger" data-action="delete" title="刪除">
-                                <i class="fas fa-trash"></i>
+                            <button type="button" class="btn text" data-action="edit" title="編輯">
+                                <i class="fas fa-edit"></i>
                             </button>
                         </td>
                     </tr>
@@ -146,23 +182,117 @@
             `;
         }
 
-        function populateRoleSelect(selectElement, roles, selectedValue = '') {
-            if (!selectElement) return;
-            const options = roles.map(r =>
-                `<option value="${r.id}" ${r.id == selectedValue ? 'selected' : ''}>${escapeHtml(r.name)}</option>`
-            ).join('');
-            selectElement.innerHTML = '<option value="">請選擇角色</option>' + options;
+        function populatePermissionFilterOptions(selectedValue = '') {
+            if (!filterPermissionSelect) return;
+
+            const options = state.permissions.map(permission => {
+                const displayName = permission.display_name || permission.name || '';
+                const selected = Number(permission.id) === Number(selectedValue) ? ' selected' : '';
+                return `<option value="${permission.id}"${selected}>${escapeHtml(displayName)}</option>`;
+            }).join('');
+
+            filterPermissionSelect.innerHTML = '<option value="">全部權限</option>' + options;
         }
 
-        function populatePermissionSelect(permissions) {
-            if (!permissionSelect) return;
-            const options = permissions.map(p =>
-                `<option value="${p.id}">${escapeHtml(p.name)} - ${escapeHtml(p.description) || ''}</option>`
-            ).join('');
-            permissionSelect.innerHTML = '<option value="">請選擇權限</option>' + options;
+        function sortSelectOptions(selectElement) {
+            if (!selectElement) {
+                return;
+            }
+
+            const options = Array.from(selectElement.options);
+            options.sort((a, b) => a.text.localeCompare(b.text, 'zh-Hant'));
+
+            selectElement.innerHTML = '';
+            options.forEach(option => {
+                option.selected = false;
+                selectElement.appendChild(option);
+            });
         }
 
-        // ===== API 呼叫 =====
+        function moveSelectedOptions(sourceSelect, targetSelect) {
+            if (!sourceSelect || !targetSelect) {
+                return;
+            }
+
+            const selectedOptions = Array.from(sourceSelect.selectedOptions);
+            if (selectedOptions.length === 0) {
+                return;
+            }
+
+            const targetValues = new Set(Array.from(targetSelect.options).map(option => option.value));
+            selectedOptions.forEach(option => {
+                if (targetValues.has(option.value)) {
+                    option.selected = false;
+                    return;
+                }
+
+                const movedOption = option.cloneNode(true);
+                movedOption.selected = false;
+                targetSelect.appendChild(movedOption);
+                option.remove();
+            });
+
+            sortSelectOptions(sourceSelect);
+            sortSelectOptions(targetSelect);
+        }
+
+        function setupTransferControls() {
+            if (!transferControlsContainer) {
+                return;
+            }
+
+            transferControlsContainer.innerHTML = `
+                <div class="role-permission-transfer-controls-box">
+                    <button type="button" class="btn outline small" data-action="move-to-selected" title="加入右側">
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <button type="button" class="btn outline small" data-action="move-to-available" title="移回左側">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        function populateRoleTransferLists(selectedRoleIds) {
+            if (!availableRoleMultiSelect || !roleMultiSelect) {
+                return;
+            }
+
+            const selectedSet = new Set((selectedRoleIds || []).map(id => Number(id)));
+            const availableRoles = [];
+            const selectedRoles = [];
+
+            state.roles.forEach(role => {
+                const roleId = Number(role.id);
+                const roleName = role.name || '';
+                const optionHtml = `<option value="${roleId}">${escapeHtml(roleName)}</option>`;
+
+                if (selectedSet.has(roleId)) {
+                    selectedRoles.push(optionHtml);
+                } else {
+                    availableRoles.push(optionHtml);
+                }
+            });
+
+            availableRoleMultiSelect.innerHTML = availableRoles.join('');
+            roleMultiSelect.innerHTML = selectedRoles.join('');
+
+            sortSelectOptions(availableRoleMultiSelect);
+            sortSelectOptions(roleMultiSelect);
+        }
+
+        function getSelectedRoleIds() {
+            if (!roleMultiSelect) return [];
+
+            return Array.from(roleMultiSelect.options)
+                .map(option => Number(option.value))
+                .filter(id => Number.isInteger(id) && id > 0);
+        }
+
+        function findRowByPermissionId(permissionId) {
+            return state.rows.find(row => Number(row.permission_id) === Number(permissionId)) || null;
+        }
+
         async function loadRolePermissions(page = 1) {
             hideAlert();
             renderLoadingRow();
@@ -170,7 +300,7 @@
             const formData = filterForm ? new FormData(filterForm) : new FormData();
             const params = new URLSearchParams();
 
-            const roleId = (formData.get('role_id') || '').toString().trim();
+            const permissionId = (formData.get('permission_id') || '').toString().trim();
             const perPageValue = parseInt((formData.get('perPage') || '10').toString(), 10);
 
             state.page = Math.max(1, page);
@@ -178,8 +308,8 @@
 
             params.set('page', String(state.page));
             params.set('perPage', String(state.perPage));
-            if (roleId !== '') {
-                params.set('role_id', roleId);
+            if (permissionId !== '') {
+                params.set('permission_id', permissionId);
             }
 
             try {
@@ -189,164 +319,136 @@
                     headers: { 'Accept': 'application/json' },
                 });
 
-                if (!response.ok) {
-                    throw new Error(`載入失敗（${response.status}）`);
+                const result = await parseJsonSafe(response);
+
+                if (!response.ok || !result.success) {
+                    throw new Error(getApiMessage(result, `載入失敗（${response.status}）`));
                 }
 
-                const result = await response.json();
-                if (!result.success) {
-                    throw new Error(result.message || '載入失敗，請稍後再試。');
-                }
+                state.rows = Array.isArray(result.data) ? result.data : [];
+                state.roles = Array.isArray(result.roles) ? result.roles : [];
+                state.permissions = Array.isArray(result.permissions) ? result.permissions : [];
 
-                const rolePermissions = Array.isArray(result.data) ? result.data : [];
-
-                // 更新角色與權限清單
-                if (result.roles) {
-                    state.roles = result.roles;
-                    populateRoleSelect(filterRoleSelect, state.roles);
-                    populateRoleSelect(roleSelect, state.roles);
-                }
-                if (result.permissions) {
-                    state.permissions = result.permissions;
-                    populatePermissionSelect(state.permissions);
-                }
-
-                renderTableRows(rolePermissions);
+                populatePermissionFilterOptions(permissionId);
+                renderTableRows(state.rows);
 
                 if (result.pagination) {
                     state.page = result.pagination.page || state.page;
                     state.perPage = result.pagination.perPage || state.perPage;
                     state.totalPages = result.pagination.totalPages || 1;
-                    state.total = result.pagination.total || rolePermissions.length;
+                    state.total = result.pagination.total || state.rows.length;
                 }
 
                 renderPagination();
             } catch (error) {
                 console.error(error);
+                state.rows = [];
                 showAlert('error', error.message || '載入失敗，請稍後再試。');
                 renderTableRows([]);
             }
+        }
+
+        function openEditModal(row) {
+            if (!modalOverlay || !modalForm || !row) {
+                return;
+            }
+
+            modalForm.reset();
+            hideModalAlert();
+
+            if (modalTitle) {
+                modalTitle.textContent = '編輯權限可瀏覽角色';
+            }
+
+            const permissionName = row.permission_display_name || row.permission_name || '';
+            const roleIds = Array.isArray(row.role_ids) ? row.role_ids : [];
+
+            if (permissionNameInput) {
+                permissionNameInput.value = permissionName;
+            }
+            if (permissionIdInput) {
+                permissionIdInput.value = String(row.permission_id || '');
+            }
+
+            setFieldValue('permission_name', permissionName);
+            setFieldValue('permission_id', row.permission_id || '');
+            populateRoleTransferLists(roleIds);
+
+            modalOverlay.classList.remove('hidden');
+
+            if (availableRoleMultiSelect) {
+                availableRoleMultiSelect.focus();
+            }
+        }
+
+        function closeModal() {
+            if (!modalOverlay || modalOverlay.classList.contains('hidden')) return;
+
+            if (modalForm) {
+                modalForm.reset();
+            }
+
+            modalOverlay.classList.add('hidden');
+            hideModalAlert();
         }
 
         async function handleSubmit(event) {
             event.preventDefault();
             hideModalAlert();
 
-            const formData = new FormData(modalForm);
-            const payload = {
-                role_id: parseInt((formData.get('role_id') || '0').toString(), 10),
-                permission_id: parseInt((formData.get('permission_id') || '0').toString(), 10),
-            };
+            const permissionId = Number(permissionIdInput ? permissionIdInput.value : 0);
+            const roleIds = getSelectedRoleIds();
 
-            if (!payload.role_id || !payload.permission_id) {
-                showModalAlert('error', '請選擇角色和權限。');
+            if (!permissionId) {
+                showModalAlert('error', '權限資料遺失，請重新操作。', false);
                 return;
             }
 
             try {
                 const response = await fetch('api/role_permissions/index.php', {
-                    method: 'POST',
+                    method: 'PUT',
                     credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
                     },
-                    body: JSON.stringify(payload),
+                    body: JSON.stringify({
+                        permission_id: permissionId,
+                        role_ids: roleIds,
+                    }),
                 });
 
-                const result = await response.json();
+                const result = await parseJsonSafe(response);
 
-                if (!result.success) {
-                    if (result.errors) {
-                        const errorMessages = Object.values(result.errors).join('、');
-                        throw new Error(errorMessages);
-                    }
-                    throw new Error(result.message || '新增失敗。');
+                if (!response.ok || !result.success) {
+                    throw new Error(getApiMessage(result, '更新失敗，請稍後再試。'));
                 }
 
-                showAlert('success', result.message || '新增成功。');
-                closeModal(true);
-                loadRolePermissions(state.page);
+                closeModal();
+                showAlert('success', result.message || '權限角色設定已更新。');
+                await loadRolePermissions(state.page);
 
                 if (dataSyncHelper) {
-                    dataSyncHelper.notifyCreated(result.data);
+                    dataSyncHelper.notifyUpdated(result.data || { permission_id: permissionId, role_ids: roleIds });
                 }
             } catch (error) {
                 console.error(error);
-                showModalAlert('error', error.message || '新增失敗，請稍後再試。');
+                showModalAlert('error', error.message || '更新失敗，請稍後再試。', false);
             }
         }
 
-        async function handleDelete(roleId, permissionId) {
-            if (!confirm('確定要刪除此角色權限關聯嗎？')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`api/role_permissions/delete.php?role_id=${roleId}&permission_id=${permissionId}`, {
-                    method: 'DELETE',
-                    credentials: 'include',
-                    headers: { 'Accept': 'application/json' },
-                });
-
-                const result = await response.json();
-
-                if (!result.success) {
-                    throw new Error(result.message || '刪除失敗。');
-                }
-
-                showAlert('success', result.message || '刪除成功。');
-                loadRolePermissions(state.page);
-
-                if (dataSyncHelper) {
-                    dataSyncHelper.notifyDeleted({ role_id: roleId, permission_id: permissionId });
-                }
-            } catch (error) {
-                console.error(error);
-                showAlert('error', error.message || '刪除失敗，請稍後再試。');
-            }
-        }
-
-        // ===== Modal 處理 =====
-        function openModal() {
-            if (!modalOverlay || !modalForm) return;
-
-            modalForm.reset();
-            hideModalAlert();
-
-            if (modalTitle) {
-                modalTitle.textContent = '新增角色權限';
-            }
-
-            modalOverlay.classList.remove('hidden');
-
-            if (roleSelect) roleSelect.focus();
-        }
-
-        function closeModal(force = false) {
-            if (!modalOverlay || modalOverlay.classList.contains('hidden')) return;
-
-            if (modalForm) modalForm.reset();
-            modalOverlay.classList.add('hidden');
-            hideModalAlert();
-        }
-
-        // ===== 事件綁定 =====
         if (tableBody) {
             tableBody.addEventListener('click', (event) => {
                 const button = event.target.closest('[data-action]');
                 if (!button) return;
+                if (button.dataset.action !== 'edit') return;
 
-                const action = button.dataset.action;
                 const row = button.closest('tr');
-                const roleId = row ? parseInt(row.dataset.roleId, 10) : null;
-                const permissionId = row ? parseInt(row.dataset.permissionId, 10) : null;
+                const permissionId = row ? parseInt(row.dataset.permissionId || '0', 10) : 0;
+                if (!permissionId) return;
 
-                if (!roleId || !permissionId) return;
-
-                if (action === 'delete') {
-                    handleDelete(roleId, permissionId);
-                }
+                const rowData = findRowByPermissionId(permissionId);
+                openEditModal(rowData);
             });
         }
 
@@ -368,17 +470,44 @@
 
         if (resetFilterButton) {
             resetFilterButton.addEventListener('click', () => {
-                if (filterForm) filterForm.reset();
+                if (filterForm) {
+                    filterForm.reset();
+                }
                 loadRolePermissions(1);
             });
         }
 
-        if (headerCreateButton) {
-            headerCreateButton.addEventListener('click', () => openModal());
+        if (modalForm) {
+            modalForm.addEventListener('submit', handleSubmit);
         }
 
         if (modalForm) {
-            modalForm.addEventListener('submit', handleSubmit);
+            modalForm.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-action]');
+                if (!button) {
+                    return;
+                }
+
+                if (button.dataset.action === 'move-to-selected') {
+                    moveSelectedOptions(availableRoleMultiSelect, roleMultiSelect);
+                }
+
+                if (button.dataset.action === 'move-to-available') {
+                    moveSelectedOptions(roleMultiSelect, availableRoleMultiSelect);
+                }
+            });
+        }
+
+        if (availableRoleMultiSelect) {
+            availableRoleMultiSelect.addEventListener('dblclick', () => {
+                moveSelectedOptions(availableRoleMultiSelect, roleMultiSelect);
+            });
+        }
+
+        if (roleMultiSelect) {
+            roleMultiSelect.addEventListener('dblclick', () => {
+                moveSelectedOptions(roleMultiSelect, availableRoleMultiSelect);
+            });
         }
 
         if (modalOverlay) {
@@ -403,7 +532,8 @@
             }
         });
 
-        // ===== 初始化 =====
+        setupTransferControls();
+
         loadRolePermissions(1);
 
         if (typeof DataSync !== 'undefined') {
