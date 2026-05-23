@@ -389,7 +389,7 @@
                                 ${item.drawing_number ? `<div class="table-secondary">圖面：${escapeHtml(item.drawing_number)}</div>` : ''}
                             </td>
                             <td class="text-right">${formatNumber(item.total_weight_kg ?? 0, 2)}</td>
-                            <td class="text-right">${formatNumber(totals.net_weight_kg ?? 0, 3)}</td>
+                            <td class="text-right">${formatNumber(totals.net_weight_kg ?? 0, 2)}</td>
                             <td class="text-right">${formatNumber(item.total_units ?? 0, 0)}</td>
                             <td class="text-right">${formatNumber(item.unit_price_per_thousand ?? 0, 2)}</td>
                             <td class="text-right">$${formatCurrency(item.total_price ?? 0)}</td>
@@ -1382,7 +1382,7 @@
                     for (const item of items) {
                         const itemName = item.screening_item ? (item.screening_item.name || '') : '';
                         const unitW = item.screening_item && item.screening_item.weight_per_unit_g
-                            ? item.screening_item.weight_per_unit_g : '';
+                            ? formatNumber(item.screening_item.weight_per_unit_g, 4) : '';
                         lines.push([
                             '',
                             item.sub_item_number || '',
@@ -1390,13 +1390,13 @@
                             item.part_number || '',
                             item.drawing_number || '',
                             itemName,
-                            item.total_weight_kg || '',
+                            item.total_weight_kg != null && item.total_weight_kg !== '' ? formatNumber(item.total_weight_kg, 2) : '',
                             unitW,
                             item.total_units || '',
                             item.delivery_location || '',
                             item.customer_sample_status_label || item.customer_sample_status || '',
-                            item.customer_provided_weight || '',
-                            item.confirmed_weight || '',
+                            item.customer_provided_weight != null && item.customer_provided_weight !== '' ? formatNumber(item.customer_provided_weight, 2) : '',
+                            item.confirmed_weight != null && item.confirmed_weight !== '' ? formatNumber(item.confirmed_weight, 2) : '',
                             item.notes || ''
                         ].map(escapeCsvCell).join(','));
                     }
@@ -1500,14 +1500,14 @@ th { font-weight: bold; white-space: nowrap; }
     </tr></thead>
     <tbody>${items.map(item => {
         const itemName = item.screening_item ? (item.screening_item.name || '-') : '-';
-        const unitW = item.screening_item && item.screening_item.weight_per_unit_g ? item.screening_item.weight_per_unit_g : '-';
+        const unitW = item.screening_item && item.screening_item.weight_per_unit_g ? formatNumber(item.screening_item.weight_per_unit_g, 4) : '-';
         const toolW = item.totals ? (item.totals.tool_weight_kg || 0) : 0;
         return `<tr>
             <td>${escapeHtml(item.sub_item_number || '-')}</td>
             <td>${escapeHtml(item.customer_batch_number || '-')}</td>
             <td>${escapeHtml(itemName)}</td>
-            <td style="text-align:right">${item.total_weight_kg || '-'}</td>
-            <td style="text-align:right">${toolW || '-'}</td>
+            <td style="text-align:right">${item.total_weight_kg != null && item.total_weight_kg !== '' ? formatNumber(item.total_weight_kg, 2) : '-'}</td>
+            <td style="text-align:right">${formatNumber(toolW, 2)}</td>
             <td style="text-align:right">${unitW}</td>
             <td style="text-align:right">${item.total_units ? Number(item.total_units).toLocaleString() : '-'}</td>
             <td>${escapeHtml(item.delivery_location || '-')}</td>
@@ -1697,7 +1697,7 @@ ${pagesHtml}
             ${items.map(item => {
                 const itemName = item.screening_item ? (item.screening_item.name || '-') : '-';
                 const unitWeightG = item.screening_item && item.screening_item.weight_per_unit_g
-                    ? item.screening_item.weight_per_unit_g : '-';
+                    ? formatNumber(item.screening_item.weight_per_unit_g, 4) : '-';
                 const toolWeight = item.totals ? (item.totals.tool_weight_kg || 0) : 0;
                 const totalUnits = item.total_units ? Number(item.total_units).toLocaleString() : '-';
 
@@ -1705,8 +1705,8 @@ ${pagesHtml}
             <tr>
                 <td>${escapeHtml(item.customer_batch_number || item.part_number || '-')}</td>
                 <td>${escapeHtml(itemName)}</td>
-                <td class="text-right">${item.total_weight_kg || '-'}</td>
-                <td class="text-right">${toolWeight || '-'}</td>
+                <td class="text-right">${item.total_weight_kg != null && item.total_weight_kg !== '' ? formatNumber(item.total_weight_kg, 2) : '-'}</td>
+                <td class="text-right">${formatNumber(toolWeight, 2)}</td>
                 <td class="text-right">${unitWeightG}</td>
                 <td class="text-right">${totalUnits}</td>
             </tr>

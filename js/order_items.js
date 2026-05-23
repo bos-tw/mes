@@ -297,7 +297,7 @@
                 name: nameValue,
                 material: getValue(screeningCreateFields.material) || null,
                 thread_type: getValue(screeningCreateFields.threadType) || null,
-                weight_per_unit_g: Number(weightValue.toFixed(2)),
+                weight_per_unit_g: Number(weightValue.toFixed(4)),
                 unit_price: unitPriceValue,
                 unit: getValue(screeningCreateFields.unit) || null,
                 notes: getValue(screeningCreateFields.notes) || null,
@@ -736,8 +736,8 @@ function updateButtons() {
                             ${item.drawing_number ? `<div class="table-secondary">圖面：${escapeHtml(item.drawing_number)}</div>` : ''}
                         </td>
                         <td class="text-right">${formatNumber(item.total_weight_kg ?? 0, 2)}</td>
-                        <td class="text-right">${formatNumber(totals.tool_weight_kg ?? 0, 3)}</td>
-                        <td class="text-right">${formatNumber(totals.net_weight_kg ?? 0, 3)}</td>
+                        <td class="text-right">${formatNumber(totals.tool_weight_kg ?? 0, 2)}</td>
+                        <td class="text-right">${formatNumber(totals.net_weight_kg ?? 0, 2)}</td>
                         <td class="text-right">${formatNumber(item.total_units ?? 0, 0)}</td>
                         <td class="text-right">${formatNumber(item.unit_price_per_thousand ?? 0, 2)}</td>
                         <td class="text-right">${formatCurrency(item.total_price ?? 0)}</td>
@@ -751,7 +751,7 @@ function updateButtons() {
                         <td class="text-right">${item.actual_production_weight != null ? formatNumber(item.actual_production_weight, 2) : '-'}</td>
                         <td class="text-right">${getWeightVarianceCell(item)}</td>
                         <td>${item.tools && item.tools.length > 0 ? [...new Set(item.tools.map(t => escapeHtml(t.tool_type || '')).filter(Boolean))].join(', ') || '-' : '-'}</td>
-                        <td class="text-right">${item.tools && item.tools.length > 0 ? item.tools.map(t => formatNumber(t.weight_kg ?? 0, 3)).join(', ') : '-'}</td>
+                        <td class="text-right">${item.tools && item.tools.length > 0 ? item.tools.map(t => formatNumber(t.weight_kg ?? 0, 4)).join(', ') : '-'}</td>
                         <td class="text-right">${item.tools && item.tools.length > 0 ? item.tools.map(t => t.quantity ?? 0).join(', ') : '-'}</td>
                         <td class="table-actions">
                             <button type="button" class="btn text" data-action="create-work-order" title="${workOrderBtnTitle}" ${workOrderBtnAttr}>
@@ -1923,13 +1923,13 @@ function updateButtons() {
             const totalPrice = totalUnits * unitPriceValue / 1000;
 
             if (metricsFields.totalWeight) {
-                metricsFields.totalWeight.textContent = formatNumber(totalWeightValue, 3);
+                metricsFields.totalWeight.textContent = formatNumber(totalWeightValue, 2);
             }
             if (metricsFields.toolWeight) {
-                metricsFields.toolWeight.textContent = formatNumber(toolWeight, 3);
+                metricsFields.toolWeight.textContent = formatNumber(toolWeight, 2);
             }
             if (metricsFields.netWeight) {
-                metricsFields.netWeight.textContent = formatNumber(netWeight, 3);
+                metricsFields.netWeight.textContent = formatNumber(netWeight, 2);
             }
             if (metricsFields.unitWeight) {
                 metricsFields.unitWeight.textContent = weightPerUnitG ? formatNumber(weightPerUnitG, 4) : '0';
@@ -2245,6 +2245,14 @@ function updateButtons() {
             resetModalForm();
             populateModalSelects();
 
+            const formatWeightInput = (value) => {
+                const numericValue = Number.parseFloat(String(value));
+                if (!Number.isFinite(numericValue)) {
+                    return '';
+                }
+                return numericValue.toFixed(2);
+            };
+
             if (data) {
                 // 編輯模式或複製模式都填入資料
                 if (screeningItemSelect && data.screening_item && data.screening_item.id) {
@@ -2258,7 +2266,7 @@ function updateButtons() {
                     unitPriceInput.value = String(data.unit_price_per_thousand);
                 }
                 if (totalWeightInput && data.total_weight_kg != null) {
-                    totalWeightInput.value = String(data.total_weight_kg);
+                    totalWeightInput.value = formatWeightInput(data.total_weight_kg);
                 }
                 if (statusSelect && data.status) {
                     statusSelect.value = data.status;
@@ -2287,13 +2295,13 @@ function updateButtons() {
 
                 // 填入三階段重量追蹤資料
                 if (customerProvidedWeightInput && data.customer_provided_weight != null) {
-                    customerProvidedWeightInput.value = String(data.customer_provided_weight);
+                    customerProvidedWeightInput.value = formatWeightInput(data.customer_provided_weight);
                 }
                 if (confirmedWeightInput && data.confirmed_weight != null) {
-                    confirmedWeightInput.value = String(data.confirmed_weight);
+                    confirmedWeightInput.value = formatWeightInput(data.confirmed_weight);
                 }
                 if (actualProductionWeightInput && data.actual_production_weight != null) {
-                    actualProductionWeightInput.value = String(data.actual_production_weight);
+                    actualProductionWeightInput.value = formatWeightInput(data.actual_production_weight);
                 }
 
                 if (Array.isArray(data.tools) && data.tools.length > 0) {

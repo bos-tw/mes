@@ -721,6 +721,7 @@
         const { work_order, order, order_item, customer, screening_item,
                 screening_results, summary, chart_data, company, qrcode_url, generated_at,
                 report_description } = data;
+        const defectDistributionUnits = Number(summary.defect_units_distribution ?? summary.defect_units ?? 0);
 
         // 生成 QR Code URL：優先確保靜態頁可用，再回退既有 URL
         const localFallback = buildLocalStaticReportUrl(`export/qrcode_pages/${work_order.work_order_number}.html`);
@@ -845,8 +846,8 @@
                 </thead>
                 <tbody>
                     ${screening_results.map(item => {
-                        const percentage = summary.defect_units > 0
-                            ? ((item.defect_quantity / summary.defect_units) * 100).toFixed(1)
+                        const percentage = defectDistributionUnits > 0
+                            ? ((item.defect_quantity / defectDistributionUnits) * 100).toFixed(1)
                             : '0.0';
                         // 優先使用 API 回傳的英文名稱
                         const serviceEn = item.service_name_en || item.service_name;
@@ -864,7 +865,7 @@
                     }).join('')}
                     <tr style="background-color: #f5f5f5; font-weight: bold;">
                         <td colspan="2" class="text-right">合計 Total</td>
-                        <td class="text-right" style="color: #dc3545;">${formatNumber(summary.defect_units)}</td>
+                        <td class="text-right" style="color: #dc3545;">${formatNumber(defectDistributionUnits)}</td>
                         <td class="text-center">100%</td>
                         <td></td>
                     </tr>

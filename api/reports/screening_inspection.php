@@ -143,14 +143,42 @@ try {
         $defectsMap[$defect['screening_service_id']] = $defect;
     }
 
-    // 4. 合併篩分明細與不良品數據
+    // 4. 查詢載具統計（以訂單品項為基準）
+    $sqlToolSummary = "
+        SELECT
+            COALESCE(SUM(quantity), 0) AS total_tool_quantity,
+            COALESCE(SUM(total_weight), 0) AS total_tool_weight
+        FROM order_item_tools
+        WHERE order_item_id = ?
+    ";
+    $stmt = $pdo->prepare($sqlToolSummary);
+    $stmt->execute([$workOrder['order_item_id']]);
+    $toolSummary = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $totalToolQuantity = (int)($toolSummary['total_tool_quantity'] ?? 0);
+    $totalToolWeight = (float)($toolSummary['total_tool_weight'] ?? 0);
+
+    // 5. 查詢生產紀錄重量合計（篩分後實際淨重來源）
+    $sqlProductionSummary = "
+        SELECT
+            COUNT(*) AS total_records,
+            COALESCE(SUM(weight_kg), 0) AS total_weight_kg
+        FROM production_records
+        WHERE work_order_id = ?
+    ";
+    $stmt = $pdo->prepare($sqlProductionSummary);
+    $stmt->execute([$workOrderId]);
+    $productionSummary = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $productionRecordCount = (int)($productionSummary['total_records'] ?? 0);
+    $totalProductionWeight = (float)($productionSummary['total_weight_kg'] ?? 0);
+
+    // 6. 合併篩分明細與不良品數據
     $screeningResults = [];
-    $totalDefectQuantity = 0;
+    $totalDefectDistributionUnits = 0;
 
     foreach ($screeningDetails as $detail) {
         $serviceId = $detail['screening_service_id'];
         $defectQty = isset($defectsMap[$serviceId]) ? (int)$defectsMap[$serviceId]['defect_quantity'] : 0;
-        $totalDefectQuantity += $defectQty;
+        $totalDefectDistributionUnits += $defectQty;
 
         // 格式化公差值
         $toleranceDisplay = '';
@@ -174,13 +202,28 @@ try {
         ];
     }
 
-    // 5. 計算統計數據
-    $totalUnits = (float)($workOrder['total_units'] ?: $workOrder['oi_total_units'] ?: 0);
-    $goodUnits = $totalUnits - $totalDefectQuantity;
-    $defectRate = $totalUnits > 0 ? ($totalDefectQuantity / $totalUnits) * 100 : 0;
-    $defectRatePpm = $totalUnits > 0 ? ($totalDefectQuantity / $totalUnits) * 1000000 : 0;
+    // 7. 計算統計數據（重量優先口徑）
+    $weightPerUnitG = (float)($workOrder['weight_per_unit_g'] ?: $workOrder['si_weight_per_unit_g'] ?: 0);
+    $orderTotalWeight = (float)($workOrder['total_weight_kg'] ?: $workOrder['oi_total_weight_kg'] ?: 0);
+    $orderNetWeight = max($orderTotalWeight - $totalToolWeight, 0);
+    $actualNetWeight = $productionRecordCount > 0
+        ? max($totalProductionWeight - $totalToolWeight, 0)
+        : $orderNetWeight;
 
-    // 6. 準備圓餅圖數據（只包含有不良品的項目）
+    $goodUnits = $weightPerUnitG > 0
+        ? max((int)floor(($actualNetWeight * 1000) / $weightPerUnitG), 0)
+        : 0;
+
+    $defectWeightKg = max($orderNetWeight - $actualNetWeight, 0);
+    $defectUnitsByWeight = $weightPerUnitG > 0
+        ? max((int)round(($defectWeightKg * 1000) / $weightPerUnitG), 0)
+        : 0;
+
+    $totalUnits = $goodUnits + $defectUnitsByWeight;
+    $defectRate = $totalUnits > 0 ? ($defectUnitsByWeight / $totalUnits) * 100 : 0;
+    $defectRatePpm = $totalUnits > 0 ? ($defectUnitsByWeight / $totalUnits) * 1000000 : 0;
+
+    // 8. 準備圓餅圖數據（只包含有不良品的項目）
     $chartLabels = [];
     $chartLabelsEn = [];
     $chartValues = [];
@@ -198,18 +241,18 @@ try {
         }
     }
 
-    // 7. 查詢公司資訊
+    // 9. 查詢公司資訊
     $sqlCompany = "SELECT * FROM companies WHERE id = 1 LIMIT 1";
     $company = $pdo->query($sqlCompany)->fetch(PDO::FETCH_ASSOC);
 
-    // 8. 取得系統參數
+    // 10. 取得系統參數
     $sqlParams = "SELECT param_key, param_value FROM system_parameters WHERE param_key IN ('REPORT_EXTERNAL_URL', 'COMPANY_SHORT_NAME')";
     $params = [];
     foreach ($pdo->query($sqlParams)->fetchAll(PDO::FETCH_ASSOC) as $p) {
         $params[$p['param_key']] = $p['param_value'];
     }
 
-    // 9. 取得報表說明
+    // 11. 取得報表說明
     $sqlDesc = "SELECT description, description_en FROM report_descriptions WHERE report_code = 'screening_inspection' AND is_active = 1 LIMIT 1";
     $reportDesc = $pdo->query($sqlDesc)->fetch(PDO::FETCH_ASSOC);
     $reportDescription = '';
@@ -240,10 +283,16 @@ try {
             'work_order' => [
                 'id' => $workOrder['id'],
                 'work_order_number' => $workOrder['work_order_number'],
-                'total_weight_kg' => $workOrder['total_weight_kg'],
-                'weight_per_unit_g' => $workOrder['weight_per_unit_g'] ?: $workOrder['si_weight_per_unit_g'],
+                'total_weight_kg' => round($orderTotalWeight, 3),
+                'weight_per_unit_g' => $weightPerUnitG,
                 'total_units' => $totalUnits,
                 'tool_statistics' => $workOrder['tool_statistics'],
+                'total_tool_quantity' => $totalToolQuantity,
+                'total_tool_weight_kg' => round($totalToolWeight, 3),
+                'order_net_weight_kg' => round($orderNetWeight, 3),
+                'actual_net_weight_kg' => round($actualNetWeight, 3),
+                'production_total_weight_kg' => round($totalProductionWeight, 3),
+                'production_record_count' => $productionRecordCount,
                 'screening_speed' => $workOrder['screening_speed'],
                 'status' => $workOrder['status'],
                 'status_label' => $workOrder['status_label'],
@@ -289,9 +338,15 @@ try {
             'screening_results' => $screeningResults,
             // 統計摘要
             'summary' => [
-                'total_units' => round($totalUnits),
-                'good_units' => round($goodUnits),
-                'defect_units' => $totalDefectQuantity,
+                'total_units' => $totalUnits,
+                'good_units' => $goodUnits,
+                'defect_units' => $defectUnitsByWeight,
+                'defect_units_distribution' => $totalDefectDistributionUnits,
+                'defect_weight_kg' => round($defectWeightKg, 3),
+                'order_net_weight_kg' => round($orderNetWeight, 3),
+                'actual_net_weight_kg' => round($actualNetWeight, 3),
+                'total_tool_weight_kg' => round($totalToolWeight, 3),
+                'total_tool_quantity' => $totalToolQuantity,
                 'defect_rate_percent' => round($defectRate, 4),
                 'defect_rate_ppm' => round($defectRatePpm, 2)
             ],

@@ -111,7 +111,7 @@ ModuleConfig.register('inventory_items', {
     ],
 
     // ========================================
-    // 主 Modal 表單 - 使用 formRows 二欄並排佈局
+    // 主 Modal 表單 - 使用 formRows 三欄並排佈局
     // ========================================
     modal: {
         title: '新增入庫項目',
@@ -137,6 +137,13 @@ ModuleConfig.register('inventory_items', {
                             { name: 'customer_batch_number', label: '客戶批號', type: 'text', readonly: true },
                             { name: 'screening_item_name', label: '受篩產品', type: 'text', readonly: true }
                         ]
+                    },
+                    {
+                        title: '載具資訊',
+                        fields: [
+                            { name: 'tool_statistics', label: '載具統計', type: 'text', placeholder: '例: 10kg標準桶 2個、52kg標準船 1個' },
+                            { name: 'total_tool_quantity', label: '載具總數量', type: 'number' }
+                        ]
                     }
                 ]
             },
@@ -156,17 +163,6 @@ ModuleConfig.register('inventory_items', {
                             { name: 'weight_per_unit_g', label: '產品單支重 (g)', type: 'number', required: true, step: '0.001' }
                         ]
                     },
-                    {
-                        title: '載具資訊',
-                        fields: [
-                            { name: 'tool_statistics', label: '載具統計', type: 'text', placeholder: '例: 10kg標準桶 2個、52kg標準船 1個' },
-                            { name: 'total_tool_quantity', label: '載具總數量', type: 'number' }
-                        ]
-                    }
-                ]
-            },
-            {
-                sections: [
                     {
                         title: '質量與檢驗',
                         fields: [

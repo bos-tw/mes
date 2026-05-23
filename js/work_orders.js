@@ -2317,24 +2317,28 @@
             totalProductionWeight += weight;
         });
 
-        // 計算實際淨重 = SUM(使用者輸入重量) - 載具總重量
-        const actualNetWeight = totalProductionWeight - totalToolWeight;
+        // 計算實際淨重 = SUM(使用者輸入重量) - 載具總重量（最低為 0）
+        const actualNetWeight = Math.max(totalProductionWeight - totalToolWeight, 0);
 
-        // 計算不良品總數 (從篩分服務表格收集)
-        let totalDefects = 0;
+        // 計算不良品分布支數（人工輸入）
+        let totalDefectsDistribution = 0;
         const defectInputs = form.querySelectorAll('[name^="defect_quantity_"]');
         defectInputs.forEach(input => {
-            totalDefects += parseInt(input.value) || 0;
+            totalDefectsDistribution += parseInt(input.value) || 0;
         });
 
-        // 不良品重量 (kg) = 不良品支數 × 產品單重(g) ÷ 1000
-        const defectWeightKg = (totalDefects * weightPerUnit) / 1000;
+        // 重量優先口徑：不良品重量 = 訂單淨重 - 篩分後淨重
+        const defectWeightKg = Math.max(orderNetWeight - actualNetWeight, 0);
 
-        // 良品支數 = (實際淨重 * 1000) / 產品單重(g)
-        const goodUnits = weightPerUnit > 0 ? Math.floor((actualNetWeight * 1000) / weightPerUnit) : 0;
+        // 良品支數 = (篩分後淨重 * 1000) / 產品單重(g)
+        const goodUnits = weightPerUnit > 0 ? Math.max(Math.floor((actualNetWeight * 1000) / weightPerUnit), 0) : 0;
 
-        // 總支數 = 良品支數 + 不良品支數
-        const actualTotalUnits = goodUnits + totalDefects;
+        // 不良品支數（重量換算）
+        const defectUnits = weightPerUnit > 0 ? Math.max(Math.round((defectWeightKg * 1000) / weightPerUnit), 0) : 0;
+        const defectUnitsDiff = defectUnits - totalDefectsDistribution;
+
+        // 總支數 = 良品支數 + 不良品支數（重量換算）
+        const actualTotalUnits = goodUnits + defectUnits;
 
         // 總重量 (kg) = 淨重(kg) + 載具重量合計(kg) + 不良品重量(kg)
         const actualTotalWeight = actualNetWeight + totalToolWeight + defectWeightKg;
@@ -2355,10 +2359,17 @@
         setMetricValue(`${prefix}actual-tool-quantity`, actualToolQty);
         setMetricValue(`${prefix}actual-tool-weight`, totalToolWeight.toFixed(2)); // 載具重量合計
         setMetricValue(`${prefix}good-units`, formatNumber(goodUnits));
-        setMetricValue(`${prefix}defect-units`, formatNumber(totalDefects));
+        setMetricValue(`${prefix}defect-units`, formatNumber(defectUnits));
+        setMetricValue(`${prefix}defect-units-distribution`, formatNumber(totalDefectsDistribution));
+        setMetricValue(`${prefix}defect-units-diff`, formatNumber(defectUnitsDiff), defectUnitsDiff);
         setMetricValue(`${prefix}defect-weight`, defectWeightKg.toFixed(3)); // 不良品重量 (kg)
         setMetricValue(`${prefix}actual-total-units`, formatNumber(actualTotalUnits));
         setMetricValue(`${prefix}actual-total-weight`, actualTotalWeight.toFixed(2)); // 總重量 = 淨重 + 載具重量 + 不良品重量
+
+        const defectMetric = document.querySelector(`[data-metric="${prefix}defect-units"]`);
+        if (defectMetric) {
+            defectMetric.title = `分布合計：${formatNumber(totalDefectsDistribution)} 支`;
+        }
 
         // 更新差值 (正值顯示綠色,負值顯示紅色)
         setMetricValue(`${prefix}weight-diff`, weightDiff.toFixed(2), weightDiff);

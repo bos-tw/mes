@@ -3378,6 +3378,11 @@ td.actions-col {
     grid-template-columns: 1fr 1fr 1fr !important;
 }
 
+/* 客戶批號 Modal 首列: 受篩產品/重量與狀態/重量追蹤 = 6/3/3 */
+.modal-window.order-items-modal .form-row.screening-weight-row {
+    grid-template-columns: 2fr 1fr 1fr !important;
+}
+
 .modal-window .form-row > .form-section {
     margin-bottom: 0;
     min-width: 0;
@@ -3391,6 +3396,10 @@ td.actions-col {
     .modal-window .form-row.three-columns {
         grid-template-columns: 1fr 1fr !important;
     }
+
+    .modal-window.order-items-modal .form-row.screening-weight-row {
+        grid-template-columns: 1fr 1fr !important;
+    }
 }
 
 @media (max-width: 900px) {
@@ -3399,6 +3408,10 @@ td.actions-col {
         gap: 16px;
     }
     .modal-window .form-row.three-columns {
+        grid-template-columns: 1fr !important;
+    }
+
+    .modal-window.order-items-modal .form-row.screening-weight-row {
         grid-template-columns: 1fr !important;
     }
 }
@@ -4144,6 +4157,33 @@ td.actions-col {
 
 .stacked-inputs input {
     width: 100%;
+}
+
+.order-items-services-table {
+    table-layout: fixed;
+}
+
+.order-items-services-table td,
+.order-items-services-table th {
+    vertical-align: top;
+}
+
+.order-items-services-table td:nth-child(3),
+.order-items-services-table th:nth-child(3) {
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.order-items-services-table td:nth-child(4),
+.order-items-services-table td:nth-child(5),
+.order-items-services-table td:nth-child(6) {
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.order-items-services-table input,
+.order-items-services-table select {
+    min-width: 0;
 }
 
 /* Work Order Modal - Complete Layout Fix */

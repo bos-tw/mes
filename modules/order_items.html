@@ -89,7 +89,8 @@
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <div class="column-selector-body">
+        <div class="column-selector-body">
+
             <label class="column-option">
                 <input type="checkbox" data-column="customer_batch_number" checked>
                 <span>客戶批號</span>
@@ -252,7 +253,7 @@
             <form data-order-items-form novalidate>
                 <div class="order-items-modal-body">
                     <!-- 第一行:受篩產品選擇 + 總重量 -->
-                    <div class="form-row">
+                    <div class="form-row screening-weight-row">
                         <div class="form-section">
                             <h4>受篩產品</h4>
                             <div class="form-grid">
@@ -300,7 +301,7 @@
                                         </label>
                                         <label class="inline-label">
                                             <span>單支重量 (克) <abbr title="必填">*</abbr></span>
-                                            <input type="number" data-field="new-screening-item-weight" min="0" step="0.01" placeholder="請輸入重量">
+                                            <input type="number" data-field="new-screening-item-weight" min="0" step="0.0001" placeholder="請輸入重量">
                                         </label>
                                         <label class="inline-label">
                                             <span>單價 (元/M)</span>
@@ -520,15 +521,15 @@
                                 </button>
                             </header>
                             <div class="table-responsive">
-                                <table class="data-table compact">
+                                <table class="data-table compact order-items-services-table">
                                     <thead>
                                         <tr>
-                                            <th style="width: 24%;">服務項目</th>
-                                            <th style="width: 15%;">服務名稱 (客製)</th>
-                                            <th class="text-right" style="width: 10%;">實際單價 (每支)</th>
-                                            <th class="text-right" style="width: 10%;">公差 (+)</th>
-                                            <th class="text-right" style="width: 10%;">公差 (-)</th>
-                                            <th class="text-right" style="width: 8%;">PPM</th>
+                                            <th style="width: 23%;">服務項目</th>
+                                            <th style="width: 14%;">服務名稱 (客製)</th>
+                                            <th class="text-right" style="width: 8%;">實際單價 (每支)</th>
+                                            <th class="text-right" style="width: 11%;">公差 (+)</th>
+                                            <th class="text-right" style="width: 11%;">公差 (-)</th>
+                                            <th class="text-right" style="width: 10%;">PPM</th>
                                             <th style="width: 15%;">備註</th>
                                             <th style="width: 8%;">操作</th>
                                         </tr>

@@ -29,33 +29,37 @@
                 <h3>編輯訂單細項</h3>
                 <div class="modal-alert hidden" data-orders-item-modal-alert role="alert"></div>
                 <form data-orders-item-form novalidate>
-                    <div class="form-section">
-                        <h4>基本資料</h4>
-                        <div class="form-grid form-grid-two-columns">
-                            <label class="inline-label full-width"><span>受篩產品 <abbr title="必填">*</abbr></span><select name="screening_item_id" required><option value="">-- 請選擇 --</option></select></label>
-                            <label class="inline-label"><span>客戶批號</span><input type="text" name="customer_batch_number" maxlength="100"></label>
-                            <label class="inline-label"><span>圖面編號</span><input type="text" name="drawing_number" maxlength="255"></label>
-                            <label class="inline-label"><span>品項編號</span><input type="text" name="sub_item_number" maxlength="100"></label>
-                            <label class="inline-label"><span>料號</span><input type="text" name="part_number" maxlength="100"></label>
+                    <div class="form-row three-columns">
+                        <div class="form-section">
+                            <h4>基本資料</h4>
+                            <div class="form-grid form-grid-two-columns">
+                                <label class="inline-label full-width"><span>受篩產品 <abbr title="必填">*</abbr></span><select name="screening_item_id" required><option value="">-- 請選擇 --</option></select></label>
+                                <label class="inline-label"><span>客戶批號</span><input type="text" name="customer_batch_number" maxlength="100"></label>
+                                <label class="inline-label"><span>圖面編號</span><input type="text" name="drawing_number" maxlength="255"></label>
+                                <label class="inline-label"><span>品項編號</span><input type="text" name="sub_item_number" maxlength="100"></label>
+                                <label class="inline-label"><span>料號</span><input type="text" name="part_number" maxlength="100"></label>
+                            </div>
                         </div>
-                    </div>
-                    <div class="form-section">
-                        <h4>重量與狀態</h4>
-                        <div class="form-grid form-grid-two-columns">
-                            <label class="inline-label"><span>總重量(kg) <abbr title="必填">*</abbr></span><input type="number" name="total_weight_kg" min="0" step="0.01" required></label>
-                            <label class="inline-label"><span>單價/M</span><input type="number" name="unit_price_per_thousand" min="0" step="0.01"></label>
-                            <label class="inline-label"><span>生產狀態</span><select name="status"><option value="">-- 請選擇 --</option></select></label>
-                            <label class="inline-label"><span>客戶樣品狀態</span><select name="customer_sample_status"><option value="">-- 請選擇 --</option></select></label>
-                            <label class="inline-label"><span>客戶提供重量(kg)</span><input type="number" name="customer_provided_weight" min="0" step="0.01"></label>
-                            <label class="inline-label"><span>我方確認重量(kg)</span><input type="number" name="confirmed_weight" min="0" step="0.01"></label>
-                            <label class="inline-label"><span>實際生產重量(kg)</span><input type="number" name="actual_production_weight" min="0" step="0.01"></label>
+
+                        <div class="form-section">
+                            <h4>重量與狀態</h4>
+                            <div class="form-grid form-grid-two-columns">
+                                <label class="inline-label"><span>總重量(kg) <abbr title="必填">*</abbr></span><input type="number" name="total_weight_kg" min="0" step="0.01" required></label>
+                                <label class="inline-label"><span>單價/M</span><input type="number" name="unit_price_per_thousand" min="0" step="0.01"></label>
+                                <label class="inline-label"><span>生產狀態</span><select name="status"><option value="">-- 請選擇 --</option></select></label>
+                                <label class="inline-label"><span>客戶樣品狀態</span><select name="customer_sample_status"><option value="">-- 請選擇 --</option></select></label>
+                                <label class="inline-label"><span>客戶提供重量(kg)</span><input type="number" name="customer_provided_weight" min="0" step="0.01"></label>
+                                <label class="inline-label"><span>我方確認重量(kg)</span><input type="number" name="confirmed_weight" min="0" step="0.01"></label>
+                                <label class="inline-label"><span>實際生產重量(kg)</span><input type="number" name="actual_production_weight" min="0" step="0.01"></label>
+                            </div>
                         </div>
-                    </div>
-                    <div class="form-section">
-                        <h4>補充資訊</h4>
-                        <div class="form-grid form-grid-two-columns">
-                            <label class="inline-label"><span>指送地點</span><input type="text" name="delivery_location"></label>
-                            <label class="inline-label full-width"><span>備註</span><textarea name="notes" rows="3"></textarea></label>
+
+                        <div class="form-section">
+                            <h4>補充資訊</h4>
+                            <div class="form-grid form-grid-two-columns">
+                                <label class="inline-label"><span>指送地點</span><input type="text" name="delivery_location"></label>
+                                <label class="inline-label full-width"><span>備註</span><textarea name="notes" rows="3"></textarea></label>
+                            </div>
                         </div>
                     </div>
                     <div class="form-actions align-right">
@@ -138,6 +142,14 @@
     }
 
     function populate(form, item) {
+        const formatWeightInput = (value) => {
+            const numericValue = Number.parseFloat(String(value));
+            if (!Number.isFinite(numericValue)) {
+                return '';
+            }
+            return numericValue.toFixed(2);
+        };
+
         const selectedScreeningId = item?.screening_item?.id != null ? String(item.screening_item.id) : '';
         const screeningItems = [...(state.options?.screening_items || [])];
         if (selectedScreeningId && !screeningItems.some((option) => String(option.id) === selectedScreeningId)) {
@@ -152,9 +164,11 @@
         fillSelect(form.querySelector('[name="status"]'), state.options?.statuses || [], item.status ?? '');
         fillSelect(form.querySelector('[name="customer_sample_status"]'), state.options?.customer_sample_statuses || [], item.customer_sample_status ?? '');
 
-        ['total_weight_kg', 'unit_price_per_thousand', 'customer_batch_number', 'drawing_number', 'sub_item_number',
-            'part_number', 'customer_provided_weight', 'confirmed_weight', 'actual_production_weight',
-            'delivery_location', 'notes'].forEach((name) => setValue(form, name, item[name]));
+        ['unit_price_per_thousand', 'customer_batch_number', 'drawing_number', 'sub_item_number',
+            'part_number', 'delivery_location', 'notes'].forEach((name) => setValue(form, name, item[name]));
+
+        ['total_weight_kg', 'customer_provided_weight', 'confirmed_weight', 'actual_production_weight']
+            .forEach((name) => setValue(form, name, formatWeightInput(item[name])));
     }
 
     function readForm(form) {
