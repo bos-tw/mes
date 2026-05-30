@@ -4,7 +4,7 @@
  * audit-system-health.js
  *
  * 用途：在新增或修改功能模組時，自動檢查系統的健康度與完整性。
- * 此工具涵蓋安全性、架構、前端程式碼及資料完整性的靜態分析。
+ * 此工具涵蓋安全性、架構、前端程式碼、資料完整性與流程刪除守門的靜態分析。
  *
  * 使用方式：
  *   node tools/audit-system-health.js
@@ -475,12 +475,19 @@ function checkDualStatusFields() {
     if (!fs.existsSync(apiRoot)) return;
 
     const affected = [];
+    const skipDirs = new Set(['common', 'docs', 'tools', 'workflow_guard']);
 
     const walkDir = (dir) => {
         fs.readdirSync(dir).forEach(item => {
             const full = path.join(dir, item);
             const stat = fs.statSync(full);
-            if (stat.isDirectory()) { walkDir(full); return; }
+            if (stat.isDirectory()) {
+                const relDir = path.relative(apiRoot, full).replace(/\\/g, '/').split('/')[0];
+                if (!skipDirs.has(relDir)) {
+                    walkDir(full);
+                }
+                return;
+            }
             if (!item.endsWith('.php')) return;
 
             const content = fs.readFileSync(full, 'utf-8');
@@ -1028,12 +1035,107 @@ function checkDataSyncIntegration() {
 }
 
 // ─────────────────────────────────────────────
+// WF-1  流程型資料刪除守門檢查
+// ─────────────────────────────────────────────
+function checkWorkflowDeleteGuard() {
+    console.log('🔍 [WF-1] 檢查流程型資料刪除守門...');
+
+    const guardFile = 'api/common/workflow_guard.php';
+    const checkEndpoint = 'api/workflow_guard/check.php';
+    const processModules = [
+        { module: 'orders', api: 'api/orders/delete.php', js: 'js/orders.js', label: '訂單' },
+        { module: 'work_orders', api: 'api/work_orders/delete.php', js: 'js/work_orders.js', label: '工單' },
+        { module: 'inventory_items', api: 'api/inventory_items/delete.php', js: 'js/inventory_items.js', label: '庫存' },
+        { module: 'shipping_orders', api: 'api/shipping_orders/delete.php', js: 'js/shipping_orders.js', label: '出貨' },
+    ];
+
+    const guardContent = readFile(guardFile);
+    if (!guardContent) {
+        err('資料完整性', guardFile, 'WF-1 流程刪除守門',
+            '缺少流程刪除守門共用檔，訂單→工單→庫存→出貨的刪除可能產生幽靈資料',
+            '建立 api/common/workflow_guard.php，集中判斷各流程節點是否允許刪除、退回或作廢');
+        return;
+    }
+
+    if (!fileExists(checkEndpoint)) {
+        err('資料完整性', checkEndpoint, 'WF-1 流程刪除守門',
+            '缺少前端刪除預檢端點，使用者按刪除前無法取得流程影響與建議動作',
+            '建立 api/workflow_guard/check.php，讓前端在刪除前呼叫此端點取得 workflow_guard 結果');
+    }
+
+    if (!guardContent.includes('getWorkflowDeleteAssessment')) {
+        err('資料完整性', guardFile, 'WF-1 流程刪除守門',
+            'workflow_guard.php 未提供 getWorkflowDeleteAssessment() 統一入口',
+            '新增 getWorkflowDeleteAssessment(PDO $pdo, string $module, int $id)，並由各 delete API 共用');
+    }
+
+    processModules.forEach(({ module, api, js, label }) => {
+        const apiContent = readFile(api);
+        if (!apiContent) {
+            err('資料完整性', api, 'WF-1 流程刪除守門',
+                `${label}缺少 delete API，無法驗證刪除流程防呆`,
+                `建立 ${api}，或明確移除前端刪除入口`);
+            return;
+        }
+
+        if (!apiContent.includes('workflow_guard.php') || !apiContent.includes('getWorkflowDeleteAssessment')) {
+            err('資料完整性', api, 'WF-1 流程刪除守門',
+                `${label}刪除 API 未經 workflow_guard 檢查，可能直接刪除已進入後續流程的資料`,
+                '在刪除前呼叫 getWorkflowDeleteAssessment()；若 blocked，回傳 409 與 workflow_guard 詳細資訊');
+        }
+
+        if (!apiContent.includes('workflow_guard')) {
+            warn('資料完整性', api, 'WF-1 回應格式',
+                `${label}刪除 API 未明確回傳 workflow_guard 欄位，前端可能無法呈現流程影響`,
+                '被阻擋時回傳 { success:false, message, workflow_guard }，讓前端可顯示退回/作廢/取消動作');
+        }
+
+        const jsContent = readFile(js);
+        if (!jsContent) {
+            warn('前端', js, 'WF-1 前端刪除預檢',
+                `${label}前端模組不存在，無法確認刪除前是否有流程預檢`,
+                `若 ${label}有刪除按鈕，需在送出 DELETE 前呼叫 ${checkEndpoint}`);
+            return;
+        }
+
+        if (!jsContent.includes('workflow_guard/check.php')) {
+            warn('前端', js, 'WF-1 前端刪除預檢',
+                `${label}前端刪除流程未呼叫 workflow_guard/check.php，使用者可能看不到流程影響提示`,
+                '刪除前先呼叫 api/workflow_guard/check.php?module=...&action=delete&id=...，再依 allowed/impacts 顯示確認視窗');
+        }
+
+        if (!guardContent.includes(`'${module}'`)) {
+            err('資料完整性', guardFile, 'WF-1 模組覆蓋',
+                `workflow_guard.php 未覆蓋 ${module}，${label}刪除無法取得流程判斷`,
+                `在 getWorkflowDeleteAssessment() 中加入 ${module} 對應的 assess*Delete()`);
+        }
+    });
+
+    const shippingDelete = readFile('api/shipping_orders/delete.php') || '';
+    if (/\bDELETE\s+FROM\s+shipping_orders\b/i.test(shippingDelete) ||
+        /\bDELETE\s+FROM\s+shipping_order_items\b/i.test(shippingDelete)) {
+        err('資料完整性', 'api/shipping_orders/delete.php', 'WF-1 出貨刪除追溯',
+            '出貨單刪除仍包含硬刪 shipping_orders 或 shipping_order_items，會破壞流程追溯',
+            '改為軟刪 shipping_orders，保留 shipping_order_items 作為追溯資料，並只釋放未出貨配貨數量');
+    }
+
+    if (!/UPDATE\s+shipping_orders\s+SET\s+deleted_at\s*=/i.test(shippingDelete)) {
+        warn('資料完整性', 'api/shipping_orders/delete.php', 'WF-1 出貨刪除追溯',
+            '出貨單刪除未明確更新 deleted_at，可能不是可追溯的軟刪除',
+            '使用 UPDATE shipping_orders SET deleted_at = NOW()，列表端再排除 deleted_at IS NOT NULL');
+    }
+
+    info('資料完整性', 'WF-1 流程刪除守門',
+        '已檢查訂單、工單、庫存、出貨刪除 API 與前端預檢是否接上 workflow_guard。');
+}
+
+// ─────────────────────────────────────────────
 // 🚀 執行所有檢查
 // ─────────────────────────────────────────────
 function runAllChecks() {
     const sep = '═'.repeat(65);
     console.log(`\n${sep}`);
-    console.log('  MES 系統健康度審計工具 v1.2');
+    console.log('  MES 系統健康度審計工具 v1.3');
     console.log(`${sep}\n`);
 
     checkHardcodedCredentials();
@@ -1062,6 +1164,7 @@ function runAllChecks() {
     checkModuleHtmlStyle();
     checkPhpApiSecurity();
     checkDataSyncIntegration();
+    checkWorkflowDeleteGuard();
 
     // ── 輸出報告 ──────────────────────────────
     console.log(`\n${sep}`);

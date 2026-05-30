@@ -44,6 +44,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../common/workflow_guard.php';
 require_once __DIR__ . '/helpers.php';
 
 requireAuth();
@@ -65,6 +66,15 @@ if (!orderExists($pdo, (int)$id)) {
         'success' => false,
         'message' => '找不到對應的訂單資料。',
     ], 404);
+}
+
+$workflowGuard = getWorkflowDeleteAssessment($pdo, 'orders', (int)$id);
+if (!$workflowGuard['allowed']) {
+    jsonResponse([
+        'success' => false,
+        'message' => $workflowGuard['message'],
+        'workflow_guard' => $workflowGuard,
+    ], 409);
 }
 
 // 檢查是否有關聯的訂單品項

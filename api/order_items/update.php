@@ -375,8 +375,9 @@ try {
 
     // 處理要刪除的圖面
     if (!empty($deletedDrawingIds)) {
-        $deleteDrawingStmt = $pdo->prepare('SELECT file_path FROM order_item_drawings WHERE id = :id AND order_item_id = :order_item_id');
+        $deleteDrawingStmt = $pdo->prepare('SELECT id, file_path FROM order_item_drawings WHERE id = :id AND order_item_id = :order_item_id');
         $removeDrawingStmt = $pdo->prepare('DELETE FROM order_item_drawings WHERE id = :id AND order_item_id = :order_item_id');
+        $countDrawingRefStmt = $pdo->prepare('SELECT COUNT(*) FROM order_item_drawings WHERE file_path = :file_path');
 
         foreach ($deletedDrawingIds as $drawingId) {
             if (!is_int($drawingId)) {
@@ -390,11 +391,15 @@ try {
             // 刪除資料庫記錄
             $removeDrawingStmt->execute(['id' => $drawingId, 'order_item_id' => $id]);
 
-            // 刪除實體檔案
+            // 僅在沒有其他引用時才刪除實體檔案
             if ($drawing && !empty($drawing['file_path'])) {
-                $filePath = __DIR__ . '/../../' . $drawing['file_path'];
-                if (file_exists($filePath)) {
-                    @unlink($filePath);
+                $countDrawingRefStmt->execute(['file_path' => $drawing['file_path']]);
+                $remainingReferences = (int)$countDrawingRefStmt->fetchColumn();
+                if ($remainingReferences === 0) {
+                    $filePath = __DIR__ . '/../../' . $drawing['file_path'];
+                    if (file_exists($filePath)) {
+                        @unlink($filePath);
+                    }
                 }
             }
         }
@@ -451,8 +456,9 @@ try {
 
     // 處理要刪除的檔案附件
     if (!empty($deletedAttachmentIds)) {
-        $deleteAttachmentStmt = $pdo->prepare('SELECT file_path FROM order_item_attachments WHERE id = :id AND order_item_id = :order_item_id');
+        $deleteAttachmentStmt = $pdo->prepare('SELECT id, file_path FROM order_item_attachments WHERE id = :id AND order_item_id = :order_item_id');
         $removeAttachmentStmt = $pdo->prepare('DELETE FROM order_item_attachments WHERE id = :id AND order_item_id = :order_item_id');
+        $countAttachmentRefStmt = $pdo->prepare('SELECT COUNT(*) FROM order_item_attachments WHERE file_path = :file_path');
 
         foreach ($deletedAttachmentIds as $attachmentId) {
             if (!is_int($attachmentId)) {
@@ -466,11 +472,15 @@ try {
             // 刪除資料庫記錄
             $removeAttachmentStmt->execute(['id' => $attachmentId, 'order_item_id' => $id]);
 
-            // 刪除實體檔案
+            // 僅在沒有其他引用時才刪除實體檔案
             if ($attachment && !empty($attachment['file_path'])) {
-                $filePath = __DIR__ . '/../../' . $attachment['file_path'];
-                if (file_exists($filePath)) {
-                    @unlink($filePath);
+                $countAttachmentRefStmt->execute(['file_path' => $attachment['file_path']]);
+                $remainingReferences = (int)$countAttachmentRefStmt->fetchColumn();
+                if ($remainingReferences === 0) {
+                    $filePath = __DIR__ . '/../../' . $attachment['file_path'];
+                    if (file_exists($filePath)) {
+                        @unlink($filePath);
+                    }
                 }
             }
         }

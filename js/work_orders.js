@@ -885,8 +885,39 @@
         });
     }
 
+    async function checkWorkflowDelete(moduleName, id) {
+        const response = await fetch(`api/workflow_guard/check.php?module=${encodeURIComponent(moduleName)}&action=delete&id=${encodeURIComponent(id)}`, {
+            credentials: 'include'
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || '流程檢查失敗');
+        }
+        return result.data || {};
+    }
+
+    function buildWorkflowConfirmMessage(assessment, fallbackMessage) {
+        const impacts = Array.isArray(assessment.impacts) && assessment.impacts.length > 0
+            ? `\n\n影響範圍：\n${assessment.impacts.map((impact) => `- ${impact}`).join('\n')}`
+            : '';
+        return `${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`;
+    }
+
     async function deleteWorkOrder(id) {
-        if (!confirm('確定要刪除此工單嗎?')) return;
+        let assessment;
+        try {
+            assessment = await checkWorkflowDelete('work_orders', id);
+        } catch (error) {
+            showAlert(error.message || '流程檢查失敗', 'error');
+            return;
+        }
+
+        if (!assessment.allowed) {
+            showAlert(assessment.message || '此工單目前不可刪除。', 'warning');
+            return;
+        }
+
+        if (!confirm(buildWorkflowConfirmMessage(assessment, '確定要刪除此工單嗎?'))) return;
 
         try {
             const response = await fetch(`api/work_orders/delete.php?id=${id}`, {

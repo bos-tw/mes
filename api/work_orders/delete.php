@@ -34,6 +34,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../common/workflow_guard.php';
 
 /**
  * Work Order Delete API Endpoint
@@ -75,6 +76,16 @@ try {
     if (!$workOrder) {
         $pdo->rollBack();
         jsonResponse(['success' => false, 'message' => '找不到該工單。'], 404);
+    }
+
+    $workflowGuard = getWorkflowDeleteAssessment($pdo, 'work_orders', $id);
+    if (!$workflowGuard['allowed']) {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => $workflowGuard['message'],
+            'workflow_guard' => $workflowGuard,
+        ], 409);
     }
 
     $statusKey = strtolower(trim((string)($workOrder['status_key'] ?? '')));

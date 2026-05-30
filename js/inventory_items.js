@@ -53,6 +53,7 @@
         screeningItems: [],
         workOrders: [],
         employees: [],
+        deleteBlockReasons: new Map(),
     };
 
     // Initialize
@@ -218,7 +219,17 @@
 
             const submitButton = elements.shippingModal.querySelector('[data-action="submit-shipping"]');
             if (submitButton) {
-                submitButton.addEventListener('click', handleAddToShipping);
+                submitButton.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    handleAddToShipping();
+                });
+            }
+
+            if (elements.shippingForm) {
+                elements.shippingForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    handleAddToShipping();
+                });
             }
         }
     }
@@ -495,6 +506,7 @@
 
 function renderTable(items) {
         if (!elements.tbody) return;
+        state.deleteBlockReasons.clear();
 
         if (items.length === 0) {
             elements.tbody.innerHTML = `
@@ -523,6 +535,17 @@ function renderTable(items) {
             // 判斷是否已有分配數量（已加入出貨單）
             const hasAllocated = parseFloat(item.quantity_allocated || 0) > 0;
             const shippingBtnTitle = hasAllocated ? '已加入出貨單（已分配數量：' + item.quantity_allocated + '）' : '加入出貨單';
+            const deleteBlockReason = getInventoryDeleteBlockReason(item);
+            if (deleteBlockReason) {
+                state.deleteBlockReasons.set(Number(item.id), deleteBlockReason);
+            }
+            const deleteButton = deleteBlockReason
+                ? `<button type="button" class="btn text op-action-btn op-role-delete" data-action="delete-blocked" title="${escapeHtml(deleteBlockReason)}" aria-label="${escapeHtml(deleteBlockReason)}" onclick="window.inventoryItemsModule.showDeleteBlocked(${item.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>`
+                : `<button type="button" class="btn text danger op-action-btn op-role-delete" data-action="delete" title="刪除" aria-label="刪除" onclick="window.inventoryItemsModule.delete(${item.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>`;
 
             return `
             <tr data-id="${item.id}">
@@ -538,7 +561,7 @@ function renderTable(items) {
                 <td>${formatDateTime(item.received_at)}</td>
                 <td class="table-actions">
                     ${canShip ? `
-                    <button type="button" class="btn text op-action-btn op-role-shipping" data-action="add-to-shipping" title="${shippingBtnTitle}" onclick="window.inventoryItemsModule.openShippingModal(${item.id})">
+                    <button type="button" class="btn text op-action-btn op-role-shipping" data-action="add-to-shipping" title="${escapeHtml(shippingBtnTitle)}" onclick="window.inventoryItemsModule.openShippingModal(${item.id})">
                         <i class="fas fa-shipping-fast"></i>
                     </button>
                     ` : ''}
@@ -548,9 +571,7 @@ function renderTable(items) {
                     <button type="button" class="btn text op-action-btn op-role-edit" data-action="edit" title="編輯" aria-label="編輯" onclick="window.inventoryItemsModule.edit(${item.id})">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button type="button" class="btn text danger op-action-btn op-role-delete" data-action="delete" title="刪除" aria-label="刪除" onclick="window.inventoryItemsModule.delete(${item.id})">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    ${deleteButton}
                 </td>
             </tr>
         `;
@@ -1240,6 +1261,7 @@ function renderTable(items) {
                 shipping_order_id: shippingOrderId === 'new' ? null : parseInt(shippingOrderId),
                 customer_id: customerId ? parseInt(customerId) : null,
                 quantity: quantity,
+                shipped_quantity: quantity,
                 notes: notes
             };
 
@@ -1261,10 +1283,24 @@ function renderTable(items) {
             loadInventoryItems(); // 刷新表格
 
             // 詢問是否跳轉到出貨單頁面
-            if (data.shipping_order_id && confirm('已成功加入出貨單！是否前往出貨單頁面查看？')) {
+            const createdShippingOrderId = data.shipping_order_id
+                || data.data?.shipping_order_id
+                || data.data?.shipping_order?.id
+                || null;
+
+            if (typeof DataSync !== 'undefined') {
+                const eventPayload = {
+                    id: createdShippingOrderId ? Number(createdShippingOrderId) : undefined,
+                    shipping_order_id: createdShippingOrderId ? Number(createdShippingOrderId) : undefined,
+                    inventory_item_id: parseInt(inventoryItemId, 10),
+                };
+                DataSync.notifyWithDependencies('shipping_orders', DataSync.EVENT_TYPES.UPDATED, eventPayload);
+            }
+
+            if (createdShippingOrderId && confirm('已成功加入出貨單！是否前往出貨單頁面查看？')) {
                 if (typeof window.openTabAndNavigate === 'function') {
                     window.openTabAndNavigate('shipping_orders', '出貨單', {
-                        shippingOrderId: data.shipping_order_id
+                        shippingOrderId: Number(createdShippingOrderId)
                     });
                 } else if (typeof window.openTab === 'function') {
                     window.openTab('shipping_orders', '出貨單', 'modules/shipping_orders.html');
@@ -1488,8 +1524,39 @@ function renderTable(items) {
         }
     }
 
+    async function checkWorkflowDelete(moduleName, id) {
+        const response = await fetch(`api/workflow_guard/check.php?module=${encodeURIComponent(moduleName)}&action=delete&id=${encodeURIComponent(id)}`, {
+            credentials: 'include'
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || '流程檢查失敗');
+        }
+        return result.data || {};
+    }
+
+    function buildWorkflowConfirmMessage(assessment, fallbackMessage) {
+        const impacts = Array.isArray(assessment.impacts) && assessment.impacts.length > 0
+            ? `\n\n影響範圍：\n${assessment.impacts.map((impact) => `- ${impact}`).join('\n')}`
+            : '';
+        return `${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`;
+    }
+
     async function handleDelete(id) {
-        if (!confirm('確定要刪除此庫存項目嗎?')) {
+        let assessment;
+        try {
+            assessment = await checkWorkflowDelete('inventory_items', id);
+        } catch (error) {
+            showAlert('error', error.message || '流程檢查失敗');
+            return;
+        }
+
+        if (!assessment.allowed) {
+            showAlert('warning', assessment.message || '此庫存項目目前不可刪除。');
+            return;
+        }
+
+        if (!confirm(buildWorkflowConfirmMessage(assessment, '確定要刪除此庫存項目嗎?'))) {
             return;
         }
 
@@ -1511,6 +1578,11 @@ function renderTable(items) {
         } catch (error) {
             showAlert('error', error.message);
         }
+    }
+
+    function showDeleteBlocked(id) {
+        const reason = state.deleteBlockReasons.get(Number(id)) || '此庫存項目目前不可刪除。';
+        showAlert('warning', reason);
     }
 
     function handleExport() {
@@ -1635,6 +1707,19 @@ function renderTable(items) {
         return labels[status] || status;
     }
 
+    function getInventoryDeleteBlockReason(item) {
+        if (parseFloat(item.quantity_allocated || 0) > 0) {
+            return '此庫存已有配貨，請先從出貨單移除或取消配貨後再處理。';
+        }
+        if (parseFloat(item.quantity_shipped || 0) > 0) {
+            return '此庫存已有出貨記錄，無法刪除。';
+        }
+        if (Number(item.work_order_id || 0) > 0) {
+            return '此庫存由生產工單轉入，請回到生產工單調整狀態並選擇「刪除庫存並變更狀態」。';
+        }
+        return '';
+    }
+
     function getRefTypeLabel(refType) {
         const labels = {
             'work_order': '生產工單',
@@ -1725,6 +1810,7 @@ function renderTable(items) {
         viewDetail: openDetailModal,
         edit: openEditModal,
         delete: handleDelete,
+        showDeleteBlocked: showDeleteBlocked,
         goToPage: goToPage,
         openShippingModal: openShippingModal,
         openCreate: (workOrderId = null) => {

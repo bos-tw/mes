@@ -39,6 +39,9 @@
  * | drawing_files[]        | file     | 否  | 圖面檔案 (JPEG/PNG/GIF/PDF)    |
  * | drawing_numbers        | JSON     | 否  | 圖面編號陣列                   |
  * | attachment_files[]     | file     | 否  | 附件檔案                       |
+ * | copied_drawing_ids     | JSON     | 否  | 要複製關聯的既有圖面 ID 陣列   |
+ * | copied_drawing_numbers | JSON     | 否  | 覆寫圖面編號映射 {id:number}   |
+ * | copied_attachment_ids  | JSON     | 否  | 要複製關聯的既有附件 ID 陣列   |
  *
  * @output 成功 (GET):
  * ```json
@@ -171,6 +174,52 @@ function handleCreateOrderItem(): void
 {
     $pdo = db();
     $payload = readOrderItemPayload();
+
+    // 解析複製圖面 ID
+    $copiedDrawingIds = [];
+    if (isset($_POST['copied_drawing_ids']) && is_string($_POST['copied_drawing_ids'])) {
+        $copiedDrawingIdsRaw = json_decode($_POST['copied_drawing_ids'], true);
+        if (is_array($copiedDrawingIdsRaw)) {
+            foreach ($copiedDrawingIdsRaw as $value) {
+                $parsedId = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                if ($parsedId !== false) {
+                    $copiedDrawingIds[] = (int)$parsedId;
+                }
+            }
+            $copiedDrawingIds = array_values(array_unique($copiedDrawingIds));
+        }
+    }
+
+    // 解析複製圖面編號覆寫
+    $copiedDrawingNumbers = [];
+    if (isset($_POST['copied_drawing_numbers']) && is_string($_POST['copied_drawing_numbers'])) {
+        $copiedDrawingNumbersRaw = json_decode($_POST['copied_drawing_numbers'], true);
+        if (is_array($copiedDrawingNumbersRaw)) {
+            foreach ($copiedDrawingNumbersRaw as $key => $value) {
+                $parsedId = filter_var($key, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                if ($parsedId === false) {
+                    continue;
+                }
+                $normalizedValue = trim((string)$value);
+                $copiedDrawingNumbers[(int)$parsedId] = $normalizedValue !== '' ? mb_substr($normalizedValue, 0, 255) : null;
+            }
+        }
+    }
+
+    // 解析複製附件 ID
+    $copiedAttachmentIds = [];
+    if (isset($_POST['copied_attachment_ids']) && is_string($_POST['copied_attachment_ids'])) {
+        $copiedAttachmentIdsRaw = json_decode($_POST['copied_attachment_ids'], true);
+        if (is_array($copiedAttachmentIdsRaw)) {
+            foreach ($copiedAttachmentIdsRaw as $value) {
+                $parsedId = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                if ($parsedId !== false) {
+                    $copiedAttachmentIds[] = (int)$parsedId;
+                }
+            }
+            $copiedAttachmentIds = array_values(array_unique($copiedAttachmentIds));
+        }
+    }
 
     // 解析圖面編號
     $drawingNumbers = [];
@@ -423,6 +472,39 @@ function handleCreateOrderItem(): void
             }
         }
 
+        // 複製既有圖面關聯（共用同一實體檔案）
+        if (!empty($copiedDrawingIds)) {
+            $drawingPlaceholders = implode(',', array_fill(0, count($copiedDrawingIds), '?'));
+            $copiedDrawingsStmt = $pdo->prepare(
+                "SELECT id, drawing_number, file_name, file_path, file_size, mime_type
+                 FROM order_item_drawings
+                 WHERE id IN ({$drawingPlaceholders})"
+            );
+            $copiedDrawingsStmt->execute($copiedDrawingIds);
+            $copiedDrawings = $copiedDrawingsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!empty($copiedDrawings)) {
+                $insertCopiedDrawingStmt = $pdo->prepare(
+                    'INSERT INTO order_item_drawings (order_item_id, drawing_number, file_name, file_path, file_size, mime_type)
+                     VALUES (:order_item_id, :drawing_number, :file_name, :file_path, :file_size, :mime_type)'
+                );
+                foreach ($copiedDrawings as $drawing) {
+                    $sourceDrawingId = isset($drawing['id']) ? (int)$drawing['id'] : 0;
+                    $drawingNumber = array_key_exists($sourceDrawingId, $copiedDrawingNumbers)
+                        ? $copiedDrawingNumbers[$sourceDrawingId]
+                        : ($drawing['drawing_number'] ?? null);
+                    $insertCopiedDrawingStmt->execute([
+                        'order_item_id' => $orderItemId,
+                        'drawing_number' => $drawingNumber,
+                        'file_name' => $drawing['file_name'],
+                        'file_path' => $drawing['file_path'],
+                        'file_size' => $drawing['file_size'],
+                        'mime_type' => $drawing['mime_type'],
+                    ]);
+                }
+            }
+        }
+
         // 儲存檔案附件
         if (!empty($uploadedAttachments)) {
             $insertAttachmentStmt = $pdo->prepare(
@@ -437,6 +519,34 @@ function handleCreateOrderItem(): void
                     'file_size' => $attachment['file_size'],
                     'mime_type' => $attachment['mime_type'],
                 ]);
+            }
+        }
+
+        // 複製既有附件關聯（共用同一實體檔案）
+        if (!empty($copiedAttachmentIds)) {
+            $attachmentPlaceholders = implode(',', array_fill(0, count($copiedAttachmentIds), '?'));
+            $copiedAttachmentsStmt = $pdo->prepare(
+                "SELECT id, file_name, file_path, file_size, mime_type
+                 FROM order_item_attachments
+                 WHERE id IN ({$attachmentPlaceholders})"
+            );
+            $copiedAttachmentsStmt->execute($copiedAttachmentIds);
+            $copiedAttachments = $copiedAttachmentsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!empty($copiedAttachments)) {
+                $insertCopiedAttachmentStmt = $pdo->prepare(
+                    'INSERT INTO order_item_attachments (order_item_id, file_name, file_path, file_size, mime_type)
+                     VALUES (:order_item_id, :file_name, :file_path, :file_size, :mime_type)'
+                );
+                foreach ($copiedAttachments as $attachment) {
+                    $insertCopiedAttachmentStmt->execute([
+                        'order_item_id' => $orderItemId,
+                        'file_name' => $attachment['file_name'],
+                        'file_path' => $attachment['file_path'],
+                        'file_size' => $attachment['file_size'],
+                        'mime_type' => $attachment['mime_type'],
+                    ]);
+                }
             }
         }
 

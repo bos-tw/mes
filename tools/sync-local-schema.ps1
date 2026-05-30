@@ -213,6 +213,14 @@ $migrationChecks = [ordered]@{
         CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM permissions WHERE name = 'production_work_order_schedule.read'), 1, 0);"
         Description = 'production_work_order_schedule.read permission exists'
     }
+    '2026_05_30_add_orders_expected_delivery_period.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'expected_delivery_period'), 1, 0);"
+        Description = 'orders.expected_delivery_period column'
+    }
+    '2026_05_30_backfill_work_order_inventory_metrics.sql' = @{
+        CheckSql = "SELECT IF(NOT EXISTS(SELECT 1 FROM inventory_items ii JOIN work_orders wo ON wo.id = ii.work_order_id JOIN order_items oi ON oi.id = wo.order_item_id JOIN screening_items si ON si.id = oi.screening_item_id WHERE ii.deleted_at IS NULL AND ii.work_order_id IS NOT NULL AND COALESCE(ii.quantity_allocated, 0) = 0 AND COALESCE(ii.quantity_shipped, 0) = 0 AND (COALESCE(ii.quantity_on_hand, 0) = 0 OR COALESCE(ii.total_good_units, 0) = 0 OR COALESCE(ii.weight_per_unit_g, 0) = 0 OR COALESCE(wo.total_units, 0) = 0 OR COALESCE(wo.weight_per_unit_g, 0) = 0) AND COALESCE(oi.total_weight_kg, 0) > 0 AND COALESCE(si.weight_per_unit_g, 0) > 0), 1, 0);"
+        Description = 'backfilled work order and inventory metrics'
+    }
 }
 
 $migrationFiles = Get-ChildItem -LiteralPath $migrationsDir -File | Sort-Object Name

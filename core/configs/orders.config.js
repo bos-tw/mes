@@ -81,6 +81,7 @@ ModuleConfig.register('orders', {
     // Modal 表單 - 使用 formRows 模式
     modal: {
         title: '新增訂單',
+        size: 'large',
         hiddenFields: ['id'],
         formRows: [
             {
@@ -108,6 +109,16 @@ ModuleConfig.register('orders', {
                         <span>預計交期</span>
                         <input type="date" name="expected_delivery_date">
                         <span class="weekday-badge" data-weekday-for="expected_delivery_date"></span>
+                    </label>
+                    <label class="inline-label">
+                        <span>預計交期時段</span>
+                        <select name="expected_delivery_period">
+                            <option value="">-- 請選擇時段 --</option>
+                            <option value="morning">上午</option>
+                            <option value="noon">中午</option>
+                            <option value="afternoon">下午</option>
+                            <option value="evening">晚間</option>
+                        </select>
                     </label>
                     <label class="inline-label">
                         <span>客戶訂單號碼</span>

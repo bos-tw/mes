@@ -152,10 +152,12 @@ function getInventoryItemDetails(PDO $pdo, int $id): ?array
 /**
  * Check if inventory item can be deleted
  */
-function canDeleteInventoryItem(PDO $pdo, int $id): array
+function canDeleteInventoryItem(PDO $pdo, int $id, array $options = []): array
 {
+    $allowWorkOrderSourceDelete = (bool)($options['allow_work_order_source_delete'] ?? false);
+
     $stmt = $pdo->prepare("
-        SELECT quantity_allocated, quantity_shipped
+        SELECT id, work_order_id, quantity_allocated, quantity_shipped
         FROM inventory_items
         WHERE id = :id AND deleted_at IS NULL
     ");
@@ -166,11 +168,11 @@ function canDeleteInventoryItem(PDO $pdo, int $id): array
         return ['can_delete' => false, 'reason' => '庫存項目不存在。'];
     }
 
-    if ($item['quantity_allocated'] > 0) {
+    if ((float)$item['quantity_allocated'] > 0) {
         return ['can_delete' => false, 'reason' => '此庫存已有配貨，無法刪除。'];
     }
 
-    if ($item['quantity_shipped'] > 0) {
+    if ((float)$item['quantity_shipped'] > 0) {
         return ['can_delete' => false, 'reason' => '此庫存已有出貨記錄，無法刪除。'];
     }
 
@@ -181,6 +183,24 @@ function canDeleteInventoryItem(PDO $pdo, int $id): array
     $shippingStmt->execute(['id' => $id]);
     if ($shippingStmt->fetchColumn() > 0) {
         return ['can_delete' => false, 'reason' => '此庫存項目已被出貨單引用，無法刪除。'];
+    }
+
+    $transactionStmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM inventory_transactions
+        WHERE inventory_item_id = :id
+          AND NOT (ref_type = 'work_order' AND direction = 'inbound')
+    ");
+    $transactionStmt->execute(['id' => $id]);
+    if ((int)$transactionStmt->fetchColumn() > 0) {
+        return ['can_delete' => false, 'reason' => '此庫存已有入庫以外的異動紀錄，無法刪除。'];
+    }
+
+    if (!$allowWorkOrderSourceDelete && !empty($item['work_order_id'])) {
+        return [
+            'can_delete' => false,
+            'reason' => '此庫存由生產工單轉入，請回到生產工單調整狀態並選擇「刪除庫存並變更狀態」，避免工單與庫存追溯中斷。'
+        ];
     }
 
     return ['can_delete' => true];

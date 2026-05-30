@@ -33,6 +33,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../common/workflow_guard.php';
 require_once __DIR__ . '/helpers.php';
 
 /**
@@ -63,7 +64,12 @@ if (!$item) {
 // Check if can delete
 $canDelete = canDeleteInventoryItem($pdo, $id);
 if (!$canDelete['can_delete']) {
-    jsonResponse(['success' => false, 'message' => $canDelete['reason']], 400);
+    $workflowGuard = getWorkflowDeleteAssessment($pdo, 'inventory_items', $id);
+    jsonResponse([
+        'success' => false,
+        'message' => $canDelete['reason'],
+        'workflow_guard' => $workflowGuard,
+    ], 409);
 }
 
 try {

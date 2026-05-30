@@ -275,15 +275,27 @@ function handleCreateWorkOrder(PDO $pdo): void
         $firstPieceDimensions = null;
     }
 
-    // Check if order item exists
-    $orderItemStmt = $pdo->prepare("SELECT id FROM order_items WHERE id = :id");
-    $orderItemStmt->execute(['id' => $data['order_item_id']]);
-    if (!$orderItemStmt->fetch()) {
+    // Check if order item exists and keep order metrics as a fallback.
+    $orderItemDetails = fetchOrderItemDetailsForWorkOrder($pdo, (int)$data['order_item_id']);
+    if (!$orderItemDetails) {
         jsonResponse([
             'success' => false,
             'message' => '客戶批號不存在。'
         ], 404);
         return;
+    }
+
+    if (!array_key_exists('total_weight_kg', $data) || $data['total_weight_kg'] === null) {
+        $data['total_weight_kg'] = (float)($orderItemDetails['net_weight'] ?? 0);
+    }
+    if (!array_key_exists('weight_per_unit_g', $data) || $data['weight_per_unit_g'] === null) {
+        $data['weight_per_unit_g'] = (float)($orderItemDetails['weight_per_unit_g'] ?? 0);
+    }
+    if (!array_key_exists('total_units', $data) || $data['total_units'] === null) {
+        $data['total_units'] = (float)($orderItemDetails['total_units'] ?? 0);
+    }
+    if (!array_key_exists('tool_statistics', $data) || $data['tool_statistics'] === null) {
+        $data['tool_statistics'] = $orderItemDetails['tool_statistics'] ?? null;
     }
 
     // Prevent duplicate work orders for the same order item

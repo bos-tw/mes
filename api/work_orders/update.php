@@ -324,7 +324,9 @@ try {
         $inventoryItemId = (int)($inventoryStmt->fetchColumn() ?: 0);
 
         if ($inventoryItemId > 0) {
-            $canDelete = canDeleteInventoryItem($pdo, $inventoryItemId);
+            $canDelete = canDeleteInventoryItem($pdo, $inventoryItemId, [
+                'allow_work_order_source_delete' => true,
+            ]);
             if (!$canDelete['can_delete']) {
                 $pdo->rollBack();
                 jsonResponse(['success' => false, 'message' => $canDelete['reason']], 400);
@@ -359,6 +361,8 @@ try {
             $orderItemInfo = $orderItemStmt->fetch(PDO::FETCH_ASSOC);
 
             if ($orderItemInfo) {
+                $orderItemMetrics = fetchOrderItemDetailsForWorkOrder($pdo, (int)$existingWorkOrder['order_item_id']) ?? [];
+
                 // 計算良品/不良品數量
                 $defectStmt = $pdo->prepare("
                     SELECT COALESCE(SUM(defect_quantity), 0) FROM work_order_screening_defects WHERE work_order_id = :woid
@@ -366,17 +370,37 @@ try {
                 $defectStmt->execute(['woid' => $id]);
                 $totalDefects = (float)$defectStmt->fetchColumn();
 
-                $totalUnits = (float)($existingWorkOrder['total_units'] ?? 0);
+                $totalUnits = (float)(
+                    $data['total_units']
+                    ?? $existingWorkOrder['total_units']
+                    ?? $orderItemMetrics['total_units']
+                    ?? 0
+                );
                 $totalGoodUnits = max(0, $totalUnits - $totalDefects);
 
                 // 取得重量資料（可能從最新的 data 或既有欄位）
-                $totalWeightKg = (float)($data['total_weight_kg'] ?? $existingWorkOrder['total_weight_kg'] ?? 0);
-                $weightPerUnitG = (float)($data['weight_per_unit_g'] ?? $existingWorkOrder['weight_per_unit_g'] ?? 0);
-                $toolStatistics = $data['tool_statistics'] ?? $existingWorkOrder['tool_statistics'] ?? null;
+                $totalWeightKg = (float)(
+                    $data['total_weight_kg']
+                    ?? $existingWorkOrder['total_weight_kg']
+                    ?? $orderItemMetrics['net_weight']
+                    ?? 0
+                );
+                $weightPerUnitG = (float)(
+                    $data['weight_per_unit_g']
+                    ?? $existingWorkOrder['weight_per_unit_g']
+                    ?? $orderItemMetrics['weight_per_unit_g']
+                    ?? 0
+                );
+                $toolStatistics = $data['tool_statistics']
+                    ?? $existingWorkOrder['tool_statistics']
+                    ?? $orderItemMetrics['tool_statistics']
+                    ?? null;
+                $toolWeightKg = (float)($orderItemMetrics['total_tool_weight'] ?? 0);
+                $totalToolQuantity = (int)($orderItemMetrics['tool_quantity'] ?? 0);
 
                 // 計算淨重（良品重量）
                 $netWeightKg = $weightPerUnitG > 0 ? round($totalGoodUnits * $weightPerUnitG / 1000, 2) : $totalWeightKg;
-                $grossWeightKg = $totalWeightKg > 0 ? $totalWeightKg : $netWeightKg;
+                $grossWeightKg = round($netWeightKg + $toolWeightKg, 2);
 
                 // 產生庫存編號
                 require_once __DIR__ . '/../inventory_items/helpers.php';
@@ -400,8 +424,8 @@ try {
                         :order_item_id, :order_id, :customer_id, :customer_batch_number,
                         :total_good_units, :total_defect_units,
                         :quantity_on_hand, 0, 0, 0,
-                        :net_weight_kg, :gross_weight_kg, 0, :weight_per_unit_g,
-                        :tool_statistics, 0,
+                        :net_weight_kg, :gross_weight_kg, :tool_weight_kg, :weight_per_unit_g,
+                        :tool_statistics, :total_tool_quantity,
                         'pending', 'in_stock', NOW(), :created_by
                     )
                 ";
@@ -419,8 +443,10 @@ try {
                     'quantity_on_hand' => $totalGoodUnits,
                     'net_weight_kg' => $netWeightKg,
                     'gross_weight_kg' => $grossWeightKg,
+                    'tool_weight_kg' => $toolWeightKg,
                     'weight_per_unit_g' => $weightPerUnitG,
                     'tool_statistics' => $toolStatistics,
+                    'total_tool_quantity' => $totalToolQuantity,
                     'created_by' => $currentUserId,
                 ]);
 

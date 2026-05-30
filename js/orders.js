@@ -65,6 +65,7 @@
         const customerIdSelect = modalForm ? modalForm.querySelector('select[name="customer_id"]') : null;
         const orderDateInput = modalForm ? modalForm.querySelector('input[name="order_date"]') : null;
         const expectedDeliveryDateInput = modalForm ? modalForm.querySelector('input[name="expected_delivery_date"]') : null;
+        const expectedDeliveryPeriodSelect = modalForm ? modalForm.querySelector('select[name="expected_delivery_period"]') : null;
         const customerPoNumberInput = modalForm ? modalForm.querySelector('input[name="customer_po_number"]') : null;
         const statusSelect = modalForm ? modalForm.querySelector('select[name="status"]') : null;
         const totalAmountInput = modalForm ? modalForm.querySelector('input[name="total_amount"]') : null;
@@ -944,8 +945,39 @@
             }
         }
 
+        async function checkWorkflowDelete(moduleName, id) {
+            const response = await fetch(`api/workflow_guard/check.php?module=${encodeURIComponent(moduleName)}&action=delete&id=${encodeURIComponent(id)}`, {
+                credentials: 'include'
+            });
+            const result = await readJsonResponse(response, '流程檢查失敗。');
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || '流程檢查失敗。');
+            }
+            return result.data || {};
+        }
+
+        function buildWorkflowConfirmMessage(assessment, fallbackMessage) {
+            const impacts = Array.isArray(assessment.impacts) && assessment.impacts.length > 0
+                ? `\n\n影響範圍：\n${assessment.impacts.map((impact) => `- ${impact}`).join('\n')}`
+                : '';
+            return `${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`;
+        }
+
         async function deleteOrder(id) {
-            const confirmed = window.confirm('確認刪除此訂單資料？');
+            let assessment;
+            try {
+                assessment = await checkWorkflowDelete('orders', id);
+            } catch (error) {
+                showAlert('error', error.message || '流程檢查失敗。');
+                return;
+            }
+
+            if (!assessment.allowed) {
+                showAlert('warning', assessment.message || '此訂單目前不可刪除。');
+                return;
+            }
+
+            const confirmed = window.confirm(buildWorkflowConfirmMessage(assessment, '確認刪除此訂單資料？'));
             if (!confirmed) {
                 return;
             }
@@ -1009,6 +1041,7 @@
                 if (customerIdSelect) customerIdSelect.value = data.customer?.id || '';
                 if (orderDateInput) orderDateInput.value = data.order_date || '';
                 if (expectedDeliveryDateInput) expectedDeliveryDateInput.value = data.expected_delivery_date || '';
+                if (expectedDeliveryPeriodSelect) expectedDeliveryPeriodSelect.value = data.expected_delivery_period || '';
                 if (customerPoNumberInput) customerPoNumberInput.value = normalizeNullableText(data.customer_po_number);
                 if (statusSelect) statusSelect.value = data.status || '';
                 if (totalAmountInput) totalAmountInput.value = data.total_amount || '';

@@ -32,7 +32,7 @@ if ($id <= 0) {
 $pdo = db();
 
 $stmt = $pdo->prepare('
-    SELECT id, order_number, order_date, expected_delivery_date, customer_id, status, total_amount, final_quote_per_m, single_ppm, notes
+    SELECT id, order_number, order_date, expected_delivery_date, expected_delivery_period, customer_po_number, customer_id, status, total_amount, final_quote_per_m, single_ppm, notes
     FROM orders
     WHERE id = ? AND deleted_at IS NULL
 ');
@@ -54,6 +54,8 @@ jsonResponse([
         'order_number' => $order['order_number'],
         'order_date' => $order['order_date'],
         'expected_delivery_date' => $order['expected_delivery_date'],
+        'expected_delivery_period' => $order['expected_delivery_period'],
+        'customer_po_number' => $order['customer_po_number'],
         'customer_id' => (int)$order['customer_id'],
         'status' => $order['status'],
         'total_amount' => $order['total_amount'] !== null ? (float)$order['total_amount'] : null,

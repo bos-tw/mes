@@ -113,6 +113,21 @@
             font-size: 10pt;
         }
 
+        .customer-po-row {
+            margin-top: 2px;
+            margin-bottom: 8px;
+            padding: 2px 4px;
+            border-top: 1px solid #777;
+            border-bottom: 1px solid #777;
+            font-size: 10pt;
+            font-weight: bold;
+        }
+
+        .customer-po-row .label {
+            display: inline-block;
+            min-width: 120px;
+        }
+
         .content-section {
             margin-top: 10px;
         }
@@ -438,6 +453,10 @@
             <div class="delivery-date">預計交期：<span id="expectedDeliveryDate"></span></div>
         </div>
     </div>
+    <div class="customer-po-row">
+        <span class="label">客戶訂單編號</span>
+        <span id="customerPoNumber"></span>
+    </div>
 
     <div class="content-section">
     <div id="batchSectionsContainer">
@@ -696,11 +715,13 @@
         const orderNoEl = document.getElementById('orderNo');
         const orderDateEl = document.getElementById('orderDate');
         const expectedDeliveryDateEl = document.getElementById('expectedDeliveryDate');
+        const customerPoNumberEl = document.getElementById('customerPoNumber');
 
         if (!orderId) {
             if (orderNoEl) orderNoEl.textContent = '請指定訂單';
             if (orderDateEl) orderDateEl.textContent = '';
             if (expectedDeliveryDateEl) expectedDeliveryDateEl.textContent = '';
+            if (customerPoNumberEl) customerPoNumberEl.textContent = '';
             currentFinalQuotePerM = null;
             currentSinglePpm = null;
             currentOrderMainNotes = '';
@@ -733,10 +754,16 @@
                 }
 
                 // 設定預計交期（民國年 + 星期）
-                if (expectedDeliveryDateEl && order.expected_delivery_date) {
-                    expectedDeliveryDateEl.textContent = formatRocDateWithWeekday(order.expected_delivery_date);
-                } else if (expectedDeliveryDateEl) {
-                    expectedDeliveryDateEl.textContent = '';
+                if (expectedDeliveryDateEl) {
+                    const dateText = order.expected_delivery_date
+                        ? formatRocDateWithWeekday(order.expected_delivery_date)
+                        : '';
+                    const periodText = formatExpectedDeliveryPeriod(order.expected_delivery_period);
+                    expectedDeliveryDateEl.textContent = [dateText, periodText].filter(Boolean).join(' ');
+                }
+
+                if (customerPoNumberEl) {
+                    customerPoNumberEl.textContent = order.customer_po_number || '';
                 }
 
                 currentFinalQuotePerM = Number.isFinite(Number(order.final_quote_per_m))
@@ -752,6 +779,7 @@
                 return order.customer_id || null;
             } else {
                 if (orderNoEl) orderNoEl.textContent = '無法載入訂單資訊';
+                if (customerPoNumberEl) customerPoNumberEl.textContent = '';
                 currentFinalQuotePerM = null;
                 currentSinglePpm = null;
                 currentOrderMainNotes = '';
@@ -761,12 +789,23 @@
         } catch (error) {
             console.error('載入訂單資訊失敗:', error);
             if (orderNoEl) orderNoEl.textContent = '載入失敗';
+            if (customerPoNumberEl) customerPoNumberEl.textContent = '';
             currentFinalQuotePerM = null;
             currentSinglePpm = null;
             currentOrderMainNotes = '';
             renderOrderMainNotes();
             return null;
         }
+    }
+
+    function formatExpectedDeliveryPeriod(period) {
+        const map = {
+            morning: '上午',
+            noon: '中午',
+            afternoon: '下午',
+            evening: '晚間',
+        };
+        return map[period] || '';
     }
 
     /**

@@ -2107,6 +2107,8 @@ function updateButtons() {
                     const drawingRows = drawingsTableBody.querySelectorAll('.drawing-row');
                     const drawingNumbers = [];
                     const newDrawingNumbersOnly = []; // New array
+                    const copiedDrawingIds = [];
+                    const copiedDrawingNumbers = {};
                     drawingRows.forEach((row) => {
                         const numberInput = row.querySelector('[data-field="drawing-number"]');
                         const drawingNumber = numberInput ? numberInput.value.trim() : '';
@@ -2118,8 +2120,17 @@ function updateButtons() {
                         } else {
                             const drawingId = row.getAttribute('data-drawing-id');
                             if (drawingId) {
-                                // 已存在的圖面,如果圖面編號有變更,需要更新
-                                formData.append(`existing_drawing_numbers[${drawingId}]`, drawingNumber);
+                                if (isEdit) {
+                                    // 已存在的圖面,如果圖面編號有變更,需要更新
+                                    formData.append(`existing_drawing_numbers[${drawingId}]`, drawingNumber);
+                                } else {
+                                    // 複製模式：沿用既有圖面關聯（不重傳實體檔）
+                                    const parsedDrawingId = Number.parseInt(drawingId, 10);
+                                    if (Number.isInteger(parsedDrawingId) && parsedDrawingId > 0) {
+                                        copiedDrawingIds.push(parsedDrawingId);
+                                        copiedDrawingNumbers[drawingId] = drawingNumber;
+                                    }
+                                }
                             } else if (drawingNumber) {
                                 // 新增的列，但只有圖面編號
                                 newDrawingNumbersOnly.push(drawingNumber);
@@ -2134,6 +2145,10 @@ function updateButtons() {
                     // 將只有編號的新圖面以 JSON 格式送出
                     if (newDrawingNumbersOnly.length > 0) {
                         formData.append('new_drawing_numbers_only', JSON.stringify(newDrawingNumbersOnly));
+                    }
+                    if (!isEdit && copiedDrawingIds.length > 0) {
+                        formData.append('copied_drawing_ids', JSON.stringify(copiedDrawingIds));
+                        formData.append('copied_drawing_numbers', JSON.stringify(copiedDrawingNumbers));
                     }
                 }
 
@@ -2152,6 +2167,9 @@ function updateButtons() {
                 // 添加現有的檔案附件 ID
                 if (isEdit && payload.existing_attachment_ids && payload.existing_attachment_ids.length > 0) {
                     formData.append('existing_attachment_ids', JSON.stringify(payload.existing_attachment_ids));
+                }
+                if (!isEdit && payload.existing_attachment_ids && payload.existing_attachment_ids.length > 0) {
+                    formData.append('copied_attachment_ids', JSON.stringify(payload.existing_attachment_ids));
                 }
 
                 // 添加要刪除的檔案附件 ID
@@ -2183,7 +2201,7 @@ function updateButtons() {
 
                 // 根據是否為複製模式顯示不同的提示訊息
                 if (state.isCopyMode) {
-                    showAlert('success', '已複製並儲存品項資料（不含圖面及檔案附件）。');
+                    showAlert('success', '已複製並儲存品項資料（已同步圖面與檔案附件）。');
                 } else {
                     showAlert('success', result.message || '操作成功。');
                 }
@@ -2503,10 +2521,15 @@ function updateButtons() {
                             id: undefined, // 移除服務 ID
                             order_item_id: undefined
                         })),
-                        // 圖面不複製（因為無法複製實際檔案，使用者需要重新上傳）
-                        drawings: [],
-                        // 檔案附件不複製（因為無法複製實際檔案，使用者需要重新上傳）
-                        attachments: []
+                        // 複製圖面與附件關聯，避免重複儲存實體檔案
+                        drawings: (item.drawings || []).map(drawing => ({
+                            ...drawing,
+                            isExisting: true,
+                        })),
+                        attachments: (item.attachments || []).map(attachment => ({
+                            ...attachment,
+                            isExisting: true,
+                        })),
                     };
                     openModal('create', copiedItem);
                     // 提示訊息將在使用者確認儲存後才顯示

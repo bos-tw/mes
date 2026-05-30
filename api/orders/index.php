@@ -71,6 +71,7 @@
  * | customer_id            | int    | 是   | > 0，客戶必須存在         | 客戶 ID              |
  * | order_date             | string | 是   | YYYY-MM-DD 格式          | 訂單日期              |
  * | expected_delivery_date | string | 否   | YYYY-MM-DD 格式          | 預計交期              |
+ * | expected_delivery_period | string | 否 | morning/noon/afternoon/evening | 預計交期時段       |
  * | customer_po_number     | string | 否   | 最大 100 字             | 客戶訂單號（客戶PO號） |
  * | status                 | string | 否   | 最大 50 字，預設 pending | 訂單狀態              |
  * | total_amount           | float  | 否   | >= 0，預設 0             | 訂單總金額            |
@@ -206,7 +207,7 @@ function handleListOrders(): void
     $offset = ($page - 1) * $perPage;
 
     // 查詢資料
-    $sql = 'SELECT o.id, o.order_number, o.customer_id, o.order_date, o.expected_delivery_date, '
+    $sql = 'SELECT o.id, o.order_number, o.customer_id, o.order_date, o.expected_delivery_date, o.expected_delivery_period, '
         . 'o.customer_po_number, o.status, o.total_amount, o.final_quote_per_m, o.single_ppm, o.notes, o.created_at, o.updated_at, o.deleted_at, '
         . 'c.name AS customer_name, c.customer_number, c.is_active AS customer_is_active, '
         . 'c.minimum_order_amount AS customer_minimum_order_amount, '

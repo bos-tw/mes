@@ -30,6 +30,7 @@ declare(strict_types=1);
  *   - customer_id: int              客戶 ID
  *   - order_date: string            訂單日期 (YYYY-MM-DD)
  *   - expected_delivery_date: string 預計交期 (YYYY-MM-DD)
+ *   - expected_delivery_period: string 預計交期時段 (morning/noon/afternoon/evening)
  *   - customer_po_number: string    客戶訂單號
  *   - status: string                訂單狀態
  *   - total_amount: float           訂單總金額
@@ -56,6 +57,7 @@ function normalizeOrderNullableString(mixed $value): string
  * - customer_id:              正整數，新增時必填
  * - order_date:               YYYY-MM-DD 格式，新增時必填
  * - expected_delivery_date:   YYYY-MM-DD 格式，可選
+ * - expected_delivery_period: morning/noon/afternoon/evening，可選
  * - customer_po_number:       字串最長 100 字，可選
  * - status:                   狀態代碼最長 50 字，可選
  * - total_amount:             非負浮點數，可選（通常由系統計算）
@@ -177,6 +179,21 @@ function validateOrderData(array $payload, bool $isUpdate = false): array
         }
     }
 
+    // 預計交期時段 - 可選
+    if (array_key_exists('expected_delivery_period', $payload)) {
+        $expectedDeliveryPeriod = normalizeOrderNullableString($payload['expected_delivery_period'] ?? '');
+        if ($expectedDeliveryPeriod === '') {
+            $data['expected_delivery_period'] = null;
+        } else {
+            $allowedPeriods = ['morning', 'noon', 'afternoon', 'evening'];
+            if (!in_array($expectedDeliveryPeriod, $allowedPeriods, true)) {
+                $errors['expected_delivery_period'] = '預計交期時段格式不正確。';
+            } else {
+                $data['expected_delivery_period'] = $expectedDeliveryPeriod;
+            }
+        }
+    }
+
     // 單一 PPM - 可選
     if (array_key_exists('single_ppm', $payload)) {
         $singlePpm = $payload['single_ppm'];
@@ -216,13 +233,13 @@ function validateOrderData(array $payload, bool $isUpdate = false): array
  * @param int $id  訂單 ID
  *
  * @return array<string,mixed>|null 訂單資料（含關聯欄位），找不到時回傳 null
- *   傳回欄位：id, order_number, customer_id, order_date, expected_delivery_date,
+ *   傳回欄位：id, order_number, customer_id, order_date, expected_delivery_date, expected_delivery_period,
  *             customer_po_number, status, total_amount, notes, created_at,
  *             updated_at, deleted_at, customer_name, customer_number, status_label
  */
 function findOrder(PDO $pdo, int $id): ?array
 {
-    $sql = 'SELECT o.id, o.order_number, o.customer_id, o.order_date, o.expected_delivery_date, '
+    $sql = 'SELECT o.id, o.order_number, o.customer_id, o.order_date, o.expected_delivery_date, o.expected_delivery_period, '
         . 'o.customer_po_number, o.status, o.total_amount, o.final_quote_per_m, o.single_ppm, o.notes, o.created_at, o.updated_at, o.deleted_at, '
         . 'c.name AS customer_name, c.customer_number, '
         . 'c.minimum_order_amount AS customer_minimum_order_amount, '
@@ -326,6 +343,7 @@ function customerExists(PDO $pdo, int $customerId): bool
  *   },
  *   "order_date": "2025-01-15",
  *   "expected_delivery_date": "2025-01-30",
+ *   "expected_delivery_period": "morning",
  *   "customer_po_number": "PO-2025-001",
  *   "status": "pending",
  *   "status_label": "待處理",
@@ -359,6 +377,7 @@ function transformOrder(array $row): array
         ],
         'order_date' => $row['order_date'],
         'expected_delivery_date' => $row['expected_delivery_date'],
+        'expected_delivery_period' => normalizeOrderNullableString($row['expected_delivery_period'] ?? '') ?: null,
         'customer_po_number' => normalizeOrderNullableString($row['customer_po_number'] ?? '') ?: null,
         'status' => $row['status'],
         'status_label' => $row['status_label'] ?? null,

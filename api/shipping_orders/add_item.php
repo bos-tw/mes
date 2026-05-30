@@ -58,7 +58,7 @@ if (!$data) {
 $inventoryItemId = $data['inventory_item_id'] ?? null;
 $shippingOrderId = $data['shipping_order_id'] ?? null;
 $createNew = $data['create_new'] ?? false;
-$shippedQuantity = $data['shipped_quantity'] ?? null;
+$shippedQuantity = $data['shipped_quantity'] ?? ($data['quantity'] ?? null);
 $shippedUnit = $data['shipped_unit'] ?? '支';
 
 if (!$inventoryItemId) {
@@ -253,7 +253,11 @@ try {
     jsonResponse([
         'success' => true,
         'message' => '已成功加入出貨單。',
+        'shipping_order_id' => $shippingOrderId,
+        'shipping_order_item_id' => $itemId,
         'data' => [
+            'shipping_order_id' => $shippingOrderId,
+            'shipping_order_item_id' => $itemId,
             'shipping_order' => $shippingOrder,
             'item_id' => $itemId,
         ],

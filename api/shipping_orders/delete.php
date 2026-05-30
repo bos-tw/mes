@@ -40,6 +40,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../common/workflow_guard.php';
 requireAuth();
 
 requireMethod('DELETE');
@@ -60,6 +61,15 @@ try {
 
     if (!$order) {
         jsonResponse(['success' => false, 'message' => '找不到該出貨單。'], 404);
+    }
+
+    $workflowGuard = getWorkflowDeleteAssessment($pdo, 'shipping_orders', $id);
+    if (!$workflowGuard['allowed']) {
+        jsonResponse([
+            'success' => false,
+            'message' => $workflowGuard['message'],
+            'workflow_guard' => $workflowGuard,
+        ], 409);
     }
 
     // 檢查是否有關聯資料（品質檢驗、退貨單）
@@ -143,19 +153,15 @@ try {
             recalculateOrderItemShipping($pdo, (int)$oiId);
         }
 
-        // 刪除出貨項目
-        $stmt = $pdo->prepare("DELETE FROM shipping_order_items WHERE shipping_order_id = ?");
-        $stmt->execute([$id]);
-
-        // 刪除出貨單
-        $stmt = $pdo->prepare("DELETE FROM shipping_orders WHERE id = ?");
+        // 軟刪出貨單，保留出貨品項供追溯；列表透過 shipping_orders.deleted_at 排除。
+        $stmt = $pdo->prepare("UPDATE shipping_orders SET deleted_at = NOW(), delete_token = id WHERE id = ? AND deleted_at IS NULL");
         $stmt->execute([$id]);
 
         $pdo->commit();
 
         jsonResponse([
             'success' => true,
-            'message' => '出貨單已刪除。'
+            'message' => '出貨單已刪除，相關品項已保留供追溯。'
         ]);
 
     } catch (Exception $e) {

@@ -280,8 +280,8 @@ ModuleConfig.register('inventory_items', {
                 </section>
 
                 <div class="form-actions">
-                    <button type="button" class="outline" data-action="close-shipping-modal">取消</button>
-                    <button type="submit" class="success">
+                    <button type="button" class="btn outline" data-action="close-shipping-modal">取消</button>
+                    <button type="submit" class="btn success" data-action="submit-shipping">
                         <i class="fas fa-plus"></i> 加入出貨單
                     </button>
                 </div>

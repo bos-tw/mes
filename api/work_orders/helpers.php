@@ -290,6 +290,37 @@ function validateWorkOrderData(array $payload, bool $isUpdate = false): array
         }
     }
 
+    $productionMetricFields = [
+        'total_weight_kg' => '總重量',
+        'weight_per_unit_g' => '產品單支重',
+        'total_units' => '總支數',
+    ];
+
+    foreach ($productionMetricFields as $field => $label) {
+        if (!array_key_exists($field, $payload)) {
+            continue;
+        }
+
+        $value = $payload[$field];
+        if ($value === null || $value === '') {
+            $data[$field] = null;
+            continue;
+        }
+
+        $numericValue = filter_var($value, FILTER_VALIDATE_FLOAT);
+        if ($numericValue === false || $numericValue < 0) {
+            $errors[$field] = "{$label}必須為非負數。";
+            continue;
+        }
+
+        $data[$field] = $numericValue;
+    }
+
+    if (array_key_exists('tool_statistics', $payload)) {
+        $toolStatistics = trim((string)($payload['tool_statistics'] ?? ''));
+        $data['tool_statistics'] = $toolStatistics === '' ? null : $toolStatistics;
+    }
+
     // 篩選速度 - 可選
     if (array_key_exists('screening_speed', $payload)) {
         $screeningSpeed = trim((string)($payload['screening_speed'] ?? ''));

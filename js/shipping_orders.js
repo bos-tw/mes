@@ -98,7 +98,7 @@
         // Initialize
         init();
 
-        function handleIncomingContext(context) {
+        async function handleIncomingContext(context) {
             if (!context || typeof context !== 'object') {
                 return;
             }
@@ -113,7 +113,9 @@
                 return;
             }
 
-            openDetailModal(shippingOrderId);
+            state.currentPage = 1;
+            await loadShippingOrders();
+            await openDetailModal(shippingOrderId);
         }
 
         function init() {
@@ -125,12 +127,16 @@
 
             // Handle initial context
             setTimeout(() => {
-                handleIncomingContext(initialContext);
+                handleIncomingContext(initialContext).catch((error) => {
+                    console.error('處理初始導頁參數失敗:', error);
+                });
             }, 500);
 
             // Handle context updates for already-open tabs
             container.addEventListener('module:context', (event) => {
-                handleIncomingContext(event?.detail?.context ?? null);
+                handleIncomingContext(event?.detail?.context ?? null).catch((error) => {
+                    console.error('處理模組導頁參數失敗:', error);
+                });
             });
         }
 
@@ -1294,8 +1300,39 @@ function renderTable(items) {
             }
         }
 
+        async function checkWorkflowDelete(moduleName, id) {
+            const response = await fetch(`api/workflow_guard/check.php?module=${encodeURIComponent(moduleName)}&action=delete&id=${encodeURIComponent(id)}`, {
+                credentials: 'include'
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || '流程檢查失敗');
+            }
+            return result.data || {};
+        }
+
+        function buildWorkflowConfirmMessage(assessment, fallbackMessage) {
+            const impacts = Array.isArray(assessment.impacts) && assessment.impacts.length > 0
+                ? `\n\n影響範圍：\n${assessment.impacts.map((impact) => `- ${impact}`).join('\n')}`
+                : '';
+            return `${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`;
+        }
+
         async function handleDelete(id) {
-            if (!confirm('確定要刪除此出貨單嗎？')) return;
+            let assessment;
+            try {
+                assessment = await checkWorkflowDelete('shipping_orders', id);
+            } catch (error) {
+                showAlert('error', error.message || '流程檢查失敗');
+                return;
+            }
+
+            if (!assessment.allowed) {
+                showAlert('warning', assessment.message || '此出貨單目前不可刪除。');
+                return;
+            }
+
+            if (!confirm(buildWorkflowConfirmMessage(assessment, '確定要刪除此出貨單嗎？'))) return;
 
             try {
                 await deleteShippingOrder(id);
@@ -2064,6 +2101,16 @@ function renderTable(items) {
             await refreshOpenShippingModalsForDataSync();
         }
 
+        async function navigateToShippingOrder(shippingOrderId) {
+            const normalizedId = Number.parseInt(shippingOrderId, 10);
+            if (!Number.isInteger(normalizedId) || normalizedId <= 0) {
+                return;
+            }
+            state.currentPage = 1;
+            await loadShippingOrders();
+            await openDetailModal(normalizedId);
+        }
+
         if (typeof DataSync !== 'undefined') {
             DataSync.createModuleHelper('shipping_orders', {
                 onRefresh: refreshCurrentShippingOrderView,
@@ -2081,7 +2128,7 @@ function renderTable(items) {
 
         // Public API
         window.shippingOrdersModule = {
-            viewDetail: openDetailModal,
+            viewDetail: navigateToShippingOrder,
             edit: openEditModal,
             delete: handleDelete,
             deleteItem: handleDeleteItem,
