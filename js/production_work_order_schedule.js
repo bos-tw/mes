@@ -149,18 +149,18 @@
                         return;
                     }
 
-                    await openScheduleModal(workOrderId, action === 'edit-work-order' ? 'edit' : 'view');
+                    await openScheduleModal(workOrderId, action === 'edit-work-order' ? 'edit' : 'view', row?.dataset.nodeKey || '');
                     return;
                 }
 
                 if (action === 'remove-from-machine-schedule') {
                     const row = actionElement.closest('[data-work-order-id]');
-                    const workOrderId = row ? parseInt(row.dataset.workOrderId || '', 10) : 0;
-                    if (!workOrderId) {
+                    const nodeKey = row?.dataset.nodeKey || '';
+                    if (!nodeKey) {
                         return;
                     }
 
-                    await removeFromMachineSchedule(workOrderId);
+                    await removeFromMachineSchedule(nodeKey);
                     return;
                 }
 
@@ -301,22 +301,20 @@
         }
 
         async function loadWorkOrdersOnly() {
-            const params = new URLSearchParams({
-                page: '1',
-                perPage: '500',
-                sortBy: 'id',
-                sortOrder: 'ASC'
-            });
-
-            const response = await fetch(`api/work_orders/index.php?${params.toString()}`, { credentials: 'include' });
+            const response = await fetch('api/work_orders/schedule_nodes.php', { credentials: 'include' });
             const result = await response.json();
             if (!result.success) {
-                throw new Error(result.message || '載入工單資料失敗。');
+                throw new Error(result.message || '載入排程節點失敗。');
             }
 
             const rows = Array.isArray(result.data) ? result.data : [];
             state.workOrders = rows.filter((row) => !isCompleted(row)).map((row) => ({
                 ...row,
+                id: row.node_key || row.id,
+                node_key: row.node_key || `wo:${row.work_order_id || row.id}`,
+                work_order_id: row.work_order_id ? parseInt(row.work_order_id, 10) : parseInt(row.id, 10),
+                node_id: row.node_id ? parseInt(row.node_id, 10) : null,
+                machine_run_id: row.machine_run_id ? parseInt(row.machine_run_id, 10) : null,
                 machine_id: row.machine_id ? parseInt(row.machine_id, 10) : null,
                 machine_sequence: row.machine_sequence ? parseInt(row.machine_sequence, 10) : null
             }));
@@ -511,16 +509,17 @@
 
         function createScheduleRow(order, sequence) {
             const row = document.createElement('tr');
-            row.className = 'schedule-row';
+            row.className = `schedule-row${isSplitWorkOrder(order) ? ' schedule-row-split' : ''}`;
             row.draggable = true;
-            row.dataset.workOrderId = String(order.id);
+            row.dataset.workOrderId = String(order.work_order_id || order.id);
+            row.dataset.nodeKey = String(order.node_key || order.id);
 
             const statusText = escapeHtmlSafe(order.status_label || '未設定');
             const scheduledText = `${formatDateTime(order.scheduled_start_date)} ~ ${formatDateTime(order.scheduled_end_date)}`;
 
             row.innerHTML = `
                 <td class="schedule-sequence">${sequence}</td>
-                <td>${escapeHtmlSafe(order.work_order_number || `#${order.id}`)}</td>
+                <td>${renderScheduleWorkOrderLabel(order)}</td>
                 <td>${escapeHtmlSafe(order.customer_name || '-')}</td>
                 <td>${scheduledText}</td>
                 <td><span class="schedule-status-chip">${statusText}</span></td>
@@ -545,9 +544,10 @@
 
         function createQueueScheduleRow(order, sequence) {
             const row = document.createElement('tr');
-            row.className = 'schedule-row schedule-queue-row';
+            row.className = `schedule-row schedule-queue-row${isSplitWorkOrder(order) ? ' schedule-row-split' : ''}`;
             row.draggable = true;
-            row.dataset.workOrderId = String(order.id);
+            row.dataset.workOrderId = String(order.work_order_id || order.id);
+            row.dataset.nodeKey = String(order.node_key || order.id);
 
             const workOrderNumber = escapeHtmlSafe(order.work_order_number || `#${order.id}`);
             const tooltipText = escapeHtmlSafe(buildWorkOrderTooltip(order)).replace(/\n/g, '&#10;');
@@ -556,6 +556,7 @@
                 <td class="schedule-sequence">${sequence}</td>
                 <td>
                     <span class="schedule-work-order-code" tabindex="0" title="${tooltipText}">${workOrderNumber}</span>
+                    ${renderSplitBadge(order)}
                 </td>
                 <td class="table-actions">
                     <button type="button" class="btn text" data-action="view-work-order" title="檢視" aria-label="檢視">
@@ -642,13 +643,14 @@
 
             runningOrders.forEach((order) => {
                 const row = document.createElement('tr');
-                row.dataset.workOrderId = String(order.id);
-                row.className = 'schedule-time-row';
+                row.dataset.workOrderId = String(order.work_order_id || order.id);
+                row.dataset.nodeKey = String(order.node_key || order.id);
+                row.className = `schedule-time-row${isSplitWorkOrder(order) ? ' schedule-row-split' : ''}`;
 
                 const windowText = `${formatDateTime(resolveProductionStart(order))} ~ ${formatDateTime(resolveProductionEnd(order))}`;
                 row.innerHTML = `
                     <td>${escapeHtmlSafe(resolveMachineName(order.machine_id) || '-')}</td>
-                    <td>${escapeHtmlSafe(order.work_order_number || `#${order.id}`)}</td>
+                    <td>${renderScheduleWorkOrderLabel(order)}</td>
                     <td>${escapeHtmlSafe(order.customer_name || '-')}</td>
                     <td>${windowText}</td>
                     <td>${escapeHtmlSafe(getRemainingText(order, now))}</td>
@@ -729,7 +731,7 @@
                 summaryRow.innerHTML = `
                     <td>${escapeHtmlSafe(formatMachineLabel(machine))}</td>
                     <td>${queueOrders.length}</td>
-                    <td>${firstOrder ? escapeHtmlSafe(firstOrder.work_order_number || `#${firstOrder.id}`) : '-'}</td>
+                    <td>${firstOrder ? renderScheduleWorkOrderLabel(firstOrder) : '-'}</td>
                     <td>${firstOrder ? formatDateTime(firstOrder.scheduled_start_date) : '-'}</td>
                     <td class="table-actions">
                         <button type="button" class="btn text" data-action="details" title="${detailsTitle}" aria-label="${detailsTitle}">
@@ -762,10 +764,13 @@
             const rowsHtml = queueOrders.map((order, index) => {
                 const scheduledText = `${formatDateTime(order.scheduled_start_date)} ~ ${formatDateTime(order.scheduled_end_date)}`;
                 const statusText = escapeHtmlSafe(order.status_label || '未設定');
+                const rowClass = isSplitWorkOrder(order) ? ' class="schedule-row-split"' : '';
+                const workOrderId = escapeHtmlSafe(String(order.work_order_id || order.id || ''));
+                const nodeKey = escapeHtmlSafe(String(order.node_key || order.id || ''));
                 return `
-                    <tr>
+                    <tr${rowClass} data-work-order-id="${workOrderId}" data-node-key="${nodeKey}">
                         <td>${index + 1}</td>
-                        <td>${escapeHtmlSafe(order.work_order_number || `#${order.id}`)}</td>
+                        <td>${renderScheduleWorkOrderLabel(order)}</td>
                         <td>${escapeHtmlSafe(order.customer_name || '-')}</td>
                         <td>${scheduledText}</td>
                         <td><span class="schedule-status-chip">${statusText}</span></td>
@@ -793,6 +798,33 @@
             `;
         }
 
+        function isSplitWorkOrder(order) {
+            return String(order.work_order_type || '').toLowerCase() === 'split'
+                || (parseInt(order.machine_run_count || 0, 10) > 1);
+        }
+
+        function renderSplitBadge(order) {
+            if (!isSplitWorkOrder(order)) {
+                return '';
+            }
+            const totalCount = parseInt(order.machine_run_count || 0, 10);
+            const scheduledCount = parseInt(order.scheduled_machine_run_count || 0, 10);
+            const countText = totalCount > 0
+                ? ` ${scheduledCount}/${totalCount}台`
+                : '';
+            const title = totalCount > 0
+                ? `拆分工單：已排程 ${scheduledCount} 台 / 共 ${totalCount} 台`
+                : '拆分工單';
+            return `<span class="schedule-split-badge" title="${escapeHtmlSafe(title)}">${escapeHtmlSafe(`拆分工單${countText}`)}</span>`;
+        }
+
+        function renderScheduleWorkOrderLabel(order) {
+            const runLabel = order.node_type === 'machine_run' && order.run_label
+                ? `<small class="schedule-run-label">${escapeHtmlSafe(order.run_label)}</small>`
+                : '';
+            return `<span class="schedule-work-order-label">${escapeHtmlSafe(order.work_order_number || `#${order.work_order_id || order.id}`)}</span>${renderSplitBadge(order)}${runLabel}`;
+        }
+
         function handleDragStart(event) {
             const row = event.target.closest('tr.schedule-row');
             const list = row ? row.closest('tbody[data-schedule-list-type]') : null;
@@ -800,7 +832,7 @@
                 return;
             }
 
-            state.draggingId = parseInt(row.dataset.workOrderId || '', 10);
+            state.draggingId = row.dataset.nodeKey || row.dataset.workOrderId || '';
             row.classList.add('dragging');
             if (event.dataTransfer) {
                 event.dataTransfer.effectAllowed = 'move';
@@ -870,9 +902,8 @@
 
         function syncWorkOrdersFromDom() {
             if (elements.queueBody) {
-                elements.queueBody.querySelectorAll('tr.schedule-row[data-work-order-id]').forEach((row, index) => {
-                    const id = parseInt(row.dataset.workOrderId || '', 10);
-                    const order = getOrderById(id);
+                elements.queueBody.querySelectorAll('tr.schedule-row[data-node-key]').forEach((row, index) => {
+                    const order = getOrderById(row.dataset.nodeKey || '');
                     if (order) {
                         order.machine_id = null;
                         order.queue_rank = index + 1;
@@ -883,9 +914,8 @@
             }
 
             if (elements.machineBody && state.selectedMachineId) {
-                elements.machineBody.querySelectorAll('tr.schedule-row[data-work-order-id]').forEach((row, index) => {
-                    const id = parseInt(row.dataset.workOrderId || '', 10);
-                    const order = getOrderById(id);
+                elements.machineBody.querySelectorAll('tr.schedule-row[data-node-key]').forEach((row, index) => {
+                    const order = getOrderById(row.dataset.nodeKey || '');
                     if (order) {
                         order.machine_id = state.selectedMachineId;
                         order.machine_rank = index + 1;
@@ -908,13 +938,20 @@
                         machine_sequence: order.machine_sequence || ''
                     };
 
-                    const response = await fetch(`api/work_orders/update.php?id=${order.id}`, {
+                    const response = await fetch('api/work_orders/schedule_nodes.php', {
                         method: 'PUT',
                         credentials: 'include',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify({
+                            ...payload,
+                            node_key: order.node_key || order.id,
+                            scheduled_start_date: order.scheduled_start_date || '',
+                            scheduled_end_date: order.scheduled_end_date || '',
+                            actual_start_date: order.actual_start_date || '',
+                            actual_end_date: order.actual_end_date || ''
+                        })
                     });
                     const result = await response.json();
                     if (!result.success) {
@@ -923,11 +960,11 @@
                 }
 
                 if (typeof DataSync !== 'undefined' && typeof DataSync.notifyWithDependencies === 'function') {
-                    const changedIds = targets.map((order) => order.id);
+                    const changedIds = targets.map((order) => order.work_order_id || order.id);
                     DataSync.notifyWithDependencies('work_orders', DataSync.EVENT_TYPES.BULK_UPDATED, { ids: changedIds });
                 }
                 if (state.dataSyncHelper && typeof state.dataSyncHelper.notifyBulkUpdated === 'function') {
-                    state.dataSyncHelper.notifyBulkUpdated({ ids: targets.map((order) => order.id) });
+                    state.dataSyncHelper.notifyBulkUpdated({ ids: targets.map((order) => order.node_key || order.id) });
                 }
 
                 showAlert('success', successMessage || '排程順序已儲存。');
@@ -959,7 +996,7 @@
             const seenIds = new Set();
 
             state.workOrders.forEach((order) => {
-                const orderId = parseInt(order.id, 10);
+                const orderId = String(order.node_key || order.id);
                 if (seenIds.has(orderId)) {
                     return;
                 }
@@ -967,7 +1004,7 @@
                 const orderMachineId = order.machine_id ? parseInt(order.machine_id, 10) : null;
                 const affectsQueue = !orderMachineId && (!normalizedOldMachineId || !normalizedNewMachineId || normalizedOldMachineId !== normalizedNewMachineId);
                 const affectsMachine = orderMachineId && targetMachineIds.has(orderMachineId);
-                const isChangedOrder = orderId === parseInt(changedWorkOrderId, 10);
+                const isChangedOrder = orderId === String(changedWorkOrderId);
 
                 if (affectsQueue || affectsMachine || isChangedOrder) {
                     seenIds.add(orderId);
@@ -978,7 +1015,7 @@
             return result;
         }
 
-        async function openScheduleModal(workOrderId, mode) {
+        async function openScheduleModal(workOrderId, mode, nodeKey = '') {
             try {
                 const response = await fetch(`api/work_orders/show.php?id=${workOrderId}`, { credentials: 'include' });
                 const result = await response.json();
@@ -986,7 +1023,8 @@
                     throw new Error(result.message || '載入工單資料失敗。');
                 }
 
-                fillScheduleModal(result.data);
+                const node = nodeKey ? getOrderById(nodeKey) : null;
+                fillScheduleModal(result.data, node);
                 setScheduleModalMode(mode);
                 elements.scheduleModal.classList.remove('hidden');
                 clearModalAlert();
@@ -1033,20 +1071,21 @@
             }
         }
 
-        function fillScheduleModal(data) {
+        function fillScheduleModal(data, node = null) {
             if (!elements.scheduleModalForm) {
                 return;
             }
 
             setFieldValue('id', data.id || '');
+            setFieldValue('node_key', node?.node_key || `wo:${data.id || ''}`);
             setFieldValue('work_order_number', data.work_order_number || '');
             setFieldValue('customer_name', data.customer_name || '');
             setFieldValue('order_number', data.order_number || '');
-            setFieldValue('machine_id', data.machine_id || '');
-            setFieldValue('scheduled_start_date', toDateTimeLocalValue(data.scheduled_start_date));
-            setFieldValue('scheduled_end_date', toDateTimeLocalValue(data.scheduled_end_date));
-            setFieldValue('actual_start_date', toDateTimeLocalValue(data.actual_start_date));
-            setFieldValue('actual_end_date', toDateTimeLocalValue(data.actual_end_date));
+            setFieldValue('machine_id', node?.machine_id || data.machine_id || '');
+            setFieldValue('scheduled_start_date', toDateTimeLocalValue(node?.scheduled_start_date || data.scheduled_start_date));
+            setFieldValue('scheduled_end_date', toDateTimeLocalValue(node?.scheduled_end_date || data.scheduled_end_date));
+            setFieldValue('actual_start_date', toDateTimeLocalValue(node?.actual_start_date || data.actual_start_date));
+            setFieldValue('actual_end_date', toDateTimeLocalValue(node?.actual_end_date || data.actual_end_date));
         }
 
         function setFieldValue(name, value) {
@@ -1076,7 +1115,9 @@
                 return;
             }
 
+            const nodeKey = elements.scheduleModalForm.querySelector('[name="node_key"]')?.value || `wo:${id}`;
             const payload = {
+                node_key: nodeKey,
                 machine_id: elements.scheduleModalForm.querySelector('[name="machine_id"]').value || '',
                 scheduled_start_date: elements.scheduleModalForm.querySelector('[name="scheduled_start_date"]').value || '',
                 scheduled_end_date: elements.scheduleModalForm.querySelector('[name="scheduled_end_date"]').value || '',
@@ -1085,7 +1126,7 @@
             };
 
             try {
-                const response = await fetch(`api/work_orders/update.php?id=${id}`, {
+                const response = await fetch('api/work_orders/schedule_nodes.php', {
                     method: 'PUT',
                     credentials: 'include',
                     headers: {
@@ -1114,8 +1155,8 @@
             }
         }
 
-        async function removeFromMachineSchedule(workOrderId) {
-            const order = getOrderById(workOrderId);
+        async function removeFromMachineSchedule(nodeKey) {
+            const order = getOrderById(nodeKey);
             if (!order) {
                 showAlert('error', '找不到工單資料，請重新整理後再試。');
                 return;
@@ -1129,7 +1170,7 @@
 
             const workOrderNumber = order.work_order_number
                 ? order.work_order_number
-                : `#${workOrderId}`;
+                : `#${order.work_order_id || order.id || nodeKey}`;
 
             if (!window.confirm(`確定將工單 ${workOrderNumber} 從機台排程移除，並回到待排程清單嗎？`)) {
                 return;
@@ -1137,7 +1178,7 @@
 
             try {
                 const maxQueueRank = state.workOrders.reduce((maxRank, item) => {
-                    if (parseInt(item.id, 10) === workOrderId) {
+                    if (String(item.node_key || item.id) === String(nodeKey)) {
                         return maxRank;
                     }
                     const itemMachineId = item.machine_id ? parseInt(item.machine_id, 10) : null;
@@ -1154,7 +1195,7 @@
                 order.machine_sequence = order.queue_rank;
 
                 await persistScheduleSequences(
-                    workOrderId,
+                    nodeKey,
                     oldMachineId,
                     null,
                     `工單 ${workOrderNumber} 已移回待排程。`
@@ -1180,6 +1221,7 @@
 
             const machineId = parseInt(elements.scheduleModalForm.querySelector('[name="machine_id"]').value || '', 10) || null;
             const workOrderId = parseInt(elements.scheduleModalForm.querySelector('[name="id"]').value || '', 10) || 0;
+            const currentNodeKey = elements.scheduleModalForm.querySelector('[name="node_key"]')?.value || `wo:${workOrderId}`;
             const scheduledStartRaw = elements.scheduleModalForm.querySelector('[name="scheduled_start_date"]').value || '';
             const scheduledEndRaw = elements.scheduleModalForm.querySelector('[name="scheduled_end_date"]').value || '';
             const actualStartRaw = elements.scheduleModalForm.querySelector('[name="actual_start_date"]').value || '';
@@ -1204,7 +1246,7 @@
 
             if (machineId && scheduledStart && scheduledEnd && scheduledEnd > scheduledStart) {
                 const overlapOrder = state.workOrders.find((order) => {
-                    if (parseInt(order.id, 10) === workOrderId) {
+                    if (String(order.node_key || order.id) === String(currentNodeKey)) {
                         return false;
                     }
                     if ((parseInt(order.machine_id || 0, 10) || null) !== machineId) {
@@ -1261,7 +1303,7 @@
                     const end = parseDateTime(order.scheduled_end_date);
 
                     if (start && end && end <= start) {
-                        conflictIds.add(parseInt(order.id, 10));
+                        conflictIds.add(String(order.node_key || order.id));
                         issues.push(`工單 ${order.work_order_number || order.id} 的預定結束時間需晚於預定開始時間。`);
                         previousOrder = order;
                         return;
@@ -1270,8 +1312,8 @@
                     if (previousOrder) {
                         const previousEnd = parseDateTime(previousOrder.scheduled_end_date);
                         if (start && previousEnd && start < previousEnd) {
-                            conflictIds.add(parseInt(order.id, 10));
-                            conflictIds.add(parseInt(previousOrder.id, 10));
+                            conflictIds.add(String(order.node_key || order.id));
+                            conflictIds.add(String(previousOrder.node_key || previousOrder.id));
                             issues.push(`機台 ${resolveMachineName(machineId)} 的排程時間發生重疊。`);
                         }
                     }
@@ -1294,8 +1336,8 @@
 
         function applyConflictMarks() {
             moduleRoot.querySelectorAll('[data-work-order-id]').forEach((node) => {
-                const id = parseInt(node.dataset.workOrderId || '', 10);
-                const hasConflict = state.conflictOrderIds.has(id);
+                const id = node.dataset.nodeKey || node.dataset.workOrderId || '';
+                const hasConflict = state.conflictOrderIds.has(String(id));
                 node.classList.toggle('schedule-row-conflict', hasConflict);
             });
         }
@@ -1410,7 +1452,8 @@
         }
 
         function getOrderById(id) {
-            return state.workOrders.find((item) => parseInt(item.id, 10) === parseInt(id, 10));
+            return state.workOrders.find((item) => String(item.node_key || item.id) === String(id)
+                || String(item.work_order_id || '') === String(id));
         }
 
         function resolveMachineName(machineId) {

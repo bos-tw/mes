@@ -223,6 +223,78 @@ try {
     $defectRate = $totalUnits > 0 ? ($defectUnitsByWeight / $totalUnits) * 100 : 0;
     $defectRatePpm = $totalUnits > 0 ? ($defectUnitsByWeight / $totalUnits) * 1000000 : 0;
 
+    // 7-1. 拆分工單機台分頁明細：主工單總表仍採重量優先，機台頁籤提供追溯拆解。
+    $sqlMachineRuns = "
+        SELECT
+            womr.id,
+            womr.run_label,
+            womr.machine_id,
+            m.name AS machine_name,
+            womr.machine_sequence,
+            womr.scheduled_start_date,
+            womr.scheduled_end_date,
+            womr.actual_start_date,
+            womr.actual_end_date,
+            womr.planned_net_weight_kg,
+            womr.completed_net_weight_kg,
+            womr.weight_per_unit_g,
+            womr.planned_units,
+            womr.completed_units,
+            womr.status,
+            womr.notes,
+            COALESCE(receipts.partial_receipt_count, 0) AS partial_receipt_count,
+            COALESCE(receipts.partial_receipt_net_weight_kg, 0) AS partial_receipt_net_weight_kg,
+            COALESCE(receipts.partial_receipt_units, 0) AS partial_receipt_units
+        FROM work_order_machine_runs womr
+        LEFT JOIN machines m ON m.id = womr.machine_id
+        LEFT JOIN (
+            SELECT
+                machine_run_id,
+                COUNT(*) AS partial_receipt_count,
+                SUM(net_weight_kg) AS partial_receipt_net_weight_kg,
+                SUM(calculated_units) AS partial_receipt_units
+            FROM work_order_partial_receipts
+            WHERE receipt_status != 'reversed'
+            GROUP BY machine_run_id
+        ) receipts ON receipts.machine_run_id = womr.id
+        WHERE womr.work_order_id = ?
+          AND womr.deleted_at IS NULL
+        ORDER BY womr.machine_sequence IS NULL, womr.machine_sequence, womr.id
+    ";
+    $stmt = $pdo->prepare($sqlMachineRuns);
+    $stmt->execute([$workOrderId]);
+    $machineRuns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $machineRunDefects = [];
+    if (!empty($machineRuns)) {
+        $machineRunIds = array_map(static fn($run) => (int)$run['id'], $machineRuns);
+        $placeholders = implode(',', array_fill(0, count($machineRunIds), '?'));
+        $defectStmt = $pdo->prepare("
+            SELECT machine_run_id, screening_service_id, service_name, defect_quantity, notes
+            FROM work_order_machine_defects
+            WHERE machine_run_id IN ($placeholders)
+            ORDER BY machine_run_id, screening_service_id
+        ");
+        $defectStmt->execute($machineRunIds);
+        foreach ($defectStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $runId = (int)$row['machine_run_id'];
+            if (!isset($machineRunDefects[$runId])) {
+                $machineRunDefects[$runId] = [];
+            }
+            $machineRunDefects[$runId][] = $row;
+        }
+
+        foreach ($machineRuns as &$machineRun) {
+            $runId = (int)$machineRun['id'];
+            $machineRun['defects'] = $machineRunDefects[$runId] ?? [];
+            $machineRun['defect_units_distribution'] = array_sum(array_map(
+                static fn($defect) => (int)($defect['defect_quantity'] ?? 0),
+                $machineRun['defects']
+            ));
+        }
+        unset($machineRun);
+    }
+
     // 8. 準備圓餅圖數據（只包含有不良品的項目）
     $chartLabels = [];
     $chartLabelsEn = [];
@@ -336,6 +408,8 @@ try {
             ],
             // 篩分檢驗結果
             'screening_results' => $screeningResults,
+            // 拆分工單機台分頁明細
+            'machine_runs' => $machineRuns,
             // 統計摘要
             'summary' => [
                 'total_units' => $totalUnits,

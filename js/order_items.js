@@ -2555,6 +2555,39 @@ function updateButtons() {
             }
         }
 
+        async function checkWorkflowDelete(moduleName, id) {
+            const response = await fetch(`api/workflow_guard/check.php?module=${encodeURIComponent(moduleName)}&action=delete&id=${encodeURIComponent(id)}`, {
+                credentials: 'include'
+            });
+            const result = await readJsonResponse(response, '流程檢查失敗。');
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || '流程檢查失敗。');
+            }
+            return result.data || {};
+        }
+
+        async function confirmWorkflowDelete(assessment, fallbackMessage, confirmText = '確定刪除') {
+            if (typeof window.showWorkflowImpactConfirm === 'function') {
+                return window.showWorkflowImpactConfirm({
+                    title: '流程影響確認',
+                    message: assessment.message || fallbackMessage,
+                    impacts: Array.isArray(assessment.impacts) ? assessment.impacts : [],
+                    recommendedAction: assessment.recommended_action || '',
+                    severity: assessment.severity || 'info',
+                    allowConfirm: !!assessment.allowed,
+                    confirmText,
+                    cancelText: '取消'
+                });
+            }
+            if (!assessment.allowed) {
+                return false;
+            }
+            const impacts = Array.isArray(assessment.impacts) && assessment.impacts.length > 0
+                ? `\n\n影響範圍：\n${assessment.impacts.map((impact) => `- ${impact}`).join('\n')}`
+                : '';
+            return window.confirm(`${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`);
+        }
+
         async function handleDelete(id) {
             if (!state.orderContext) {
                 return;
@@ -2564,7 +2597,22 @@ function updateButtons() {
             const screeningLabel = item && item.screening_item
                 ? [item.screening_item.item_number, item.screening_item.name].filter(Boolean).join(' - ')
                 : `ID ${id}`;
-            const shouldDelete = window.confirm(`確定要刪除「${screeningLabel || `ID ${id}`}」嗎？刪除後將無法復原。`);
+
+            let assessment;
+            try {
+                assessment = await checkWorkflowDelete('order_items', id);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : '流程檢查失敗。';
+                showAlert('error', message);
+                return;
+            }
+
+            if (!assessment.allowed) {
+                await confirmWorkflowDelete(assessment, `此客戶批號「${screeningLabel || `ID ${id}`}」目前不可刪除。`);
+                return;
+            }
+
+            const shouldDelete = await confirmWorkflowDelete(assessment, `確定要刪除「${screeningLabel || `ID ${id}`}」嗎？刪除後將無法復原。`);
             if (!shouldDelete) {
                 return;
             }

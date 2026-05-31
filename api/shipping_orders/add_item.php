@@ -92,7 +92,8 @@ try {
         jsonResponse(['success' => false, 'message' => '該庫存項目已完全出貨。'], 400);
     }
 
-    if ($inventoryItem['quality_status'] !== 'qualified') {
+    $receiptType = strtolower(trim((string)($inventoryItem['receipt_type'] ?? 'standard')));
+    if ($inventoryItem['quality_status'] !== 'qualified' && $receiptType !== 'partial') {
         jsonResponse(['success' => false, 'message' => '該庫存項目未通過品質檢驗，無法出貨。'], 400);
     }
 

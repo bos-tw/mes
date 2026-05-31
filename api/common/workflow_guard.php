@@ -31,13 +31,66 @@ function workflowBlocked(string $message, array $impacts = [], string $action = 
     ];
 }
 
+function workflowTableExists(PDO $pdo, string $table): bool
+{
+    static $cache = [];
+    if (array_key_exists($table, $cache)) {
+        return $cache[$table];
+    }
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+        $cache[$table] = false;
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->prepare('SHOW TABLES LIKE ?');
+        $stmt->execute([$table]);
+        $cache[$table] = $stmt->fetchColumn() !== false;
+    } catch (Throwable $exception) {
+        $cache[$table] = false;
+    }
+
+    return $cache[$table];
+}
+
+function workflowColumnExists(PDO $pdo, string $table, string $column): bool
+{
+    static $cache = [];
+    $cacheKey = $table . '.' . $column;
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $table) || !preg_match('/^[a-zA-Z0-9_]+$/', $column)) {
+        $cache[$cacheKey] = false;
+        return false;
+    }
+
+    if (!workflowTableExists($pdo, $table)) {
+        $cache[$cacheKey] = false;
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->query("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
+        $cache[$cacheKey] = $stmt !== false && $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+    } catch (Throwable $exception) {
+        $cache[$cacheKey] = false;
+    }
+
+    return $cache[$cacheKey];
+}
+
 function getWorkflowDeleteAssessment(PDO $pdo, string $module, int $id): array
 {
     return match ($module) {
         'orders' => assessOrderDelete($pdo, $id),
+        'order_items' => assessOrderItemDelete($pdo, $id),
         'work_orders' => assessWorkOrderDelete($pdo, $id),
         'inventory_items' => assessInventoryItemDelete($pdo, $id),
         'shipping_orders' => assessShippingOrderDelete($pdo, $id),
+        'shipping_order_items' => assessShippingOrderItemDelete($pdo, $id),
+        'return_orders' => assessReturnOrderDelete($pdo, $id),
         default => workflowBlocked('此模組尚未支援流程刪除檢查。'),
     };
 }
@@ -222,4 +275,162 @@ function assessShippingOrderDelete(PDO $pdo, int $id): array
     }
 
     return workflowAllowed('此出貨單尚未確認出貨，可以刪除；系統會釋放已配貨庫存並保留刪除追溯。', $impacts);
+}
+
+function assessOrderItemDelete(PDO $pdo, int $id): array
+{
+    $stmt = $pdo->prepare("
+        SELECT oi.id, oi.order_id, oi.sub_item_number, oi.customer_batch_number, o.order_number
+        FROM order_items oi
+        LEFT JOIN orders o ON o.id = oi.order_id
+        WHERE oi.id = :id
+    ");
+    $stmt->execute(['id' => $id]);
+    $orderItem = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$orderItem) {
+        return workflowBlocked('找不到該訂單品項。');
+    }
+
+    $workOrderCount = 0;
+    if (workflowColumnExists($pdo, 'work_orders', 'order_item_id')) {
+        $workOrderStmt = $pdo->prepare('SELECT COUNT(*) FROM work_orders WHERE order_item_id = :id AND deleted_at IS NULL');
+        $workOrderStmt->execute(['id' => $id]);
+        $workOrderCount = (int)$workOrderStmt->fetchColumn();
+    }
+
+    $inventoryCount = 0;
+    if (workflowColumnExists($pdo, 'inventory_items', 'order_item_id')) {
+        $inventoryStmt = $pdo->prepare('SELECT COUNT(*) FROM inventory_items WHERE order_item_id = :id AND deleted_at IS NULL');
+        $inventoryStmt->execute(['id' => $id]);
+        $inventoryCount = (int)$inventoryStmt->fetchColumn();
+    }
+
+    $shippingCount = 0;
+    if (workflowColumnExists($pdo, 'shipping_order_items', 'order_item_id')) {
+        $shippingStmt = $pdo->prepare('SELECT COUNT(*) FROM shipping_order_items WHERE order_item_id = :id');
+        $shippingStmt->execute(['id' => $id]);
+        $shippingCount = (int)$shippingStmt->fetchColumn();
+    }
+
+    $returnCount = 0;
+    if (workflowColumnExists($pdo, 'return_order_items', 'order_item_id')) {
+        $returnStmt = $pdo->prepare('SELECT COUNT(*) FROM return_order_items WHERE order_item_id = :id');
+        $returnStmt->execute(['id' => $id]);
+        $returnCount = (int)$returnStmt->fetchColumn();
+    }
+
+    $impacts = [];
+    if ($workOrderCount > 0) {
+        $impacts[] = "生產工單：{$workOrderCount} 筆";
+    }
+    if ($inventoryCount > 0) {
+        $impacts[] = "庫存項目：{$inventoryCount} 筆";
+    }
+    if ($shippingCount > 0) {
+        $impacts[] = "出貨品項：{$shippingCount} 筆";
+    }
+    if ($returnCount > 0) {
+        $impacts[] = "退貨品項：{$returnCount} 筆";
+    }
+
+    if (!empty($impacts)) {
+        return workflowBlocked(
+            '此訂單品項已進入後續流程，不能直接刪除。請先從後段流程退回或作廢後再處理。',
+            $impacts,
+            'rollback_workflow'
+        );
+    }
+
+    return workflowAllowed('此訂單品項尚未進入工單/庫存/出貨/退貨流程，可以刪除。');
+}
+
+function assessShippingOrderItemDelete(PDO $pdo, int $id): array
+{
+    $stmt = $pdo->prepare("
+        SELECT soi.id, soi.shipping_order_id, soi.inventory_item_id, soi.shipped_quantity,
+               so.shipping_order_number, so.status AS shipping_status, so.deleted_at AS shipping_deleted_at
+        FROM shipping_order_items soi
+        LEFT JOIN shipping_orders so ON so.id = soi.shipping_order_id
+        WHERE soi.id = :id
+    ");
+    $stmt->execute(['id' => $id]);
+    $item = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$item) {
+        return workflowBlocked('找不到該出貨品項。');
+    }
+
+    if (!empty($item['shipping_deleted_at'])) {
+        return workflowBlocked('此出貨品項所屬出貨單已刪除，請先確認追溯流程。', ['所屬出貨單：已刪除'], 'review');
+    }
+
+    $status = strtolower(trim((string)($item['shipping_status'] ?? '')));
+    if (in_array($status, ['shipped', 'delivered'], true)) {
+        return workflowBlocked('此出貨品項已進入出貨完成流程，不能直接刪除。請改走退貨或沖銷流程。', ['出貨狀態：已出貨'], 'return_or_void');
+    }
+
+    if ($status !== 'draft') {
+        return workflowBlocked('只有草稿狀態的出貨單品項可以刪除。', ['出貨狀態：' . ($status ?: 'unknown')], 'go_shipping');
+    }
+
+    $returnCount = 0;
+    if (workflowColumnExists($pdo, 'return_order_items', 'shipping_order_item_id')) {
+        $returnStmt = $pdo->prepare('SELECT COUNT(*) FROM return_order_items WHERE shipping_order_item_id = :id');
+        $returnStmt->execute(['id' => $id]);
+        $returnCount = (int)$returnStmt->fetchColumn();
+    }
+    if ($returnCount > 0) {
+        return workflowBlocked('此出貨品項已有退貨紀錄，不能直接刪除。', ["退貨品項：{$returnCount} 筆"], 'return_or_void');
+    }
+
+    $impacts = [];
+    if ((float)$item['shipped_quantity'] > 0) {
+        $impacts[] = '將釋放已分配庫存數量：' . (float)$item['shipped_quantity'];
+    }
+    return workflowAllowed('此出貨品項可刪除，系統會釋放已分配庫存。', $impacts, 'delete');
+}
+
+function assessReturnOrderDelete(PDO $pdo, int $id): array
+{
+    $stmt = $pdo->prepare("
+        SELECT id, return_order_number, processing_status
+        FROM return_orders
+        WHERE id = :id AND deleted_at IS NULL
+    ");
+    $stmt->execute(['id' => $id]);
+    $order = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$order) {
+        return workflowBlocked('退貨單不存在。');
+    }
+
+    $processingStatus = strtolower(trim((string)($order['processing_status'] ?? '')));
+    if ($processingStatus === 'completed') {
+        return workflowBlocked('此退貨單已處理完成，不能直接刪除。請改用作廢或沖銷流程保留追溯。', ['退貨處理狀態：已完成'], 'return_or_void');
+    }
+
+    $itemCount = 0;
+    if (workflowColumnExists($pdo, 'return_order_items', 'return_order_id')) {
+        $itemStmt = $pdo->prepare('SELECT COUNT(*) FROM return_order_items WHERE return_order_id = :id');
+        $itemStmt->execute(['id' => $id]);
+        $itemCount = (int)$itemStmt->fetchColumn();
+    }
+
+    $txnCount = 0;
+    if (workflowColumnExists($pdo, 'inventory_transactions', 'source_type') && workflowColumnExists($pdo, 'inventory_transactions', 'source_id')) {
+        $txnStmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM inventory_transactions
+            WHERE source_type = 'return_order' AND source_id = :id
+        ");
+        $txnStmt->execute(['id' => $id]);
+        $txnCount = (int)$txnStmt->fetchColumn();
+    }
+    if ($txnCount > 0) {
+        return workflowBlocked('此退貨單已產生庫存異動，不能直接刪除。請改用沖銷或作廢流程。', ["庫存異動：{$txnCount} 筆"], 'return_or_void');
+    }
+
+    $impacts = [];
+    if ($itemCount > 0) {
+        $impacts[] = "將同步移除退貨流程關聯品項：{$itemCount} 筆";
+    }
+    return workflowAllowed('此退貨單尚未完成且未產生庫存異動，可以刪除。', $impacts, 'delete');
 }

@@ -343,7 +343,11 @@ function buildInventoryWhereClause(array $filters): array
 
     // Quality status filter
     if (!empty($filters['quality_status'])) {
-        $where[] = 'ii.quality_status = :quality_status';
+        if ($filters['quality_status'] === 'qualified') {
+            $where[] = "(ii.quality_status = :quality_status OR ii.receipt_type = 'partial')";
+        } else {
+            $where[] = 'ii.quality_status = :quality_status';
+        }
         $params['quality_status'] = $filters['quality_status'];
     }
 

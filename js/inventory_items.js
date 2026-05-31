@@ -523,6 +523,10 @@ function renderTable(items) {
         elements.tbody.innerHTML = items.map(item => {
             const statusClass = item.status ? item.status.toLowerCase().replace(/_/g, '-') : 'in-stock';
             const qualityClass = item.quality_status ? item.quality_status.toLowerCase().replace(/_/g, '-') : 'qualified';
+            const receiptType = String(item.receipt_type || 'standard').toLowerCase();
+            const receiptTypeBadge = receiptType === 'partial'
+                ? '<span class="inventory-receipt-badge partial">部分入庫</span>'
+                : (receiptType === 'final' ? '<span class="inventory-receipt-badge final">最終補入</span>' : '');
 
             // 客戶名稱處理（停用顯示）
             const customerIsActive = item.customer_is_active !== 0 && item.customer_is_active !== '0' && item.customer_is_active !== false;
@@ -531,16 +535,18 @@ function renderTable(items) {
                 : '-';
 
             // 判斷是否可以加入出貨單 (在庫 + 合格)
-            const canShip = item.status === 'in_stock' && item.quality_status === 'qualified' && item.quantity_on_hand > 0;
+            const canShip = item.status === 'in_stock'
+                && (item.quality_status === 'qualified' || receiptType === 'partial')
+                && item.quantity_on_hand > 0;
             // 判斷是否已有分配數量（已加入出貨單）
             const hasAllocated = parseFloat(item.quantity_allocated || 0) > 0;
             const shippingBtnTitle = hasAllocated ? '已加入出貨單（已分配數量：' + item.quantity_allocated + '）' : '加入出貨單';
             const deleteBlockReason = getInventoryDeleteBlockReason(item);
             if (deleteBlockReason) {
-                state.deleteBlockReasons.set(Number(item.id), deleteBlockReason);
+                state.deleteBlockReasons.set(Number(item.id), deleteBlockReason.alert);
             }
             const deleteButton = deleteBlockReason
-                ? `<button type="button" class="btn text op-action-btn op-role-delete" data-action="delete-blocked" title="${escapeHtml(deleteBlockReason)}" aria-label="${escapeHtml(deleteBlockReason)}" onclick="window.inventoryItemsModule.showDeleteBlocked(${item.id})">
+                ? `<button type="button" class="btn text op-action-btn op-role-delete" data-action="delete-blocked" title="${escapeHtml(deleteBlockReason.tooltip)}" aria-label="${escapeHtml(deleteBlockReason.tooltip)}" onclick="window.inventoryItemsModule.showDeleteBlocked(${item.id})">
                         <i class="fas fa-trash"></i>
                     </button>`
                 : `<button type="button" class="btn text danger op-action-btn op-role-delete" data-action="delete" title="刪除" aria-label="刪除" onclick="window.inventoryItemsModule.delete(${item.id})">
@@ -549,7 +555,7 @@ function renderTable(items) {
 
             return `
             <tr data-id="${item.id}">
-                <td><strong>${escapeHtml(item.inventory_number) || '-'}</strong></td>
+                <td><strong>${escapeHtml(item.inventory_number) || '-'}</strong>${receiptTypeBadge}</td>
                 <td>${escapeHtml(item.work_order_number) || '-'}</td>
                 <td>${customerDisplay}</td>
                 <td>${escapeHtml(item.customer_batch_number) || '-'}</td>
@@ -1158,6 +1164,11 @@ function renderTable(items) {
             elements.shippingModal.querySelector('[data-shipping-inventory-number]').textContent = item.inventory_number || '-';
             elements.shippingModal.querySelector('[data-shipping-customer-name]').textContent = item.customer_name || '-';
             elements.shippingModal.querySelector('[data-shipping-product-name]').textContent = item.screening_item_name || '-';
+            const receiptType = String(item.receipt_type || 'standard').toLowerCase();
+            const receiptLabel = receiptType === 'partial' ? '（部分入庫）' : (receiptType === 'final' ? '（最終補入）' : '');
+            if (receiptLabel) {
+                elements.shippingModal.querySelector('[data-shipping-inventory-number]').textContent = `${item.inventory_number || '-'} ${receiptLabel}`;
+            }
 
             const availableQty = parseInt(item.quantity_on_hand) - parseInt(item.quantity_allocated || 0);
             elements.shippingModal.querySelector('[data-shipping-available-qty]').textContent = formatNumber(availableQty);
@@ -1542,6 +1553,25 @@ function renderTable(items) {
         return `${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`;
     }
 
+    async function confirmWorkflowDelete(assessment, fallbackMessage, confirmText = '確定刪除') {
+        if (typeof window.showWorkflowImpactConfirm === 'function') {
+            return window.showWorkflowImpactConfirm({
+                title: '流程影響確認',
+                message: assessment.message || fallbackMessage,
+                impacts: Array.isArray(assessment.impacts) ? assessment.impacts : [],
+                recommendedAction: assessment.recommended_action || '',
+                severity: assessment.severity || 'info',
+                allowConfirm: !!assessment.allowed,
+                confirmText,
+                cancelText: '取消'
+            });
+        }
+        if (!assessment.allowed) {
+            return false;
+        }
+        return window.confirm(buildWorkflowConfirmMessage(assessment, fallbackMessage));
+    }
+
     async function handleDelete(id) {
         let assessment;
         try {
@@ -1552,11 +1582,12 @@ function renderTable(items) {
         }
 
         if (!assessment.allowed) {
-            showAlert('warning', assessment.message || '此庫存項目目前不可刪除。');
+            await confirmWorkflowDelete(assessment, '此庫存項目目前不可刪除。');
             return;
         }
 
-        if (!confirm(buildWorkflowConfirmMessage(assessment, '確定要刪除此庫存項目嗎?'))) {
+        const confirmed = await confirmWorkflowDelete(assessment, '確定要刪除此庫存項目嗎?');
+        if (!confirmed) {
             return;
         }
 
@@ -1707,17 +1738,39 @@ function renderTable(items) {
         return labels[status] || status;
     }
 
+    function buildWorkflowBlockedAlertMessage(type) {
+        switch (type) {
+            case 'allocated':
+                return '此資料已進入後續流程\n\n目前流程：\n庫存 → 出貨配貨\n\n可執行動作：\n請先從出貨單移除配貨或取消配貨。';
+            case 'shipped':
+                return '此資料已進入後續流程\n\n目前流程：\n庫存 → 已出貨\n\n可執行動作：\n請走退貨、沖銷或作廢流程。';
+            case 'from_work_order':
+                return '此資料已進入後續流程\n\n目前流程：\n生產工單 → 庫存\n\n可執行動作：\n請回到生產工單調整狀態，並選擇「刪除庫存並變更狀態」。';
+            default:
+                return '此庫存項目目前不可刪除。';
+        }
+    }
+
     function getInventoryDeleteBlockReason(item) {
         if (parseFloat(item.quantity_allocated || 0) > 0) {
-            return '此庫存已有配貨，請先從出貨單移除或取消配貨後再處理。';
+            return {
+                tooltip: '此庫存已有配貨，請先從出貨單移除或取消配貨後再處理。',
+                alert: buildWorkflowBlockedAlertMessage('allocated')
+            };
         }
         if (parseFloat(item.quantity_shipped || 0) > 0) {
-            return '此庫存已有出貨記錄，無法刪除。';
+            return {
+                tooltip: '此庫存已有出貨記錄，無法刪除。',
+                alert: buildWorkflowBlockedAlertMessage('shipped')
+            };
         }
         if (Number(item.work_order_id || 0) > 0) {
-            return '此庫存由生產工單轉入，請回到生產工單調整狀態並選擇「刪除庫存並變更狀態」。';
+            return {
+                tooltip: '此庫存由生產工單轉入，請回到生產工單調整狀態。',
+                alert: buildWorkflowBlockedAlertMessage('from_work_order')
+            };
         }
-        return '';
+        return null;
     }
 
     function getRefTypeLabel(refType) {

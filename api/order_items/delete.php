@@ -37,6 +37,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../common/workflow_guard.php';
 require_once __DIR__ . '/helpers.php';
 
 requireAuth();
@@ -120,6 +121,15 @@ if (!$orderItem) {
 }
 
 $orderId = (int)$orderItem['order_id'];
+
+$workflowGuard = getWorkflowDeleteAssessment($pdo, 'order_items', $id);
+if (!$workflowGuard['allowed']) {
+    jsonResponse([
+        'success' => false,
+        'message' => $workflowGuard['message'],
+        'workflow_guard' => $workflowGuard,
+    ], 409);
+}
 
 // 檢查是否有關聯資料
 // order_item_tools / order_item_screening_details / drawings / attachments

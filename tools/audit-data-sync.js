@@ -28,6 +28,7 @@ const CORE_MODULES = new Set([
     'work_orders',
     'inventory_items',
     'shipping_orders',
+    'shipping_order_items',
     'return_orders'
 ]);
 
@@ -429,6 +430,79 @@ function printConsoleSummary(results) {
     console.log(`Stateful refresh review: ${statefulReviewCount}`);
 }
 
+function requireDependency(dependencies, source, target, issues) {
+    const targets = dependencies[source] || [];
+    if (!targets.includes(target)) {
+        issues.push(`${source} missing dependency ${target}`);
+    }
+}
+
+function requireFilePattern(filePath, regex, label, issues) {
+    if (!fs.existsSync(filePath)) {
+        issues.push(`${path.relative(ROOT, filePath)} missing`);
+        return;
+    }
+
+    const content = readText(filePath);
+    if (!regex.test(content)) {
+        issues.push(label);
+    }
+}
+
+function checkSplitWorkOrderDataSync(dependencies) {
+    const issues = [];
+
+    requireDependency(dependencies, 'work_orders', 'inventory_items', issues);
+    requireDependency(dependencies, 'work_orders', 'inventory_transactions', issues);
+    requireDependency(dependencies, 'work_orders', 'production_work_order_schedule', issues);
+    requireDependency(dependencies, 'inventory_items', 'shipping_orders', issues);
+    requireDependency(dependencies, 'inventory_items', 'shipping_order_items', issues);
+    requireDependency(dependencies, 'inventory_items', 'work_orders', issues);
+    requireDependency(dependencies, 'shipping_orders', 'inventory_items', issues);
+
+    requireFilePattern(
+        path.join(JS_DIR, 'work_orders.js'),
+        /partial_receipt\.php[\s\S]*notifyWithDependencies\(['"]work_orders['"]/,
+        'work_orders partial receipt must notify DataSync dependencies',
+        issues
+    );
+    requireFilePattern(
+        path.join(JS_DIR, 'inventory_items.js'),
+        /receipt_type|partial|部分/,
+        'inventory_items must render partial/final receipt state',
+        issues
+    );
+    requireFilePattern(
+        path.join(JS_DIR, 'shipping_orders.js'),
+        /receipt_type|partial|部分/,
+        'shipping_orders must expose partial inventory state',
+        issues
+    );
+    requireFilePattern(
+        path.join(JS_DIR, 'production_work_order_schedule.js'),
+        /schedule_nodes\.php[\s\S]*node_key/,
+        'production schedule must persist split machine-run nodes',
+        issues
+    );
+
+    return issues;
+}
+
+function printSplitWorkOrderDataSyncSummary(dependencies) {
+    const issues = checkSplitWorkOrderDataSync(dependencies);
+
+    if (issues.length === 0) {
+        console.log('Split work order DataSync review: OK');
+        return issues;
+    }
+
+    console.log(`Split work order DataSync review: ${issues.length} issue(s)`);
+    issues.forEach((issue) => {
+        console.log(`  - ${issue}`);
+    });
+    return issues;
+}
+
 function main() {
     const args = process.argv.slice(2);
     const writeIndex = args.findIndex((arg) => arg === '--write' || arg.startsWith('--write='));
@@ -450,6 +524,7 @@ function main() {
         .sort((a, b) => priorityWeight(a.priority) - priorityWeight(b.priority) || a.moduleName.localeCompare(b.moduleName));
 
     printConsoleSummary(results);
+    printSplitWorkOrderDataSyncSummary(dependencies);
 
     if (reportPath) {
         fs.mkdirSync(path.dirname(reportPath), { recursive: true });

@@ -148,6 +148,7 @@ function handleGetInventoryItems(PDO $pdo): void
         SELECT
             ii.id,
             ii.inventory_number,
+            ii.receipt_type,
             ii.screening_item_id,
             si.name AS screening_item_name,
             ii.work_order_id,

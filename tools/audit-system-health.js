@@ -1044,9 +1044,12 @@ function checkWorkflowDeleteGuard() {
     const checkEndpoint = 'api/workflow_guard/check.php';
     const processModules = [
         { module: 'orders', api: 'api/orders/delete.php', js: 'js/orders.js', label: '訂單' },
+        { module: 'order_items', api: 'api/order_items/delete.php', js: 'js/order_items.js', label: '訂單品項' },
         { module: 'work_orders', api: 'api/work_orders/delete.php', js: 'js/work_orders.js', label: '工單' },
         { module: 'inventory_items', api: 'api/inventory_items/delete.php', js: 'js/inventory_items.js', label: '庫存' },
         { module: 'shipping_orders', api: 'api/shipping_orders/delete.php', js: 'js/shipping_orders.js', label: '出貨' },
+        { module: 'shipping_order_items', api: 'api/shipping_orders/delete_item.php', js: 'js/shipping_orders.js', label: '出貨品項' },
+        { module: 'return_orders', api: 'api/return_orders/delete.php', js: 'js/return_orders.js', label: '退貨單' },
     ];
 
     const guardContent = readFile(guardFile);
@@ -1098,10 +1101,25 @@ function checkWorkflowDeleteGuard() {
             return;
         }
 
-        if (!jsContent.includes('workflow_guard/check.php')) {
+        const hasWorkflowPrecheck = jsContent.includes('workflow_guard/check.php') &&
+            (jsContent.includes(`'${module}'`) || jsContent.includes(`"${module}"`) || jsContent.includes('`' + module + '`'));
+
+        if (!hasWorkflowPrecheck) {
             warn('前端', js, 'WF-1 前端刪除預檢',
                 `${label}前端刪除流程未呼叫 workflow_guard/check.php，使用者可能看不到流程影響提示`,
                 '刪除前先呼叫 api/workflow_guard/check.php?module=...&action=delete&id=...，再依 allowed/impacts 顯示確認視窗');
+        }
+
+        const usesNativeConfirm = /\b(?:window\.)?confirm\s*\(/.test(jsContent);
+        const hasWorkflowModal = jsContent.includes('data-workflow') ||
+            jsContent.includes('workflow-impact') ||
+            jsContent.includes('showWorkflow') ||
+            jsContent.includes('showWorkflowImpactConfirm') ||
+            jsContent.includes('流程影響確認 modal');
+        if (hasWorkflowPrecheck && usesNativeConfirm && !hasWorkflowModal) {
+            warn('前端', js, 'WF-1 流程影響 modal',
+                `${label}刪除流程仍可能使用瀏覽器原生 confirm()，尚未確認已改為標準流程影響 modal`,
+                '建立共用流程影響確認 modal，顯示目前流程、影響範圍與合法動作，再由後端 workflow_guard 做最終判斷');
         }
 
         if (!guardContent.includes(`'${module}'`)) {
@@ -1126,7 +1144,84 @@ function checkWorkflowDeleteGuard() {
     }
 
     info('資料完整性', 'WF-1 流程刪除守門',
-        '已檢查訂單、工單、庫存、出貨刪除 API 與前端預檢是否接上 workflow_guard。');
+        '已檢查訂單、訂單品項、工單、庫存、出貨、出貨品項、退貨單刪除 API 與前端預檢是否接上 workflow_guard。');
+}
+
+// ─────────────────────────────────────────────
+// SWO-1  拆分工單資料結構與追溯檢查
+// ─────────────────────────────────────────────
+function checkSplitWorkOrderIntegrity() {
+    console.log('🔍 [SWO-1] 檢查拆分工單資料結構與追溯...');
+
+    const migration = 'migrations/2026_05_31_add_split_work_order_foundation.sql';
+    const syncScript = 'tools/sync-local-schema.ps1';
+    const workOrderHelper = 'api/work_orders/helpers.php';
+    const partialReceiptApi = 'api/work_orders/partial_receipt.php';
+    const scheduleNodesApi = 'api/work_orders/schedule_nodes.php';
+    const reportApi = 'api/reports/screening_inspection.php';
+    const scheduleJs = 'js/production_work_order_schedule.js';
+
+    const requiredMigrationTokens = [
+        'work_order_machine_runs',
+        'work_order_machine_defects',
+        'work_order_partial_receipts',
+        'work_order_type',
+        'receipt_type'
+    ];
+
+    const migrationContent = readFile(migration) || '';
+    requiredMigrationTokens.forEach((token) => {
+        if (!migrationContent.includes(token)) {
+            err('資料完整性', migration, 'SWO-1 拆分工單 migration',
+                `拆分工單 migration 缺少 ${token}`,
+                '確認 migration 建立主工單類型、機台明細、不良明細、部分入庫追蹤與庫存入庫類型');
+        }
+    });
+
+    const syncContent = readFile(syncScript) || '';
+    if (!syncContent.includes('2026_05_31_add_split_work_order_foundation.sql')) {
+        err('資料完整性', syncScript, 'SWO-1 schema 同步',
+            'sync-local-schema.ps1 未收錄拆分工單 migration',
+            '將 2026_05_31_add_split_work_order_foundation.sql 加入 $migrationChecks');
+    }
+
+    const helperContent = readFile(workOrderHelper) || '';
+    if (!helperContent.includes('canReplaceWorkOrderMachineRuns') || !helperContent.includes('work_order_partial_receipts')) {
+        err('資料完整性', workOrderHelper, 'SWO-1 機台明細防呆',
+            '缺少已有部分入庫時禁止重建拆分機台明細的防呆',
+            '更新工單重建 machine runs 前必須檢查 work_order_partial_receipts 與出貨關聯');
+    }
+
+    const partialContent = readFile(partialReceiptApi) || '';
+    if (!partialContent.includes("receipt_type") || !partialContent.includes("'partial'") || !partialContent.includes('completed_net_weight_kg')) {
+        err('資料完整性', partialReceiptApi, 'SWO-1 部分完工入庫',
+            '部分完工入庫 API 未完整建立 partial 庫存或未使用完成淨重',
+            '部分入庫必須建立 work_order_partial_receipts、receipt_type=partial 庫存與 inventory_transactions');
+    }
+
+    const scheduleContent = readFile(scheduleNodesApi) || '';
+    if (!scheduleContent.includes('work_order_machine_runs') || !scheduleContent.includes('node_key')) {
+        warn('資料完整性', scheduleNodesApi, 'SWO-1 排程節點',
+            '排程尚未完整使用 work_order_machine_runs 節點',
+            '拆分工單排程應以 machine run 為節點，避免同一主工單多機台互相覆蓋');
+    }
+
+    const scheduleJsContent = readFile(scheduleJs) || '';
+    if (!scheduleJsContent.includes('schedule_nodes.php')) {
+        warn('前端', scheduleJs, 'SWO-1 排程節點',
+            '生產工單排程前端尚未使用 schedule_nodes.php',
+            '改用排程節點 API，讓一般工單與拆分機台明細共用拖拉排程流程');
+    }
+
+    const reportContent = readFile(reportApi) || '';
+    if (!reportContent.includes('machine_runs') || !reportContent.includes('work_order_machine_defects')) {
+        warn('報表', reportApi, 'SWO-1 拆分報表',
+            '篩分報表尚未回傳拆分機台分頁明細',
+            '報表 API 應回傳 machine_runs 與每台機台的不良明細，供列印頁呈現主表與機台分頁');
+    }
+
+    info('資料完整性', 'SWO-1 拆分工單',
+        '已檢查拆分工單 migration、schema 同步、部分入庫、防重建、排程節點與報表機台明細。');
 }
 
 // ─────────────────────────────────────────────
@@ -1165,6 +1260,7 @@ function runAllChecks() {
     checkPhpApiSecurity();
     checkDataSyncIntegration();
     checkWorkflowDeleteGuard();
+    checkSplitWorkOrderIntegrity();
 
     // ── 輸出報告 ──────────────────────────────
     console.log(`\n${sep}`);

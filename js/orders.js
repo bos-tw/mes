@@ -963,6 +963,25 @@
             return `${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`;
         }
 
+        async function confirmWorkflowDelete(assessment, fallbackMessage, confirmText = '確定刪除') {
+            if (typeof window.showWorkflowImpactConfirm === 'function') {
+                return window.showWorkflowImpactConfirm({
+                    title: '流程影響確認',
+                    message: assessment.message || fallbackMessage,
+                    impacts: Array.isArray(assessment.impacts) ? assessment.impacts : [],
+                    recommendedAction: assessment.recommended_action || '',
+                    severity: assessment.severity || 'info',
+                    allowConfirm: !!assessment.allowed,
+                    confirmText,
+                    cancelText: '取消'
+                });
+            }
+            if (!assessment.allowed) {
+                return false;
+            }
+            return window.confirm(buildWorkflowConfirmMessage(assessment, fallbackMessage));
+        }
+
         async function deleteOrder(id) {
             let assessment;
             try {
@@ -973,11 +992,11 @@
             }
 
             if (!assessment.allowed) {
-                showAlert('warning', assessment.message || '此訂單目前不可刪除。');
+                await confirmWorkflowDelete(assessment, '此訂單目前不可刪除。');
                 return;
             }
 
-            const confirmed = window.confirm(buildWorkflowConfirmMessage(assessment, '確認刪除此訂單資料？'));
+            const confirmed = await confirmWorkflowDelete(assessment, '確認刪除此訂單資料？');
             if (!confirmed) {
                 return;
             }

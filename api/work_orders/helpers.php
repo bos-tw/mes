@@ -13,6 +13,7 @@
  *
  * ## 驗證欄位說明
  * - order_item_id:              訂單品項 ID，新增時必填
+ * - work_order_type:            工單類型 normal/split，可選
  * - machine_id:                 機台 ID，可選
  * - machine_sequence:           機台內排序序號，可選
  * - assigned_employee_id:       指定員工 ID，可選
@@ -32,6 +33,33 @@
  * @see /api/work_orders/delete.php  刪除
  */
 declare(strict_types=1);
+
+/**
+ * Check if table has a specific column (cached per-request).
+ */
+function workOrderTableHasColumn(PDO $pdo, string $table, string $column): bool
+{
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key];
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = :table_name
+          AND COLUMN_NAME = :column_name
+    ");
+    $stmt->execute([
+        'table_name' => $table,
+        'column_name' => $column,
+    ]);
+
+    $cache[$key] = ((int)$stmt->fetchColumn()) > 0;
+    return $cache[$key];
+}
 
 /**
  * Retrieve request payload supporting JSON and form submissions.
@@ -104,6 +132,487 @@ function filterMeaningfulProductionRecords(array $records): array
     }
 
     return $filtered;
+}
+
+/**
+ * Split machine production records inherit machine_id from their machine run.
+ * Do not treat inherited machine_id alone as real production history.
+ *
+ * @param array<int,array<string,mixed>>|array<mixed> $records
+ * @return array<int,array<string,mixed>>
+ */
+function filterMeaningfulMachineRunProductionRecords(array $records): array
+{
+    $filtered = [];
+
+    foreach ($records as $record) {
+        if (!is_array($record) || empty($record['card_number'])) {
+            continue;
+        }
+
+        foreach (['weight_kg', 'production_date', 'production_time', 'notes'] as $field) {
+            if (array_key_exists($field, $record) && hasFilledWorkOrderValue($record[$field])) {
+                $filtered[] = $record;
+                break;
+            }
+        }
+    }
+
+    return $filtered;
+}
+
+function normalizeWorkOrderDateTimeValue($value): ?string
+{
+    $value = trim((string)($value ?? ''));
+    if ($value === '') {
+        return null;
+    }
+
+    foreach (['Y-m-d\TH:i', 'Y-m-d H:i:s', 'Y-m-d H:i'] as $format) {
+        $date = DateTime::createFromFormat($format, $value);
+        if ($date instanceof DateTime) {
+            return $date->format('Y-m-d H:i:s');
+        }
+    }
+
+    return null;
+}
+
+/**
+ * @param array<int,array<string,mixed>>|array<mixed> $machineRuns
+ * @return array{runs: array<int,array<string,mixed>>, errors: array<string,string>}
+ */
+function validateWorkOrderMachineRuns(array $machineRuns, float $expectedNetWeightKg, float $fallbackUnitWeightG): array
+{
+    $errors = [];
+    $normalisedRuns = [];
+    $totalCompletedNetWeight = 0.0;
+
+    foreach ($machineRuns as $index => $run) {
+        if (!is_array($run)) {
+            continue;
+        }
+
+        $rowNo = $index + 1;
+        $machineId = $run['machine_id'] ?? null;
+        $machineIdInt = null;
+        if ($machineId !== null && $machineId !== '') {
+            $machineIdInt = filter_var($machineId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($machineIdInt === false) {
+                $errors["machine_runs.$index.machine_id"] = "第 {$rowNo} 個機台頁籤的機台 ID 不正確。";
+            }
+        } else {
+            $errors["machine_runs.$index.machine_id"] = "第 {$rowNo} 個機台頁籤必須從機台設備管理選擇實際機台。";
+        }
+
+        $plannedNetWeight = (float)($run['planned_net_weight_kg'] ?? 0);
+        $completedNetWeight = (float)($run['completed_net_weight_kg'] ?? 0);
+        $quantityToProduce = $run['quantity_to_produce'] ?? null;
+        $quantityToProduceFloat = null;
+        if ($quantityToProduce !== null && $quantityToProduce !== '') {
+            $quantityToProduceFloat = filter_var($quantityToProduce, FILTER_VALIDATE_FLOAT);
+            if ($quantityToProduceFloat === false || $quantityToProduceFloat < 0) {
+                $errors["machine_runs.$index.quantity_to_produce"] = "第 {$rowNo} 個機台頁籤的生產數量必須為非負數。";
+                $quantityToProduceFloat = null;
+            }
+        }
+
+        $assignedEmployeeId = $run['assigned_employee_id'] ?? null;
+        $assignedEmployeeIdInt = null;
+        if ($assignedEmployeeId !== null && $assignedEmployeeId !== '') {
+            $assignedEmployeeIdInt = filter_var($assignedEmployeeId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($assignedEmployeeIdInt === false) {
+                $errors["machine_runs.$index.assigned_employee_id"] = "第 {$rowNo} 個機台頁籤的指定員工 ID 不正確。";
+            }
+        }
+
+        $calibrationEmployeeId = $run['calibration_employee_id'] ?? null;
+        $calibrationEmployeeIdInt = null;
+        if ($calibrationEmployeeId !== null && $calibrationEmployeeId !== '') {
+            $calibrationEmployeeIdInt = filter_var($calibrationEmployeeId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($calibrationEmployeeIdInt === false) {
+                $errors["machine_runs.$index.calibration_employee_id"] = "第 {$rowNo} 個機台頁籤的校機人員 ID 不正確。";
+            }
+        }
+
+        $unitWeight = (float)($run['weight_per_unit_g'] ?? $fallbackUnitWeightG);
+        if ($unitWeight <= 0) {
+            $unitWeight = $fallbackUnitWeightG;
+        }
+
+        if ($plannedNetWeight < 0 || $completedNetWeight < 0) {
+            $errors["machine_runs.$index.weight"] = "第 {$rowNo} 個機台頁籤重量不可小於 0。";
+        }
+
+        $totalCompletedNetWeight += $completedNetWeight;
+        $plannedUnits = $unitWeight > 0 ? round($plannedNetWeight * 1000 / $unitWeight, 2) : 0.0;
+        $completedUnits = $unitWeight > 0 ? round($completedNetWeight * 1000 / $unitWeight, 2) : 0.0;
+
+        $status = strtolower(trim((string)($run['status'] ?? 'pending')));
+        if (!in_array($status, ['pending', 'scheduled', 'in_progress', 'completed', 'cancelled'], true)) {
+            $status = 'pending';
+        }
+
+        $defects = [];
+        if (isset($run['defects']) && is_array($run['defects'])) {
+            foreach ($run['defects'] as $defectIndex => $defect) {
+                if (!is_array($defect)) {
+                    continue;
+                }
+
+                $serviceId = filter_var($defect['screening_service_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                if ($serviceId === false) {
+                    $errors["machine_runs.$index.defects.$defectIndex.screening_service_id"] = "第 {$rowNo} 個機台頁籤有不正確的不良項目。";
+                    continue;
+                }
+
+                $quantity = $defect['defect_quantity'] ?? null;
+                if ($quantity === null || $quantity === '') {
+                    $errors["machine_runs.$index.defects.$defectIndex.defect_quantity"] = "第 {$rowNo} 個機台頁籤的不良數量不可留空，若無不良請填 0。";
+                    continue;
+                }
+
+                $quantityInt = filter_var($quantity, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+                if ($quantityInt === false) {
+                    $errors["machine_runs.$index.defects.$defectIndex.defect_quantity"] = "第 {$rowNo} 個機台頁籤的不良數量必須為 0 或正整數。";
+                    continue;
+                }
+
+                $defects[] = [
+                    'screening_service_id' => (int)$serviceId,
+                    'defect_quantity' => (int)$quantityInt,
+                ];
+            }
+        }
+
+        $normalisedRuns[] = [
+            'run_label' => trim((string)($run['run_label'] ?? ('機台 ' . $rowNo))),
+            'machine_id' => $machineIdInt === false ? null : $machineIdInt,
+            'machine_sequence' => $rowNo,
+            'assigned_employee_id' => $assignedEmployeeIdInt === false ? null : $assignedEmployeeIdInt,
+            'calibration_employee_id' => $calibrationEmployeeIdInt === false ? null : $calibrationEmployeeIdInt,
+            'scheduled_start_date' => normalizeWorkOrderDateTimeValue($run['scheduled_start_date'] ?? null),
+            'scheduled_end_date' => normalizeWorkOrderDateTimeValue($run['scheduled_end_date'] ?? null),
+            'actual_start_date' => normalizeWorkOrderDateTimeValue($run['actual_start_date'] ?? null),
+            'actual_end_date' => normalizeWorkOrderDateTimeValue($run['actual_end_date'] ?? null),
+            'quantity_to_produce' => $quantityToProduceFloat === null ? null : round((float)$quantityToProduceFloat, 2),
+            'screening_speed' => mb_substr(trim((string)($run['screening_speed'] ?? '')), 0, 50),
+            'planned_net_weight_kg' => round($plannedNetWeight, 2),
+            'completed_net_weight_kg' => round($completedNetWeight, 2),
+            'weight_per_unit_g' => round($unitWeight, 3),
+            'planned_units' => $plannedUnits,
+            'completed_units' => $completedUnits,
+            'status' => $status,
+            'notes' => trim((string)($run['notes'] ?? '')),
+            'production_records' => filterMeaningfulMachineRunProductionRecords(is_array($run['production_records'] ?? null) ? $run['production_records'] : []),
+            'defects' => $defects,
+        ];
+    }
+
+    if ($totalCompletedNetWeight - $expectedNetWeightKg > 0.0001) {
+        $excess = round($totalCompletedNetWeight - $expectedNetWeightKg, 2);
+        $errors['machine_runs.completed_net_weight_kg'] = "拆分機台完成淨重合計 {$totalCompletedNetWeight} kg 已超過主工單預期淨重 {$expectedNetWeightKg} kg，超出 {$excess} kg。";
+    }
+
+    return ['runs' => $normalisedRuns, 'errors' => $errors];
+}
+
+/**
+ * Check whether split machine runs can be replaced safely.
+ *
+ * Replacing currently deletes and recreates machine runs. Once partial receipts
+ * exist, the machine run rows are part of traceability and must be preserved.
+ *
+ * @return array{allowed: bool, message: string, details: array<string,mixed>}
+ */
+function canReplaceWorkOrderMachineRuns(PDO $pdo, int $workOrderId): array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            COUNT(*) AS receipt_count,
+            COALESCE(SUM(wopr.net_weight_kg), 0) AS receipt_net_weight_kg,
+            COALESCE(SUM(wopr.calculated_units), 0) AS receipt_units,
+            COUNT(DISTINCT wopr.machine_run_id) AS machine_run_count,
+            COUNT(DISTINCT wopr.inventory_item_id) AS inventory_item_count,
+            COALESCE(SUM(ii.quantity_allocated), 0) AS allocated_units,
+            COALESCE(SUM(ii.quantity_shipped), 0) AS shipped_units,
+            COALESCE(SUM(shipping_refs.shipping_item_count), 0) AS shipping_item_count
+        FROM work_order_partial_receipts wopr
+        LEFT JOIN inventory_items ii ON ii.id = wopr.inventory_item_id AND ii.deleted_at IS NULL
+        LEFT JOIN (
+            SELECT inventory_item_id, COUNT(*) AS shipping_item_count
+            FROM shipping_order_items
+            GROUP BY inventory_item_id
+        ) shipping_refs ON shipping_refs.inventory_item_id = ii.id
+        WHERE wopr.work_order_id = :work_order_id
+    ");
+    $stmt->execute(['work_order_id' => $workOrderId]);
+    $summary = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $receiptCount = (int)($summary['receipt_count'] ?? 0);
+    if ($receiptCount === 0) {
+        return [
+            'allowed' => true,
+            'message' => '',
+            'details' => [],
+        ];
+    }
+
+    $netWeightKg = round((float)($summary['receipt_net_weight_kg'] ?? 0), 2);
+    $units = round((float)($summary['receipt_units'] ?? 0), 2);
+
+    $allocatedUnits = round((float)($summary['allocated_units'] ?? 0), 2);
+    $shippedUnits = round((float)($summary['shipped_units'] ?? 0), 2);
+    $shippingItemCount = (int)($summary['shipping_item_count'] ?? 0);
+    $shippingImpact = $shippingItemCount > 0
+        ? "，其中已有 {$shippingItemCount} 筆出貨關聯 / 已配貨 {$allocatedUnits} 支 / 已出貨 {$shippedUnits} 支"
+        : '';
+
+    return [
+        'allowed' => false,
+        'message' => "此工單已有 {$receiptCount} 筆部分完工入庫紀錄，合計 {$netWeightKg} kg / {$units} 支{$shippingImpact}，不能重建或清除拆分機台明細。請先走部分入庫沖銷/結清流程。",
+        'details' => [
+            'receipt_count' => $receiptCount,
+            'receipt_net_weight_kg' => $netWeightKg,
+            'receipt_units' => $units,
+            'machine_run_count' => (int)($summary['machine_run_count'] ?? 0),
+            'inventory_item_count' => (int)($summary['inventory_item_count'] ?? 0),
+            'shipping_item_count' => $shippingItemCount,
+            'allocated_units' => $allocatedUnits,
+            'shipped_units' => $shippedUnits,
+        ],
+    ];
+}
+
+/**
+ * Insert production records for normal work orders or split machine runs.
+ *
+ * @param array<int,array<string,mixed>> $productionRecords
+ */
+function insertWorkOrderProductionRecords(PDO $pdo, int $workOrderId, array $productionRecords, ?int $machineRunId = null, ?int $forcedMachineId = null): int
+{
+    $productionRecords = filterMeaningfulProductionRecords($productionRecords);
+    if ($productionRecords === []) {
+        return 0;
+    }
+
+    $currentEmployee = $_SESSION['employee'] ?? null;
+    $currentUserId = $currentEmployee ? (int)$currentEmployee['id'] : null;
+
+    $hasMachineRunIdColumn = workOrderTableHasColumn($pdo, 'production_records', 'machine_run_id');
+    $columns = ['work_order_id'];
+    $params = [':work_order_id'];
+    if ($hasMachineRunIdColumn) {
+        $columns[] = 'machine_run_id';
+        $params[] = ':machine_run_id';
+    }
+    $columns = array_merge($columns, [
+        'card_number',
+        'weight_kg',
+        'production_date',
+        'production_time',
+        'machine_id',
+        'machine_type',
+        'employee_id',
+        'notes',
+    ]);
+    $params = array_merge($params, [
+        ':card_number',
+        ':weight_kg',
+        ':production_date',
+        ':production_time',
+        ':machine_id',
+        ':machine_type',
+        ':employee_id',
+        ':notes',
+    ]);
+
+    $prodRecordSql = sprintf(
+        "INSERT INTO production_records (%s) VALUES (%s)",
+        implode(', ', $columns),
+        implode(', ', $params)
+    );
+    $prodRecordStmt = $pdo->prepare($prodRecordSql);
+    $machineStmt = $pdo->prepare("SELECT name FROM machines WHERE id = :id");
+    $inserted = 0;
+
+    foreach ($productionRecords as $record) {
+        if (empty($record['card_number'])) {
+            continue;
+        }
+
+        $machineId = $forcedMachineId ?: (!empty($record['machine_id']) ? (int)$record['machine_id'] : null);
+        $machineType = '';
+        if ($machineId) {
+            $machineStmt->execute(['id' => $machineId]);
+            $machineType = $machineStmt->fetchColumn() ?: '';
+        }
+
+        $insertParams = [
+            'work_order_id' => $workOrderId,
+            'card_number' => $record['card_number'],
+            'weight_kg' => !empty($record['weight_kg']) ? (float)$record['weight_kg'] : null,
+            'production_date' => !empty($record['production_date']) ? $record['production_date'] : null,
+            'production_time' => !empty($record['production_time']) ? $record['production_time'] : null,
+            'machine_id' => $machineId,
+            'machine_type' => $machineType,
+            'employee_id' => $currentUserId,
+            'notes' => $record['notes'] ?? null,
+        ];
+        if ($hasMachineRunIdColumn) {
+            $insertParams['machine_run_id'] = $machineRunId;
+        }
+        $prodRecordStmt->execute($insertParams);
+        $inserted++;
+    }
+
+    return $inserted;
+}
+
+/**
+ * @param array<int,array<string,mixed>> $machineRuns
+ */
+function replaceWorkOrderMachineRuns(PDO $pdo, int $workOrderId, array $machineRuns): void
+{
+    $pdo->prepare('DELETE FROM work_order_machine_defects WHERE work_order_id = :work_order_id')
+        ->execute(['work_order_id' => $workOrderId]);
+    $pdo->prepare('DELETE FROM work_order_machine_runs WHERE work_order_id = :work_order_id')
+        ->execute(['work_order_id' => $workOrderId]);
+
+    if ($machineRuns === []) {
+        return;
+    }
+
+    $currentEmployee = $_SESSION['employee'] ?? null;
+    $currentUserId = $currentEmployee ? (int)$currentEmployee['id'] : null;
+    $now = date('Y-m-d H:i:s');
+
+    $runColumns = [
+        'work_order_id',
+        'run_label',
+        'machine_id',
+        'machine_sequence',
+        'assigned_employee_id',
+    ];
+    $runParams = [
+        ':work_order_id',
+        ':run_label',
+        ':machine_id',
+        ':machine_sequence',
+        ':assigned_employee_id',
+    ];
+
+    if (workOrderTableHasColumn($pdo, 'work_order_machine_runs', 'calibration_employee_id')) {
+        $runColumns[] = 'calibration_employee_id';
+        $runParams[] = ':calibration_employee_id';
+    }
+
+    $runColumns = array_merge($runColumns, [
+        'scheduled_start_date',
+        'scheduled_end_date',
+        'actual_start_date',
+        'actual_end_date',
+    ]);
+    $runParams = array_merge($runParams, [
+        ':scheduled_start_date',
+        ':scheduled_end_date',
+        ':actual_start_date',
+        ':actual_end_date',
+    ]);
+
+    if (workOrderTableHasColumn($pdo, 'work_order_machine_runs', 'quantity_to_produce')) {
+        $runColumns[] = 'quantity_to_produce';
+        $runParams[] = ':quantity_to_produce';
+    }
+    if (workOrderTableHasColumn($pdo, 'work_order_machine_runs', 'screening_speed')) {
+        $runColumns[] = 'screening_speed';
+        $runParams[] = ':screening_speed';
+    }
+
+    $runColumns = array_merge($runColumns, [
+        'planned_net_weight_kg',
+        'completed_net_weight_kg',
+        'weight_per_unit_g',
+        'planned_units',
+        'completed_units',
+        'status',
+        'notes',
+        'created_by_employee_id',
+    ]);
+    $runParams = array_merge($runParams, [
+        ':planned_net_weight_kg',
+        ':completed_net_weight_kg',
+        ':weight_per_unit_g',
+        ':planned_units',
+        ':completed_units',
+        ':status',
+        ':notes',
+        ':created_by_employee_id',
+    ]);
+
+    $runStmt = $pdo->prepare(sprintf(
+        "INSERT INTO work_order_machine_runs (%s) VALUES (%s)",
+        implode(', ', $runColumns),
+        implode(', ', $runParams)
+    ));
+
+    $defectStmt = $pdo->prepare("
+        INSERT INTO work_order_machine_defects
+            (machine_run_id, work_order_id, screening_service_id, service_name, defect_quantity, recorded_at, recorded_by_employee_id)
+        VALUES
+            (:machine_run_id, :work_order_id, :screening_service_id, :service_name, :defect_quantity, :recorded_at, :recorded_by_employee_id)
+    ");
+
+    $serviceStmt = $pdo->prepare('SELECT name FROM screening_services WHERE id = :id LIMIT 1');
+
+    foreach ($machineRuns as $run) {
+        $runParams = [
+            'work_order_id' => $workOrderId,
+            'run_label' => $run['run_label'],
+            'machine_id' => $run['machine_id'],
+            'machine_sequence' => $run['machine_sequence'],
+            'assigned_employee_id' => $run['assigned_employee_id'],
+            'scheduled_start_date' => $run['scheduled_start_date'],
+            'scheduled_end_date' => $run['scheduled_end_date'],
+            'actual_start_date' => $run['actual_start_date'],
+            'actual_end_date' => $run['actual_end_date'],
+            'planned_net_weight_kg' => $run['planned_net_weight_kg'],
+            'completed_net_weight_kg' => $run['completed_net_weight_kg'],
+            'weight_per_unit_g' => $run['weight_per_unit_g'],
+            'planned_units' => $run['planned_units'],
+            'completed_units' => $run['completed_units'],
+            'status' => $run['status'],
+            'notes' => $run['notes'] === '' ? null : $run['notes'],
+            'created_by_employee_id' => $currentUserId,
+        ];
+        if (in_array('calibration_employee_id', $runColumns, true)) {
+            $runParams['calibration_employee_id'] = $run['calibration_employee_id'];
+        }
+        if (in_array('quantity_to_produce', $runColumns, true)) {
+            $runParams['quantity_to_produce'] = $run['quantity_to_produce'];
+        }
+        if (in_array('screening_speed', $runColumns, true)) {
+            $runParams['screening_speed'] = $run['screening_speed'] === '' ? null : $run['screening_speed'];
+        }
+        $runStmt->execute($runParams);
+
+        $machineRunId = (int)$pdo->lastInsertId();
+        insertWorkOrderProductionRecords($pdo, $workOrderId, $run['production_records'] ?? [], $machineRunId, $run['machine_id']);
+
+        foreach ($run['defects'] as $defect) {
+            $serviceStmt->execute(['id' => $defect['screening_service_id']]);
+            $serviceName = $serviceStmt->fetchColumn() ?: '';
+            $defectStmt->execute([
+                'machine_run_id' => $machineRunId,
+                'work_order_id' => $workOrderId,
+                'screening_service_id' => $defect['screening_service_id'],
+                'service_name' => $serviceName,
+                'defect_quantity' => $defect['defect_quantity'],
+                'recorded_at' => $now,
+                'recorded_by_employee_id' => $currentUserId,
+            ]);
+        }
+    }
 }
 
 /**
@@ -287,6 +796,20 @@ function validateWorkOrderData(array $payload, bool $isUpdate = false): array
             } else {
                 $data['quantity_to_produce'] = $quantityFloat;
             }
+        }
+    }
+
+    // 工單類型 - 預設一般工單
+    if (array_key_exists('work_order_type', $payload)) {
+        $workOrderType = strtolower(trim((string)($payload['work_order_type'] ?? 'normal')));
+        if ($workOrderType === '') {
+            $workOrderType = 'normal';
+        }
+
+        if (!in_array($workOrderType, ['normal', 'split'], true)) {
+            $errors['work_order_type'] = '工單類型必須為 normal 或 split。';
+        } else {
+            $data['work_order_type'] = $workOrderType;
         }
     }
 

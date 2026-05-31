@@ -265,6 +265,111 @@ try {
     $screeningDefects = $defectsStmt->fetchAll(PDO::FETCH_ASSOC);
     $workOrder['screening_defects'] = $screeningDefects;
 
+    // Get split machine runs with per-machine defect details.
+    $hasRunCalibrationEmployee = workOrderTableHasColumn($pdo, 'work_order_machine_runs', 'calibration_employee_id');
+    $machineRunCalibrationSelect = $hasRunCalibrationEmployee ? 'e3.name AS calibration_employee_name,' : "'' AS calibration_employee_name,";
+    $machineRunCalibrationJoin = $hasRunCalibrationEmployee ? 'LEFT JOIN employees e3 ON womr.calibration_employee_id = e3.id' : '';
+
+    $machineRunsStmt = $pdo->prepare("
+        SELECT
+            womr.*,
+            m.name AS machine_name,
+            e1.name AS assigned_employee_name,
+            e2.name AS created_by_name,
+            {$machineRunCalibrationSelect}
+            COALESCE(receipts.partial_receipt_count, 0) AS partial_receipt_count,
+            COALESCE(receipts.partial_receipt_net_weight_kg, 0) AS partial_receipt_net_weight_kg,
+            COALESCE(receipts.partial_receipt_units, 0) AS partial_receipt_units
+        FROM work_order_machine_runs womr
+        LEFT JOIN machines m ON womr.machine_id = m.id
+        LEFT JOIN employees e1 ON womr.assigned_employee_id = e1.id
+        LEFT JOIN employees e2 ON womr.created_by_employee_id = e2.id
+        {$machineRunCalibrationJoin}
+        LEFT JOIN (
+            SELECT
+                machine_run_id,
+                COUNT(*) AS partial_receipt_count,
+                SUM(net_weight_kg) AS partial_receipt_net_weight_kg,
+                SUM(calculated_units) AS partial_receipt_units
+            FROM work_order_partial_receipts
+            WHERE receipt_status <> 'reversed'
+            GROUP BY machine_run_id
+        ) receipts ON receipts.machine_run_id = womr.id
+        WHERE womr.work_order_id = :work_order_id
+          AND womr.deleted_at IS NULL
+        ORDER BY womr.machine_sequence IS NULL, womr.machine_sequence, womr.id
+    ");
+    $machineRunsStmt->execute(['work_order_id' => $id]);
+    $machineRuns = $machineRunsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if ($machineRuns) {
+        $machineRunIds = array_map(static fn(array $run): int => (int)$run['id'], $machineRuns);
+        $placeholders = implode(',', array_fill(0, count($machineRunIds), '?'));
+        $machineDefectsStmt = $pdo->prepare("
+            SELECT
+                womd.machine_run_id,
+                womd.screening_service_id,
+                womd.service_name,
+                womd.defect_quantity,
+                womd.recorded_at,
+                e.name AS recorded_by_name
+            FROM work_order_machine_defects womd
+            LEFT JOIN employees e ON womd.recorded_by_employee_id = e.id
+            WHERE womd.machine_run_id IN ($placeholders)
+            ORDER BY womd.machine_run_id ASC, womd.screening_service_id ASC
+        ");
+        $machineDefectsStmt->execute($machineRunIds);
+        $machineDefects = $machineDefectsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $defectsByRun = [];
+        foreach ($machineDefects as $defect) {
+            $runId = (int)$defect['machine_run_id'];
+            if (!isset($defectsByRun[$runId])) {
+                $defectsByRun[$runId] = [];
+            }
+            $defectsByRun[$runId][] = $defect;
+        }
+
+        foreach ($machineRuns as &$machineRun) {
+            $runId = (int)$machineRun['id'];
+            $machineRun['defects'] = $defectsByRun[$runId] ?? [];
+        }
+        unset($machineRun);
+
+        $recordsByRun = [];
+        if (workOrderTableHasColumn($pdo, 'production_records', 'machine_run_id')) {
+            $machineRecordsStmt = $pdo->prepare("
+                SELECT
+                    pr.*,
+                    m.name AS machine_name,
+                    e.name AS employee_name
+                FROM production_records pr
+                LEFT JOIN machines m ON pr.machine_id = m.id
+                LEFT JOIN employees e ON pr.employee_id = e.id
+                WHERE pr.machine_run_id IN ($placeholders)
+                ORDER BY pr.machine_run_id ASC, pr.production_date ASC, pr.production_time ASC, pr.id ASC
+            ");
+            $machineRecordsStmt->execute($machineRunIds);
+            $machineProductionRecords = $machineRecordsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($machineProductionRecords as $record) {
+                $runId = (int)$record['machine_run_id'];
+                if (!isset($recordsByRun[$runId])) {
+                    $recordsByRun[$runId] = [];
+                }
+                $recordsByRun[$runId][] = $record;
+            }
+        }
+
+        foreach ($machineRuns as &$machineRun) {
+            $runId = (int)$machineRun['id'];
+            $machineRun['production_records'] = $recordsByRun[$runId] ?? [];
+        }
+        unset($machineRun);
+    }
+
+    $workOrder['machine_runs'] = $machineRuns;
+
     jsonResponse([
         'success' => true,
         'data' => $workOrder

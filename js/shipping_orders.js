@@ -1093,8 +1093,10 @@ function renderTable(items) {
                 select.innerHTML = '<option value="">-- 請選擇庫存項目 --</option>';
                 state.inventoryItems.forEach(item => {
                     const available = parseInt(item.quantity_on_hand) - parseInt(item.quantity_allocated || 0);
+                    const receiptType = String(item.receipt_type || 'standard').toLowerCase();
+                    const receiptLabel = receiptType === 'partial' ? '（部分入庫）' : (receiptType === 'final' ? '（最終補入）' : '');
                     if (available > 0) {
-                        select.innerHTML += `<option value="${item.id}" data-available="${available}">${escapeHtml(item.inventory_number)} - ${escapeHtml(item.screening_item_name || '未知產品')} (可用: ${formatNumber(available)})</option>`;
+                        select.innerHTML += `<option value="${item.id}" data-available="${available}">${escapeHtml(item.inventory_number)}${receiptLabel} - ${escapeHtml(item.screening_item_name || '未知產品')} (可用: ${formatNumber(available)})</option>`;
                     }
                 });
 
@@ -1125,10 +1127,16 @@ function renderTable(items) {
             const item = state.inventoryItems.find(i => String(i.id) === String(itemId));
             if (item) {
                 const available = parseInt(item.quantity_on_hand) - parseInt(item.quantity_allocated || 0);
+                const receiptType = String(item.receipt_type || 'standard').toLowerCase();
+                const receiptLabel = receiptType === 'partial' ? '部分入庫' : (receiptType === 'final' ? '最終補入' : '一般入庫');
                 infoDiv.innerHTML = `
                     <div class="detail-item">
                         <span class="detail-label">庫存編號</span>
                         <span class="detail-value">${escapeHtml(item.inventory_number) || '-'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">入庫類型</span>
+                        <span class="detail-value">${escapeHtml(receiptLabel)}</span>
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">產品</span>
@@ -1215,7 +1223,21 @@ function renderTable(items) {
         }
 
         async function handleDeleteItem(itemId, shippingOrderId) {
-            if (!confirm('確定要刪除此出貨項目嗎？此操作會釋放已分配的庫存數量。')) return;
+            let assessment;
+            try {
+                assessment = await checkWorkflowDelete('shipping_order_items', itemId);
+            } catch (error) {
+                showAlert('error', error.message || '流程檢查失敗');
+                return;
+            }
+
+            if (!assessment.allowed) {
+                await confirmWorkflowDelete(assessment, '此出貨項目目前不可刪除。');
+                return;
+            }
+
+            const confirmed = await confirmWorkflowDelete(assessment, '確定要刪除此出貨項目嗎？此操作會釋放已分配的庫存數量。');
+            if (!confirmed) return;
 
             try {
                 const response = await fetch(`api/shipping_orders/delete_item.php?id=${itemId}`, {
@@ -1318,6 +1340,25 @@ function renderTable(items) {
             return `${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`;
         }
 
+        async function confirmWorkflowDelete(assessment, fallbackMessage, confirmText = '確定刪除') {
+            if (typeof window.showWorkflowImpactConfirm === 'function') {
+                return window.showWorkflowImpactConfirm({
+                    title: '流程影響確認',
+                    message: assessment.message || fallbackMessage,
+                    impacts: Array.isArray(assessment.impacts) ? assessment.impacts : [],
+                    recommendedAction: assessment.recommended_action || '',
+                    severity: assessment.severity || 'info',
+                    allowConfirm: !!assessment.allowed,
+                    confirmText,
+                    cancelText: '取消'
+                });
+            }
+            if (!assessment.allowed) {
+                return false;
+            }
+            return window.confirm(buildWorkflowConfirmMessage(assessment, fallbackMessage));
+        }
+
         async function handleDelete(id) {
             let assessment;
             try {
@@ -1328,11 +1369,12 @@ function renderTable(items) {
             }
 
             if (!assessment.allowed) {
-                showAlert('warning', assessment.message || '此出貨單目前不可刪除。');
+                await confirmWorkflowDelete(assessment, '此出貨單目前不可刪除。');
                 return;
             }
 
-            if (!confirm(buildWorkflowConfirmMessage(assessment, '確定要刪除此出貨單嗎？'))) return;
+            const confirmed = await confirmWorkflowDelete(assessment, '確定要刪除此出貨單嗎？');
+            if (!confirmed) return;
 
             try {
                 await deleteShippingOrder(id);

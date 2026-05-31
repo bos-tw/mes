@@ -37,6 +37,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../common/workflow_guard.php';
 requireAuth();
 
 // 只接受 DELETE 請求
@@ -65,9 +66,13 @@ try {
         jsonResponse(['success' => false, 'message' => '找不到該出貨項目。'], 404);
     }
 
-    // 只有草稿狀態才能刪除項目
-    if ($item['order_status'] !== 'draft') {
-        jsonResponse(['success' => false, 'message' => '只有草稿狀態的出貨單才能刪除項目。'], 400);
+    $workflowGuard = getWorkflowDeleteAssessment($pdo, 'shipping_order_items', $itemId);
+    if (!$workflowGuard['allowed']) {
+        jsonResponse([
+            'success' => false,
+            'message' => $workflowGuard['message'],
+            'workflow_guard' => $workflowGuard,
+        ], 409);
     }
 
     $pdo->beginTransaction();

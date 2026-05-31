@@ -171,6 +171,7 @@ function handleListWorkOrders(PDO $pdo): void
         SELECT
             wo.id,
             wo.work_order_number,
+            wo.work_order_type,
             wo.order_item_id,
             wo.machine_id,
             wo.machine_sequence,
@@ -201,7 +202,10 @@ function handleListWorkOrders(PDO $pdo): void
             lv.value_label AS status_label,
             lv.value_key AS status_key,
             CASE WHEN wo.completed_at IS NOT NULL THEN 1 ELSE 0 END AS lifecycle_locked,
-            CASE WHEN ii_check.id IS NOT NULL THEN 1 ELSE 0 END AS has_inventory
+            CASE WHEN ii_check.id IS NOT NULL THEN 1 ELSE 0 END AS has_inventory,
+            COALESCE(womr_summary.machine_run_count, 0) AS machine_run_count,
+            COALESCE(womr_summary.scheduled_machine_run_count, 0) AS scheduled_machine_run_count,
+            COALESCE(womr_summary.completed_net_weight_kg, 0) AS machine_runs_completed_net_weight_kg
         FROM work_orders wo
         LEFT JOIN order_items oi ON wo.order_item_id = oi.id
         LEFT JOIN orders o ON oi.order_id = o.id
@@ -212,6 +216,16 @@ function handleListWorkOrders(PDO $pdo): void
         LEFT JOIN employees e2 ON wo.calibration_employee_id = e2.id
         LEFT JOIN lookup_values lv ON wo.status_lookup_id = lv.id
         LEFT JOIN inventory_items ii_check ON ii_check.work_order_id = wo.id AND ii_check.deleted_at IS NULL
+        LEFT JOIN (
+            SELECT
+                work_order_id,
+                COUNT(*) AS machine_run_count,
+                SUM(CASE WHEN machine_id IS NOT NULL THEN 1 ELSE 0 END) AS scheduled_machine_run_count,
+                SUM(completed_net_weight_kg) AS completed_net_weight_kg
+            FROM work_order_machine_runs
+            WHERE deleted_at IS NULL
+            GROUP BY work_order_id
+        ) womr_summary ON womr_summary.work_order_id = wo.id
         WHERE {$whereClause}
         ORDER BY {$orderBy} {$sortOrder}
         LIMIT :limit OFFSET :offset
@@ -255,6 +269,10 @@ function handleCreateWorkOrder(PDO $pdo): void
     unset($payload['production_records']); // 從主 payload 中移除
     $productionRecords = is_array($productionRecords) ? filterMeaningfulProductionRecords($productionRecords) : [];
 
+    $machineRunsPayload = $payload['machine_runs'] ?? [];
+    unset($payload['machine_runs']);
+    $machineRunsPayload = is_array($machineRunsPayload) ? $machineRunsPayload : [];
+
     $validation = validateWorkOrderData($payload, false);
 
     if (!empty($validation['errors'])) {
@@ -296,6 +314,32 @@ function handleCreateWorkOrder(PDO $pdo): void
     }
     if (!array_key_exists('tool_statistics', $data) || $data['tool_statistics'] === null) {
         $data['tool_statistics'] = $orderItemDetails['tool_statistics'] ?? null;
+    }
+
+    $workOrderType = (string)($data['work_order_type'] ?? 'normal');
+    $validatedMachineRuns = [];
+    if ($workOrderType === 'split') {
+        $machineRunValidation = validateWorkOrderMachineRuns(
+            $machineRunsPayload,
+            (float)($data['total_weight_kg'] ?? 0),
+            (float)($data['weight_per_unit_g'] ?? 0)
+        );
+        if (!empty($machineRunValidation['errors'])) {
+            jsonResponse([
+                'success' => false,
+                'message' => '拆分機台資料驗證失敗。',
+                'errors' => $machineRunValidation['errors'],
+            ], 400);
+            return;
+        }
+        $validatedMachineRuns = $machineRunValidation['runs'];
+        if ($validatedMachineRuns === []) {
+            jsonResponse([
+                'success' => false,
+                'message' => '拆分工單至少需要 1 個機台頁籤。',
+            ], 400);
+            return;
+        }
     }
 
     // Prevent duplicate work orders for the same order item
@@ -405,45 +449,16 @@ function handleCreateWorkOrder(PDO $pdo): void
             }
         }
 
-        // 處理生產紀錄 (Production Records)
-        if (!empty($productionRecords) && is_array($productionRecords)) {
-            $currentEmployee = $_SESSION['employee'] ?? null;
-            $currentUserId = $currentEmployee ? $currentEmployee['id'] : null;
+        // 處理一般工單生產紀錄；拆分工單的履歷由各機台頁籤明細寫入。
+        $productionRecordCount = 0;
+        if ($workOrderType !== 'split' && !empty($productionRecords) && is_array($productionRecords)) {
+            $productionRecordCount = insertWorkOrderProductionRecords($pdo, $workOrderId, $productionRecords);
+        }
 
-            $prodRecordSql = "
-                INSERT INTO production_records
-                (work_order_id, card_number, weight_kg, production_date, production_time, machine_id, machine_type, employee_id, notes)
-                VALUES (:work_order_id, :card_number, :weight_kg, :production_date, :production_time, :machine_id, :machine_type, :employee_id, :notes)
-            ";
-            $prodRecordStmt = $pdo->prepare($prodRecordSql);
-
-            foreach ($productionRecords as $record) {
-                // 驗證必要欄位 (卡號是自動生成的，應該要有)
-                if (empty($record['card_number'])) {
-                    continue;
-                }
-
-                $machineId = !empty($record['machine_id']) ? (int)$record['machine_id'] : null;
-                $machineType = '';
-
-                // 如果有選擇機台，自動帶入機台種類
-                if ($machineId) {
-                    $machineStmt = $pdo->prepare("SELECT name FROM machines WHERE id = :id");
-                    $machineStmt->execute(['id' => $machineId]);
-                    $machineType = $machineStmt->fetchColumn() ?: '';
-                }
-
-                $prodRecordStmt->execute([
-                    'work_order_id' => $workOrderId,
-                    'card_number' => $record['card_number'],
-                    'weight_kg' => !empty($record['weight_kg']) ? (float)$record['weight_kg'] : null,
-                    'production_date' => !empty($record['production_date']) ? $record['production_date'] : null,
-                    'production_time' => !empty($record['production_time']) ? $record['production_time'] : null,
-                    'machine_id' => $machineId,
-                    'machine_type' => $machineType,
-                    'employee_id' => $currentUserId, // 登錄者
-                    'notes' => $record['notes'] ?? null
-                ]);
+        if ($workOrderType === 'split') {
+            replaceWorkOrderMachineRuns($pdo, $workOrderId, $validatedMachineRuns);
+            foreach ($validatedMachineRuns as $machineRun) {
+                $productionRecordCount += count(filterMeaningfulProductionRecords($machineRun['production_records'] ?? []));
             }
         }
 
@@ -451,7 +466,8 @@ function handleCreateWorkOrder(PDO $pdo): void
         logAuditAction('Added new work order', 'WorkOrders', $workOrderId, [
             'work_order_number' => $workOrderNumber,
             'screening_defects_count' => count($screeningDefects),
-            'production_records_count' => count($productionRecords)
+            'production_records_count' => $productionRecordCount,
+            'machine_runs_count' => count($validatedMachineRuns),
         ]);
 
         $pdo->commit();

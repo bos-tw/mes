@@ -71,7 +71,13 @@
         firstPieceDimensions: null,
         images: [],
         productionRecords: [],
+        splitMachineRuns: {
+            create: [],
+            edit: []
+        },
+        createSourceMode: 'manual',
         machines: [],
+        employees: [],
         currentUser: null,
         liveTimeIntervalId: null
     };
@@ -82,11 +88,12 @@
     function showModalAlert(type, message, autoHide = true, isEditMode = false) {
         const alertBox = isEditMode ? editModalAlertBox : createModalAlertBox;
         if (!alertBox) return;
+        const normalizedType = type === 'danger' ? 'error' : (type || 'info');
         alertBox.textContent = message;
-        alertBox.className = `modal-alert alert alert-${type}`;
+        alertBox.className = `modal-alert ${normalizedType}`;
         alertBox.removeAttribute('hidden');
         alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        if (autoHide && type === 'success') {
+        if (autoHide && normalizedType === 'success') {
             setTimeout(() => hideModalAlert(isEditMode), 3000);
         }
     }
@@ -157,6 +164,28 @@
         });
     }
 
+    function parseDateTime(value) {
+        if (!value) {
+            return null;
+        }
+        const normalized = String(value).trim().replace(' ', 'T');
+        const date = new Date(normalized);
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function toDateTimeLocalValue(value) {
+        const date = parseDateTime(value);
+        if (!date) {
+            return '';
+        }
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hour = String(date.getHours()).padStart(2, '0');
+        const minute = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hour}:${minute}`;
+    }
+
     function formatLiveTimestamp(date) {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -185,6 +214,745 @@
             clearInterval(state.liveTimeIntervalId);
             state.liveTimeIntervalId = null;
         }
+    }
+
+    function getSplitModeKey(isEditMode) {
+        return isEditMode ? 'edit' : 'create';
+    }
+
+    function getSplitRuns(isEditMode) {
+        return state.splitMachineRuns[getSplitModeKey(isEditMode)];
+    }
+
+    function setSplitRuns(isEditMode, runs) {
+        state.splitMachineRuns[getSplitModeKey(isEditMode)] = Array.isArray(runs) ? runs : [];
+    }
+
+    function createEmptyMachineRun(index = 0) {
+        const unitWeight = parseFloat(state.orderItemDetails?.weight_per_unit_g) || 0;
+        return {
+            run_label: '',
+            machine_id: '',
+            scheduled_start_date: '',
+            scheduled_end_date: '',
+            actual_start_date: '',
+            actual_end_date: '',
+            assigned_employee_id: '',
+            calibration_employee_id: '',
+            quantity_to_produce: '',
+            screening_speed: '',
+            planned_net_weight_kg: '',
+            completed_net_weight_kg: '',
+            weight_per_unit_g: unitWeight || '',
+            status: 'pending',
+            notes: '',
+            production_records: [],
+            defects: buildMachineRunDefects([])
+        };
+    }
+
+    function createEmptySplitProductionRecord(run = {}) {
+        return {
+            card_number: '',
+            weight_kg: '',
+            production_date: '',
+            production_time: '',
+            machine_id: run.machine_id || '',
+            notes: ''
+        };
+    }
+
+    function buildMachineRunDefects(existingDefects = []) {
+        const services = state.orderItemDetails?.screening_services_details || [];
+        const existingMap = new Map();
+        existingDefects.forEach(defect => {
+            existingMap.set(String(defect.screening_service_id), defect);
+        });
+
+        return services.map(service => ({
+            screening_service_id: service.id,
+            service_name: service.screening_service_name || service.custom_service_name || '',
+            tolerance_plus_value: service.tolerance_plus_value ?? '',
+            tolerance_minus_value: service.tolerance_minus_value ?? '',
+            ppm_standard: service.ppm_standard ?? '',
+            notes: service.notes || '',
+            defect_quantity: existingMap.has(String(service.id))
+                ? (existingMap.get(String(service.id))?.defect_quantity ?? 0)
+                : 0
+        }));
+    }
+
+    function getExpectedNetWeightForSplit() {
+        const { form } = getCurrentModal();
+        const formValue = form ? parseFloat(form.querySelector('[name="total_weight_kg"]')?.value) : NaN;
+        if (!Number.isNaN(formValue) && formValue > 0) {
+            return formValue;
+        }
+        return parseFloat(state.orderItemDetails?.net_weight || state.orderItemDetails?.total_weight_kg) || 0;
+    }
+
+    function getMachineOptionsHtml(selectedValue = '') {
+        const options = ['<option value="">-- 請選擇 --</option>'];
+        state.machines.forEach(machine => {
+            const id = String(machine.id);
+            const selected = id === String(selectedValue || '') ? ' selected' : '';
+            const labelParts = [
+                machine.machine_number ? String(machine.machine_number) : '',
+                machine.name ? String(machine.name) : ''
+            ].filter(Boolean);
+            options.push(`<option value="${escapeHtml(id)}"${selected}>${escapeHtml(labelParts.join(' - ') || id)}</option>`);
+        });
+        return options.join('');
+    }
+
+    function getMachineDisplayName(machineId) {
+        const id = String(machineId || '');
+        if (!id) {
+            return '';
+        }
+        const machine = state.machines.find(item => String(item.id) === id);
+        if (!machine) {
+            return '';
+        }
+        return [machine.machine_number || '', machine.name || ''].filter(Boolean).join(' - ') || id;
+    }
+
+    function getEmployeeOptionsHtml(selectedValue = '') {
+        const options = ['<option value="">-- 請選擇 --</option>'];
+        state.employees.forEach(employee => {
+            const id = String(employee.id);
+            const selected = id === String(selectedValue || '') ? ' selected' : '';
+            options.push(`<option value="${escapeHtml(id)}"${selected}>${escapeHtml(employee.name || id)}</option>`);
+        });
+        return options.join('');
+    }
+
+    function setWorkOrderType(form, nextType) {
+        if (!form) return;
+        const normalizedType = nextType === 'split' ? 'split' : 'normal';
+        const hiddenInput = form.querySelector('input[name="work_order_type"]');
+        if (hiddenInput) {
+            hiddenInput.value = normalizedType;
+        }
+        form.querySelectorAll('[data-work-order-type-switch] .tab-btn').forEach((button) => {
+            const active = button.dataset.value === normalizedType;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        syncSplitPanelVisibility(form, form === elements.editModalForm);
+    }
+
+    function setCreateSourceTab(tabName) {
+        if (!elements.createModalForm) {
+            return;
+        }
+        const sourceSection = elements.createModalForm.querySelector('[data-source-selection-section]');
+        if (!sourceSection) {
+            return;
+        }
+        const tabs = sourceSection.querySelectorAll('.tab-btn[data-tab]');
+        const contents = sourceSection.querySelectorAll('.tab-content[data-tab-content]');
+        tabs.forEach((tab) => {
+            tab.classList.toggle('active', tab.dataset.tab === tabName);
+        });
+        contents.forEach((content) => {
+            content.classList.toggle('active', content.dataset.tabContent === tabName);
+        });
+    }
+
+    function setCreateSourceMode(mode = 'manual') {
+        if (!elements.createModalForm) {
+            return;
+        }
+        const normalizedMode = mode === 'order_item' ? 'order_item' : 'manual';
+        state.createSourceMode = normalizedMode;
+        const sourceSection = elements.createModalForm.querySelector('[data-source-selection-section]');
+        const sourceHint = elements.createModalForm.querySelector('[data-work-order-source-mode-hint]');
+        const shouldHideSourceSection = normalizedMode === 'order_item';
+
+        if (sourceSection) {
+            sourceSection.classList.toggle('hidden', shouldHideSourceSection);
+        }
+        if (sourceHint) {
+            sourceHint.classList.toggle('hidden', !shouldHideSourceSection);
+        }
+    }
+
+    function syncSplitPanelVisibility(form, isEditMode) {
+        if (!form) return;
+        const type = form.querySelector('[name="work_order_type"]')?.value || 'normal';
+        const panel = form.querySelector('[data-split-work-order-panel]');
+        const isSplit = type === 'split';
+        if (!panel) return;
+        panel.classList.toggle('hidden', !isSplit);
+
+        form.querySelectorAll('[data-primary-machine-field]').forEach((field) => {
+            field.classList.toggle('hidden', isSplit);
+            const select = field.querySelector('select[name="machine_id"]');
+            if (select) {
+                select.disabled = isSplit;
+                if (isSplit) {
+                    select.value = '';
+                }
+            }
+        });
+
+        form.querySelectorAll('[data-split-mode-hidden]').forEach((section) => {
+            section.classList.toggle('hidden', isSplit);
+        });
+
+        renderSplitMachineRuns(isEditMode);
+    }
+
+    function renderSplitMachineRuns(isEditMode) {
+        const form = isEditMode ? elements.editModalForm : elements.createModalForm;
+        if (!form) return;
+        const panel = form.querySelector('[data-split-work-order-panel]');
+        if (!panel || panel.classList.contains('hidden')) return;
+
+        const runs = getSplitRuns(isEditMode);
+        const tabs = panel.querySelector('[data-split-machine-tabs]');
+        const editor = panel.querySelector('[data-split-machine-editor]');
+        const activeIndex = Math.min(parseInt(panel.dataset.activeRunIndex || '0', 10) || 0, Math.max(runs.length - 1, 0));
+        panel.dataset.activeRunIndex = String(activeIndex);
+
+        if (tabs) {
+            tabs.innerHTML = runs.map((run, index) => `
+                <button type="button" class="split-machine-tab ${index === activeIndex ? 'active' : ''}" data-action="select-machine-run" data-run-index="${index}">
+                    <i class="fas fa-industry"></i>
+                    <span>${escapeHtml(getSplitRunTabLabel(run, index))}</span>
+                </button>
+            `).join('');
+        }
+
+        if (!editor) return;
+        if (runs.length === 0) {
+            if (tabs) {
+                tabs.innerHTML = '<div class="split-machine-empty-tabs">尚未選擇機台</div>';
+            }
+            editor.innerHTML = `
+                <div class="split-machine-empty-state">
+                    <strong>尚未建立拆分機台</strong>
+                    <span>請先按「選擇機台新增」，從機台設備管理清單加入實際生產機台。</span>
+                </div>
+            `;
+            updateSplitSummary(isEditMode);
+            return;
+        }
+
+        const run = runs[activeIndex];
+        const completedNetWeight = parseFloat(run.completed_net_weight_kg) || 0;
+        const partialReceiptNetWeight = parseFloat(run.partial_receipt_net_weight_kg) || 0;
+        const partialReceiptRemaining = Math.max(0, completedNetWeight - partialReceiptNetWeight);
+        const defectsHtml = (run.defects || []).map((defect, defectIndex) => {
+            const tolerancePlus = defect.tolerance_plus_value !== null && defect.tolerance_plus_value !== undefined && defect.tolerance_plus_value !== ''
+                ? Number.parseFloat(defect.tolerance_plus_value).toFixed(2)
+                : '';
+            const toleranceMinus = defect.tolerance_minus_value !== null && defect.tolerance_minus_value !== undefined && defect.tolerance_minus_value !== ''
+                ? Number.parseFloat(defect.tolerance_minus_value).toFixed(2)
+                : '';
+            const ppm = defect.ppm_standard !== null && defect.ppm_standard !== undefined && defect.ppm_standard !== ''
+                ? Number.parseFloat(defect.ppm_standard).toFixed(0)
+                : '';
+
+            return `
+                <tr data-split-defect-row data-defect-index="${defectIndex}">
+                    <td>${escapeHtml(defect.service_name || `項目 ${defect.screening_service_id}`)}</td>
+                    <td class="text-right">${escapeHtml(tolerancePlus)}</td>
+                    <td class="text-right">${escapeHtml(toleranceMinus)}</td>
+                    <td class="text-right">${escapeHtml(ppm)}</td>
+                    <td>
+                        <input type="number" min="0" step="1" value="${escapeHtml(String(defect.defect_quantity ?? 0))}" data-split-field="defect_quantity" data-defect-index="${defectIndex}" style="width: 100%; padding: 4px;">
+                    </td>
+                    <td>${escapeHtml(defect.notes || '')}</td>
+                </tr>
+            `;
+        }).join('');
+        const productionRecordsHtml = getSplitProductionRecordsHtml(run);
+        const machineName = getMachineDisplayName(run.machine_id) || '未選機台';
+
+        editor.innerHTML = `
+            <div class="split-machine-content-stack" data-run-index="${activeIndex}">
+                <section class="split-machine-card">
+                    <h5>拆分統計</h5>
+                    <div class="split-summary-grid">
+                        <span>主工單淨重</span><strong data-split-summary="expected">0.00 kg</strong>
+                        <span>機台完成淨重</span><strong data-split-summary="completed">0.00 kg</strong>
+                        <span>尚可分配</span><strong data-split-summary="remaining">0.00 kg</strong>
+                    </div>
+                </section>
+
+                <section class="split-machine-card">
+                    <div class="split-machine-card-header">
+                        <h5>生產排程資訊</h5>
+                        <span class="split-machine-name">${escapeHtml(machineName)}</span>
+                    </div>
+                    <div class="form-grid form-grid-four-columns">
+                        <label class="inline-label">
+                            <span>預定開始</span>
+                            <input type="datetime-local" value="${escapeHtml(toDateTimeLocalValue(run.scheduled_start_date || ''))}" data-split-field="scheduled_start_date">
+                        </label>
+                        <label class="inline-label">
+                            <span>預定結束</span>
+                            <input type="datetime-local" value="${escapeHtml(toDateTimeLocalValue(run.scheduled_end_date || ''))}" data-split-field="scheduled_end_date">
+                        </label>
+                        <label class="inline-label">
+                            <span>實際開始</span>
+                            <input type="datetime-local" value="${escapeHtml(toDateTimeLocalValue(run.actual_start_date || ''))}" data-split-field="actual_start_date">
+                        </label>
+                        <label class="inline-label">
+                            <span>實際結束</span>
+                            <input type="datetime-local" value="${escapeHtml(toDateTimeLocalValue(run.actual_end_date || ''))}" data-split-field="actual_end_date">
+                        </label>
+                    </div>
+                </section>
+
+                <section class="split-machine-card">
+                    <div class="split-machine-card-header">
+                        <h5>生產履歷</h5>
+                        <button type="button" class="btn outline small" data-action="add-split-production-record">
+                            <i class="fas fa-plus"></i> 新增履歷
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table compact split-production-records-table">
+                            <thead>
+                                <tr>
+                                    <th>卡號</th>
+                                    <th>重量(kg)</th>
+                                    <th>日期</th>
+                                    <th>時間</th>
+                                    <th>備註</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>${productionRecordsHtml}</tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="split-machine-card">
+                    <h5>篩分服務明細（自動帶入）</h5>
+                    <div class="table-responsive">
+                        <table class="data-table compact split-defects-table">
+                            <thead>
+                                <tr>
+                                    <th>服務項目</th>
+                                    <th class="col-100">公差(+)</th>
+                                    <th class="col-100">公差(-)</th>
+                                    <th class="col-80">PPM</th>
+                                    <th class="col-120">不良品數量</th>
+                                    <th>備註</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${defectsHtml || '<tr class="empty-row"><td colspan="6" class="text-center text-muted">請先選擇客戶批號以載入確認單服務項目。</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="split-machine-card">
+                    <h5>生產設定</h5>
+                    <div class="form-grid form-grid-four-columns">
+                        <label class="inline-label">
+                            <span>指定員工</span>
+                            <select data-split-field="assigned_employee_id">${getEmployeeOptionsHtml(run.assigned_employee_id)}</select>
+                        </label>
+                        <label class="inline-label">
+                            <span>校機人員</span>
+                            <select data-split-field="calibration_employee_id">${getEmployeeOptionsHtml(run.calibration_employee_id)}</select>
+                        </label>
+                        <label class="inline-label">
+                            <span>生產數量</span>
+                            <input type="number" min="0" step="0.01" value="${escapeHtml(String(run.quantity_to_produce || ''))}" data-split-field="quantity_to_produce" placeholder="請輸入生產數量">
+                        </label>
+                        <label class="inline-label">
+                            <span>篩選速度</span>
+                            <input type="text" maxlength="50" value="${escapeHtml(run.screening_speed || '')}" data-split-field="screening_speed" placeholder="例如: 300支/分">
+                        </label>
+                        <label class="inline-label">
+                            <span>流程備註</span>
+                            <input type="text" value="${escapeHtml(run.run_label || '')}" data-split-field="run_label" placeholder="例如：急件先跑、夜班接續">
+                        </label>
+                        <label class="inline-label">
+                            <span>分配淨重 (kg)</span>
+                            <input type="number" min="0" step="0.01" value="${escapeHtml(String(run.planned_net_weight_kg || ''))}" data-split-field="planned_net_weight_kg">
+                        </label>
+                        <label class="inline-label">
+                            <span>完成淨重 (kg)</span>
+                            <input type="number" min="0" step="0.01" value="${escapeHtml(String(run.completed_net_weight_kg || ''))}" data-split-field="completed_net_weight_kg">
+                        </label>
+                        <label class="inline-label">
+                            <span>狀態</span>
+                            <select data-split-field="status">
+                                <option value="pending"${run.status === 'pending' ? ' selected' : ''}>待排程</option>
+                                <option value="scheduled"${run.status === 'scheduled' ? ' selected' : ''}>已排程</option>
+                                <option value="in_progress"${run.status === 'in_progress' ? ' selected' : ''}>生產中</option>
+                                <option value="completed"${run.status === 'completed' ? ' selected' : ''}>已完成</option>
+                            </select>
+                        </label>
+                        <label class="inline-label full-width">
+                            <span>備註</span>
+                            <textarea rows="2" data-split-field="notes">${escapeHtml(run.notes || '')}</textarea>
+                        </label>
+                    </div>
+                    <div class="split-partial-receipt-box">
+                        <strong>部分入庫統計</strong>
+                        <span>已入庫 ${partialReceiptNetWeight.toFixed(2)} kg，尚可入庫 ${partialReceiptRemaining.toFixed(2)} kg</span>
+                        <span class="text-muted small">請使用視窗底部「部分入庫」按鈕執行入庫；拆分工單會以目前機台頁籤作為來源。</span>
+                    </div>
+                    <div class="form-actions align-right">
+                        <button type="button" class="btn outline small" data-action="change-machine-run">
+                            <i class="fas fa-exchange-alt"></i> 更換機台
+                        </button>
+                        <button type="button" class="btn outline small danger" data-action="remove-machine-run">
+                            <i class="fas fa-trash"></i> 移除機台
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        updateSplitSummary(isEditMode);
+    }
+
+    function getSplitProductionRecordsHtml(run) {
+        const records = Array.isArray(run.production_records) ? run.production_records : [];
+        if (!records.length) {
+            return '<tr class="empty-row"><td colspan="6" class="text-center text-muted">尚未建立此機台的生產履歷</td></tr>';
+        }
+
+        return records.map((record, index) => `
+            <tr data-split-production-record-row data-record-index="${index}">
+                <td><input type="text" value="${escapeHtml(record.card_number || '')}" data-split-record-field="card_number" placeholder="卡號"></td>
+                <td><input type="number" step="0.01" value="${escapeHtml(String(record.weight_kg || ''))}" data-split-record-field="weight_kg" placeholder="重量"></td>
+                <td><input type="date" value="${escapeHtml(record.production_date || '')}" data-split-record-field="production_date"></td>
+                <td><input type="time" value="${escapeHtml(record.production_time ? String(record.production_time).substring(0, 5) : '')}" data-split-record-field="production_time"></td>
+                <td><input type="text" value="${escapeHtml(record.notes || '')}" data-split-record-field="notes" placeholder="備註"></td>
+                <td>
+                    <button type="button" class="btn icon danger" data-action="remove-split-production-record" aria-label="移除生產履歷">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function getSplitRunTabLabel(run, index) {
+        const machineName = getMachineDisplayName(run.machine_id);
+        if (machineName) {
+            return machineName;
+        }
+        if (run.run_label && !/^機台 \d+$/.test(run.run_label)) {
+            return run.run_label;
+        }
+        return `未選機台 ${index + 1}`;
+    }
+
+    function updateSplitSummary(isEditMode) {
+        const form = isEditMode ? elements.editModalForm : elements.createModalForm;
+        const panel = form?.querySelector('[data-split-work-order-panel]');
+        if (!panel) return;
+        const expected = getExpectedNetWeightForSplit();
+        const completed = getSplitRuns(isEditMode).reduce((sum, run) => sum + (parseFloat(run.completed_net_weight_kg) || 0), 0);
+        const remaining = expected - completed;
+        const set = (key, value) => {
+            const el = panel.querySelector(`[data-split-summary="${key}"]`);
+            if (el) {
+                el.textContent = `${value.toFixed(2)} kg`;
+                el.classList.toggle('negative', value < -0.0001);
+            }
+        };
+        set('expected', expected);
+        set('completed', completed);
+        set('remaining', remaining);
+    }
+
+    async function askMachineSelectionDialog({ title = '選擇機台', message = '請先選擇要加入拆分流程的機台。' } = {}) {
+        return new Promise((resolve) => {
+            document.querySelector('[data-machine-picker-modal]')?.remove();
+
+            const availableMachines = state.machines;
+            if (!availableMachines.length) {
+                showAlert('目前沒有可選機台，請先到機台設備管理確認機台資料。', 'warning');
+                resolve('');
+                return;
+            }
+
+            const machineOptions = availableMachines
+                .map((machine) => `<option value="${escapeHtml(String(machine.id))}">${escapeHtml(getMachineDisplayName(machine.id))}</option>`)
+                .join('');
+
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.setAttribute('data-machine-picker-modal', 'true');
+            overlay.style.zIndex = '3000';
+            overlay.innerHTML = `
+                <div class="modal-window small" role="dialog" aria-modal="true" aria-labelledby="machine-picker-title">
+                    <h3 id="machine-picker-title">${escapeHtml(title)}</h3>
+                    <p class="text-muted" style="margin-bottom: 12px;">${escapeHtml(message)}</p>
+                    <label class="inline-label">
+                        <span>機台設備</span>
+                        <select data-machine-picker-select>
+                            <option value="">-- 請選擇機台 --</option>
+                            ${machineOptions}
+                        </select>
+                    </label>
+                    <div class="form-actions align-right" style="margin-top: 14px;">
+                        <button type="button" class="btn outline" data-choice="cancel">取消</button>
+                        <button type="button" class="btn primary" data-choice="confirm">確認新增</button>
+                    </div>
+                </div>
+            `;
+
+            const select = overlay.querySelector('[data-machine-picker-select]');
+
+            const cleanup = (value) => {
+                document.removeEventListener('keydown', handleKeydown);
+                overlay.remove();
+                resolve(value);
+            };
+
+            const handleKeydown = (event) => {
+                if (event.key === 'Escape') {
+                    cleanup('');
+                }
+            };
+
+            overlay.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-choice]');
+                if (!button) {
+                    return;
+                }
+                if (button.dataset.choice === 'cancel') {
+                    cleanup('');
+                    return;
+                }
+                const selectedId = select ? String(select.value || '') : '';
+                if (!selectedId) {
+                    showAlert('請先選擇機台設備。', 'warning');
+                    return;
+                }
+                cleanup(selectedId);
+            });
+
+            document.addEventListener('keydown', handleKeydown);
+            document.body.appendChild(overlay);
+            select?.focus();
+        });
+    }
+
+    async function handleSplitMachineAction(event, isEditMode) {
+        const actionEl = event.target.closest('[data-action]');
+        if (!actionEl) return;
+        const form = isEditMode ? elements.editModalForm : elements.createModalForm;
+        const panel = form?.querySelector('[data-split-work-order-panel]');
+        if (!panel || !panel.contains(actionEl)) return;
+
+        const runs = getSplitRuns(isEditMode);
+        if (actionEl.dataset.action === 'add-machine-run') {
+            const selectedMachineId = await askMachineSelectionDialog({
+                title: '新增拆分機台',
+                message: '請從機台設備管理清單選擇要加入的機台。',
+            });
+            if (!selectedMachineId) {
+                return;
+            }
+            const run = createEmptyMachineRun(runs.length);
+            run.machine_id = selectedMachineId;
+            runs.push(run);
+            panel.dataset.activeRunIndex = String(runs.length - 1);
+            renderSplitMachineRuns(isEditMode);
+            return;
+        }
+
+        if (actionEl.dataset.action === 'change-machine-run') {
+            const activeIndex = parseInt(panel.dataset.activeRunIndex || '0', 10) || 0;
+            const run = runs[activeIndex];
+            if (!run) return;
+            const selectedMachineId = await askMachineSelectionDialog({
+                title: '更換拆分機台',
+                message: '請從機台設備管理清單選擇此頁籤要對應的機台。',
+            });
+            if (!selectedMachineId) {
+                return;
+            }
+            run.machine_id = selectedMachineId;
+            run.production_records = (run.production_records || []).map(record => ({
+                ...record,
+                machine_id: selectedMachineId
+            }));
+            renderSplitMachineRuns(isEditMode);
+            return;
+        }
+
+        if (actionEl.dataset.action === 'select-machine-run') {
+            panel.dataset.activeRunIndex = String(parseInt(actionEl.dataset.runIndex || '0', 10) || 0);
+            renderSplitMachineRuns(isEditMode);
+            return;
+        }
+
+        if (actionEl.dataset.action === 'add-split-production-record') {
+            const activeIndex = parseInt(panel.dataset.activeRunIndex || '0', 10) || 0;
+            const run = runs[activeIndex];
+            if (!run) return;
+            if (!Array.isArray(run.production_records)) {
+                run.production_records = [];
+            }
+            run.production_records.push(createEmptySplitProductionRecord(run));
+            renderSplitMachineRuns(isEditMode);
+            return;
+        }
+
+        if (actionEl.dataset.action === 'remove-split-production-record') {
+            const activeIndex = parseInt(panel.dataset.activeRunIndex || '0', 10) || 0;
+            const recordRow = actionEl.closest('[data-split-production-record-row]');
+            const recordIndex = parseInt(recordRow?.dataset.recordIndex || '-1', 10);
+            const run = runs[activeIndex];
+            if (!run || !Array.isArray(run.production_records) || recordIndex < 0) return;
+            run.production_records.splice(recordIndex, 1);
+            renderSplitMachineRuns(isEditMode);
+            return;
+        }
+
+        if (actionEl.dataset.action === 'remove-machine-run') {
+            const activeIndex = parseInt(panel.dataset.activeRunIndex || '0', 10) || 0;
+            runs.splice(activeIndex, 1);
+            runs.forEach((run, index) => {
+                if (!run.run_label || /^機台 \d+$/.test(run.run_label)) {
+                    run.run_label = '';
+                }
+            });
+            panel.dataset.activeRunIndex = String(Math.max(0, activeIndex - 1));
+            renderSplitMachineRuns(isEditMode);
+        }
+    }
+
+    function handleSplitMachineInput(event, isEditMode) {
+        const recordField = event.target.closest('[data-split-record-field]');
+        if (recordField) {
+            const form = isEditMode ? elements.editModalForm : elements.createModalForm;
+            const panel = form?.querySelector('[data-split-work-order-panel]');
+            if (!panel || !panel.contains(recordField)) return;
+            const activeIndex = parseInt(panel.dataset.activeRunIndex || '0', 10) || 0;
+            const recordRow = recordField.closest('[data-split-production-record-row]');
+            const recordIndex = parseInt(recordRow?.dataset.recordIndex || '-1', 10);
+            const run = getSplitRuns(isEditMode)[activeIndex];
+            if (!run || !Array.isArray(run.production_records) || recordIndex < 0 || !run.production_records[recordIndex]) return;
+            run.production_records[recordIndex][recordField.dataset.splitRecordField] = recordField.value;
+            run.production_records[recordIndex].machine_id = run.machine_id || '';
+            return;
+        }
+
+        const field = event.target.closest('[data-split-field]');
+        if (!field) return;
+        const form = isEditMode ? elements.editModalForm : elements.createModalForm;
+        const panel = form?.querySelector('[data-split-work-order-panel]');
+        if (!panel || !panel.contains(field)) return;
+
+        const activeIndex = parseInt(panel.dataset.activeRunIndex || '0', 10) || 0;
+        const runs = getSplitRuns(isEditMode);
+        const run = runs[activeIndex];
+        if (!run) return;
+
+        const fieldName = field.dataset.splitField;
+        if (fieldName === 'defect_quantity') {
+            const defectIndex = parseInt(field.dataset.defectIndex || '0', 10) || 0;
+            if (run.defects && run.defects[defectIndex]) {
+                run.defects[defectIndex].defect_quantity = field.value;
+            }
+        } else {
+            run[fieldName] = field.value;
+            if (fieldName === 'run_label' || fieldName === 'machine_id') {
+                renderSplitMachineRuns(isEditMode);
+                return;
+            }
+        }
+        updateSplitSummary(isEditMode);
+    }
+
+    function normalizeMachineRunsFromApi(machineRuns = []) {
+        return machineRuns.map((run, index) => ({
+            id: run.id || '',
+            run_label: run.run_label || '',
+            machine_id: run.machine_id || '',
+            scheduled_start_date: toDateTimeLocalValue(run.scheduled_start_date || ''),
+            scheduled_end_date: toDateTimeLocalValue(run.scheduled_end_date || ''),
+            actual_start_date: toDateTimeLocalValue(run.actual_start_date || ''),
+            actual_end_date: toDateTimeLocalValue(run.actual_end_date || ''),
+            assigned_employee_id: run.assigned_employee_id || '',
+            calibration_employee_id: run.calibration_employee_id || '',
+            quantity_to_produce: run.quantity_to_produce || '',
+            screening_speed: run.screening_speed || '',
+            planned_net_weight_kg: run.planned_net_weight_kg || '',
+            completed_net_weight_kg: run.completed_net_weight_kg || '',
+            weight_per_unit_g: run.weight_per_unit_g || state.orderItemDetails?.weight_per_unit_g || '',
+            status: run.status || 'pending',
+            notes: run.notes || '',
+            partial_receipt_count: run.partial_receipt_count || 0,
+            partial_receipt_net_weight_kg: run.partial_receipt_net_weight_kg || 0,
+            partial_receipt_units: run.partial_receipt_units || 0,
+            production_records: Array.isArray(run.production_records) ? run.production_records : [],
+            defects: buildMachineRunDefects(run.defects || [])
+        }));
+    }
+
+    function collectSplitMachineRuns(isEditMode) {
+        return getSplitRuns(isEditMode).map((run, index) => ({
+            run_label: run.run_label || '',
+            machine_id: run.machine_id || null,
+            scheduled_start_date: run.scheduled_start_date || null,
+            scheduled_end_date: run.scheduled_end_date || null,
+            actual_start_date: run.actual_start_date || null,
+            actual_end_date: run.actual_end_date || null,
+            assigned_employee_id: run.assigned_employee_id === '' ? null : run.assigned_employee_id,
+            calibration_employee_id: run.calibration_employee_id === '' ? null : run.calibration_employee_id,
+            quantity_to_produce: run.quantity_to_produce === '' ? null : run.quantity_to_produce,
+            screening_speed: run.screening_speed || '',
+            planned_net_weight_kg: run.planned_net_weight_kg || 0,
+            completed_net_weight_kg: run.completed_net_weight_kg || 0,
+            weight_per_unit_g: run.weight_per_unit_g || state.orderItemDetails?.weight_per_unit_g || 0,
+            status: run.status || 'pending',
+            notes: run.notes || '',
+            production_records: (run.production_records || [])
+                .filter(record => hasSubmittedValue(record.card_number)
+                    && ['weight_kg', 'production_date', 'production_time', 'notes'].some(field => hasSubmittedValue(record[field])))
+                .map(record => ({
+                    card_number: record.card_number || '',
+                    weight_kg: record.weight_kg || null,
+                    production_date: record.production_date || null,
+                    production_time: record.production_time || null,
+                    machine_id: run.machine_id || null,
+                    notes: record.notes || null
+                })),
+            defects: (run.defects || []).map(defect => ({
+                screening_service_id: defect.screening_service_id,
+                defect_quantity: defect.defect_quantity === '' || defect.defect_quantity === null ? '' : parseInt(defect.defect_quantity, 10)
+            }))
+        }));
+    }
+
+    function validateSplitMachineRunsBeforeSubmit(isEditMode) {
+        const runs = collectSplitMachineRuns(isEditMode);
+        if (runs.length === 0) {
+            return '請先使用「選擇機台新增」加入至少 1 台實際機台。';
+        }
+        const expected = getExpectedNetWeightForSplit();
+        const completed = runs.reduce((sum, run) => sum + (parseFloat(run.completed_net_weight_kg) || 0), 0);
+        if (completed - expected > 0.0001) {
+            return `機台完成淨重合計 ${completed.toFixed(2)} kg 已超過主工單預期淨重 ${expected.toFixed(2)} kg。`;
+        }
+        for (const run of runs) {
+            if (!run.machine_id) {
+                return '拆分工單每個機台頁籤都必須從機台資料表選擇實際機台，不可留下未選機台。';
+            }
+            for (const defect of run.defects || []) {
+                if (defect.defect_quantity === '' || Number.isNaN(defect.defect_quantity) || defect.defect_quantity < 0) {
+                    return '拆分工單每個不良項目都必須填 0 或正整數。';
+                }
+            }
+        }
+        return '';
     }
 
     // 輔助函數: 取得當前活動的 modal 和 form
@@ -289,15 +1057,11 @@
             }
 
             // Tab Switching
-            const tabBtns = elements.createModalForm.querySelectorAll('.tab-btn');
-            tabBtns.forEach(btn => {
+            const sourceSection = elements.createModalForm.querySelector('[data-source-selection-section]');
+            const sourceTabBtns = sourceSection ? sourceSection.querySelectorAll('.tab-btn[data-tab]') : [];
+            sourceTabBtns.forEach(btn => {
                 btn.addEventListener('click', () => {
-                    tabBtns.forEach(b => b.classList.remove('active'));
-                    elements.createModalForm.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                    btn.classList.add('active');
-                    const tabName = btn.dataset.tab;
-                    const content = elements.createModalForm.querySelector(`.tab-content[data-tab-content="${tabName}"]`);
-                    if (content) content.classList.add('active');
+                    setCreateSourceTab(btn.dataset.tab || 'cascade');
                 });
             });
 
@@ -373,6 +1137,20 @@
                 if (e.target.name === 'pr_weight_kg[]') {
                     updateMetricsPanel(false);
                 }
+                handleSplitMachineInput(e, false);
+            });
+
+            elements.createModalForm.addEventListener('change', (e) => {
+                handleSplitMachineInput(e, false);
+            });
+
+            elements.createModalForm.addEventListener('click', async (e) => {
+                const typeSwitchButton = e.target.closest('[data-action="set-work-order-type"]');
+                if (typeSwitchButton) {
+                    setWorkOrderType(elements.createModalForm, typeSwitchButton.dataset.value || 'normal');
+                    return;
+                }
+                await handleSplitMachineAction(e, false);
             });
 
             // 排程日期星期顯示
@@ -454,6 +1232,24 @@
                 if (e.target.name === 'pr_weight_kg[]') {
                     updateMetricsPanel(true);
                 }
+                handleSplitMachineInput(e, true);
+            });
+
+            elements.editModalForm.addEventListener('change', (e) => {
+                handleSplitMachineInput(e, true);
+            });
+
+            elements.editModalForm.addEventListener('click', async (e) => {
+                const typeSwitchButton = e.target.closest('[data-action="set-work-order-type"]');
+                if (typeSwitchButton) {
+                    setWorkOrderType(elements.editModalForm, typeSwitchButton.dataset.value || 'normal');
+                    return;
+                }
+                if (e.target.closest('[data-action="create-work-order-partial-receipt"]')) {
+                    await createPartialReceiptForWorkOrder();
+                    return;
+                }
+                await handleSplitMachineAction(e, true);
             });
 
             // 排程日期星期顯示
@@ -702,9 +1498,12 @@
             const response = await fetch('api/employees/index.php');
             const result = await response.json();
             if (result.success) {
+                state.employees = result.data || [];
                 populateSelect('[name="assigned_employee_id"]', result.data, 'id', 'name');
                 populateSelect('[name="calibration_employee_id"]', result.data, 'id', 'name');
                 populateSelect('[name="fp_measured_by_employee_id"]', result.data, 'id', 'name');
+                renderSplitMachineRuns(false);
+                renderSplitMachineRuns(true);
             }
         } catch (error) {
             console.error('Load employees error:', error);
@@ -756,7 +1555,15 @@
                 body: JSON.stringify(data)
             });
 
-            const result = await response.json();
+            const rawText = await response.text();
+            let result = null;
+            try {
+                result = JSON.parse(rawText);
+            } catch (parseError) {
+                console.error('Save work order response is not valid JSON:', rawText);
+                showModalAlert('error', `儲存失敗：伺服器回應格式異常（HTTP ${response.status}）。`, false, isEditMode);
+                return;
+            }
 
             if (result.success) {
                 showAlert(result.message, 'success');
@@ -787,6 +1594,9 @@
                 let errorMessage = result.message || '儲存失敗';
                 if (result.error) {
                     errorMessage += `: ${result.error}`;
+                }
+                if (!response.ok) {
+                    errorMessage = `${errorMessage}（HTTP ${response.status}）`;
                 }
                 showModalAlert('error', errorMessage, false, isEditMode);
                 console.error('Server-side save error:', result);
@@ -903,6 +1713,25 @@
         return `${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`;
     }
 
+    async function confirmWorkflowDelete(assessment, fallbackMessage, confirmText = '確定刪除') {
+        if (typeof window.showWorkflowImpactConfirm === 'function') {
+            return window.showWorkflowImpactConfirm({
+                title: '流程影響確認',
+                message: assessment.message || fallbackMessage,
+                impacts: Array.isArray(assessment.impacts) ? assessment.impacts : [],
+                recommendedAction: assessment.recommended_action || '',
+                severity: assessment.severity || 'info',
+                allowConfirm: !!assessment.allowed,
+                confirmText,
+                cancelText: '取消'
+            });
+        }
+        if (!assessment.allowed) {
+            return false;
+        }
+        return window.confirm(buildWorkflowConfirmMessage(assessment, fallbackMessage));
+    }
+
     async function deleteWorkOrder(id) {
         let assessment;
         try {
@@ -913,11 +1742,12 @@
         }
 
         if (!assessment.allowed) {
-            showAlert(assessment.message || '此工單目前不可刪除。', 'warning');
+            await confirmWorkflowDelete(assessment, '此工單目前不可刪除。');
             return;
         }
 
-        if (!confirm(buildWorkflowConfirmMessage(assessment, '確定要刪除此工單嗎?'))) return;
+        const confirmed = await confirmWorkflowDelete(assessment, '確定要刪除此工單嗎?');
+        if (!confirmed) return;
 
         try {
             const response = await fetch(`api/work_orders/delete.php?id=${id}`, {
@@ -975,6 +1805,98 @@
         });
     }
 
+    async function submitPartialReceipt(payload) {
+        try {
+            const response = await fetch('api/work_orders/partial_receipt.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+
+            if (!result.success) {
+                showModalAlert('error', result.message || '部分完工入庫失敗。', false, true);
+                return;
+            }
+
+            showModalAlert('success', result.message || '部分完工入庫完成。', true, true);
+            if (typeof DataSync !== 'undefined') {
+                DataSync.notifyWithDependencies('inventory_items', DataSync.EVENT_TYPES.CREATED, {
+                    id: result.data?.inventory_item_id,
+                    work_order_id: state.editingId
+                });
+                DataSync.notifyWithDependencies('work_orders', DataSync.EVENT_TYPES.UPDATED, {
+                    id: state.editingId
+                });
+            }
+
+            await openModal(state.editingId);
+            loadWorkOrders();
+        } catch (error) {
+            console.error('Create partial receipt error:', error);
+            showModalAlert('error', '部分完工入庫時發生錯誤，請檢查網路連線或主控台。', false, true);
+        }
+    }
+
+    async function createPartialReceiptForMachineRun(run) {
+        if (!state.editingId || !run || !run.id) {
+            showModalAlert('error', '請先儲存拆分機台明細後，再執行部分完工入庫。', false, true);
+            return;
+        }
+
+        const completedNetWeight = parseFloat(run.completed_net_weight_kg) || 0;
+        const receivedNetWeight = parseFloat(run.partial_receipt_net_weight_kg) || 0;
+        const remainingNetWeight = Math.max(0, completedNetWeight - receivedNetWeight);
+        if (run.status !== 'completed' || remainingNetWeight <= 0.0001) {
+            showModalAlert('error', '只有已完成且尚有剩餘淨重的機台可以部分入庫。', false, true);
+            return;
+        }
+
+        const confirmed = confirm(`確定要將「${run.run_label || '機台'}」剩餘 ${remainingNetWeight.toFixed(2)} kg 建立為部分完工入庫嗎？\n\n主工單仍需所有機台完成後才可結案。`);
+        if (!confirmed) {
+            return;
+        }
+
+        await submitPartialReceipt({
+            work_order_id: state.editingId,
+            machine_run_id: run.id
+        });
+    }
+
+    async function createPartialReceiptForWorkOrder() {
+        if (!state.editingId || !elements.editModalForm) {
+            showModalAlert('error', '請先開啟工單後再執行部分入庫。', false, true);
+            return;
+        }
+
+        const workOrderType = elements.editModalForm.querySelector('[name="work_order_type"]')?.value || 'normal';
+        if (workOrderType === 'split') {
+            const runs = getSplitRuns(true);
+            const activeIndex = parseInt(elements.editModalForm.querySelector('[data-split-work-order-panel]')?.dataset.activeRunIndex || '0', 10) || 0;
+            const activeRun = runs[activeIndex];
+            const completedNetWeight = parseFloat(activeRun?.completed_net_weight_kg) || 0;
+            const receivedNetWeight = parseFloat(activeRun?.partial_receipt_net_weight_kg) || 0;
+            const remainingNetWeight = Math.max(0, completedNetWeight - receivedNetWeight);
+
+            if (!activeRun || !activeRun.id || activeRun.status !== 'completed' || remainingNetWeight <= 0.0001) {
+                showModalAlert('error', '拆分工單請先切到「已完成且有剩餘淨重」的機台頁籤，再執行部分入庫。', false, true);
+                return;
+            }
+
+            await createPartialReceiptForMachineRun(activeRun);
+            return;
+        }
+
+        const confirmed = confirm('確定要為此一般工單建立部分完工入庫嗎？\n\n系統會以工單剩餘可入庫淨重建立庫存。');
+        if (!confirmed) {
+            return;
+        }
+
+        await submitPartialReceipt({
+            work_order_id: state.editingId
+        });
+    }
+
     // Event Handlers
     async function handleOrderItemChange(e) {
         const orderItemId = e.target.value;
@@ -1022,8 +1944,9 @@
             const id = row.dataset.id;
             deleteWorkOrder(id);
         } else if (convertButton) {
-            if (convertButton.disabled || convertButton.hasAttribute('disabled')) {
-                return; // 已轉為庫存，不可重複操作
+            if (convertButton.getAttribute('aria-disabled') === 'true') {
+                showAlert(convertButton.getAttribute('title') || '已轉為庫存項目', 'warning');
+                return;
             }
             const row = convertButton.closest('tr');
             const id = row.dataset.id;
@@ -1160,6 +2083,18 @@
 
         if (Object.keys(fpData).length > 0) {
             data.first_piece_dimensions = fpData;
+        }
+
+        const workOrderType = form.querySelector('[name="work_order_type"]')?.value || 'normal';
+        data.work_order_type = workOrderType;
+        if (workOrderType === 'split') {
+            data.machine_id = null;
+            const splitValidationMessage = validateSplitMachineRunsBeforeSubmit(isEditMode);
+            if (splitValidationMessage) {
+                showModalAlert('error', splitValidationMessage, false, isEditMode);
+                return;
+            }
+            data.machine_runs = collectSplitMachineRuns(isEditMode);
         }
 
         if (isEditMode) {
@@ -1553,9 +2488,13 @@
             const completedRowClass = isCompleted ? ' class="is-completed-work-order"' : '';
             const statusKeyAttr = escapeHtml(statusKey);
             const statusLabelAttr = escapeHtml(statusLabel);
+            const convertButtonLabel = hasInventory ? '已轉為庫存項目' : '轉為庫存項目';
+            const convertButtonLabelAttr = escapeHtml(convertButtonLabel);
+            const deleteBlockedLabel = '此工單已進入完成或追溯流程，無法刪除';
+            const deleteBlockedLabelAttr = escapeHtml(deleteBlockedLabel);
             const deleteButtonClass = isCompleted ? 'btn text' : 'btn text danger';
             const deleteDisabledAttr = isCompleted
-                ? ' disabled aria-disabled="true" data-disabled-reason="completed" title="此工單已進入完成或追溯流程，無法刪除"'
+                ? ` aria-disabled="true" data-disabled-reason="completed" title="${deleteBlockedLabelAttr}" aria-label="${deleteBlockedLabelAttr}"`
                 : ' title="刪除"';
 
             // 客戶名稱處理（停用顯示）
@@ -1579,23 +2518,39 @@
                 <td>${formatDateTime(item.actual_end_date)}${item.actual_end_date ? ` <span class="weekday-text">${getWeekdayText(item.actual_end_date)}</span>` : ''}</td>
                 <td><span class="status-badge ${statusClass}">${escapeHtml(item.status_label || '')}</span></td>
                 <td class="table-actions">
-                    <button type="button" class="btn text op-action-btn op-role-print" data-action="print-work-order" title="${item.is_printed ? '再次列印（已列印過）' : '列印工單'}">
+                    <button type="button" class="btn text op-action-btn op-role-print" data-action="print-work-order" title="${item.is_printed ? '再次列印（已列印過）' : '列印工單'}" aria-label="${item.is_printed ? '再次列印（已列印過）' : '列印工單'}">
                         <i class="fas fa-print"></i>
                     </button>
                     <button type="button" class="btn text op-action-btn op-role-screening-report" data-action="print-screening-report" title="列印篩分檢驗結果報表" aria-label="列印篩分檢驗結果報表">
                         <i class="fas fa-file-medical-alt"></i>
                     </button>
-                    <button type="button" class="btn text" data-action="edit-work-order" title="編輯">
+                    <button type="button" class="btn text" data-action="edit-work-order" title="編輯" aria-label="編輯工單">
                         <i class="fas fa-edit"></i>
                     </button>
                     ${showConvertButton ? `
-                    <button type="button" class="btn text" data-action="convert-to-inventory" title="${hasInventory ? '已轉為庫存項目' : '轉為庫存項目'}"${hasInventory ? ' disabled' : ''}>
+                    ${hasInventory ? `
+                    <span class="op-disabled-title-wrap" title="${convertButtonLabelAttr}" aria-label="${convertButtonLabelAttr}">
+                        <button type="button" class="btn text op-action-btn op-role-workflow" data-action="convert-to-inventory" title="${convertButtonLabelAttr}" aria-label="${convertButtonLabelAttr}" aria-disabled="true" data-disabled-reason="already-inventory">
+                            <i class="fas fa-cogs"></i>
+                        </button>
+                    </span>
+                    ` : `
+                    <button type="button" class="btn text op-action-btn op-role-workflow" data-action="convert-to-inventory" title="${convertButtonLabelAttr}" aria-label="${convertButtonLabelAttr}">
                         <i class="fas fa-cogs"></i>
                     </button>
+                    `}
                     ` : ''}
-                    <button type="button" class="${deleteButtonClass}" data-action="delete-work-order"${deleteDisabledAttr}>
+                    ${isCompleted ? `
+                    <span class="op-disabled-title-wrap" title="${deleteBlockedLabelAttr}" aria-label="${deleteBlockedLabelAttr}">
+                        <button type="button" class="${deleteButtonClass}" data-action="delete-work-order"${deleteDisabledAttr}>
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </span>
+                    ` : `
+                    <button type="button" class="${deleteButtonClass}" data-action="delete-work-order" aria-label="刪除工單"${deleteDisabledAttr}>
                         <i class="fas fa-trash"></i>
                     </button>
+                    `}
                 </td>
             </tr>
         `;
@@ -1661,7 +2616,8 @@
 
     // Modal Functions
     // 開啟建立工單 Modal (含頁籤選擇)
-    function openCreateModal() {
+    function openCreateModal(options = {}) {
+        const sourceMode = options.sourceMode === 'order_item' ? 'order_item' : 'manual';
         state.editingId = null;
 
         // Reset UI
@@ -1669,12 +2625,8 @@
         hideModalAlert(false);
 
         // Reset Tabs
-        const tabBtns = elements.createModalForm.querySelectorAll('.tab-btn');
-        const tabContents = elements.createModalForm.querySelectorAll('.tab-content');
-        tabBtns.forEach(b => b.classList.remove('active'));
-        tabContents.forEach(c => c.classList.remove('active'));
-        if (tabBtns[0]) tabBtns[0].classList.add('active');
-        if (tabContents[0]) tabContents[0].classList.add('active');
+        setCreateSourceTab('cascade');
+        setCreateSourceMode(sourceMode);
 
         // Reset Search Results
         const searchResults = elements.createModalForm.querySelector('[data-search-results]');
@@ -1701,6 +2653,8 @@
         }
 
         clearOrderItemFields(false);
+        setSplitRuns(false, []);
+        setWorkOrderType(elements.createModalForm, 'normal');
         state.images = [];
         renderImages(false);
 
@@ -1714,6 +2668,7 @@
         // Reset UI
         elements.editModalForm.reset();
         hideModalAlert(true);
+        setSplitRuns(true, []);
 
         await loadWorkOrderData(id);
 
@@ -1731,6 +2686,7 @@
         state.editingInventoryItemId = null;
         state.orderItemDetails = null;
         state.images = [];
+        setSplitRuns(false, []);
     }
 
     function closeEditModal() {
@@ -1744,6 +2700,7 @@
         state.editingInventoryItemId = null;
         state.orderItemDetails = null;
         state.images = [];
+        setSplitRuns(true, []);
     }
 
     async function openModal(id = null) {
@@ -1861,6 +2818,7 @@
         // 更新排程日期星期顯示
         const prefix = isEditMode ? 'edit' : 'create';
         updateAllScheduleWeekdays(form, prefix);
+        setWorkOrderType(form, form.querySelector('[name="work_order_type"]')?.value || 'normal');
 
         // Populate first piece dimensions
         if (data.first_piece_dimensions) {
@@ -1933,9 +2891,20 @@
         // 填充篩分服務明細表格
         renderScreeningServicesTable(data.screening_services_details || [], isEditMode);
 
+        const currentType = form.querySelector('[name="work_order_type"]')?.value || data.work_order_type || 'normal';
+        if (currentType === 'split') {
+            const runs = normalizeMachineRunsFromApi(data.machine_runs || []);
+            setSplitRuns(isEditMode, runs);
+        } else {
+            setSplitRuns(isEditMode, []);
+        }
+        syncSplitPanelVisibility(form, isEditMode);
+
         // 自動生成並填充生產紀錄表格 (僅在新增模式或無紀錄時)
         // 根據需求: 總支數/載具數量 = 卡號
-        if (!isEditMode && data.total_units && data.tool_quantity) {
+        if (currentType === 'split') {
+            // 拆分工單的生產履歷掛在各機台頁籤內，避免主工單與機台履歷混在一起。
+        } else if (!isEditMode && data.total_units && data.tool_quantity) {
             generateProductionRecords(data.total_units, data.tool_quantity, isEditMode);
         } else if (isEditMode && data.production_records && data.production_records.length > 0) {
             // 如果是編輯模式且有紀錄，則顯示現有紀錄
@@ -2237,7 +3206,7 @@
         if (!services || services.length === 0) {
             screeningServicesBody.innerHTML = `
                 <tr class="empty-row">
-                    <td colspan="7" class="text-center text-muted">此客戶批號無篩分服務</td>
+                    <td colspan="6" class="text-center text-muted">此客戶批號無篩分服務</td>
                 </tr>
             `;
             return;
@@ -2274,7 +3243,6 @@
             return `
             <tr data-service-index="${index}">
                 <td>${escapeHtml(service.screening_service_name || '')}</td>
-                <td>${escapeHtml(service.custom_service_name || '')}</td>
                 <td class="text-right">${tolerancePlus}</td>
                 <td class="text-right">${toleranceMinus}</td>
                 <td class="text-right">${ppm}</td>
@@ -2530,7 +3498,7 @@
             const customerId = order.customer?.id || order.customer_id;
 
             // 3. 開啟新增表單（這會重設所有欄位和下拉選單）
-            openCreateModal();
+            openCreateModal({ sourceMode: 'order_item' });
 
             // 等待 DOM 更新和初始載入完成
             await new Promise(resolve => setTimeout(resolve, 300));

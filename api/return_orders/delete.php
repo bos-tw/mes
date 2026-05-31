@@ -28,6 +28,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../common/workflow_guard.php';
 require_once __DIR__ . '/helpers.php';
 
 /**
@@ -117,10 +118,23 @@ if ($id <= 0) {
 
 $pdo = db();
 
+$workflowGuard = getWorkflowDeleteAssessment($pdo, 'return_orders', $id);
+if (!$workflowGuard['allowed']) {
+    jsonResponse([
+        'success' => false,
+        'message' => $workflowGuard['message'],
+        'workflow_guard' => $workflowGuard,
+    ], 409);
+}
+
 // 檢查是否可刪除
 $canDelete = canDeleteReturnOrder($pdo, $id);
 if (!$canDelete['can_delete']) {
-    jsonResponse(['success' => false, 'message' => $canDelete['reason']], 400);
+    jsonResponse([
+        'success' => false,
+        'message' => $canDelete['reason'],
+        'workflow_guard' => $workflowGuard,
+    ], 409);
 }
 
 try {

@@ -1,231 +1,210 @@
 # 開發進度摘要
 
-更新時間：2026-05-30
-目前基底 commit：ba8dba9
-本輪版本：v2.0.8
+更新時間：2026-05-31 17:10
+目前基底 commit：0e20974
+本輪工作版本：v2.0.12
+目前分支：main
 
 ## 1. 專案架構
 
 ### 目錄結構與技術棧
 
-- 後端：PHP API，位於 `api/`，共用啟動與權限邏輯在 `api/bootstrap.php`，資料庫連線在 `api/config.php`。
-- 前端：原生 JavaScript 模組，位於 `js/`，模組配置位於 `core/configs/`，頁面片段位於 `modules/`。
-- 列印：HTML 列印模板位於 `print/`，本輪主要修改訂單確認單。
-- DB：MySQL 8，本機同步腳本為 `tools/sync-local-schema.ps1`，migration 位於 `migrations/`。
-- 診斷工具：`tools/audit-system-health.js`、`tools/audit-data-sync.js`、`tools/validate-config-modules.js`。
-- 開發規範：`.github/copilot-instructions.md`，本輪新增流程型資料刪除守門規範。
+- 後端：PHP API，位於 `api/`，共用啟動、登入、DB、稽核與錯誤處理在 `api/bootstrap.php`。
+- 前端：原生 JavaScript 模組，位於 `js/`；畫面片段位於 `modules/`；共用樣式位於 `styles.css`。
+- DB：MySQL 8，migration 位於 `migrations/`，本機 schema 同步腳本為 `tools/sync-local-schema.ps1`。
+- 更新系統：更新包產生腳本位於 `tools/build-update-package.ps1`、`tools/build-update-package-safe.ps1`；上傳/套用 API 為 `api/system_update_upload.php`、`api/system_update_apply.php`、`api/system_update_common.php`。
+- 報表/列印：報表 API 位於 `api/reports/`，列印模板位於 `print/`。
+- 專案規範：`.github/copilot-instructions.md`，本輪新增 UI/tooltip/警示訊息與 `.github/skills/` 讀取規範。
 
-### 本輪主要涉及模組
+### 本輪主要涉及模組、Controller、View
 
-- 訂單主表：`orders`
-- 客戶批號 / 訂單品項：`order_items`
-- 生產工單：`work_orders`
-- 庫存項目：`inventory_items`
-- 出貨單：`shipping_orders`
-- 流程刪除守門：`workflow_guard`
-- 訂單確認單列印：`print/order_confirmation_print.html`
+- 生產工單：`api/work_orders/*`、`js/work_orders.js`、`modules/work_orders.html`
+- 生產工單排程：`api/work_orders/schedule_nodes.php`、`js/production_work_order_schedule.js`、`modules/production_work_order_schedule.html`
+- 庫存項目：`api/inventory_items/*`、`js/inventory_items.js`
+- 出貨/退貨/訂單品項刪除防呆：`api/shipping_orders/*`、`api/return_orders/delete.php`、`api/order_items/delete.php`
+- 流程守門：`api/common/workflow_guard.php`
+- 篩分報表：`api/reports/screening_inspection.php`、`print/screening_inspection_print.html`
+- 稽核工具：`tools/audit-system-health.js`、`tools/audit-data-sync.js`
 
 ### 本輪主要涉及資料表
 
-- `orders`
-- `order_items`
-- `order_item_attachments`
-- `order_item_drawings`
 - `work_orders`
+- `work_order_machine_runs`
+- `work_order_machine_defects`
+- `work_order_partial_receipts`
+- `production_records`
 - `inventory_items`
 - `inventory_transactions`
-- `shipping_orders`
 - `shipping_order_items`
 - `return_orders`
-- `shipping_quality_inspections`
+- `order_items`
 
 ## 2. 已完成功能
 
-### 新增或修改項目
+### 本次新增或修改項目
 
-- 新增 `orders.expected_delivery_period`，支援預計交期時段：上午、中午、下午、晚間。
-- 調整訂單編輯 modal 寬度，避免左右過寬，並在預計交期旁顯示交期時段欄位。
-- 訂單確認單列印新增客戶訂單編號，來源改為訂單主表的 `customer_order_number`。
-- 訂單確認單的訂單日期、預計交期改成一致顯示格式，預計交期右側顯示上午/中午/下午/晚間。
-- 修正複製客戶批號細項時，圖面附件與檔案附件未同步複製的問題。
-- 修正庫存轉出貨單流程：前端送出欄位、後端回傳 `shipping_order_id`、跳轉出貨單、列表即時刷新。
-- 修正工單轉庫存時數量/重量可能變成 0 的問題。
-- 工單建立與完成轉庫存時，會從訂單細項補齊總重、淨重、單重、總支數、載具重量、載具數量。
-- 新增資料修復 migration，回補既有工單、庫存與入庫異動缺失的數量/重量。
-- 新增流程刪除守門機制，避免訂單 > 工單 > 庫存 > 出貨流程產生幽靈資料。
-- 出貨單刪除改為軟刪 `shipping_orders.deleted_at`，保留 `shipping_order_items` 追溯資料；未出貨狀態刪除會釋放庫存配貨。
-- 前端刪除前加入 workflow guard 預檢，提示流程影響；目前仍以 `confirm()` 過渡，後續要改成標準 modal。
-- `.github/copilot-instructions.md` 已寫入流程型資料刪除守門規範與標準 modal 文案。
-- `tools/audit-system-health.js` 新增 `WF-1`，可檢查流程刪除守門是否接好。
+- 新增拆分工單資料骨架：主工單類型、機台執行明細、機台不良明細、部分入庫追蹤。
+- 生產工單 Modal 新增一般/拆分工單切換；拆分工單以機台頁籤管理各機台生產履歷、排程、不良項目與生產設定。
+- 拆分機台必須從 `machines` 資料表選擇，禁止幽靈機台或預設未選機台。
+- 生產工單排程改支援一般工單節點 `wo:{id}` 與拆分機台節點 `mr:{id}`，同一主工單可排到多台機台。
+- 部分入庫改為工單層共用入口：一般工單可直接部分入庫；拆分工單需以目前機台頁籤作來源。
+- 拆分機台區移除部分入庫按鈕，只保留統計與提示，避免雙入口操作混淆。
+- 拆分工單不良紀錄改為完整欄位：服務項目、公差(+)、公差(-)、PPM、不良品數量、備註。
+- 一般工單與拆分工單皆移除「服務名稱(客製)」欄位，避免與服務項目重疊。
+- 更新刪除/出貨/退貨/庫存相關流程守門，避免已關聯流程資料被硬刪造成追溯斷裂。
+- 更新 `audit-system-health.js` 與 `audit-data-sync.js`，加入拆分工單資料結構檢查。
+- 修正多處灰色/禁用按鈕缺少 tooltip 或 aria-label 的問題，並把規範寫入 `.github/copilot-instructions.md`。
+- 修正 Modal 警示訊息樣式應使用系統既有 `modal-alert error/success/info` 風格。
 
 ### 修改檔案清單
 
 - `.github/copilot-instructions.md`
 - `DEVELOPMENT_PROGRESS_SUMMARY.md`
 - `api/common/workflow_guard.php`
-- `api/workflow_guard/check.php`
-- `api/inventory_items/delete.php`
 - `api/inventory_items/helpers.php`
-- `api/order_items/index.php`
-- `api/order_items/update.php`
-- `api/orders/delete.php`
-- `api/orders/helpers.php`
-- `api/orders/index.php`
-- `api/orders/public_info.php`
+- `api/inventory_items/index.php`
+- `api/order_items/delete.php`
+- `api/reports/screening_inspection.php`
+- `api/return_orders/delete.php`
 - `api/shipping_orders/add_item.php`
-- `api/shipping_orders/delete.php`
-- `api/work_orders/delete.php`
+- `api/shipping_orders/delete_item.php`
 - `api/work_orders/helpers.php`
 - `api/work_orders/index.php`
+- `api/work_orders/partial_receipt.php`
+- `api/work_orders/schedule_nodes.php`
+- `api/work_orders/show.php`
 - `api/work_orders/update.php`
-- `core/configs/inventory_items.config.js`
-- `core/configs/orders.config.js`
+- `docs/change-summary-2026-05-31-v2.0.9.md`
+- `docs/change-summary-2026-05-31-v2.0.10.md`
+- `docs/change-summary-2026-05-31-v2.0.11.md`
+- `docs/split-work-order-discussion-2026-05-23.md`
+- `docs/split-work-order-implementation-plan-2026-05-31.md`
 - `js/inventory_items.js`
 - `js/order_items.js`
 - `js/orders.js`
+- `js/production_work_order_schedule.js`
+- `js/return_orders.js`
 - `js/shipping_orders.js`
+- `js/utils.js`
 - `js/work_orders.js`
-- `print/order_confirmation_print.html`
+- `migrations/2026_05_31_add_split_work_order_foundation.sql`
+- `modules/production_work_order_schedule.html`
+- `modules/work_orders.html`
+- `print/screening_inspection_print.html`
+- `styles.css`
+- `tools/audit-data-sync.js`
 - `tools/audit-system-health.js`
 - `tools/sync-local-schema.ps1`
-- `migrations/2026_05_30_add_orders_expected_delivery_period.sql`
-- `migrations/2026_05_30_backfill_work_order_inventory_metrics.sql`
-- `release-notes/2026-05-30-v2.0.8.txt`
 
 ### 版本號、更新包、migration
 
-- 本輪版本：`v2.0.8`
-- 更新包已建立：`dist/update_v2.0.8_20260530_221737.zip`
-- 注意：使用者後續表示遠端無法執行診斷工具，因此本輪最後只更新本地診斷工具，不需重打更新包。
-- 新增 migration：`migrations/2026_05_30_add_orders_expected_delivery_period.sql`
-- 新增 migration：`migrations/2026_05_30_backfill_work_order_inventory_metrics.sql`
-- `tools/sync-local-schema.ps1` 已加入上述 migration 檢查。
-- 本機已執行 schema 同步腳本，`expected_delivery_period` 與 backfill migration 已套用。
-
-### 本機資料庫已做的資料修復
-
-- 恢復測試用軟刪庫存資料，讓使用者可繼續測試。
-- 修復 `WO-20260530-0001` / `ORDER-20260505-0001` / `INV-20260530-0004` 的數量與重量：由訂單細項回填總重、淨重、總支數、載具重量、載具數量與入庫異動數量。
-- 這些資料修復已由 backfill migration 覆蓋可重複執行邏輯，遠端可透過 migration 修補同類資料。
+- 最新可用更新包：`dist/update_v2.0.12_*.zip`，請以 `dist/` 中最新產生時間的 `v2.0.12` zip 為準。
+- 最新版本號：`v2.0.12`
+- FileVersion：`20260531.4`
+- ReleaseDate：`2026-05-31`
+- 注意：`dist/*.zip` 目前受 `.gitignore` 忽略，本次 commit 不會包含 zip 檔，但本地檔案已產生供手動上傳。
+- 不要再使用：`v2.0.9`、`v2.0.10`、`v2.0.11`
+- `v2.0.9` 問題：打包後 migration 又被修正，包內 migration 與工作區不一致。
+- `v2.0.10` 問題：migration 內 no-op 使用 `SELECT 1`，一鍵更新器以 `PDO::exec()` 執行時可能留下未讀結果集導致套用失敗。`v2.0.11` 問題：打包後才更新本交接摘要，包內摘要不是最新。
+- 最新 migration：`migrations/2026_05_31_add_split_work_order_foundation.sql`
+- migration 已修正：條件式 no-op 改用 `DO 0`，且 `work_order_partial_receipts.machine_run_id` 為 nullable，支援一般工單部分入庫。
 
 ## 3. 重要決策與規範
 
-### 已定稿流程決策
+### 已定稿設計/資料/流程決策
 
-- MES 核心流程視為：訂單 > 工單 > 庫存 > 出貨 > 退貨/沖銷。
-- 已進入後續流程的資料不可當作普通 CRUD 直接刪除。
-- 刪除語意分三類：真正刪除/軟刪除、退回上一步、作廢/沖銷/退貨。
-- 後端必須用 `api/common/workflow_guard.php` 做最終守門，前端 confirm 或 modal 不能取代後端檢查。
-- 前端刪除前必須呼叫 `api/workflow_guard/check.php?module={module}&action=delete&id={id}`。
-- 不允許刪除時，API 應回傳 HTTP 409 與 `workflow_guard` 詳細資訊。
-- 出貨單刪除不可硬刪；需軟刪主檔、保留明細追溯。
-- 從工單轉庫存時，不可產生 0 數量庫存；若工單數量缺失，要回源訂單細項補值。
-
-### 標準流程影響 modal 方向
-
-目前前端先以 `confirm()` 過渡，但下一輪應補標準 modal。理想文案如下：
-
-```text
-此資料已進入後續流程
-
-目前流程：
-訂單 ORDER-xxx
-  → 工單 WO-xxx
-  → 庫存 INV-xxx
-  → 尚未出貨
-
-可執行動作：
-[退回工單] [作廢庫存] [取消]
-```
-
-按鈕應依流程狀態提供，不可提供會造成追溯斷鏈的動作。
+- 重量優先：所有流程從入料、生產到出貨都以淨重為主，支數由淨重與單支重反推。
+- 載具不是核心管制對象；進貨載具與出貨載具可不同，重點是內容物淨重與可追溯數量。
+- 不良欄位只記錄確認單上的篩分服務項目；多服務項目代表實際計價服務，不可自創項目。
+- 部分入庫是工單共用能力，不是拆分工單專屬功能。
+- 拆分工單只是多了機台來源追溯；一般工單部分入庫時 `machine_run_id` 可為 `NULL`。
+- 拆分工單需所有機台完成才可結案；已完成部分可先部分入庫與出貨，但最終結清時不可重複入庫。
+- 拆分機台要從機台設備管理資料表選取，不能產生幽靈機台。
+- 生產工單排程是安排時間的地方；工單 Modal 只設定要生產的機台與內容，不應把排程選項做成不可操作。
+- 現場操作要單一路徑、少選項、強防呆；複雜追蹤與結清由系統後台負責。
 
 ### 使用者明確偏好
 
-- 使用者偏好直接進資料庫與程式修正，不要只提供建議。
-- 使用者重視流程追溯，不能讓資料「消失但不回上游也不到下游」。
-- 使用者認同「詢問是否退回上個流程」與「依狀態提供退回/作廢/取消」的防呆設計。
-- 訂單確認單資訊要跟畫面欄位連動，不可寫死或抓錯來源。
-- 更新包要注意版本號與 migration，不可漏 DB 異動。
+- UI 必須遵循既有系統風格，不要自創 UI/UX。
+- 拆分/一般工單的類型切換要做在上方頁籤，類似「依客戶/訂單選擇」與「快速搜尋」。
+- 錯誤/警告訊息要遵循系統既有樣式。
+- 灰色禁用按鈕也必須有可理解的 tooltip/title 與 aria-label。
+- 讀取 `.github/copilot-instructions.md` 時，也必須讀取 `.github/skills/` 內容。
 
-### 下一輪不可重犯
+### 下一輪不可重犯踩雷點
 
-- 不可讓工單完成轉庫存產生 0 數量庫存。
-- 不可直接刪除已銜接後續流程的訂單、工單、庫存或出貨單。
-- 不可只在前端擋刪除，後端 delete API 一定要守門。
-- 不可硬刪出貨單明細，否則追溯會斷。
-- 不可只新增 migration 卻忘記更新 `tools/sync-local-schema.ps1`。
-- 不可只更新 `DEVELOPMENT_PROGRESS_SUMMARY.md` 以外的分散追蹤文件；對話收尾統一更新此檔。
+- 不要把部分入庫放在拆分機台卡片內做第二入口。
+- 不要讓拆分工單自動產生「未選機台 1」。
+- 不要在 migration 的動態 no-op 裡使用 `SELECT 1`，一鍵更新器可能因未讀結果集失敗；請用 `DO 0`。
+- 不要讓 `work_order_partial_receipts.machine_run_id` 維持 `NOT NULL`，一般工單部分入庫需要 `NULL`。
+- 不要在一般/拆分篩分服務明細顯示「服務名稱(客製)」，使用者認為與服務項目重疊。
+- 不要只看 ZIP 驗證通過；一鍵套用還會跑檔案覆蓋、migration、健康檢查。
+- 打包後若又改檔，必須重打包並 hash 比對，避免包內內容與工作區不同。
 
 ## 4. 待修 Bug
 
 ### 已知問題
 
-- `tools/audit-system-health.js` 仍會因既有專案健康度問題回傳失敗。
-- 既有問題包含：多個大型 JS 檔超過行數限制、許多 `innerHTML` 未包 `escapeHtml()` 的 XSS 風險、部分 module HTML 按鈕 class 缺少 `btn` 前綴、部分模組 DataSync notify 不完整、部分 API 同時使用 `status` 與 `status_lookup_id`。
-- 前端流程刪除提示目前仍是瀏覽器 `confirm()` 過渡，尚未做成標準 modal。
-- `workflow_guard` 目前涵蓋 `orders`、`work_orders`、`inventory_items`、`shipping_orders`，但規範中列出的 `order_items`、`shipping_order_items`、`return_orders` 還需要後續擴充。
+- P0：遠端需改用最新 `v2.0.12` 更新包重新上傳與套用；`v2.0.9`、`v2.0.10`、`v2.0.11` 均已棄用。
+- P0：拆分工單流程尚未做完整瀏覽器人工回歸，包含建立、編輯、排程、部分入庫、出貨與最終結清。
+- P1：遠端套用後需確認「關於系統」版本是否更新到 `v2.0.12`，以及 `system_update_jobs.status = success`。
+- P1：現場看板與 dashboard 的拆分工單統計口徑仍未整合，本輪列為後續另案。
+- P1：部分入庫、最終結清與出貨後不可刪除的防呆流程，需要真實資料情境驗證。
+- P2：篩分報表已支援拆分明細，但尚未做完整列印版人工驗證。
 
-### 重現條件
+### 重現條件與推測原因
 
-- 執行 `node tools/audit-system-health.js` 會看到既有 F-1/J-2/M-1/DS-1/D-3 等錯誤或警告。
-- 在已產生庫存或出貨的資料上按刪除，會由 workflow guard 阻擋或提示流程影響；目前提示形式還不是正式 modal。
-- 若遠端資料已有缺失工單/庫存數量，需套用 migration 後再驗證是否回補成功。
-
-### 目前推測原因
-
-- 既有前端模組累積較大，尚未拆分，且歷史上 `innerHTML` escape 規範未完全落地。
-- 舊流程刪除原本偏 CRUD 思維，沒有完整流程生命週期守門。
-- 舊工單資料模型允許部分重量/數量欄位缺失，導致完成轉庫存時用到空值或 0。
+- `v2.0.10` 一鍵套用失敗：遠端上傳通過後按一鍵套用，migration 執行到動態 no-op `SELECT 1` 後，下一條 SQL 可能報 `Cannot execute queries while other unbuffered queries are active`。
+- 一般工單部分入庫若 DB 還是舊結構：`work_order_partial_receipts.machine_run_id` 若仍為 `NOT NULL`，一般工單部分入庫會無法寫入。`v2.0.12` migration 已修正。
+- UI 若看起來仍是舊內容：可能是遠端仍套用 `v2.0.9/v2.0.10`、套用失敗回滾，或瀏覽器 cache 未更新。
 
 ### 尚未驗證風險
 
-- 遠端套用 migration 後，實際既有資料的回補結果需抽樣驗證。
-- 出貨單刪除改為軟刪後，所有列表、報表、查詢是否都正確排除 `deleted_at IS NOT NULL` 仍需完整回歸。
-- workflow guard 的阻擋訊息與 recommended action 還未完全串成使用者理想的 modal 操作流。
+- 遠端 DB 若已有半套用狀態，需確認 migration 可重複執行。
+- 更新器套用成功後的健康檢查可能仍受遠端環境檔案權限或目錄權限影響。
+- 生產工單的拆分與一般模式共用大量前端狀態，仍需人工檢查切換模式後資料是否殘留。
 
 ## 5. 下一步任務
 
 ### P0
 
-- 建立共用「流程影響確認 modal」，取代目前刪除流程中的原生 `confirm()`。
-- 擴充 workflow guard 到 `order_items`、`shipping_order_items`、`return_orders`。
-- 遠端套用 v2.0.8 migration 後，驗證 `WO-20260530-0001` 類型資料不再產生 0 庫存。
-- 回歸測試：訂單 > 工單 > 庫存 > 出貨 > 刪除/退回/作廢的主要流程。
+- 遠端上傳並套用最新的 `dist/update_v2.0.12_*.zip`。
+- 套用後查 `system_update_jobs` 最新任務，確認 `status = success`、`version_number = v2.0.12`。
+- 確認 DB 欄位：`work_order_partial_receipts.machine_run_id` 必須允許 `NULL`。
+- 做一般工單最小回歸：開工單、編輯、儲存、篩分服務不良數量、部分入庫入口。
+- 做拆分工單最小回歸：切拆分、選機台、新增/移除機台、填生產履歷、不良數量、儲存。
 
 ### P1
 
-- 檢查所有 `shipping_orders` 查詢是否正確排除軟刪資料。
-- 強化出貨單刪除後的 DataSync notify，確保其他分頁與相關模組同步刷新。
-- 清理本輪涉及檔案中的 `innerHTML` XSS audit 命中點，至少先處理 `orders.js`、`order_items.js`、`inventory_items.js`、`shipping_orders.js`、`work_orders.js`。
-- 將流程刪除守門的 UI 操作與 `recommended_action` 做更細緻對應。
+- 驗證生產工單排程：一般節點 `wo:{id}`、拆分節點 `mr:{id}`，拖拉與衝突檢查正常。
+- 驗證部分入庫後庫存、出貨、刪除防呆與回溯關聯。
+- 驗證最終結清：主工單完成時只補入剩餘淨重，不重複計入已部分入庫。
+- 補遠端實測結果到 `docs/split-work-order-implementation-plan-2026-05-31.md`。
 
 ### P2
 
-- 拆分過大的 JS 模組，降低 `F-1` 健康度錯誤。
-- 補齊全系統 DataSync notify。
-- 整理雙重狀態欄位 `status` / `status_lookup_id` 的主從策略。
-- 將 `audit-system-health.js` 的 WF-1 規則持續擴充到更多流程型模組。
+- 整合現場看板/dashboard 的拆分統計口徑。
+- 補更完整的自動化 smoke test 或 API 測試腳本。
+- 檢視 `v2.0.9/v2.0.10` 摘要檔是否需要保留，若要保留需在文件註明已棄用。
 
 ## 6. 驗證狀態
 
 ### 已執行檢查與結果
 
-- `powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1`：已執行，migration 已套用。
-- PHP 語法檢查：本輪涉及的 API 與 helper 先前已執行 `php -l`，結果通過。
-- JS 語法檢查：`js/orders.js`、`js/work_orders.js`、`js/inventory_items.js`、`js/shipping_orders.js`、`tools/audit-system-health.js` 先前已執行 `node --check`，結果通過。
-- `node tools/audit-data-sync.js`：先前通過，結果 P0:0、P1:0、P2:10。
-- `node tools/validate-config-modules.js`：先前通過。
-- `node tools/audit-system-health.js`：已執行，WF-1 正常通過並顯示資訊；整體仍因既有 F-1/J-2/M-1 等歷史問題回傳失敗。
+- `php -l api/work_orders/partial_receipt.php`：通過。
+- `php -l api/work_orders/schedule_nodes.php`：通過。
+- `php -l api/system_update_apply.php`：通過。
+- `php -l api/system_update_common.php`：通過。
+- `node --check js/work_orders.js`：通過。
+- 本地執行 `executeSqlMigrationFile()` 套用 `migrations/2026_05_31_add_split_work_order_foundation.sql`：成功，回報 57 條語句。
+- 本地確認 `work_order_partial_receipts.machine_run_id` 已可為 `NULL`。
+- `v2.0.12` 更新包 manifest 檢查：版本 `v2.0.12`、FileVersion `20260531.4`、37 個檔案、1 個 migration。
+- `v2.0.12` 更新包內容與本地工作區 hash 比對：已通過，`Mismatches=0`。
 
-### 本次收尾已完成
+### 未執行檢查與原因
 
-- 已重新執行本輪修改檔案的 PHP/JS 語法檢查，結果通過。
-- 已執行 git status --short --branch，確認工作區異動均屬本輪相關內容。
-- 接下來只加入本輪相關檔案後 commit 與 push。
-
-### 未執行或限制
-
-- 未在瀏覽器做完整人工 UI 回歸，需要使用者在本機或遠端實測。
-- 未重打 v2.0.8 更新包，因使用者表示遠端無法執行診斷工具，最後的診斷工具更新不需納入遠端包。
+- 未在遠端成功套用 `v2.0.12`：需使用者上傳最新包後執行。
+- 未做完整瀏覽器人工回歸：本輪已到對話收斂與打包階段。
+- 未驗證現場看板/dashboard：本輪列為 P2/另案。
+- 未提交 `dist/update_v2.0.12_*.zip`：`dist/*.zip` 受 `.gitignore` 忽略；更新包已存在於本地 `dist/` 供手動上傳。
 

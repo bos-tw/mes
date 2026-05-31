@@ -611,11 +611,27 @@
 
         // 刪除資料
         async function deleteData(id) {
-            if (!confirm('確定要刪除此退貨單嗎？')) return;
+            let assessment;
+            try {
+                assessment = await checkWorkflowDelete('return_orders', id);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : '流程檢查失敗。';
+                alert(message);
+                return;
+            }
+
+            if (!assessment.allowed) {
+                await confirmWorkflowDelete(assessment, '此退貨單目前不可刪除。');
+                return;
+            }
+
+            const confirmed = await confirmWorkflowDelete(assessment, '確定要刪除此退貨單嗎？');
+            if (!confirmed) return;
 
             try {
                 const response = await fetch(`${API_BASE}/delete.php?id=${id}`, {
                     method: 'DELETE',
+                    credentials: 'include',
                 });
 
                 const result = await response.json();
@@ -633,6 +649,39 @@
                 console.error('刪除退貨單失敗:', error);
                 alert('刪除資料失敗。');
             }
+        }
+
+        async function checkWorkflowDelete(moduleName, id) {
+            const response = await fetch(`api/workflow_guard/check.php?module=${encodeURIComponent(moduleName)}&action=delete&id=${encodeURIComponent(id)}`, {
+                credentials: 'include',
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || '流程檢查失敗');
+            }
+            return result.data || {};
+        }
+
+        async function confirmWorkflowDelete(assessment, fallbackMessage, confirmText = '確定刪除') {
+            if (typeof window.showWorkflowImpactConfirm === 'function') {
+                return window.showWorkflowImpactConfirm({
+                    title: '流程影響確認',
+                    message: assessment.message || fallbackMessage,
+                    impacts: Array.isArray(assessment.impacts) ? assessment.impacts : [],
+                    recommendedAction: assessment.recommended_action || '',
+                    severity: assessment.severity || 'info',
+                    allowConfirm: !!assessment.allowed,
+                    confirmText,
+                    cancelText: '取消'
+                });
+            }
+            if (!assessment.allowed) {
+                return false;
+            }
+            const impacts = Array.isArray(assessment.impacts) && assessment.impacts.length > 0
+                ? `\n\n影響範圍：\n${assessment.impacts.map((impact) => `- ${impact}`).join('\n')}`
+                : '';
+            return window.confirm(`${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`);
         }
 
         // 事件綁定

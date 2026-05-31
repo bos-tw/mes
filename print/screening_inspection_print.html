@@ -720,7 +720,7 @@
     async function renderReport(data) {
         const { work_order, order, order_item, customer, screening_item,
                 screening_results, summary, chart_data, company, qrcode_url, generated_at,
-                report_description } = data;
+                report_description, machine_runs = [] } = data;
         const defectDistributionUnits = Number(summary.defect_units_distribution ?? summary.defect_units ?? 0);
 
         // 生成 QR Code URL：優先確保靜態頁可用，再回退既有 URL
@@ -871,6 +871,41 @@
                     </tr>
                 </tbody>
             </table>
+
+            ${Array.isArray(machine_runs) && machine_runs.length > 0 ? `
+            <h3 style="margin-top: 18px;">拆分機台明細 <span class="title-en">Split Machine Details</span></h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>機台頁籤</th>
+                        <th>機台</th>
+                        <th>完成淨重</th>
+                        <th>換算支數</th>
+                        <th>部分入庫</th>
+                        <th>狀態</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${machine_runs.map(run => `
+                        <tr>
+                            <td>${escapeHtml(run.run_label || '-')}</td>
+                            <td>${escapeHtml(run.machine_name || '-')}</td>
+                            <td class="text-right">${formatNumber(run.completed_net_weight_kg || 0, 2)} kg</td>
+                            <td class="text-right">${formatNumber(run.completed_units || 0)}</td>
+                            <td class="text-right">${formatNumber(run.partial_receipt_net_weight_kg || 0, 2)} kg / ${formatNumber(run.partial_receipt_units || 0)}</td>
+                            <td class="text-center">${escapeHtml(run.status || '-')}</td>
+                        </tr>
+                        ${(run.defects || []).length > 0 ? `
+                        <tr>
+                            <td colspan="6" style="font-size: 8pt; color: #555;">
+                                不良項目：${(run.defects || []).map(defect => `${escapeHtml(defect.service_name || '')} ${formatNumber(defect.defect_quantity || 0)}`).join('、')}
+                            </td>
+                        </tr>
+                        ` : ''}
+                    `).join('')}
+                </tbody>
+            </table>
+            ` : ''}
 
             <!-- 不良品分布圖區（SVG：柏拉圖 + 圓餅圖 + 數據明細）-->
             ${chart_data.labels.length > 0 ? `

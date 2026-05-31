@@ -725,7 +725,7 @@ iconClass: 'fas fa-search'
 | 加入出貨單/出貨操作 | `add-to-shipping` | green `#28a745`，hover `#1e7e34` |
 | 啟用/成功 | `.btn.text.success` | green `#28a745`，hover `#1e7e34` |
 | 停用/警告 | `.btn.text.warning` | orange `#f97316`，hover `#ea580c` |
-| 不可操作/已完成狀態 | `disabled`, `aria-disabled="true"` | gray `#6c757d` |
+| 不可操作/已完成狀態 | `aria-disabled="true"`（若需 tooltip 禁止僅用 `disabled`） | gray `#6c757d` |
 
 列印按鈕不得與檢視按鈕同色；客戶批號與跳轉按鈕不得同色；兩者皆不得使用橘色；複製不得與編輯同色。若新增操作欄按鈕，優先沿用既有 `data-action` 命名以自動套用顏色，並同步更新此表與 `styles.css`。
 
@@ -740,6 +740,24 @@ iconClass: 'fas fa-search'
 3. 禁止在操作欄按鈕寫 inline 色彩（`style="background:..."`、`style="color:..."`）。
 4. 禁止新增或回填舊樣式系統：`btn-icon`、`link icon-button`（僅允許既有歷史區塊維持相容，不得擴散）。
 5. 若同時有 `title` / `aria-label`，需符合下列統一命名；不得混用「查看 / 明細 / 詳情」等多種詞。
+6. 停用的「圖示操作按鈕」若需要滑鼠提示文字（tooltip），禁止只加原生 `disabled`；需使用 `aria-disabled="true"` 並保留 hover 能力。
+7. 狀態型提示（例如：`已轉為庫存項目`、`不可刪除原因`）不得只依賴按鈕本體 `title`，需放在外層包裝節點，避免被瀏覽器停用行為或全域標準化覆蓋。
+
+##### 停用圖示按鈕 Tooltip 防呆（2026-05-31 新增，強制）
+
+適用情境：灰色操作鈕仍需顯示原因提示（例如「已轉為庫存項目」、「此工單已進入完成或追溯流程，無法刪除」）。
+
+1. 結構必須採用外層包裝：
+   - 外層：`<span class="op-disabled-title-wrap" title="...">`
+   - 內層按鈕：`aria-disabled="true"`（可加 `data-disabled-reason`）
+2. 事件必須在 JS click handler 擋下：
+   - 若 `aria-disabled="true"`，只顯示警示訊息並 `return`，不得執行實際動作。
+3. 不可使用單一 `disabled` 當成最終方案：
+   - 原生 `disabled` 在部分瀏覽器/場景不會顯示 `title`，容易造成「灰色按鈕無提示」回歸。
+4. 驗收必做：
+   - 滑鼠移入灰色按鈕可看到對應提示文字。
+   - 鍵盤/滑鼠觸發時不會執行動作。
+   - 按鈕具備對應 `aria-label`。
 
 ##### 統一命名對照（title / aria-label）
 
@@ -1093,6 +1111,9 @@ modal: {
 4. **Alert 區域**：
    - 必須有 `role="alert"` 屬性
    - 使用 `data-{module}-modal-alert` 命名
+   - 顯示錯誤/警告/成功訊息時，必須使用系統既有樣式：`modal-alert error`、`modal-alert warning`、`modal-alert success`、`modal-alert info`
+   - JS 不得產生 `alert-error`、`alert-danger`、`alert-warning` 這類未定義樣式；若 API 或舊程式回傳 `danger`，需先正規化為 `error`
+   - 禁止在 Modal 內用裸文字、瀏覽器原生 alert 或自訂 inline style 呈現驗證錯誤
 
 5. **輸入欄位**：
    - 加上 `autocomplete="off"` 防止瀏覽器自動填入
@@ -1840,6 +1861,12 @@ DataSync.subscribe('模組名稱', (event) => {
 
 > 各文件已同步為 `.github/instructions/*.instructions.md`，VS Code Copilot 會依編輯的檔案類型自動套用。
 
+### 🔒 Skills 全檔讀取規範（2026-05-31 新增，強制）
+
+1. 只要讀取本檔（`.github/copilot-instructions.md`），**必須先完整讀取 `.github/skills/` 目錄下所有檔案**，不得只讀與當前任務看似相關的單一檔案。
+2. 若 `.github/skills/` 有新增、刪除或改名，需先重新掃描清單並完整讀取後，才能開始實作。
+3. 交接給下一位 AI/工程師時，需明確註記：已讀取 `.github/skills/*` 全部內容。
+
 | 文件 | 適用範圍 | 說明 |
 |------|----------|------|
 | `.github/skills/php-api-style.md` | `api/**/*.php` | PHP API 程式碼撰寫風格（宣告、輸出、錯誤處理） |
@@ -2291,3 +2318,35 @@ node tools/audit-data-sync.js --write docs/data-sync-audit.md
     - `node tools/audit-system-health.js`
     - `node --check js/work_orders.js`
     - `php -l api/reports/screening_inspection.php`
+
+### F. 拆分工單重量與服務項目原則（2026-05-31 新增，強制）
+
+1. 訂單、工單、生產、庫存、出貨與退貨/沖銷全流程一律維持「重量優先」：
+    - 以內容物淨重作為主控數值。
+    - 支數由淨重與單隻重量反推：`支數 = 淨重(kg) * 1000 / 單重(g)`。
+    - UI 與報表必須保留單隻重量呈現，讓支數換算可追溯。
+2. 進貨/生產載具與出貨載具可能不同，不能把載具視為內容物本體：
+    - 載具重量只用於計算內容物淨重。
+    - 流程追蹤與出貨判斷以內容物淨重、換算支數與訂單品項為主。
+    - 不可因載具更換而覆寫原始內容物淨重口徑。
+3. 拆分工單的每台機台仍採重量優先：
+    - 每台機台需記錄分配/完成淨重。
+    - 每台機台支數由該機台淨重與單隻重量反推。
+    - 主工單合計由各機台明細彙總，不得直接手動覆寫機台明細。
+4. 不良欄位統一來自確認單上的篩分服務項目：
+    - 確認單所列項目就是販賣的篩分服務項目。
+    - 多項目代表多項服務/加價依據，不能任意新增不在確認單上的不良項目。
+    - 即使某機台某服務項目為 0，也需明確記錄 0，不能留空。
+5. 拆分工單允許「已完成部分先入庫/先出貨」，但工單結案仍需全部拆分機台完成：
+    - 主工單狀態不可因部分入庫就視為已結案。
+    - 已先入庫數量/重量必須另有關聯紀錄，可追溯來源機台、淨重、換算支數與關聯庫存。
+    - 最終整張工單完成入庫時，需沖抵或結清先入庫紀錄，避免重複計入有效庫存。
+    - 庫存畫面需能辨識先入庫/暫估入庫，避免與完整完工入庫混淆。
+6. 部分完工入庫/拆分機台合計不得超過主工單預期內容物淨重：
+    - 超過時必須硬阻擋，不提供一般現場人員覆蓋確認。
+    - 若未來需特殊例外，必須另走主管權限與異常紀錄流程，不能混入一般操作路徑。
+    - 防呆訊息需明確指出目前已入庫淨重、此次淨重、主工單預期淨重與超出差額。
+7. 現場操作路徑必須簡單，複雜追溯與沖抵由系統負責：
+    - UI 不應要求現場人員理解沖抵、暫估、結清等帳務細節。
+    - 現場只需依頁籤填寫機台、重量、不良項目與完成/入庫動作。
+    - 系統需自動記錄每次從一般工單切換為拆分工單、增減機台、部分入庫、最終結清與沖抵事件。
