@@ -420,8 +420,8 @@ function handleCreateWorkOrder(PDO $pdo): void
 
             $defectSql = "
                 INSERT INTO work_order_screening_defects
-                (work_order_id, screening_service_id, service_name, defect_quantity, recorded_at, recorded_by_employee_id)
-                VALUES (:work_order_id, :screening_service_id, :service_name, :defect_quantity, :recorded_at, :recorded_by_employee_id)
+                (work_order_id, screening_service_id, service_name, defect_quantity, recorded_at, recorded_by_employee_id, notes)
+                VALUES (:work_order_id, :screening_service_id, :service_name, :defect_quantity, :recorded_at, :recorded_by_employee_id, :notes)
             ";
             $defectStmt = $pdo->prepare($defectSql);
 
@@ -437,6 +437,7 @@ function handleCreateWorkOrder(PDO $pdo): void
                 $serviceStmt = $pdo->prepare("SELECT name FROM screening_services WHERE id = :id");
                 $serviceStmt->execute(['id' => $serviceId]);
                 $serviceName = $serviceStmt->fetchColumn() ?: '';
+                $notes = trim((string)($defect['notes'] ?? ''));
 
                 $defectStmt->execute([
                     'work_order_id' => $workOrderId,
@@ -444,7 +445,8 @@ function handleCreateWorkOrder(PDO $pdo): void
                     'service_name' => $serviceName,
                     'defect_quantity' => $defectQuantity,
                     'recorded_at' => $currentTime,
-                    'recorded_by_employee_id' => $currentUserId
+                    'recorded_by_employee_id' => $currentUserId,
+                    'notes' => $notes === '' ? null : $notes
                 ]);
             }
         }

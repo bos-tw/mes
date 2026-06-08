@@ -44,6 +44,7 @@
         productionRecordsSection: moduleRoot.querySelector('[data-production-records-section]'),
         imagesRows: moduleRoot.querySelector('[data-images-rows]'),
         editImagesRows: moduleRoot.querySelector('[data-edit-images-rows]'),
+        editOrderDrawingsRows: moduleRoot.querySelector('[data-edit-order-drawings-rows]'),
         screeningServicesTable: moduleRoot.querySelector('[data-screening-services-table]'),
         screeningServicesBody: moduleRoot.querySelector('[data-screening-services-body]'),
         liveTimeLabel: moduleRoot.querySelector('[data-work-orders-live-time]')
@@ -71,6 +72,15 @@
         firstPieceDimensions: null,
         images: [],
         productionRecords: [],
+        productionRecordModes: {
+            create: 'preset',
+            edit: 'preset'
+        },
+        productionRecordBuffers: {
+            create: { preset: [], manual: [] },
+            edit: { preset: [], manual: [] }
+        },
+        deletedOrderDrawingIds: [],
         splitMachineRuns: {
             create: [],
             edit: []
@@ -164,6 +174,50 @@
         });
     }
 
+    function syncEditStatusDisplay() {
+        const statusSelect = elements.editModalForm?.querySelector('[name="status_lookup_id"]');
+        const statusDisplay = elements.editModalForm?.querySelector('[data-edit-summary-status]');
+        if (!statusSelect || !statusDisplay) {
+            return;
+        }
+
+        const selectedOption = statusSelect.options[statusSelect.selectedIndex];
+        const label = statusSelect.value ? (selectedOption?.textContent?.trim() || '--') : '--';
+        statusDisplay.textContent = label;
+        statusDisplay.className = `status-badge ${getStatusBadgeClassByLabel(label)} work-order-edit-summary-status-badge`;
+    }
+
+    function getStatusBadgeClassByLabel(label) {
+        const normalizedLabel = String(label || '').trim();
+        switch (normalizedLabel) {
+            case '待開始':
+                return 'scheduled';
+            case '進行中':
+                return 'in-progress';
+            case '已完成':
+                return 'completed';
+            case '暫停':
+                return 'paused';
+            case '已取消':
+                return 'cancelled';
+            default:
+                return 'secondary';
+        }
+    }
+
+    function toggleSectionBody(button, body) {
+        if (!button || !body) {
+            return;
+        }
+
+        body.classList.toggle('hidden');
+        const icon = button.querySelector('i');
+        if (icon) {
+            icon.classList.toggle('fa-chevron-down');
+            icon.classList.toggle('fa-chevron-up');
+        }
+    }
+
     function parseDateTime(value) {
         if (!value) {
             return null;
@@ -171,6 +225,18 @@
         const normalized = String(value).trim().replace(' ', 'T');
         const date = new Date(normalized);
         return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function formatFileSize(bytes) {
+        const numericBytes = Number(bytes) || 0;
+        if (numericBytes <= 0) {
+            return '0 B';
+        }
+
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const exponent = Math.min(Math.floor(Math.log(numericBytes) / Math.log(1024)), units.length - 1);
+        const size = numericBytes / Math.pow(1024, exponent);
+        return `${size.toFixed(exponent === 0 ? 0 : 2)} ${units[exponent]}`;
     }
 
     function toDateTimeLocalValue(value) {
@@ -228,6 +294,282 @@
         state.splitMachineRuns[getSplitModeKey(isEditMode)] = Array.isArray(runs) ? runs : [];
     }
 
+    function getProductionRecordContextKey(isEditMode) {
+        return isEditMode ? 'edit' : 'create';
+    }
+
+    function getProductionRecordBuffers(isEditMode) {
+        return state.productionRecordBuffers[getProductionRecordContextKey(isEditMode)];
+    }
+
+    function getProductionRecordMode(isEditMode) {
+        return state.productionRecordModes[getProductionRecordContextKey(isEditMode)] || 'preset';
+    }
+
+    function cloneProductionRecord(record = {}) {
+        return {
+            card_number: record.card_number || '',
+            tool_name: record.tool_name || '',
+            tool_weight_kg: record.tool_weight_kg ?? '',
+            weight_kg: record.weight_kg ?? '',
+            production_date: record.production_date || '',
+            production_time: record.production_time || '',
+            machine_id: record.machine_id || '',
+            machine_type: record.machine_type || '',
+            operator_name: record.operator_name || record.employee_name || state.currentUser?.name || '',
+            notes: record.notes || '',
+            production_source_mode: record.production_source_mode || 'preset'
+        };
+    }
+
+    function recalculateProductionRecordCards(records, totalUnits) {
+        const safeRecords = Array.isArray(records) ? records.map((record) => cloneProductionRecord(record)) : [];
+        const rowCount = safeRecords.length;
+        if (rowCount <= 0) {
+            return safeRecords;
+        }
+
+        const piecesPerContainer = Math.ceil((parseFloat(totalUnits) || 0) / rowCount);
+        return safeRecords.map((record, index) => {
+            const cardNumber = rowCount > 0
+                ? Math.min((index + 1) * piecesPerContainer, parseFloat(totalUnits) || 0)
+                : '';
+            return {
+                ...record,
+                card_number: cardNumber > 0 ? String(cardNumber) : ''
+            };
+        });
+    }
+
+    function buildPresetProductionRecordsFromOrder(orderItemDetails, totalUnits) {
+        const toolDetails = Array.isArray(orderItemDetails?.tool_details) ? orderItemDetails.tool_details : [];
+        const rows = [];
+
+        toolDetails.forEach((detail) => {
+            const quantity = Math.max(0, Math.round(parseFloat(detail.quantity) || 0));
+            const unitWeight = parseFloat(detail.unit_weight_kg) || 0;
+            const toolName = detail.tool_name || detail.tool_type || '';
+            for (let i = 0; i < quantity; i += 1) {
+                rows.push(cloneProductionRecord({
+                    tool_name: toolName,
+                    tool_weight_kg: unitWeight ? unitWeight.toFixed(3) : '',
+                    production_source_mode: 'preset'
+                }));
+            }
+        });
+
+        return recalculateProductionRecordCards(rows, totalUnits);
+    }
+
+    function buildManualProductionRecords(orderItemDetails, totalUnits, existingRecords = []) {
+        if (Array.isArray(existingRecords) && existingRecords.length > 0) {
+            return recalculateProductionRecordCards(existingRecords.map((record) => ({
+                ...record,
+                production_source_mode: 'manual'
+            })), totalUnits);
+        }
+
+        const fallbackCount = Math.max(1, parseInt(orderItemDetails?.tool_quantity, 10) || 0);
+        const rows = Array.from({ length: fallbackCount }, () => cloneProductionRecord({
+            production_source_mode: 'manual'
+        }));
+        return recalculateProductionRecordCards(rows, totalUnits);
+    }
+
+    function addOrderDrawingRow(drawing = null) {
+        const tbody = elements.editOrderDrawingsRows;
+        if (!tbody) return null;
+        tbody.querySelector('.empty-row')?.remove();
+        const row = document.createElement('tr');
+        row.className = 'drawing-row';
+        if (drawing?.id) row.dataset.drawingId = String(drawing.id);
+        if (drawing?.file_path) row.dataset.filePath = drawing.file_path;
+        row.innerHTML = `
+            <td><input type="text" data-field="drawing-number" maxlength="100" placeholder="請輸入圖面編號" value="${escapeHtml(drawing?.drawing_number || '')}"></td>
+            <td class="drawing-file-cell">${drawing?.file_name ? escapeHtml(drawing.file_name) : '<input type="file" accept="image/*,.pdf" data-field="drawing-file">'}</td>
+            <td data-field="drawing-size">${drawing?.file_size ? escapeHtml(formatFileSize(drawing.file_size)) : '-'}</td>
+            <td data-field="drawing-time">${drawing?.uploaded_at ? escapeHtml(formatDateTime(drawing.uploaded_at)) : '-'}</td>
+            <td class="text-center">${drawing?.file_path ? '<button type="button" class="btn ghost icon-only" data-action="preview-order-drawing" title="預覽"><i class="fas fa-eye"></i></button>' : '-'}</td>
+            <td class="text-center"><button type="button" class="btn ghost icon-only" data-action="remove-order-drawing" title="移除"><i class="fas fa-trash"></i></button></td>
+        `;
+        tbody.appendChild(row);
+        return row;
+    }
+
+    function renderOrderDrawings(drawings = []) {
+        const tbody = elements.editOrderDrawingsRows;
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        state.deletedOrderDrawingIds = [];
+        drawings.forEach(addOrderDrawingRow);
+        if (!drawings.length) tbody.innerHTML = '<tr class="empty-row"><td colspan="6" class="text-center">尚未上傳圖面</td></tr>';
+    }
+
+    async function syncOrderItemDrawings() {
+        const orderItemId = state.orderItemDetails?.id || state.orderItemDetails?.order_item_id;
+        if (!orderItemId) return;
+        const formData = new FormData();
+        formData.append('_method', 'PUT');
+        const drawingNumbers = [];
+        const numberOnly = [];
+        elements.editOrderDrawingsRows.querySelectorAll('.drawing-row').forEach((row) => {
+            const number = row.querySelector('[data-field="drawing-number"]')?.value.trim() || '';
+            if (row.fileObject) {
+                formData.append('drawing_files[]', row.fileObject);
+                drawingNumbers.push(number);
+            } else if (row.dataset.drawingId) {
+                formData.append(`existing_drawing_numbers[${row.dataset.drawingId}]`, number);
+            } else if (number) {
+                numberOnly.push(number);
+            }
+        });
+        if (drawingNumbers.length) formData.append('drawing_numbers', JSON.stringify(drawingNumbers));
+        if (numberOnly.length) formData.append('new_drawing_numbers_only', JSON.stringify(numberOnly));
+        if (state.deletedOrderDrawingIds.length) formData.append('deleted_drawing_ids', JSON.stringify(state.deletedOrderDrawingIds));
+        const response = await fetch(`api/order_items/update.php?id=${encodeURIComponent(orderItemId)}`, { method: 'POST', body: formData });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || '圖面附件儲存失敗');
+    }
+
+    function getProductionRecordsTableBody(isEditMode, mode) {
+        const form = isEditMode ? elements.editModalForm : elements.createModalForm;
+        const selector = isEditMode
+            ? (mode === 'manual' ? '[data-edit-production-records-manual-rows]' : '[data-edit-production-records-preset-rows]')
+            : '[data-production-records-rows]';
+        return form?.querySelector(selector) || null;
+    }
+
+    function getProductionRecordRowsFromForm(isEditMode, mode = null) {
+        const activeMode = mode || getProductionRecordMode(isEditMode);
+        const tbody = getProductionRecordsTableBody(isEditMode, activeMode);
+        if (!tbody) {
+            return [];
+        }
+
+        return Array.from(tbody.querySelectorAll('.production-record-row')).map((row) => {
+            const machineSelect = row.querySelector('[name="pr_machine_id[]"]');
+            const machineTypeInput = row.querySelector('[name="pr_machine_type[]"]');
+            const operatorInput = row.querySelector('[name="pr_operator_name[]"]');
+
+            return cloneProductionRecord({
+                card_number: row.querySelector('[name="pr_card_number[]"]')?.value || '',
+                tool_name: row.querySelector('[name="pr_tool_name[]"]')?.value || '',
+                tool_weight_kg: row.querySelector('[name="pr_tool_weight_kg[]"]')?.value || '',
+                weight_kg: row.querySelector('[name="pr_weight_kg[]"]')?.value || '',
+                production_date: row.querySelector('[name="pr_date[]"]')?.value || '',
+                production_time: row.querySelector('[name="pr_time[]"]')?.value || '',
+                machine_id: machineSelect?.value || '',
+                machine_type: machineTypeInput?.value || '',
+                operator_name: operatorInput?.value || state.currentUser?.name || '',
+                notes: row.querySelector('[name="pr_notes[]"]')?.value || '',
+                production_source_mode: activeMode
+            });
+        });
+    }
+
+    function syncProductionRecordBufferFromForm(isEditMode) {
+        const mode = getProductionRecordMode(isEditMode);
+        const buffers = getProductionRecordBuffers(isEditMode);
+        buffers[mode] = getProductionRecordRowsFromForm(isEditMode, mode);
+    }
+
+    function toggleProductionRecordPanelInputs(form, activeMode) {
+        const panels = form?.querySelectorAll('[data-production-record-mode-panel]');
+        panels?.forEach((panel) => {
+            const panelMode = panel.getAttribute('data-production-record-mode-panel');
+            const isActive = panelMode === activeMode;
+            panel.classList.toggle('active', isActive);
+            panel.querySelectorAll('input, select, textarea, button').forEach((element) => {
+                if (element.getAttribute('data-action') === 'switch-production-record-mode') {
+                    return;
+                }
+                if (element.matches('button')) {
+                    element.disabled = !isActive && !element.hasAttribute('data-file-path');
+                    return;
+                }
+                element.disabled = !isActive;
+            });
+        });
+
+        const tabs = form?.querySelectorAll('[data-action="switch-production-record-mode"]');
+        tabs?.forEach((tab) => {
+            const isActive = tab.getAttribute('data-mode') === activeMode;
+            tab.classList.toggle('active', isActive);
+            tab.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+    }
+
+    function renderProductionRecordRows(records, isEditMode, mode) {
+        const tbody = getProductionRecordsTableBody(isEditMode, mode);
+        if (!tbody) {
+            return;
+        }
+
+        const normalizedRecords = recalculateProductionRecordCards(records, parseFloat((isEditMode ? elements.editModalForm : elements.createModalForm)?.querySelector('[name="total_units"]')?.value || state.orderItemDetails?.total_units || 0));
+        if (!normalizedRecords.length) {
+            tbody.innerHTML = mode === 'manual'
+                ? '<tr class="empty-row"><td colspan="11" class="text-center">尚無自行輸入的載具記錄</td></tr>'
+                : '<tr class="empty-row"><td colspan="10" class="text-center">尚無預設生產記錄</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = normalizedRecords.map((record) => `
+            <tr class="production-record-row">
+                <td><span class="readonly-cell">${escapeHtml(record.card_number || '')}</span><input type="hidden" name="pr_card_number[]" value="${escapeHtml(record.card_number || '')}"></td>
+                <td><input type="text" name="pr_tool_name[]" value="${escapeHtml(record.tool_name || '')}" placeholder="載具種類"></td>
+                <td><input type="number" name="pr_tool_weight_kg[]" value="${escapeHtml(String(record.tool_weight_kg || ''))}" step="0.001" min="0" placeholder="0.000"></td>
+                <td><input type="number" name="pr_weight_kg[]" value="${escapeHtml(String(record.weight_kg || ''))}" step="0.01" min="0" placeholder="重量"></td>
+                <td><input type="date" name="pr_date[]" value="${escapeHtml(record.production_date || '')}"></td>
+                <td><input type="time" name="pr_time[]" value="${escapeHtml(record.production_time ? String(record.production_time).substring(0, 5) : '')}"></td>
+                <td>
+                    <select name="pr_machine_id[]" onchange="updateMachineType(this)">
+                        <option value="">選擇機台</option>
+                        ${getMachineOptionsHtml(record.machine_id)}
+                    </select>
+                </td>
+                <td><input type="text" name="pr_machine_type[]" value="${escapeHtml(record.machine_type || '')}" readonly class="form-control-plaintext"></td>
+                <td>
+                    <span class="current-user-name">${escapeHtml(record.operator_name || state.currentUser?.name || '')}</span>
+                    <input type="hidden" name="pr_operator_name[]" value="${escapeHtml(record.operator_name || state.currentUser?.name || '')}">
+                </td>
+                <td><input type="text" name="pr_notes[]" value="${escapeHtml(record.notes || '')}" placeholder="備註"></td>
+                ${mode === 'manual'
+                    ? `<td><button type="button" class="btn icon danger" data-action="remove-manual-production-record"><i class="fas fa-trash-alt"></i></button></td>`
+                    : ''}
+            </tr>
+        `).join('');
+    }
+
+    function renderProductionRecordEditor(isEditMode) {
+        const form = isEditMode ? elements.editModalForm : elements.createModalForm;
+        if (!form || isEditMode === false) {
+            return;
+        }
+
+        const mode = getProductionRecordMode(isEditMode);
+        const buffers = getProductionRecordBuffers(isEditMode);
+        const hiddenModeInput = form.querySelector('[name="production_record_mode"]');
+        if (hiddenModeInput) {
+            hiddenModeInput.value = mode;
+        }
+
+        renderProductionRecordRows(buffers.preset || [], isEditMode, 'preset');
+        renderProductionRecordRows(buffers.manual || [], isEditMode, 'manual');
+        toggleProductionRecordPanelInputs(form, mode);
+        attachProductionRecordEvents(form, isEditMode);
+    }
+
+    function setProductionRecordMode(isEditMode, mode) {
+        const normalizedMode = mode === 'manual' ? 'manual' : 'preset';
+        if (getProductionRecordMode(isEditMode) === normalizedMode) {
+            return;
+        }
+        syncProductionRecordBufferFromForm(isEditMode);
+        state.productionRecordModes[getProductionRecordContextKey(isEditMode)] = normalizedMode;
+        renderProductionRecordEditor(isEditMode);
+        updateMetricsPanel(isEditMode);
+    }
+
     function createEmptyMachineRun(index = 0) {
         const unitWeight = parseFloat(state.orderItemDetails?.weight_per_unit_g) || 0;
         return {
@@ -246,20 +588,67 @@
             weight_per_unit_g: unitWeight || '',
             status: 'pending',
             notes: '',
+            production_record_mode: 'preset',
+            production_record_buffers: {
+                preset: [],
+                manual: []
+            },
             production_records: [],
-            defects: buildMachineRunDefects([])
+            defects: buildMachineRunDefects([]),
+            split_ui_state: {
+                scheduleCollapsed: false,
+                inspectionCollapsed: false,
+                productionCollapsed: false
+            }
         };
     }
 
     function createEmptySplitProductionRecord(run = {}) {
         return {
             card_number: '',
+            tool_name: '',
+            tool_weight_kg: '',
             weight_kg: '',
             production_date: '',
             production_time: '',
             machine_id: run.machine_id || '',
+            machine_type: getMachineDisplayName(run.machine_id || '') || '',
             notes: ''
         };
+    }
+
+    function getSplitRunReferenceUnits(run = {}) {
+        return parseFloat(run.completed_units || run.planned_units || state.orderItemDetails?.total_units || 0) || 0;
+    }
+
+    function ensureSplitRunProductionBuffers(run) {
+        if (!run.production_record_buffers) {
+            const existingRecords = Array.isArray(run.production_records) ? run.production_records.map((record) => cloneProductionRecord(record)) : [];
+            const referenceUnits = getSplitRunReferenceUnits(run);
+            const presetRecords = existingRecords.filter((record) => (record.production_source_mode || 'preset') !== 'manual');
+            const manualRecords = existingRecords.filter((record) => record.production_source_mode === 'manual');
+            run.production_record_buffers = {
+                preset: presetRecords.length > 0
+                    ? recalculateProductionRecordCards(presetRecords, referenceUnits)
+                    : buildPresetProductionRecordsFromOrder(state.orderItemDetails, referenceUnits),
+                manual: buildManualProductionRecords(state.orderItemDetails, referenceUnits, manualRecords)
+            };
+        }
+        if (!run.production_record_mode) {
+            run.production_record_mode = 'preset';
+        }
+        return run.production_record_buffers;
+    }
+
+    function ensureSplitRunUiState(run) {
+        if (!run.split_ui_state) {
+            run.split_ui_state = {
+                scheduleCollapsed: false,
+                inspectionCollapsed: false,
+                productionCollapsed: false
+            };
+        }
+        return run.split_ui_state;
     }
 
     function buildMachineRunDefects(existingDefects = []) {
@@ -441,6 +830,7 @@
         }
 
         const run = runs[activeIndex];
+        const uiState = ensureSplitRunUiState(run);
         const completedNetWeight = parseFloat(run.completed_net_weight_kg) || 0;
         const partialReceiptNetWeight = parseFloat(run.partial_receipt_net_weight_kg) || 0;
         const partialReceiptRemaining = Math.max(0, completedNetWeight - partialReceiptNetWeight);
@@ -457,37 +847,32 @@
 
             return `
                 <tr data-split-defect-row data-defect-index="${defectIndex}">
-                    <td>${escapeHtml(defect.service_name || `項目 ${defect.screening_service_id}`)}</td>
-                    <td class="text-right">${escapeHtml(tolerancePlus)}</td>
-                    <td class="text-right">${escapeHtml(toleranceMinus)}</td>
-                    <td class="text-right">${escapeHtml(ppm)}</td>
-                    <td>
+                    <td class="split-defect-service-cell">${escapeHtml(defect.service_name || `項目 ${defect.screening_service_id}`)}</td>
+                    <td class="text-right split-defect-number-cell">${escapeHtml(tolerancePlus)}</td>
+                    <td class="text-right split-defect-number-cell">${escapeHtml(toleranceMinus)}</td>
+                    <td class="text-right split-defect-number-cell">${escapeHtml(ppm)}</td>
+                    <td class="split-defect-quantity-cell">
                         <input type="number" min="0" step="1" value="${escapeHtml(String(defect.defect_quantity ?? 0))}" data-split-field="defect_quantity" data-defect-index="${defectIndex}" style="width: 100%; padding: 4px;">
                     </td>
-                    <td>${escapeHtml(defect.notes || '')}</td>
+                    <td class="split-defect-notes-cell">
+                        <input type="text" value="${escapeHtml(defect.notes || '')}" data-split-field="defect_notes" data-defect-index="${defectIndex}" placeholder="請輸入備註">
+                    </td>
                 </tr>
             `;
         }).join('');
         const productionRecordsHtml = getSplitProductionRecordsHtml(run);
-        const machineName = getMachineDisplayName(run.machine_id) || '未選機台';
 
         editor.innerHTML = `
             <div class="split-machine-content-stack" data-run-index="${activeIndex}">
-                <section class="split-machine-card">
-                    <h5>拆分統計</h5>
-                    <div class="split-summary-grid">
-                        <span>主工單淨重</span><strong data-split-summary="expected">0.00 kg</strong>
-                        <span>機台完成淨重</span><strong data-split-summary="completed">0.00 kg</strong>
-                        <span>尚可分配</span><strong data-split-summary="remaining">0.00 kg</strong>
-                    </div>
-                </section>
-
-                <section class="split-machine-card">
-                    <div class="split-machine-card-header">
-                        <h5>生產排程資訊</h5>
-                        <span class="split-machine-name">${escapeHtml(machineName)}</span>
-                    </div>
-                    <div class="form-grid form-grid-four-columns">
+                <section class="form-section work-order-edit-schedule-section split-machine-schedule-section" data-split-collapsible-section>
+                    <header class="subsection-header">
+                        <div class="subsection-actions">
+                            <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-split-section" data-section="schedule" title="展開/收合"><i class="fas ${uiState.scheduleCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
+                        </div>
+                        <h4>生產排程</h4>
+                    </header>
+                    <div class="subsection-body${uiState.scheduleCollapsed ? ' hidden' : ''}" data-split-section-body="schedule">
+                    <div class="form-grid work-order-edit-schedule-grid">
                         <label class="inline-label">
                             <span>預定開始</span>
                             <input type="datetime-local" value="${escapeHtml(toDateTimeLocalValue(run.scheduled_start_date || ''))}" data-split-field="scheduled_start_date">
@@ -505,36 +890,25 @@
                             <input type="datetime-local" value="${escapeHtml(toDateTimeLocalValue(run.actual_end_date || ''))}" data-split-field="actual_end_date">
                         </label>
                     </div>
-                </section>
-
-                <section class="split-machine-card">
-                    <div class="split-machine-card-header">
-                        <h5>生產履歷</h5>
-                        <button type="button" class="btn outline small" data-action="add-split-production-record">
-                            <i class="fas fa-plus"></i> 新增履歷
-                        </button>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="data-table compact split-production-records-table">
-                            <thead>
-                                <tr>
-                                    <th>卡號</th>
-                                    <th>重量(kg)</th>
-                                    <th>日期</th>
-                                    <th>時間</th>
-                                    <th>備註</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody>${productionRecordsHtml}</tbody>
-                        </table>
                     </div>
                 </section>
 
-                <section class="split-machine-card">
-                    <h5>篩分服務明細（自動帶入）</h5>
-                    <div class="table-responsive">
-                        <table class="data-table compact split-defects-table">
+                <section class="form-section work-order-edit-inspection-section split-machine-inspection-section" data-split-collapsible-section>
+                    <header class="subsection-header">
+                        <div class="subsection-actions">
+                            <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-split-section" data-section="inspection" title="展開/收合"><i class="fas ${uiState.inspectionCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
+                        </div>
+                        <h4>篩分明細 / 生產設定</h4>
+                    </header>
+                    <div class="subsection-body${uiState.inspectionCollapsed ? ' hidden' : ''}" data-split-section-body="inspection">
+                    <div class="work-order-edit-middle-row">
+                        <section class="form-section info-section work-order-edit-service-section split-machine-service-section">
+                            <header class="subsection-header">
+                                <h4>篩分服務明細</h4>
+                            </header>
+                            <div class="subsection-body">
+                            <div class="table-responsive">
+                                <table class="data-table compact split-defects-table">
                             <thead>
                                 <tr>
                                     <th>服務項目</th>
@@ -548,94 +922,181 @@
                             <tbody>
                                 ${defectsHtml || '<tr class="empty-row"><td colspan="6" class="text-center text-muted">請先選擇客戶批號以載入確認單服務項目。</td></tr>'}
                             </tbody>
-                        </table>
+                                </table>
+                            </div>
+                            </div>
+                        </section>
+
+                        <section class="subsection work-order-edit-first-piece-card split-machine-settings-card">
+                            <header class="subsection-header">
+                                <h4>機台設定</h4>
+                            </header>
+                            <div class="subsection-body">
+                            <div class="form-grid split-machine-settings-grid">
+                                <label class="inline-label">
+                                    <span>指定員工</span>
+                                    <select data-split-field="assigned_employee_id">${getEmployeeOptionsHtml(run.assigned_employee_id)}</select>
+                                </label>
+                                <label class="inline-label">
+                                    <span>校機人員</span>
+                                    <select data-split-field="calibration_employee_id">${getEmployeeOptionsHtml(run.calibration_employee_id)}</select>
+                                </label>
+                                <label class="inline-label">
+                                    <span>生產數量</span>
+                                    <input type="number" min="0" step="0.01" value="${escapeHtml(String(run.quantity_to_produce || ''))}" data-split-field="quantity_to_produce" placeholder="請輸入生產數量">
+                                </label>
+                                <label class="inline-label">
+                                    <span>篩選速度</span>
+                                    <input type="text" maxlength="50" value="${escapeHtml(run.screening_speed || '')}" data-split-field="screening_speed" placeholder="例如: 300支/分">
+                                </label>
+                                <label class="inline-label">
+                                    <span>流程備註</span>
+                                    <input type="text" value="${escapeHtml(run.run_label || '')}" data-split-field="run_label" placeholder="例如：急件先跑、夜班接續">
+                                </label>
+                                <label class="inline-label">
+                                    <span>分配淨重 (kg)</span>
+                                    <input type="number" min="0" step="0.01" value="${escapeHtml(String(run.planned_net_weight_kg || ''))}" data-split-field="planned_net_weight_kg">
+                                </label>
+                                <label class="inline-label">
+                                    <span>完成淨重 (kg)</span>
+                                    <input type="number" min="0" step="0.01" value="${escapeHtml(String(run.completed_net_weight_kg || ''))}" data-split-field="completed_net_weight_kg">
+                                </label>
+                                <label class="inline-label">
+                                    <span>狀態</span>
+                                    <select data-split-field="status">
+                                        <option value="pending"${run.status === 'pending' ? ' selected' : ''}>待排程</option>
+                                        <option value="scheduled"${run.status === 'scheduled' ? ' selected' : ''}>已排程</option>
+                                        <option value="in_progress"${run.status === 'in_progress' ? ' selected' : ''}>生產中</option>
+                                        <option value="completed"${run.status === 'completed' ? ' selected' : ''}>已完成</option>
+                                    </select>
+                                </label>
+                                <label class="inline-label full-width">
+                                    <span>備註</span>
+                                    <textarea rows="2" data-split-field="notes">${escapeHtml(run.notes || '')}</textarea>
+                                </label>
+                            </div>
+                            <div class="split-partial-receipt-box">
+                                <strong>部分入庫統計</strong>
+                                <span>已入庫 ${partialReceiptNetWeight.toFixed(2)} kg，尚可入庫 ${partialReceiptRemaining.toFixed(2)} kg</span>
+                                <span class="text-muted small">請使用視窗底部「部分入庫」按鈕執行入庫；拆分工單會以目前機台頁籤作為來源。</span>
+                            </div>
+                            <div class="form-actions align-right">
+                                <button type="button" class="btn outline small" data-action="change-machine-run">
+                                    <i class="fas fa-exchange-alt"></i> 更換機台
+                                </button>
+                                <button type="button" class="btn outline small danger" data-action="remove-machine-run">
+                                    <i class="fas fa-trash"></i> 移除機台
+                                </button>
+                            </div>
+                            </div>
+                        </section>
+                    </div>
                     </div>
                 </section>
 
-                <section class="split-machine-card">
-                    <h5>生產設定</h5>
-                    <div class="form-grid form-grid-four-columns">
-                        <label class="inline-label">
-                            <span>指定員工</span>
-                            <select data-split-field="assigned_employee_id">${getEmployeeOptionsHtml(run.assigned_employee_id)}</select>
-                        </label>
-                        <label class="inline-label">
-                            <span>校機人員</span>
-                            <select data-split-field="calibration_employee_id">${getEmployeeOptionsHtml(run.calibration_employee_id)}</select>
-                        </label>
-                        <label class="inline-label">
-                            <span>生產數量</span>
-                            <input type="number" min="0" step="0.01" value="${escapeHtml(String(run.quantity_to_produce || ''))}" data-split-field="quantity_to_produce" placeholder="請輸入生產數量">
-                        </label>
-                        <label class="inline-label">
-                            <span>篩選速度</span>
-                            <input type="text" maxlength="50" value="${escapeHtml(run.screening_speed || '')}" data-split-field="screening_speed" placeholder="例如: 300支/分">
-                        </label>
-                        <label class="inline-label">
-                            <span>流程備註</span>
-                            <input type="text" value="${escapeHtml(run.run_label || '')}" data-split-field="run_label" placeholder="例如：急件先跑、夜班接續">
-                        </label>
-                        <label class="inline-label">
-                            <span>分配淨重 (kg)</span>
-                            <input type="number" min="0" step="0.01" value="${escapeHtml(String(run.planned_net_weight_kg || ''))}" data-split-field="planned_net_weight_kg">
-                        </label>
-                        <label class="inline-label">
-                            <span>完成淨重 (kg)</span>
-                            <input type="number" min="0" step="0.01" value="${escapeHtml(String(run.completed_net_weight_kg || ''))}" data-split-field="completed_net_weight_kg">
-                        </label>
-                        <label class="inline-label">
-                            <span>狀態</span>
-                            <select data-split-field="status">
-                                <option value="pending"${run.status === 'pending' ? ' selected' : ''}>待排程</option>
-                                <option value="scheduled"${run.status === 'scheduled' ? ' selected' : ''}>已排程</option>
-                                <option value="in_progress"${run.status === 'in_progress' ? ' selected' : ''}>生產中</option>
-                                <option value="completed"${run.status === 'completed' ? ' selected' : ''}>已完成</option>
-                            </select>
-                        </label>
-                        <label class="inline-label full-width">
-                            <span>備註</span>
-                            <textarea rows="2" data-split-field="notes">${escapeHtml(run.notes || '')}</textarea>
-                        </label>
+                <section class="subsection work-order-edit-production-records split-machine-production-records-section" data-split-collapsible-section>
+                    <header class="subsection-header">
+                        <div class="subsection-actions">
+                            <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-split-section" data-section="production" title="展開/收合"><i class="fas ${uiState.productionCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i></button>
+                        </div>
+                        <h4>生產記錄</h4>
+                    </header>
+                    <div class="subsection-body${uiState.productionCollapsed ? ' hidden' : ''}" data-split-section-body="production">
+                        ${productionRecordsHtml}
                     </div>
-                    <div class="split-partial-receipt-box">
-                        <strong>部分入庫統計</strong>
-                        <span>已入庫 ${partialReceiptNetWeight.toFixed(2)} kg，尚可入庫 ${partialReceiptRemaining.toFixed(2)} kg</span>
-                        <span class="text-muted small">請使用視窗底部「部分入庫」按鈕執行入庫；拆分工單會以目前機台頁籤作為來源。</span>
-                    </div>
-                    <div class="form-actions align-right">
-                        <button type="button" class="btn outline small" data-action="change-machine-run">
-                            <i class="fas fa-exchange-alt"></i> 更換機台
-                        </button>
-                        <button type="button" class="btn outline small danger" data-action="remove-machine-run">
-                            <i class="fas fa-trash"></i> 移除機台
-                        </button>
-                    </div>
-                </div>
+                </section>
             </div>
         `;
         updateSplitSummary(isEditMode);
     }
 
     function getSplitProductionRecordsHtml(run) {
-        const records = Array.isArray(run.production_records) ? run.production_records : [];
-        if (!records.length) {
-            return '<tr class="empty-row"><td colspan="6" class="text-center text-muted">尚未建立此機台的生產履歷</td></tr>';
-        }
+        const buffers = ensureSplitRunProductionBuffers(run);
+        const activeMode = run.production_record_mode === 'manual' ? 'manual' : 'preset';
+        const referenceUnits = getSplitRunReferenceUnits(run);
+        buffers.preset = recalculateProductionRecordCards(buffers.preset || [], referenceUnits);
+        buffers.manual = recalculateProductionRecordCards(buffers.manual || [], referenceUnits);
 
-        return records.map((record, index) => `
-            <tr data-split-production-record-row data-record-index="${index}">
-                <td><input type="text" value="${escapeHtml(record.card_number || '')}" data-split-record-field="card_number" placeholder="卡號"></td>
-                <td><input type="number" step="0.01" value="${escapeHtml(String(record.weight_kg || ''))}" data-split-record-field="weight_kg" placeholder="重量"></td>
-                <td><input type="date" value="${escapeHtml(record.production_date || '')}" data-split-record-field="production_date"></td>
-                <td><input type="time" value="${escapeHtml(record.production_time ? String(record.production_time).substring(0, 5) : '')}" data-split-record-field="production_time"></td>
-                <td><input type="text" value="${escapeHtml(record.notes || '')}" data-split-record-field="notes" placeholder="備註"></td>
-                <td>
-                    <button type="button" class="btn icon danger" data-action="remove-split-production-record" aria-label="移除生產履歷">
-                        <i class="fas fa-trash"></i>
+        const buildRows = (records, mode) => {
+            if (!records.length) {
+                return `<tr class="empty-row"><td colspan="${mode === 'manual' ? '8' : '7'}" class="text-center text-muted">尚未建立此機台的生產履歷</td></tr>`;
+            }
+
+            return records.map((record, index) => `
+                <tr data-split-production-record-row data-record-index="${index}" data-split-production-record-mode="${mode}">
+                    <td><span class="readonly-cell">${escapeHtml(record.card_number || '')}</span></td>
+                    <td><input type="text" value="${escapeHtml(record.tool_name || '')}" data-split-record-field="tool_name" placeholder="載具種類"></td>
+                    <td><input type="number" step="0.001" min="0" value="${escapeHtml(String(record.tool_weight_kg || ''))}" data-split-record-field="tool_weight_kg" placeholder="載具重"></td>
+                    <td><input type="number" step="0.01" min="0" value="${escapeHtml(String(record.weight_kg || ''))}" data-split-record-field="weight_kg" placeholder="生產重量"></td>
+                    <td><input type="date" value="${escapeHtml(record.production_date || '')}" data-split-record-field="production_date"></td>
+                    <td><input type="time" value="${escapeHtml(record.production_time ? String(record.production_time).substring(0, 5) : '')}" data-split-record-field="production_time"></td>
+                    <td><input type="text" value="${escapeHtml(record.notes || '')}" data-split-record-field="notes" placeholder="備註"></td>
+                    ${mode === 'manual' ? `
+                        <td>
+                            <button type="button" class="btn icon danger" data-action="remove-split-production-record" aria-label="移除生產履歷">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    ` : ''}
+                </tr>
+            `).join('');
+        };
+
+        return `
+            <div class="split-production-record-mode-tabs work-order-production-mode-tabs">
+                <button type="button" class="tab-btn${activeMode === 'preset' ? ' active' : ''}" data-action="switch-split-production-record-mode" data-mode="preset">預設</button>
+                <button type="button" class="tab-btn${activeMode === 'manual' ? ' active' : ''}" data-action="switch-split-production-record-mode" data-mode="manual">自行輸入</button>
+            </div>
+            <div class="split-production-record-mode-panel${activeMode === 'preset' ? ' active' : ''}" data-split-production-panel="preset">
+                <div class="work-order-production-mode-header">
+                    <p class="text-muted small">依訂單載具預設帶入此機台的生產履歷，卡號依目前機台支數與載具列數自動分配。</p>
+                    <button type="button" class="btn outline small" data-action="reset-split-production-records-preset">
+                        <i class="fas fa-sync-alt"></i> 重新帶入
                     </button>
-                </td>
-            </tr>
-        `).join('');
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table compact split-production-records-table production-records-table">
+                        <thead>
+                            <tr>
+                                <th>卡號</th>
+                                <th>載具種類</th>
+                                <th>載具重量(kg)</th>
+                                <th>生產重量(kg)</th>
+                                <th>日期</th>
+                                <th>時間</th>
+                                <th>備註</th>
+                            </tr>
+                        </thead>
+                        <tbody>${buildRows(buffers.preset || [], 'preset')}</tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="split-production-record-mode-panel${activeMode === 'manual' ? ' active' : ''}" data-split-production-panel="manual">
+                <div class="work-order-production-mode-header">
+                    <p class="text-muted small">由現場自行輸入此機台的載具種類與載具重量，卡號依目前列數自動重算。</p>
+                    <button type="button" class="btn outline small" data-action="add-split-production-record">
+                        <i class="fas fa-plus"></i> 新增履歷
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table compact split-production-records-table production-records-table">
+                        <thead>
+                            <tr>
+                                <th>卡號</th>
+                                <th>載具種類</th>
+                                <th>載具重量(kg)</th>
+                                <th>生產重量(kg)</th>
+                                <th>日期</th>
+                                <th>時間</th>
+                                <th>備註</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>${buildRows(buffers.manual || [], 'manual')}</tbody>
+                    </table>
+                </div>
+            </div>
+        `;
     }
 
     function getSplitRunTabLabel(run, index) {
@@ -778,10 +1239,35 @@
                 return;
             }
             run.machine_id = selectedMachineId;
-            run.production_records = (run.production_records || []).map(record => ({
-                ...record,
-                machine_id: selectedMachineId
-            }));
+            ensureSplitRunProductionBuffers(run);
+            ['preset', 'manual'].forEach((mode) => {
+                run.production_record_buffers[mode] = (run.production_record_buffers[mode] || []).map((record) => ({
+                    ...record,
+                    machine_id: selectedMachineId,
+                    machine_type: getMachineDisplayName(selectedMachineId) || ''
+                }));
+            });
+            renderSplitMachineRuns(isEditMode);
+            return;
+        }
+
+        if (actionEl.dataset.action === 'toggle-split-section') {
+            const activeIndex = parseInt(panel.dataset.activeRunIndex || '0', 10) || 0;
+            const run = runs[activeIndex];
+            if (!run) return;
+            const uiState = ensureSplitRunUiState(run);
+            const section = String(actionEl.dataset.section || '');
+
+            if (section === 'schedule') {
+                uiState.scheduleCollapsed = !uiState.scheduleCollapsed;
+            } else if (section === 'inspection') {
+                uiState.inspectionCollapsed = !uiState.inspectionCollapsed;
+            } else if (section === 'production') {
+                uiState.productionCollapsed = !uiState.productionCollapsed;
+            } else {
+                return;
+            }
+
             renderSplitMachineRuns(isEditMode);
             return;
         }
@@ -792,15 +1278,39 @@
             return;
         }
 
+        if (actionEl.dataset.action === 'switch-split-production-record-mode') {
+            const activeIndex = parseInt(panel.dataset.activeRunIndex || '0', 10) || 0;
+            const run = runs[activeIndex];
+            if (!run) return;
+            ensureSplitRunProductionBuffers(run);
+            run.production_record_mode = actionEl.dataset.mode === 'manual' ? 'manual' : 'preset';
+            renderSplitMachineRuns(isEditMode);
+            updateMetricsPanel(isEditMode);
+            return;
+        }
+
+        if (actionEl.dataset.action === 'reset-split-production-records-preset') {
+            const activeIndex = parseInt(panel.dataset.activeRunIndex || '0', 10) || 0;
+            const run = runs[activeIndex];
+            if (!run) return;
+            ensureSplitRunProductionBuffers(run);
+            run.production_record_buffers.preset = buildPresetProductionRecordsFromOrder(state.orderItemDetails, getSplitRunReferenceUnits(run));
+            run.production_record_mode = 'preset';
+            renderSplitMachineRuns(isEditMode);
+            updateMetricsPanel(isEditMode);
+            return;
+        }
+
         if (actionEl.dataset.action === 'add-split-production-record') {
             const activeIndex = parseInt(panel.dataset.activeRunIndex || '0', 10) || 0;
             const run = runs[activeIndex];
             if (!run) return;
-            if (!Array.isArray(run.production_records)) {
-                run.production_records = [];
-            }
-            run.production_records.push(createEmptySplitProductionRecord(run));
+            ensureSplitRunProductionBuffers(run);
+            run.production_record_mode = 'manual';
+            run.production_record_buffers.manual.push(createEmptySplitProductionRecord(run));
+            run.production_record_buffers.manual = recalculateProductionRecordCards(run.production_record_buffers.manual, getSplitRunReferenceUnits(run));
             renderSplitMachineRuns(isEditMode);
+            updateMetricsPanel(isEditMode);
             return;
         }
 
@@ -809,9 +1319,12 @@
             const recordRow = actionEl.closest('[data-split-production-record-row]');
             const recordIndex = parseInt(recordRow?.dataset.recordIndex || '-1', 10);
             const run = runs[activeIndex];
-            if (!run || !Array.isArray(run.production_records) || recordIndex < 0) return;
-            run.production_records.splice(recordIndex, 1);
+            if (!run || recordIndex < 0) return;
+            ensureSplitRunProductionBuffers(run);
+            run.production_record_buffers.manual.splice(recordIndex, 1);
+            run.production_record_buffers.manual = recalculateProductionRecordCards(run.production_record_buffers.manual, getSplitRunReferenceUnits(run));
             renderSplitMachineRuns(isEditMode);
+            updateMetricsPanel(isEditMode);
             return;
         }
 
@@ -838,9 +1351,17 @@
             const recordRow = recordField.closest('[data-split-production-record-row]');
             const recordIndex = parseInt(recordRow?.dataset.recordIndex || '-1', 10);
             const run = getSplitRuns(isEditMode)[activeIndex];
-            if (!run || !Array.isArray(run.production_records) || recordIndex < 0 || !run.production_records[recordIndex]) return;
-            run.production_records[recordIndex][recordField.dataset.splitRecordField] = recordField.value;
-            run.production_records[recordIndex].machine_id = run.machine_id || '';
+            if (!run || recordIndex < 0) return;
+            ensureSplitRunProductionBuffers(run);
+            const mode = recordRow?.dataset.splitProductionRecordMode === 'manual' ? 'manual' : 'preset';
+            const targetRecords = run.production_record_buffers[mode] || [];
+            if (!targetRecords[recordIndex]) return;
+            targetRecords[recordIndex][recordField.dataset.splitRecordField] = recordField.value;
+            targetRecords[recordIndex].machine_id = run.machine_id || '';
+            targetRecords[recordIndex].machine_type = getMachineDisplayName(run.machine_id || '') || '';
+            if (recordField.dataset.splitRecordField === 'weight_kg' || recordField.dataset.splitRecordField === 'tool_weight_kg') {
+                updateMetricsPanel(isEditMode);
+            }
             return;
         }
 
@@ -861,8 +1382,22 @@
             if (run.defects && run.defects[defectIndex]) {
                 run.defects[defectIndex].defect_quantity = field.value;
             }
+        } else if (fieldName === 'defect_notes') {
+            const defectIndex = parseInt(field.dataset.defectIndex || '0', 10) || 0;
+            if (run.defects && run.defects[defectIndex]) {
+                run.defects[defectIndex].notes = field.value;
+            }
         } else {
             run[fieldName] = field.value;
+            if (fieldName === 'planned_net_weight_kg' || fieldName === 'completed_net_weight_kg') {
+                const unitWeight = parseFloat(run.weight_per_unit_g || state.orderItemDetails?.weight_per_unit_g || 0) || 0;
+                run.planned_units = unitWeight > 0 ? Math.round(((parseFloat(run.planned_net_weight_kg) || 0) * 1000 / unitWeight) * 100) / 100 : 0;
+                run.completed_units = unitWeight > 0 ? Math.round(((parseFloat(run.completed_net_weight_kg) || 0) * 1000 / unitWeight) * 100) / 100 : 0;
+                ensureSplitRunProductionBuffers(run);
+                const referenceUnits = getSplitRunReferenceUnits(run);
+                run.production_record_buffers.preset = recalculateProductionRecordCards(run.production_record_buffers.preset, referenceUnits);
+                run.production_record_buffers.manual = recalculateProductionRecordCards(run.production_record_buffers.manual, referenceUnits);
+            }
             if (fieldName === 'run_label' || fieldName === 'machine_id') {
                 renderSplitMachineRuns(isEditMode);
                 return;
@@ -892,8 +1427,15 @@
             partial_receipt_count: run.partial_receipt_count || 0,
             partial_receipt_net_weight_kg: run.partial_receipt_net_weight_kg || 0,
             partial_receipt_units: run.partial_receipt_units || 0,
-            production_records: Array.isArray(run.production_records) ? run.production_records : [],
-            defects: buildMachineRunDefects(run.defects || [])
+            production_record_mode: Array.isArray(run.production_records) && run.production_records[0]?.production_source_mode === 'manual' ? 'manual' : 'preset',
+            production_record_buffers: null,
+            production_records: Array.isArray(run.production_records) ? run.production_records.map((record) => cloneProductionRecord(record)) : [],
+            defects: buildMachineRunDefects(run.defects || []),
+            split_ui_state: {
+                scheduleCollapsed: false,
+                inspectionCollapsed: false,
+                productionCollapsed: false
+            }
         }));
     }
 
@@ -914,16 +1456,19 @@
             weight_per_unit_g: run.weight_per_unit_g || state.orderItemDetails?.weight_per_unit_g || 0,
             status: run.status || 'pending',
             notes: run.notes || '',
-            production_records: (run.production_records || [])
+            production_records: (((ensureSplitRunProductionBuffers(run), run.production_record_buffers?.[run.production_record_mode === 'manual' ? 'manual' : 'preset']) || []))
                 .filter(record => hasSubmittedValue(record.card_number)
-                    && ['weight_kg', 'production_date', 'production_time', 'notes'].some(field => hasSubmittedValue(record[field])))
+                    && ['weight_kg', 'production_date', 'production_time', 'tool_name', 'tool_weight_kg', 'notes'].some(field => hasSubmittedValue(record[field])))
                 .map(record => ({
                     card_number: record.card_number || '',
+                    tool_name: record.tool_name || '',
+                    tool_weight_kg: record.tool_weight_kg || null,
                     weight_kg: record.weight_kg || null,
                     production_date: record.production_date || null,
                     production_time: record.production_time || null,
                     machine_id: run.machine_id || null,
-                    notes: record.notes || null
+                    notes: record.notes || null,
+                    production_source_mode: run.production_record_mode === 'manual' ? 'manual' : 'preset'
                 })),
             defects: (run.defects || []).map(defect => ({
                 screening_service_id: defect.screening_service_id,
@@ -1219,8 +1764,18 @@
             const editTotalUnitsInput = elements.editModalForm.querySelector('[name="total_units"]');
             if (editTotalUnitsInput) {
                 editTotalUnitsInput.addEventListener('input', () => {
+                    syncProductionRecordBufferFromForm(true);
+                    const totalUnitsValue = editTotalUnitsInput.value || state.orderItemDetails?.total_units || 0;
+                    state.productionRecordBuffers.edit.preset = recalculateProductionRecordCards(state.productionRecordBuffers.edit.preset, totalUnitsValue);
+                    state.productionRecordBuffers.edit.manual = recalculateProductionRecordCards(state.productionRecordBuffers.edit.manual, totalUnitsValue);
+                    renderProductionRecordEditor(true);
                     updateMetricsPanel(true);
                 });
+            }
+
+            const editStatusSelect = elements.editModalForm.querySelector('[name="status_lookup_id"]');
+            if (editStatusSelect) {
+                editStatusSelect.addEventListener('change', syncEditStatusDisplay);
             }
 
             // 事件委派: 監聽動態生成的篩分服務缺陷數量輸入 (編輯模式)
@@ -1229,13 +1784,29 @@
                     updateMetricsPanel(true);
                 }
                 // 監聽生產紀錄重量輸入變化
-                if (e.target.name === 'pr_weight_kg[]') {
+                if (e.target.name === 'pr_weight_kg[]' || e.target.name === 'pr_tool_weight_kg[]') {
                     updateMetricsPanel(true);
                 }
                 handleSplitMachineInput(e, true);
             });
 
             elements.editModalForm.addEventListener('change', (e) => {
+                if (e.target.matches('[data-field="drawing-file"]')) {
+                    const file = e.target.files?.[0];
+                    const row = e.target.closest('.drawing-row');
+                    if (file && row) {
+                        if (file.size > 10 * 1024 * 1024) {
+                            showModalAlert('error', '圖面檔案大小不能超過 10MB。', false, true);
+                            e.target.value = '';
+                            return;
+                        }
+                        row.fileObject = file;
+                        row.previewUrl = URL.createObjectURL(file);
+                        row.querySelector('[data-field="drawing-size"]').textContent = formatFileSize(file.size);
+                        row.querySelector('[data-field="drawing-time"]').textContent = new Date().toLocaleString('zh-TW');
+                        row.children[4].innerHTML = '<button type="button" class="btn ghost icon-only" data-action="preview-order-drawing" title="預覽"><i class="fas fa-eye"></i></button>';
+                    }
+                }
                 handleSplitMachineInput(e, true);
             });
 
@@ -1243,6 +1814,98 @@
                 const typeSwitchButton = e.target.closest('[data-action="set-work-order-type"]');
                 if (typeSwitchButton) {
                     setWorkOrderType(elements.editModalForm, typeSwitchButton.dataset.value || 'normal');
+                    return;
+                }
+                const serviceToggleButton = e.target.closest('[data-action="toggle-service-section"]');
+                if (serviceToggleButton) {
+                    toggleSectionBody(serviceToggleButton, elements.editModalForm.querySelector('[data-edit-service-section]'));
+                    return;
+                }
+                const detailToggleButton = e.target.closest('[data-action="toggle-detail-section"]');
+                if (detailToggleButton) {
+                    toggleSectionBody(detailToggleButton, elements.editModalForm.querySelector('[data-edit-detail-section]'));
+                    return;
+                }
+                const scheduleToggleButton = e.target.closest('[data-action="toggle-schedule-section"]');
+                if (scheduleToggleButton) {
+                    toggleSectionBody(scheduleToggleButton, elements.editModalForm.querySelector('[data-edit-schedule-section]'));
+                    return;
+                }
+                const inspectionToggleButton = e.target.closest('[data-action="toggle-inspection-section"]');
+                if (inspectionToggleButton) {
+                    toggleSectionBody(inspectionToggleButton, elements.editModalForm.querySelector('[data-edit-inspection-section]'));
+                    return;
+                }
+                const productionRecordsToggleButton = e.target.closest('[data-action="toggle-production-records-section"]');
+                if (productionRecordsToggleButton) {
+                    toggleSectionBody(productionRecordsToggleButton, elements.editModalForm.querySelector('[data-edit-production-records-section]'));
+                    return;
+                }
+                const productionModeButton = e.target.closest('[data-action="switch-production-record-mode"]');
+                if (productionModeButton) {
+                    setProductionRecordMode(true, productionModeButton.dataset.mode || 'preset');
+                    return;
+                }
+                if (e.target.closest('[data-action="reset-production-records-preset"]')) {
+                    state.productionRecordBuffers.edit.preset = buildPresetProductionRecordsFromOrder(
+                        state.orderItemDetails,
+                        elements.editModalForm.querySelector('[name="total_units"]')?.value || state.orderItemDetails?.total_units || 0
+                    );
+                    renderProductionRecordEditor(true);
+                    updateMetricsPanel(true);
+                    return;
+                }
+                if (e.target.closest('[data-action="add-manual-production-record"]')) {
+                    syncProductionRecordBufferFromForm(true);
+                    const totalUnits = elements.editModalForm.querySelector('[name="total_units"]')?.value || state.orderItemDetails?.total_units || 0;
+                    state.productionRecordBuffers.edit.manual.push(cloneProductionRecord({
+                        production_source_mode: 'manual'
+                    }));
+                    state.productionRecordBuffers.edit.manual = recalculateProductionRecordCards(state.productionRecordBuffers.edit.manual, totalUnits);
+                    state.productionRecordModes.edit = 'manual';
+                    renderProductionRecordEditor(true);
+                    updateMetricsPanel(true);
+                    return;
+                }
+                if (e.target.closest('[data-action="remove-manual-production-record"]')) {
+                    syncProductionRecordBufferFromForm(true);
+                    const row = e.target.closest('.production-record-row');
+                    const tbody = row?.closest('tbody');
+                    const rows = tbody ? Array.from(tbody.querySelectorAll('.production-record-row')) : [];
+                    const index = rows.indexOf(row);
+                    if (index >= 0) {
+                        state.productionRecordBuffers.edit.manual.splice(index, 1);
+                        state.productionRecordBuffers.edit.manual = recalculateProductionRecordCards(
+                            state.productionRecordBuffers.edit.manual,
+                            elements.editModalForm.querySelector('[name="total_units"]')?.value || state.orderItemDetails?.total_units || 0
+                        );
+                        renderProductionRecordEditor(true);
+                        updateMetricsPanel(true);
+                    }
+                    return;
+                }
+                const previewOrderDrawingButton = e.target.closest('[data-action="preview-order-drawing"]');
+                if (previewOrderDrawingButton) {
+                    const row = previewOrderDrawingButton.closest('.drawing-row');
+                    const filePath = row?.previewUrl || row?.dataset.filePath;
+                    if (filePath) {
+                        window.open(filePath, '_blank');
+                    }
+                    return;
+                }
+                if (e.target.closest('[data-action="add-order-drawing"]')) {
+                    addOrderDrawingRow();
+                    return;
+                }
+                const removeDrawingButton = e.target.closest('[data-action="remove-order-drawing"]');
+                if (removeDrawingButton) {
+                    const row = removeDrawingButton.closest('.drawing-row');
+                    if (row?.dataset.drawingId) state.deletedOrderDrawingIds.push(Number(row.dataset.drawingId));
+                    if (row?.previewUrl) URL.revokeObjectURL(row.previewUrl);
+                    row?.remove();
+                    if (!elements.editOrderDrawingsRows.querySelector('.drawing-row')) {
+                        elements.editOrderDrawingsRows.innerHTML = '<tr class="empty-row"><td colspan="6" class="text-center">尚未上傳圖面</td></tr>';
+                    }
                     return;
                 }
                 if (e.target.closest('[data-action="create-work-order-partial-receipt"]')) {
@@ -1983,7 +2646,7 @@
     }
 
     function isMeaningfulProductionRecord(record) {
-        return ['weight_kg', 'production_date', 'production_time', 'machine_id', 'notes']
+        return ['weight_kg', 'production_date', 'production_time', 'machine_id', 'tool_name', 'tool_weight_kg', 'notes']
             .some(field => hasSubmittedValue(record[field]));
     }
 
@@ -2006,26 +2669,38 @@
             'part_number', 'delivery_location' // 新增的訂單資訊欄位也設為 display-only
         ];
 
-        // 收集篩分服務缺陷數量
+        // 收集篩分服務缺陷與備註
         const screeningDefects = [];
 
         for (const [key, value] of formData.entries()) {
-            // 特殊處理: 收集 defect_quantity_* 欄位
-            if (key.startsWith('defect_quantity_')) {
-                const serviceId = key.replace('defect_quantity_', '');
-                const defectQuantity = parseInt(value) || 0;
-                if (defectQuantity > 0) {
-                    screeningDefects.push({
-                        screening_service_id: serviceId,
-                        defect_quantity: defectQuantity
-                    });
-                }
-            }
-            // 只提交工單專屬欄位，不提交訂單資訊顯示欄位
-            else if (!displayOnlyFields.includes(key)) {
+            // 只提交工單專屬欄位，不提交訂單資訊顯示欄位與表格內明細欄位
+            if (!displayOnlyFields.includes(key) && !key.startsWith('defect_quantity_') && !key.startsWith('screening_notes_')) {
                 data[key] = value;
             }
         }
+
+        const screeningServiceRows = form.querySelectorAll(
+            isEditMode ? '[data-edit-screening-services-body] tr[data-service-id]' : '[data-screening-services-body] tr[data-service-id]'
+        );
+        screeningServiceRows.forEach((row) => {
+            const serviceId = String(row.dataset.serviceId || '').trim();
+            if (!serviceId) {
+                return;
+            }
+
+            const defectInput = row.querySelector('[name^="defect_quantity_"]');
+            const notesInput = row.querySelector('[name^="screening_notes_"]');
+            const defectQuantity = parseInt(defectInput?.value || '0', 10) || 0;
+            const notes = notesInput ? notesInput.value.trim() : '';
+
+            if (defectQuantity > 0 || notes !== '') {
+                screeningDefects.push({
+                    screening_service_id: serviceId,
+                    defect_quantity: defectQuantity,
+                    notes: notes || null
+                });
+            }
+        });
 
         // 將篩分服務缺陷數量加入 payload
         if (screeningDefects.length > 0) {
@@ -2034,32 +2709,57 @@
 
         // 收集生產紀錄 (Production Records)
         const productionRecords = [];
-        const prRows = form.querySelectorAll('.production-record-row');
-        prRows.forEach(row => {
-            const cardInput = row.querySelector('[name="pr_card_number[]"]');
-            const weightInput = row.querySelector('[name="pr_weight_kg[]"]');
-            const dateInput = row.querySelector('[name="pr_date[]"]');
-            const timeInput = row.querySelector('[name="pr_time[]"]');
-            const machineSelect = row.querySelector('[name="pr_machine_id[]"]');
-            const operatorInput = row.querySelector('[name="pr_operator_name[]"]');
-            const notesInput = row.querySelector('[name="pr_notes[]"]');
-
-            if (cardInput) {
-                const record = {
-                    card_number: cardInput.value,
-                    weight_kg: weightInput ? weightInput.value : null,
-                    production_date: dateInput ? dateInput.value : null,
-                    production_time: timeInput ? timeInput.value : null,
-                    machine_id: machineSelect ? machineSelect.value : null,
-                    operator_name: operatorInput ? operatorInput.value : (state.currentUser?.name || ''),
-                    notes: notesInput ? notesInput.value : null
+        if (isEditMode) {
+            syncProductionRecordBufferFromForm(true);
+            const activeMode = getProductionRecordMode(true);
+            const activeRecords = getProductionRecordBuffers(true)[activeMode] || [];
+            activeRecords.forEach((record) => {
+                const normalizedRecord = {
+                    card_number: record.card_number || '',
+                    tool_name: record.tool_name || '',
+                    tool_weight_kg: record.tool_weight_kg || null,
+                    weight_kg: record.weight_kg || null,
+                    production_date: record.production_date || null,
+                    production_time: record.production_time || null,
+                    machine_id: record.machine_id || null,
+                    operator_name: record.operator_name || (state.currentUser?.name || ''),
+                    notes: record.notes || null,
+                    production_source_mode: activeMode
                 };
 
-                if (hasSubmittedValue(record.card_number) && isMeaningfulProductionRecord(record)) {
-                    productionRecords.push(record);
+                if (hasSubmittedValue(normalizedRecord.card_number) && isMeaningfulProductionRecord(normalizedRecord)) {
+                    productionRecords.push(normalizedRecord);
                 }
-            }
-        });
+            });
+            data.production_record_mode = activeMode;
+        } else {
+            const prRows = form.querySelectorAll('.production-record-row');
+            prRows.forEach(row => {
+                const cardInput = row.querySelector('[name="pr_card_number[]"]');
+                const weightInput = row.querySelector('[name="pr_weight_kg[]"]');
+                const dateInput = row.querySelector('[name="pr_date[]"]');
+                const timeInput = row.querySelector('[name="pr_time[]"]');
+                const machineSelect = row.querySelector('[name="pr_machine_id[]"]');
+                const operatorInput = row.querySelector('[name="pr_operator_name[]"]');
+                const notesInput = row.querySelector('[name="pr_notes[]"]');
+
+                if (cardInput) {
+                    const record = {
+                        card_number: cardInput.value,
+                        weight_kg: weightInput ? weightInput.value : null,
+                        production_date: dateInput ? dateInput.value : null,
+                        production_time: timeInput ? timeInput.value : null,
+                        machine_id: machineSelect ? machineSelect.value : null,
+                        operator_name: operatorInput ? operatorInput.value : (state.currentUser?.name || ''),
+                        notes: notesInput ? notesInput.value : null
+                    };
+
+                    if (hasSubmittedValue(record.card_number) && isMeaningfulProductionRecord(record)) {
+                        productionRecords.push(record);
+                    }
+                }
+            });
+        }
 
         if (productionRecords.length > 0) {
             data.production_records = productionRecords;
@@ -2121,6 +2821,14 @@
             }
         }
 
+        if (isEditMode) {
+            try {
+                await syncOrderItemDrawings();
+            } catch (error) {
+                showModalAlert('error', error.message || '圖面附件儲存失敗。', false, true);
+                return;
+            }
+        }
         await saveWorkOrder(data, isEditMode);
         // first_piece_dimensions 已嵌入 data 物件，由 API 統一新增或更新，無需額外呼叫
     }
@@ -2669,8 +3377,13 @@
         elements.editModalForm.reset();
         hideModalAlert(true);
         setSplitRuns(true, []);
+        setWorkOrderType(elements.editModalForm, 'normal');
+        state.productionRecordModes.edit = 'preset';
+        state.productionRecordBuffers.edit = { preset: [], manual: [] };
+        renderOrderDrawings([]);
 
         await loadWorkOrderData(id);
+        setWorkOrderType(elements.editModalForm, 'normal');
 
         elements.editModal.classList.remove('hidden');
         startLiveTimeTicker();
@@ -2686,6 +3399,8 @@
         state.editingInventoryItemId = null;
         state.orderItemDetails = null;
         state.images = [];
+        state.productionRecordModes.create = 'preset';
+        state.productionRecordBuffers.create = { preset: [], manual: [] };
         setSplitRuns(false, []);
     }
 
@@ -2700,6 +3415,9 @@
         state.editingInventoryItemId = null;
         state.orderItemDetails = null;
         state.images = [];
+        state.productionRecordModes.edit = 'preset';
+        state.productionRecordBuffers.edit = { preset: [], manual: [] };
+        renderOrderDrawings([]);
         setSplitRuns(true, []);
     }
 
@@ -2723,6 +3441,7 @@
                 populateForm(result.data, true);
                 state.images = result.data.images || [];
                 renderImages(true);
+                renderOrderDrawings(result.data.drawings || []);
 
                 // Load work order images
                 await loadWorkOrderImages(id, true);
@@ -2734,34 +3453,37 @@
 
                     // 建立缺陷數量查詢表
                     const defectsMap = {};
+                    const notesMap = {};
                     defects.forEach(defect => {
-                        defectsMap[defect.screening_service_id] = defect.defect_quantity;
+                        const defectKey = String(defect.screening_service_id || '');
+                        defectsMap[defectKey] = defect.defect_quantity;
+                        notesMap[defectKey] = defect.notes || '';
                     });
 
                     // 合併缺陷數量到服務列表
                     services.forEach(service => {
-                        service.defect_quantity = defectsMap[service.id] || 0;
+                        const serviceKey = String(service.id || service.screening_service_id || service.index || services.indexOf(service));
+                        service.defect_quantity = defectsMap[serviceKey] || 0;
+                        if (notesMap[serviceKey]) {
+                            service.notes = notesMap[serviceKey];
+                        }
                     });
 
                     renderScreeningServicesTable(services, true);
                 }
 
-                // 載入生產記錄 (需檢查是否與訂單資料一致)
                 const totalUnits = parseFloat(result.data.total_units) || 0;
-                const toolQty = parseInt(result.data.tool_quantity) || 0;
-                const existingRecords = result.data.production_records || [];
-
-                // 如果載具數量與現有紀錄數不符，需要重新計算卡號
-                if (toolQty > 0 && existingRecords.length !== toolQty) {
-                    // 重新生成紀錄，但保留已填寫的資料
-                    regenerateProductionRecordsWithData(totalUnits, toolQty, existingRecords, true);
-                } else if (existingRecords.length > 0) {
-                    // 數量一致但卡號可能需要更新
-                    updateProductionRecordsCardNumbers(totalUnits, toolQty, existingRecords, true);
-                } else if (toolQty > 0) {
-                    // 沒有現有紀錄，自動生成
-                    generateProductionRecords(totalUnits, toolQty, true);
-                }
+                const existingRecords = Array.isArray(result.data.production_records) ? result.data.production_records.map((record) => cloneProductionRecord(record)) : [];
+                const presetRecords = existingRecords.filter((record) => (record.production_source_mode || 'preset') !== 'manual');
+                const manualRecords = existingRecords.filter((record) => record.production_source_mode === 'manual');
+                state.productionRecordBuffers.edit = {
+                    preset: presetRecords.length > 0
+                        ? recalculateProductionRecordCards(presetRecords, totalUnits)
+                        : buildPresetProductionRecordsFromOrder(result.data, totalUnits),
+                    manual: buildManualProductionRecords(result.data, totalUnits, manualRecords)
+                };
+                state.productionRecordModes.edit = manualRecords.length > 0 && presetRecords.length === 0 ? 'manual' : (existingRecords[0]?.production_source_mode === 'manual' ? 'manual' : 'preset');
+                renderProductionRecordEditor(true);
 
                 // 更新 Metrics Panel (編輯模式)
                 updateMetricsPanel(true);
@@ -2819,6 +3541,9 @@
         const prefix = isEditMode ? 'edit' : 'create';
         updateAllScheduleWeekdays(form, prefix);
         setWorkOrderType(form, form.querySelector('[name="work_order_type"]')?.value || 'normal');
+        if (isEditMode) {
+            syncEditStatusDisplay();
+        }
 
         // Populate first piece dimensions
         if (data.first_piece_dimensions) {
@@ -2856,13 +3581,9 @@
             'screening_item_name': data.screening_item_name,
             'customer_sample_status': data.customer_sample_status_label || data.customer_sample_status || '',
             'delivery_location': data.delivery_location,
-            'order_total_weight': data.total_weight_kg,
-            'order_net_weight': (((parseFloat(data.total_weight_kg) || 0) - (parseFloat(data.total_tool_weight) || 0)).toFixed(2)),
-            'order_total_units': data.total_units,
             'total_weight_kg': (((parseFloat(data.total_weight_kg) || 0) - (parseFloat(data.total_tool_weight) || 0)).toFixed(2)),
             'weight_per_unit_g': data.weight_per_unit_g,
             'total_units': data.total_units,
-            'tool_statistics': data.tool_statistics || '',
             'expected_delivery_date': data.expected_delivery_date
         };
 
@@ -2877,6 +3598,24 @@
             }
         }
 
+        if (isEditMode) {
+            const workOrderSummary = form.querySelector('[data-edit-summary-work-order]');
+            const customerSummary = form.querySelector('[data-edit-summary-customer]');
+            const productSummary = form.querySelector('[data-edit-summary-product]');
+            if (workOrderSummary) {
+                workOrderSummary.textContent = data.work_order_number || '--';
+            }
+            if (customerSummary) {
+                customerSummary.textContent = data.customer_name || '--';
+            }
+            if (productSummary) {
+                productSummary.textContent = [
+                    data.part_number || '',
+                    data.screening_item_name || ''
+                ].filter(Boolean).join(' / ') || '--';
+            }
+        }
+
         // 設定訂單資訊欄位為唯讀
         setOrderInfoFieldsReadonly(isEditMode);
 
@@ -2885,7 +3624,9 @@
             ...data,
             tool_quantity: data.tool_quantity || 0,
             total_tool_weight: data.total_tool_weight || 0,
-            weight_per_unit_g: data.weight_per_unit_g || 0
+            weight_per_unit_g: data.weight_per_unit_g || 0,
+            tool_details: Array.isArray(data.tool_details) ? data.tool_details : [],
+            drawings: Array.isArray(data.drawings) ? data.drawings : []
         };
 
         // 填充篩分服務明細表格
@@ -2900,18 +3641,16 @@
         }
         syncSplitPanelVisibility(form, isEditMode);
 
-        // 自動生成並填充生產紀錄表格 (僅在新增模式或無紀錄時)
-        // 根據需求: 總支數/載具數量 = 卡號
-        if (currentType === 'split') {
-            // 拆分工單的生產履歷掛在各機台頁籤內，避免主工單與機台履歷混在一起。
-        } else if (!isEditMode && data.total_units && data.tool_quantity) {
-            generateProductionRecords(data.total_units, data.tool_quantity, isEditMode);
-        } else if (isEditMode && data.production_records && data.production_records.length > 0) {
-            // 如果是編輯模式且有紀錄，則顯示現有紀錄
-            renderProductionRecords(data.production_records, isEditMode);
-        } else if (isEditMode && data.total_units && data.tool_quantity) {
-            // 如果是編輯模式但沒有紀錄,自動生成
-            generateProductionRecords(data.total_units, data.tool_quantity, isEditMode);
+        if (isEditMode) {
+            renderOrderDrawings(data.drawings || []);
+        }
+
+        if (!isEditMode && currentType !== 'split') {
+            state.productionRecordBuffers.create = {
+                preset: buildPresetProductionRecordsFromOrder(data, data.total_units),
+                manual: buildManualProductionRecords(data, data.total_units)
+            };
+            state.productionRecordModes.create = 'preset';
         }
 
         // 更新 Metrics Panel
@@ -3149,15 +3888,6 @@
         // 此函數僅作為事件處理的佔位符
     }
 
-    // 輔助函式：取得機台選項 HTML (需確保 state.machines 已載入)
-    function getMachineOptionsHtml(selectedId = null) {
-        if (!state.machines) return '';
-        return state.machines.map(m => {
-            const selected = (selectedId && m.id == selectedId) ? 'selected' : '';
-            return `<option value="${m.id}" data-type="${m.name}" ${selected}>${m.machine_number} - ${m.name}</option>`;
-        }).join('');
-    }
-
     // 全局函式供行內 onchange 使用
     window.updateMachineType = function(select) {
         const option = select.options[select.selectedIndex];
@@ -3213,6 +3943,7 @@
         }
 
         const html = services.map((service, index) => {
+            const serviceKey = String(service.id || index);
             // 格式化公差(+)
             let tolerancePlus = '';
             if (service.tolerance_plus_value != null) {
@@ -3234,20 +3965,25 @@
             // 不良品數量 (編輯時可輸入)
             const defectQuantity = service.defect_quantity || 0;
             const defectInput = isEditMode
-                ? `<input type="number" name="defect_quantity_${service.id || index}"
+                ? `<input type="number" name="defect_quantity_${serviceKey}"
                           value="${defectQuantity}" min="0" step="1"
-                          data-service-id="${service.id || index}"
-                          style="width: 100%; padding: 4px;" />`
+                          data-service-id="${serviceKey}"
+                          class="screening-service-defect-input" />`
                 : `<span>${defectQuantity}</span>`;
 
+            const notesValue = service.notes || '';
+            const notesCell = isEditMode
+                ? `<input type="text" name="screening_notes_${serviceKey}" value="${escapeHtml(notesValue)}" data-service-id="${serviceKey}" class="screening-service-notes-input" placeholder="請輸入備註" />`
+                : `<span class="screening-service-notes-text">${escapeHtml(notesValue || '-')}</span>`;
+
             return `
-            <tr data-service-index="${index}">
+            <tr data-service-index="${index}" data-service-id="${serviceKey}">
                 <td>${escapeHtml(service.screening_service_name || '')}</td>
                 <td class="text-right">${tolerancePlus}</td>
                 <td class="text-right">${toleranceMinus}</td>
                 <td class="text-right">${ppm}</td>
                 <td class="text-center">${defectInput}</td>
-                <td>${escapeHtml(service.notes || '')}</td>
+                <td>${notesCell}</td>
             </tr>
             `;
         }).join('');
@@ -3297,34 +4033,63 @@
         const orderUnits = parseFloat(state.orderItemDetails.total_units) || 0;
         const totalToolWeight = parseFloat(state.orderItemDetails.total_tool_weight) || 0;
         const weightPerUnit = parseFloat(state.orderItemDetails.weight_per_unit_g) || 0; // 產品單重(g)
+        const toolStatistics = String(state.orderItemDetails.tool_statistics || '').trim() || '--';
 
         // 訂單淨重 = 總重量 - 載具總重
         const orderNetWeight = orderTotalWeight - totalToolWeight;
 
+        const workOrderType = form.querySelector('[name="work_order_type"]')?.value || 'normal';
+
         // 從生產紀錄計算實際數據
-        const productionRecordRows = form.querySelectorAll('.production-record-row');
         let actualToolQty = 0;
-        let totalProductionWeight = 0; // 使用者輸入重量總和(含載具)
+        let totalProductionWeight = 0;
+        let actualToolWeight = 0;
 
-        productionRecordRows.forEach(row => {
-            // 計算載具數量 (每一筆生產紀錄代表一個載具)
-            actualToolQty++;
-
-            // 累積使用者輸入的重量(含載具)
-            const weightInput = row.querySelector('[name="pr_weight_kg[]"]');
-            const weight = weightInput ? parseFloat(weightInput.value) || 0 : 0;
-            totalProductionWeight += weight;
-        });
+        if (workOrderType === 'split') {
+            getSplitRuns(isEditMode).forEach((run) => {
+                const buffers = ensureSplitRunProductionBuffers(run);
+                const activeRecords = buffers[run.production_record_mode === 'manual' ? 'manual' : 'preset'] || [];
+                actualToolQty += activeRecords.length;
+                activeRecords.forEach((record) => {
+                    totalProductionWeight += parseFloat(record.weight_kg) || 0;
+                    actualToolWeight += parseFloat(record.tool_weight_kg) || 0;
+                });
+            });
+        } else if (isEditMode) {
+            syncProductionRecordBufferFromForm(true);
+            const activeMode = getProductionRecordMode(true);
+            const activeRecords = getProductionRecordBuffers(true)[activeMode] || [];
+            actualToolQty = activeRecords.length;
+            activeRecords.forEach((record) => {
+                totalProductionWeight += parseFloat(record.weight_kg) || 0;
+                actualToolWeight += parseFloat(record.tool_weight_kg) || 0;
+            });
+        } else {
+            const productionRecordRows = form.querySelectorAll('.production-record-row');
+            productionRecordRows.forEach(row => {
+                actualToolQty++;
+                totalProductionWeight += parseFloat(row.querySelector('[name="pr_weight_kg[]"]')?.value || 0) || 0;
+            });
+            actualToolWeight = totalToolWeight;
+        }
 
         // 計算實際淨重 = SUM(使用者輸入重量) - 載具總重量（最低為 0）
-        const actualNetWeight = Math.max(totalProductionWeight - totalToolWeight, 0);
+        const actualNetWeight = Math.max(totalProductionWeight - actualToolWeight, 0);
 
         // 計算不良品分布支數（人工輸入）
         let totalDefectsDistribution = 0;
-        const defectInputs = form.querySelectorAll('[name^="defect_quantity_"]');
-        defectInputs.forEach(input => {
-            totalDefectsDistribution += parseInt(input.value) || 0;
-        });
+        if (workOrderType === 'split') {
+            getSplitRuns(isEditMode).forEach((run) => {
+                (run.defects || []).forEach((defect) => {
+                    totalDefectsDistribution += parseInt(defect.defect_quantity, 10) || 0;
+                });
+            });
+        } else {
+            const defectInputs = form.querySelectorAll('[name^="defect_quantity_"]');
+            defectInputs.forEach(input => {
+                totalDefectsDistribution += parseInt(input.value, 10) || 0;
+            });
+        }
 
         // 重量優先口徑：不良品重量 = 訂單淨重 - 篩分後淨重
         const defectWeightKg = Math.max(orderNetWeight - actualNetWeight, 0);
@@ -3334,46 +4099,29 @@
 
         // 不良品支數（重量換算）
         const defectUnits = weightPerUnit > 0 ? Math.max(Math.round((defectWeightKg * 1000) / weightPerUnit), 0) : 0;
-        const defectUnitsDiff = defectUnits - totalDefectsDistribution;
-
         // 總支數 = 良品支數 + 不良品支數（重量換算）
         const actualTotalUnits = goodUnits + defectUnits;
-
-        // 總重量 (kg) = 淨重(kg) + 載具重量合計(kg) + 不良品重量(kg)
-        const actualTotalWeight = actualNetWeight + totalToolWeight + defectWeightKg;
-
-        // 計算差值 (四捨五入到 2 位小數,避免浮點數精度問題)
-        const weightDiff = Math.round((orderNetWeight - actualNetWeight) * 100) / 100;
-        const toolDiff = orderToolQty - actualToolQty;
-        const unitsDiff = Math.round((orderUnits - actualTotalUnits) * 100) / 100;
 
         // 更新訂單預期
         setMetricValue(`${prefix}order-net-weight`, orderNetWeight.toFixed(2));
         setMetricValue(`${prefix}order-tool-quantity`, orderToolQty);
         setMetricValue(`${prefix}order-tool-weight`, totalToolWeight.toFixed(2));
+        setMetricValue(`${prefix}order-tool-statistics`, toolStatistics);
         setMetricValue(`${prefix}order-total-units`, formatNumber(orderUnits));
 
         // 更新實際篩分後
         setMetricValue(`${prefix}actual-net-weight`, actualNetWeight.toFixed(2)); // 實際淨重 = 輸入重量總和 - 載具總重
         setMetricValue(`${prefix}actual-tool-quantity`, actualToolQty);
-        setMetricValue(`${prefix}actual-tool-weight`, totalToolWeight.toFixed(2)); // 載具重量合計
+        setMetricValue(`${prefix}actual-tool-weight`, actualToolWeight.toFixed(2)); // 載具重量合計
         setMetricValue(`${prefix}good-units`, formatNumber(goodUnits));
         setMetricValue(`${prefix}defect-units`, formatNumber(defectUnits));
-        setMetricValue(`${prefix}defect-units-distribution`, formatNumber(totalDefectsDistribution));
-        setMetricValue(`${prefix}defect-units-diff`, formatNumber(defectUnitsDiff), defectUnitsDiff);
         setMetricValue(`${prefix}defect-weight`, defectWeightKg.toFixed(3)); // 不良品重量 (kg)
         setMetricValue(`${prefix}actual-total-units`, formatNumber(actualTotalUnits));
-        setMetricValue(`${prefix}actual-total-weight`, actualTotalWeight.toFixed(2)); // 總重量 = 淨重 + 載具重量 + 不良品重量
 
         const defectMetric = document.querySelector(`[data-metric="${prefix}defect-units"]`);
         if (defectMetric) {
             defectMetric.title = `分布合計：${formatNumber(totalDefectsDistribution)} 支`;
         }
-
-        // 更新差值 (正值顯示綠色,負值顯示紅色)
-        setMetricValue(`${prefix}weight-diff`, weightDiff.toFixed(2), weightDiff);
-        setMetricValue(`${prefix}tool-diff`, toolDiff, toolDiff);
-        setMetricValue(`${prefix}units-diff`, formatNumber(unitsDiff), unitsDiff);
     }
 
     /**
@@ -3450,6 +4198,9 @@
                 delete select.dataset.pendingValue;
             }
         });
+        if (selector === '[name="status_lookup_id"]') {
+            syncEditStatusDisplay();
+        }
     }
 
     function showAlert(message, type = 'info') {

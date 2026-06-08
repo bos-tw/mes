@@ -62,6 +62,85 @@ function workOrderTableHasColumn(PDO $pdo, string $table, string $column): bool
 }
 
 /**
+ * Fetch order-item tool details for work order preset production records.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function fetchWorkOrderToolDetails(PDO $pdo, int $orderItemId): array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            oit.id,
+            oit.tool_id,
+            t.name AS tool_name,
+            oit.tool_type,
+            oit.quantity,
+            oit.total_weight
+        FROM order_item_tools oit
+        LEFT JOIN tools t ON t.id = oit.tool_id
+        WHERE oit.order_item_id = :order_item_id
+        ORDER BY t.name ASC, oit.id ASC
+    ");
+    $stmt->execute(['order_item_id' => $orderItemId]);
+
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $result = [];
+    foreach ($rows as $row) {
+        $quantity = (float)($row['quantity'] ?? 0);
+        $totalWeight = (float)($row['total_weight'] ?? 0);
+        $unitWeight = $quantity > 0 ? round($totalWeight / $quantity, 3) : 0.0;
+
+        $result[] = [
+            'id' => (int)($row['id'] ?? 0),
+            'tool_id' => (int)($row['tool_id'] ?? 0),
+            'tool_name' => (string)($row['tool_name'] ?: ($row['tool_type'] ?? '')),
+            'tool_type' => (string)($row['tool_type'] ?? ''),
+            'quantity' => $quantity,
+            'total_weight_kg' => round($totalWeight, 3),
+            'unit_weight_kg' => $unitWeight,
+        ];
+    }
+
+    return $result;
+}
+
+/**
+ * Fetch drawings bound to the source order item.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function fetchWorkOrderDrawings(PDO $pdo, int $orderItemId): array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            drawing_number,
+            file_name,
+            file_path,
+            file_size,
+            mime_type,
+            created_at
+        FROM order_item_drawings
+        WHERE order_item_id = :order_item_id
+        ORDER BY id ASC
+    ");
+    $stmt->execute(['order_item_id' => $orderItemId]);
+
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    return array_map(static function (array $row): array {
+        return [
+            'id' => (int)($row['id'] ?? 0),
+            'drawing_number' => (string)($row['drawing_number'] ?? ''),
+            'file_name' => (string)($row['file_name'] ?? ''),
+            'file_path' => (string)($row['file_path'] ?? ''),
+            'file_size' => isset($row['file_size']) ? (int)$row['file_size'] : 0,
+            'mime_type' => (string)($row['mime_type'] ?? ''),
+            'uploaded_at' => $row['created_at'] ?? null,
+        ];
+    }, $rows);
+}
+
+/**
  * Retrieve request payload supporting JSON and form submissions.
  *
  * @return array<string,mixed>
@@ -102,7 +181,7 @@ function hasFilledWorkOrderValue($value): bool
  */
 function isMeaningfulProductionRecord(array $record): bool
 {
-    foreach (['weight_kg', 'production_date', 'production_time', 'machine_id', 'notes'] as $field) {
+    foreach (['weight_kg', 'production_date', 'production_time', 'machine_id', 'tool_name', 'tool_weight_kg', 'notes'] as $field) {
         if (array_key_exists($field, $record) && hasFilledWorkOrderValue($record[$field])) {
             return true;
         }
@@ -150,7 +229,7 @@ function filterMeaningfulMachineRunProductionRecords(array $records): array
             continue;
         }
 
-        foreach (['weight_kg', 'production_date', 'production_time', 'notes'] as $field) {
+        foreach (['weight_kg', 'production_date', 'production_time', 'tool_name', 'tool_weight_kg', 'notes'] as $field) {
             if (array_key_exists($field, $record) && hasFilledWorkOrderValue($record[$field])) {
                 $filtered[] = $record;
                 break;
@@ -400,11 +479,26 @@ function insertWorkOrderProductionRecords(PDO $pdo, int $workOrderId, array $pro
     $currentUserId = $currentEmployee ? (int)$currentEmployee['id'] : null;
 
     $hasMachineRunIdColumn = workOrderTableHasColumn($pdo, 'production_records', 'machine_run_id');
+    $hasSourceModeColumn = workOrderTableHasColumn($pdo, 'production_records', 'production_source_mode');
+    $hasToolNameColumn = workOrderTableHasColumn($pdo, 'production_records', 'tool_name');
+    $hasToolWeightColumn = workOrderTableHasColumn($pdo, 'production_records', 'tool_weight_kg');
     $columns = ['work_order_id'];
     $params = [':work_order_id'];
     if ($hasMachineRunIdColumn) {
         $columns[] = 'machine_run_id';
         $params[] = ':machine_run_id';
+    }
+    if ($hasSourceModeColumn) {
+        $columns[] = 'production_source_mode';
+        $params[] = ':production_source_mode';
+    }
+    if ($hasToolNameColumn) {
+        $columns[] = 'tool_name';
+        $params[] = ':tool_name';
+    }
+    if ($hasToolWeightColumn) {
+        $columns[] = 'tool_weight_kg';
+        $params[] = ':tool_weight_kg';
     }
     $columns = array_merge($columns, [
         'card_number',
@@ -450,6 +544,9 @@ function insertWorkOrderProductionRecords(PDO $pdo, int $workOrderId, array $pro
 
         $insertParams = [
             'work_order_id' => $workOrderId,
+            'production_source_mode' => !empty($record['production_source_mode']) ? mb_substr((string)$record['production_source_mode'], 0, 20) : 'preset',
+            'tool_name' => !empty($record['tool_name']) ? mb_substr(trim((string)$record['tool_name']), 0, 100) : null,
+            'tool_weight_kg' => hasFilledWorkOrderValue($record['tool_weight_kg'] ?? null) ? (float)$record['tool_weight_kg'] : null,
             'card_number' => $record['card_number'],
             'weight_kg' => !empty($record['weight_kg']) ? (float)$record['weight_kg'] : null,
             'production_date' => !empty($record['production_date']) ? $record['production_date'] : null,
@@ -461,6 +558,15 @@ function insertWorkOrderProductionRecords(PDO $pdo, int $workOrderId, array $pro
         ];
         if ($hasMachineRunIdColumn) {
             $insertParams['machine_run_id'] = $machineRunId;
+        }
+        if (!$hasSourceModeColumn) {
+            unset($insertParams['production_source_mode']);
+        }
+        if (!$hasToolNameColumn) {
+            unset($insertParams['tool_name']);
+        }
+        if (!$hasToolWeightColumn) {
+            unset($insertParams['tool_weight_kg']);
         }
         $prodRecordStmt->execute($insertParams);
         $inserted++;
@@ -1210,11 +1316,13 @@ function fetchOrderItemDetailsForWorkOrder(PDO $pdo, int $orderItemId): ?array
         $result['tool_statistics'] = implode('、', $toolStatistics);
         $result['tool_quantity'] = $totalContainerQuantity; // 總載具數量(桶數/船數總和)
         $result['total_tool_weight'] = round($totalToolWeight, 2); // 載具總重量 (kg)
+        $result['tool_details'] = fetchWorkOrderToolDetails($pdo, $orderItemId);
     } catch (Exception $e) {
         error_log('Fetch tools statistics error: ' . $e->getMessage());
         $result['tool_statistics'] = '';
         $result['tool_quantity'] = 0;
         $result['total_tool_weight'] = 0.0;
+        $result['tool_details'] = [];
         $totalToolWeight = 0.0;
     }
 
@@ -1279,6 +1387,13 @@ function fetchOrderItemDetailsForWorkOrder(PDO $pdo, int $orderItemId): ?array
         } catch (Exception $e) {
             error_log('Fetch drawing number from order_item_drawings error: ' . $e->getMessage());
         }
+    }
+
+    try {
+        $result['drawings'] = fetchWorkOrderDrawings($pdo, $orderItemId);
+    } catch (Exception $e) {
+        error_log('Fetch work order drawings error: ' . $e->getMessage());
+        $result['drawings'] = [];
     }
 
     return $result;

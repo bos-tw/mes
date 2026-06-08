@@ -156,6 +156,8 @@ try {
     $toolsCountStmt->execute(['order_item_id' => $workOrder['order_item_id']]);
     $toolData = $toolsCountStmt->fetch(PDO::FETCH_ASSOC);
     $workOrder['tool_quantity'] = (int)($toolData['tool_quantity'] ?? 0);
+    $workOrder['tool_details'] = fetchWorkOrderToolDetails($pdo, (int)$workOrder['order_item_id']);
+    $workOrder['drawings'] = fetchWorkOrderDrawings($pdo, (int)$workOrder['order_item_id']);
 
     // 即時計算 total_units，確保使用最新的 weight_per_unit_g 和 tool_weight
     $totalWeight = isset($workOrder['total_weight_kg']) ? (float)$workOrder['total_weight_kg'] : 0.0;
@@ -233,9 +235,22 @@ try {
     $workOrder['images'] = $imagesStmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Get production records
+    $productionSourceModeSelect = workOrderTableHasColumn($pdo, 'production_records', 'production_source_mode')
+        ? 'pr.production_source_mode,'
+        : "'preset' AS production_source_mode,";
+    $toolNameSelect = workOrderTableHasColumn($pdo, 'production_records', 'tool_name')
+        ? 'pr.tool_name,'
+        : "NULL AS tool_name,";
+    $toolWeightSelect = workOrderTableHasColumn($pdo, 'production_records', 'tool_weight_kg')
+        ? 'pr.tool_weight_kg,'
+        : "NULL AS tool_weight_kg,";
+
     $prStmt = $pdo->prepare("
         SELECT
             pr.*,
+            {$productionSourceModeSelect}
+            {$toolNameSelect}
+            {$toolWeightSelect}
             m.name AS machine_name,
             e.name AS employee_name
         FROM production_records pr
@@ -254,6 +269,7 @@ try {
             wosd.screening_service_id,
             wosd.service_name,
             wosd.defect_quantity,
+            wosd.notes,
             wosd.recorded_at,
             e.name AS recorded_by_name
         FROM work_order_screening_defects wosd
@@ -341,6 +357,9 @@ try {
             $machineRecordsStmt = $pdo->prepare("
                 SELECT
                     pr.*,
+                    {$productionSourceModeSelect}
+                    {$toolNameSelect}
+                    {$toolWeightSelect}
                     m.name AS machine_name,
                     e.name AS employee_name
                 FROM production_records pr

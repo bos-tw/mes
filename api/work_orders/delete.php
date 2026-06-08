@@ -107,11 +107,19 @@ try {
 
     // Auto-generated card-number rows are planning placeholders, not production history.
     // Clean up empty shells first, then only block deletion when real related data exists.
+    $toolNameMeaningfulSql = workOrderTableHasColumn($pdo, 'production_records', 'tool_name')
+        ? "OR TRIM(COALESCE(`tool_name`, '')) <> ''"
+        : '';
+    $toolWeightMeaningfulSql = workOrderTableHasColumn($pdo, 'production_records', 'tool_weight_kg')
+        ? 'OR `tool_weight_kg` IS NOT NULL'
+        : '';
     $meaningfulProductionSql = "
         `weight_kg` IS NOT NULL
         OR (`production_date` IS NOT NULL AND CAST(`production_date` AS CHAR) <> '0000-00-00')
         OR (`production_time` IS NOT NULL AND CAST(`production_time` AS CHAR) <> '')
         OR `machine_id` IS NOT NULL
+        {$toolNameMeaningfulSql}
+        {$toolWeightMeaningfulSql}
         OR TRIM(COALESCE(`notes`, '')) <> ''
     ";
     $cleanupProductionStmt = $pdo->prepare("

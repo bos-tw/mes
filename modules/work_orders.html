@@ -726,16 +726,8 @@
                                         <strong data-metric="good-units" class="text-success">--</strong>
                                     </div>
                                     <div class="metric">
-                                        <span class="metric-label">不良品支數</span>
+                                        <span class="metric-label">不良品支數 (參考值)</span>
                                         <strong data-metric="defect-units" class="text-danger">--</strong>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">分布合計支數</span>
-                                        <strong data-metric="defect-units-distribution">--</strong>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">差異 (重量-分布)</span>
-                                        <strong data-metric="defect-units-diff" class="diff-value">--</strong>
                                     </div>
                                     <div class="metric">
                                         <span class="metric-label">不良品重量 (kg)</span>
@@ -744,29 +736,6 @@
                                     <div class="metric">
                                         <span class="metric-label">總支數</span>
                                         <strong data-metric="actual-total-units">--</strong>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">總重量 (kg)</span>
-                                        <strong data-metric="actual-total-weight">--</strong>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- 差值 -->
-                            <div class="metrics-panel metrics-diff">
-                                <h5 class="metrics-subtitle">差值 (訂單 - 實際)</h5>
-                                <div class="metrics-grid">
-                                    <div class="metric">
-                                        <span class="metric-label">重量差 (kg)</span>
-                                        <strong data-metric="weight-diff" class="diff-value">--</strong>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">載具數差</span>
-                                        <strong data-metric="tool-diff" class="diff-value">--</strong>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">支數差</span>
-                                        <strong data-metric="units-diff" class="diff-value">--</strong>
                                     </div>
                                 </div>
                             </div>
@@ -803,7 +772,6 @@
             <form data-work-orders-edit-form novalidate>
                 <div class="work-orders-modal-main">
                 <div class="work-orders-modal-body">
-
                     <div class="source-selection-section work-order-type-top-section">
                         <div class="tabs" data-work-order-type-switch role="tablist" aria-label="工單類型">
                             <input type="hidden" name="work_order_type" value="normal">
@@ -812,379 +780,246 @@
                         </div>
                     </div>
 
-                    <!-- 基本資訊 -->
-                    <section class="form-section" data-split-mode-hidden>
-                        <h4>工單資訊</h4>
-                        <div class="form-grid form-grid-three-columns">
-                            <label class="inline-label">
+                    <section class="form-section work-order-edit-summary-section">
+                        <div class="work-order-edit-summary-grid">
+                            <div class="work-order-edit-summary-value">
                                 <span>工單號碼</span>
-                                <input type="text" name="work_order_number" disabled readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
+                                <strong data-edit-summary-work-order>--</strong>
+                            </div>
+                            <div class="work-order-edit-summary-value">
+                                <span>客戶</span>
+                                <strong data-edit-summary-customer>--</strong>
+                            </div>
+                            <div class="work-order-edit-summary-value">
+                                <span>品名規格</span>
+                                <strong data-edit-summary-product>--</strong>
+                            </div>
+                            <div class="work-order-edit-summary-value work-order-edit-summary-status">
                                 <span>工單狀態</span>
-                                <select name="status_lookup_id" data-field="status">
-                                    <option value="">-- 請選擇 --</option>
-                                </select>
-                            </label>
-                            <label class="inline-label" data-primary-machine-field>
-                                <span>指派機台</span>
-                                <select name="machine_id">
-                                    <option value="">-- 請選擇 --</option>
-                                </select>
-                            </label>
-                        </div>
-                    </section>
-
-                    <!-- 訂單資訊 (唯讀) -->
-                    <section class="form-section info-section work-order-collapsible-section" data-collapsible-section>
-                        <details open>
-                            <summary>訂單詳細資訊 <span class="text-muted small">(唯讀)</span></summary>
-                        <div class="form-grid form-grid-four-columns">
-                            <label class="inline-label">
-                                <span>客戶名稱</span>
-                                <input type="text" name="customer_name" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
-                                <span>客戶訂單號碼</span>
-                                <input type="text" name="customer_po_number" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
-                                <span>客戶批號</span>
-                                <input type="text" name="customer_batch_number" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
-                                <span>細項編號</span>
-                                <input type="text" name="sub_item_number" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
-                                <span>料號</span>
-                                <input type="text" name="part_number" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
-                                <span>圖面號碼</span>
-                                <input type="text" name="drawing_number" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
-                                <span>受篩產品</span>
-                                <input type="text" name="screening_item_name" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
-                                <span>客戶樣品狀態</span>
-                                <input type="text" name="customer_sample_status" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
-                                <span>預計交期</span>
-                                <input type="date" name="expected_delivery_date" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
-                                <span>訂單總量</span>
-                                <input type="text" name="order_total_units" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
-                                <span>訂單重量 (含載具) (kg)</span>
-                                <input type="text" name="order_total_weight" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label">
-                                <span>訂單淨重 (kg)</span>
-                                <input type="text" name="order_net_weight" readonly class="readonly-field">
-                            </label>
-                            <label class="inline-label full-width">
-                                <span>指送地點</span>
-                                <input type="text" name="delivery_location" readonly class="readonly-field">
-                            </label>
-                        </div>
-                        </details>
-                    </section>
-
-                    <div class="work-orders-section-layout">
-                        <div class="work-orders-section-left">
-                            <!-- 工單生產資訊 -->
-                            <section class="form-section work-order-collapsible-section work-order-production-section" data-collapsible-section>
-                                <details open>
-                                    <summary>工單生產資訊</summary>
-                                <div class="form-grid form-grid-four-columns work-orders-force-vertical">
-                                    <label class="inline-label">
-                                        <span>重量 (淨重) (kg)</span>
-                                        <input type="number" name="total_weight_kg" data-field="total-weight" step="0.01" placeholder="請輸入重量(淨重)">
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>產品單重 (g)</span>
-                                        <input type="number" name="weight_per_unit_g" data-field="unit-weight" step="0.001" placeholder="請輸入產品單重">
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>總支數</span>
-                                        <input type="number" name="total_units" data-field="total-units" step="1" placeholder="請輸入總支數">
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>載具類型統計 (桶數)</span>
-                                        <input type="text" name="tool_statistics" data-field="tool-statistics" placeholder="例如: 50kg標準船 1個、52kg標準船 2個">
-                                    </label>
-                                </div>
-                                </details>
-                            </section>
-
-                            <!-- 生產排程資訊 -->
-                            <section class="form-section work-order-schedule-section" data-split-mode-hidden>
-                                <h4>生產排程資訊</h4>
-                                <div class="form-grid form-grid-four-columns work-orders-force-vertical">
-                                    <label class="inline-label">
-                                        <span>預定開始日期</span>
-                                        <input type="datetime-local" name="scheduled_start_date">
-                                        <span class="weekday-badge" data-weekday-for="edit_scheduled_start_date"></span>
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>預定結束日期</span>
-                                        <input type="datetime-local" name="scheduled_end_date">
-                                        <span class="weekday-badge" data-weekday-for="edit_scheduled_end_date"></span>
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>實際開始日期</span>
-                                        <input type="datetime-local" name="actual_start_date">
-                                        <span class="weekday-badge" data-weekday-for="edit_actual_start_date"></span>
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>實際結束日期</span>
-                                        <input type="datetime-local" name="actual_end_date">
-                                        <span class="weekday-badge" data-weekday-for="edit_actual_end_date"></span>
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>指派員工</span>
-                                        <select name="assigned_employee_id">
-                                            <option value="">-- 請選擇 --</option>
-                                        </select>
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>校機人員</span>
-                                        <select name="calibration_employee_id">
-                                            <option value="">-- 請選擇 --</option>
-                                        </select>
-                                    </label>
-                                </div>
-                            </section>
-                        </div>
-
-                        <section class="form-section split-work-order-panel hidden" data-split-work-order-panel>
-                            <header class="split-work-order-header">
-                                <div>
-                                    <h4>拆分機台</h4>
-                                    <p class="text-muted small">拆分模式由下方機台明細接管排程與生產；每一筆都必須從機台資料表選擇實際機台，系統以淨重管制且不可超過主工單預期淨重。</p>
-                                </div>
-                                <button type="button" class="btn outline small" data-action="add-machine-run">
-                                    <i class="fas fa-plus"></i> 選擇機台新增
-                                </button>
-                            </header>
-                            <div class="split-work-order-layout">
-                                <div class="split-machine-tabs" data-split-machine-tabs></div>
-                                <div class="split-machine-editor" data-split-machine-editor></div>
-                            </div>
-                        </section>
-
-                        <!-- 篩分服務明細 -->
-                        <section class="form-section info-section work-orders-section-right" data-split-mode-hidden>
-                            <h4>篩分服務明細 (自動帶入)</h4>
-                            <div class="table-responsive">
-                                <table class="data-table compact" data-edit-screening-services-table>
-                                    <thead>
-                                        <tr>
-                                            <th>服務項目</th>
-                                            <th class="col-100">公差(+)</th>
-                                            <th class="col-100">公差(-)</th>
-                                            <th class="col-80">PPM</th>
-                                            <th class="col-120">不良品數量</th>
-                                            <th>備註</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody data-edit-screening-services-body>
-                                        <tr class="empty-row">
-                                            <td colspan="6" class="text-center text-muted">載入中...</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
-                    </div>
-
-                    <!-- 生產設定 -->
-                    <section class="form-section" data-split-mode-hidden>
-                        <h4>生產設定</h4>
-                        <div class="form-grid form-grid-three-columns">
-                            <label class="inline-label" data-primary-machine-field>
-                                <span>指定機台</span>
-                                <select name="machine_id" data-field="machine">
-                                    <option value="">-- 請選擇 --</option>
-                                </select>
-                            </label>
-                            <label class="inline-label">
-                                <span>指定員工</span>
-                                <select name="assigned_employee_id" data-field="assigned-employee">
-                                    <option value="">-- 請選擇 --</option>
-                                </select>
-                            </label>
-                            <label class="inline-label">
-                                <span>校機人員</span>
-                                <select name="calibration_employee_id" data-field="calibration-employee">
-                                    <option value="">-- 請選擇 --</option>
-                                </select>
-                            </label>
-                            <label class="inline-label">
-                                <span>生產數量</span>
-                                <input type="number" name="quantity_to_produce" min="0" step="0.01" placeholder="請輸入生產數量">
-                            </label>
-                            <label class="inline-label">
-                                <span>篩選速度</span>
-                                <input type="text" name="screening_speed" maxlength="50" placeholder="例如: 300支/分">
-                            </label>
-                        </div>
-                    </section>
-
-                    <!-- 首件尺寸檢驗與工單圖片 (並排兩欄) -->
-                    <div class="form-row">
-                        <!-- 首件尺寸檢驗 -->
-                        <section class="subsection">
-                            <header class="subsection-header">
-                                <div>
-                                    <h4>首件尺寸檢驗 (mm)</h4>
-                                </div>
-                            <div class="subsection-actions">
-                                <button type="button" class="btn ghost small" data-action="open-first-piece-tab" title="在專用頁籤編輯首件尺寸">
-                                    <i class="fas fa-external-link-alt"></i>
-                                    <span>開啟專用頁</span>
-                                </button>
-                                <button type="button" class="btn ghost small" data-action="toggle-first-piece" title="展開/收合">
-                                    <i class="fas fa-chevron-down"></i>
-                                </button>
-                            </div>
-                        </header>
-                        <div class="subsection-body hidden" data-edit-first-piece-section>
-                            <div class="form-grid form-grid-four-columns">
-                                <label class="inline-label">
-                                    <span>頭高</span>
-                                    <input type="number" name="fp_head_height" step="0.0001" placeholder="0.0000" data-field="fp-head-height">
-                                </label>
-                                <label class="inline-label">
-                                    <span>頭寬</span>
-                                    <input type="number" name="fp_head_width" step="0.0001" placeholder="0.0000" data-field="fp-head-width">
-                                </label>
-                                <label class="inline-label">
-                                    <span>長度</span>
-                                    <input type="number" name="fp_length" step="0.0001" placeholder="0.0000" data-field="fp-length">
-                                </label>
-                                <label class="inline-label">
-                                    <span>牙外徑</span>
-                                    <input type="number" name="fp_thread_outer_diameter" step="0.0001" placeholder="0.0000" data-field="fp-thread">
-                                </label>
-                                <label class="inline-label">
-                                    <span>華司徑</span>
-                                    <input type="number" name="fp_washer_diameter" step="0.0001" placeholder="0.0000" data-field="fp-washer">
-                                </label>
-                                <label class="inline-label">
-                                    <span>外徑</span>
-                                    <input type="number" name="fp_outer_diameter" step="0.0001" placeholder="0.0000" data-field="fp-outer">
-                                </label>
-                                <label class="inline-label">
-                                    <span>孔徑</span>
-                                    <input type="number" name="fp_hole_diameter" step="0.0001" placeholder="0.0000" data-field="fp-hole">
-                                </label>
-                                <label class="inline-label">
-                                    <span>厚度</span>
-                                    <input type="number" name="fp_thickness" step="0.0001" placeholder="0.0000" data-field="fp-thickness">
-                                </label>
-                                <label class="inline-label" data-span-two>
-                                    <span>測量時間</span>
-                                    <input type="datetime-local" name="fp_measured_at" data-field="fp-measured-at">
-                                </label>
-                                <label class="inline-label" data-span-two>
-                                    <span>測量人員</span>
-                                    <select name="fp_measured_by_employee_id" data-field="fp-measured-by">
-                                        <option value="">-- 請選擇 --</option>
-                                    </select>
-                                </label>
-                                <label class="inline-label full-width">
-                                    <span>備註</span>
-                                    <textarea name="fp_notes" maxlength="255" placeholder="首件檢驗備註" data-field="fp-notes" rows="2"></textarea>
-                                </label>
+                                <strong class="status-badge secondary" data-edit-summary-status>--</strong>
                             </div>
                         </div>
                     </section>
 
-                    <!-- 工單圖片 -->
-                    <section class="subsection">
+                    <section class="form-section info-section work-order-collapsible-section work-order-edit-detail-section" data-collapsible-section>
                         <header class="subsection-header">
-                            <div>
-                                <h4>工單圖片</h4>
-                            </div>
-                            <div class="subsection-actions">
-                                <button type="button" class="btn ghost small" data-action="toggle-images" title="展開/收合">
-                                    <i class="fas fa-chevron-down"></i>
-                                </button>
-                            </div>
+                            <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-detail-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                            <h4>訂單詳細資訊 <span class="text-muted small">(唯讀)</span></h4>
                         </header>
-                        <div class="subsection-body hidden" data-edit-images-section>
-                            <div class="subsection-actions">
-                                <button type="button" class="btn ghost small" data-action="open-images-tab" title="在專用頁籤管理圖片">
-                                    <i class="fas fa-external-link-alt"></i>
-                                    <span>開啟專用頁</span>
-                                </button>
-                                <button type="button" class="btn ghost small" data-action="add-image-edit">
-                                    <i class="fas fa-plus"></i>
-                                    <span>新增圖片</span>
-                                </button>
+                        <div class="subsection-body" data-edit-detail-section>
+                            <div class="form-grid form-grid-four-columns">
+                                <label class="inline-label"><span>客戶名稱</span><input type="text" name="customer_name" readonly class="readonly-field"></label>
+                                <label class="inline-label"><span>客戶訂單號碼</span><input type="text" name="customer_po_number" readonly class="readonly-field"></label>
+                                <label class="inline-label"><span>客戶批號</span><input type="text" name="customer_batch_number" readonly class="readonly-field"></label>
+                                <label class="inline-label"><span>細項編號</span><input type="text" name="sub_item_number" readonly class="readonly-field"></label>
+                                <label class="inline-label"><span>受篩產品</span><input type="text" name="screening_item_name" readonly class="readonly-field"></label>
+                                <label class="inline-label"><span>預計交期</span><input type="date" name="expected_delivery_date" readonly class="readonly-field"></label>
+                                <label class="inline-label"><span>客戶樣品狀態</span><input type="text" name="customer_sample_status" readonly class="readonly-field"></label>
+                                <label class="inline-label"><span>工單狀態</span><select name="status_lookup_id" data-field="status"><option value="">-- 請選擇 --</option></select></label>
+                                <label class="inline-label work-order-detail-field-part-number"><span>料號</span><input type="text" name="part_number" readonly class="readonly-field"></label>
+                                <label class="inline-label work-order-detail-field-delivery-location"><span>指送地點</span><input type="text" name="delivery_location" readonly class="readonly-field"></label>
                             </div>
-                            <div class="table-responsive">
-                                <table class="data-table compact">
-                                    <thead>
-                                        <tr>
-                                            <th class="col-80">縮圖</th>
-                                            <th class="col-120">圖片類型</th>
-                                            <th>描述</th>
-                                            <th class="col-150">上傳時間</th>
-                                            <th class="col-80">預覽</th>
-                                            <th class="col-80">操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody data-edit-images-rows>
-                                        <tr class="empty-row">
-                                            <td colspan="6" class="text-center">尚未上傳圖片</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                            <section class="subsection work-order-edit-drawing-card">
+                                <header class="subsection-header">
+                                    <h4>圖面附件</h4>
+                                    <button type="button" class="btn ghost small" data-action="add-order-drawing"><i class="fas fa-plus"></i><span>新增圖面</span></button>
+                                </header>
+                                <div class="table-responsive">
+                                    <table class="data-table compact">
+                                        <thead>
+                                            <tr>
+                                                <th>圖面編號</th>
+                                                <th>檔案名稱</th>
+                                                <th class="col-100">檔案大小</th>
+                                                <th class="col-150">上傳時間</th>
+                                                <th class="col-80">預覽</th>
+                                                <th class="col-80">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody data-edit-order-drawings-rows>
+                                            <tr class="empty-row"><td colspan="6" class="text-center">尚未上傳圖面</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+                        </div>
+                    </section>
+
+                    <section class="form-section work-order-edit-schedule-section" data-split-mode-hidden data-collapsible-section>
+                        <header class="subsection-header">
+                            <div class="subsection-actions">
+                                <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-schedule-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                            </div>
+                            <h4>生產排程</h4>
+                        </header>
+                        <div class="subsection-body" data-edit-schedule-section>
+                            <div class="form-grid work-order-edit-schedule-grid">
+                                <label class="inline-label"><span>預定開始日期</span><input type="datetime-local" name="scheduled_start_date"><span class="weekday-badge" data-weekday-for="edit_scheduled_start_date"></span></label>
+                                <label class="inline-label"><span>預定結束日期</span><input type="datetime-local" name="scheduled_end_date"><span class="weekday-badge" data-weekday-for="edit_scheduled_end_date"></span></label>
+                                <label class="inline-label"><span>指派員工</span><select name="assigned_employee_id" data-field="assigned-employee"><option value="">-- 請選擇 --</option></select></label>
+                                <label class="inline-label"><span>指定機台</span><select name="machine_id" data-field="machine"><option value="">-- 請選擇 --</option></select></label>
+                                <label class="inline-label"><span>實際開始日期</span><input type="datetime-local" name="actual_start_date"><span class="weekday-badge" data-weekday-for="edit_actual_start_date"></span></label>
+                                <label class="inline-label"><span>實際結束日期</span><input type="datetime-local" name="actual_end_date"><span class="weekday-badge" data-weekday-for="edit_actual_end_date"></span></label>
+                                <label class="inline-label"><span>校機人員</span><select name="calibration_employee_id" data-field="calibration-employee"><option value="">-- 請選擇 --</option></select></label>
+                                <label class="inline-label"><span>生產數量</span><input type="number" name="quantity_to_produce" min="0" step="0.01"></label>
+                                <label class="inline-label"><span>篩選速度</span><input type="text" name="screening_speed" maxlength="50" placeholder="例如: 300支/分"></label>
                             </div>
                         </div>
                     </section>
-                </div>
 
-                <!-- 生產記錄 -->
-                <section class="subsection">
-                    <header class="subsection-header">
-                        <h4>生產記錄</h4>
-                        <button type="button" class="btn ghost small" data-action="add-production-record">
-                            <i class="fas fa-plus"></i>
-                            <span>新增生產記錄</span>
-                        </button>
-                    </header>
-                    <div class="table-responsive">
-                        <table class="data-table compact">
-                            <thead>
-                                <tr>
-                                    <th>卡號</th>
-                                    <th>重量(kg)</th>
-                                    <th>日期</th>
-                                    <th>時間</th>
-                                    <th>機台編號</th>
-                                    <th>機台種類</th>
-                                    <th>登錄者</th>
-                                    <th>備註</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody data-edit-production-records-rows>
-                                <tr class="empty-row">
-                                    <td colspan="9" class="text-center">尚無生產記錄</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
+                    <section class="form-section split-work-order-panel hidden" data-split-work-order-panel>
+                        <header class="split-work-order-header">
+                            <div><h4>拆分機台</h4><p class="text-muted small">各機台明細分別輸入，右側統計仍彙總整張工單。</p></div>
+                            <button type="button" class="btn outline small" data-action="add-machine-run"><i class="fas fa-plus"></i> 選擇機台新增</button>
+                        </header>
+                        <div class="split-work-order-layout">
+                            <div class="split-machine-tabs" data-split-machine-tabs></div>
+                            <div class="split-machine-editor" data-split-machine-editor></div>
+                        </div>
+                    </section>
+
+                    <section class="form-section work-order-edit-inspection-section" data-split-mode-hidden data-collapsible-section>
+                        <header class="subsection-header">
+                            <div class="subsection-actions">
+                                <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-inspection-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                            </div>
+                            <h4>篩分明細 / 首件尺寸檢驗 (mm)</h4>
+                        </header>
+                        <div class="subsection-body" data-edit-inspection-section>
+                            <div class="work-order-edit-middle-row">
+                                <section class="form-section info-section work-order-edit-service-section">
+                                    <header class="subsection-header">
+                                        <h4>篩分服務明細</h4>
+                                    </header>
+                                    <div class="subsection-body" data-edit-service-section>
+                                        <div class="table-responsive">
+                                            <table class="data-table compact" data-edit-screening-services-table>
+                                                <thead>
+                                                    <tr><th>服務項目</th><th class="col-100">公差(+)</th><th class="col-100">公差(-)</th><th class="col-80">PPM</th><th class="col-80">不良品數量</th><th class="col-240">備註</th></tr>
+                                                </thead>
+                                                <tbody data-edit-screening-services-body><tr class="empty-row"><td colspan="6" class="text-center text-muted">載入中...</td></tr></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section class="subsection work-order-edit-first-piece-card">
+                                    <header class="subsection-header">
+                                        <h4>首件尺寸檢驗 (mm)</h4>
+                                        <div class="subsection-actions">
+                                            <button type="button" class="btn ghost small" data-action="open-first-piece-tab" title="在專用頁籤編輯首件尺寸"><i class="fas fa-external-link-alt"></i><span>開啟專用頁</span></button>
+                                        </div>
+                                    </header>
+                                    <div class="subsection-body" data-edit-first-piece-section>
+                                        <div class="form-grid work-order-first-piece-grid">
+                                            <label class="inline-label"><span>頭高</span><input type="number" name="fp_head_height" step="0.0001"></label>
+                                            <label class="inline-label"><span>頭寬</span><input type="number" name="fp_head_width" step="0.0001"></label>
+                                            <label class="inline-label"><span>長度</span><input type="number" name="fp_length" step="0.0001"></label>
+                                            <label class="inline-label"><span>牙外徑</span><input type="number" name="fp_thread_outer_diameter" step="0.0001"></label>
+                                            <label class="inline-label"><span>華司徑</span><input type="number" name="fp_washer_diameter" step="0.0001"></label>
+                                            <label class="inline-label"><span>外徑</span><input type="number" name="fp_outer_diameter" step="0.0001"></label>
+                                            <label class="inline-label"><span>孔徑</span><input type="number" name="fp_hole_diameter" step="0.0001"></label>
+                                            <label class="inline-label"><span>厚度</span><input type="number" name="fp_thickness" step="0.0001"></label>
+                                            <label class="inline-label" data-span-two><span>測量時間</span><input type="datetime-local" name="fp_measured_at"></label>
+                                            <label class="inline-label" data-span-two><span>測量人員</span><select name="fp_measured_by_employee_id"><option value="">-- 請選擇 --</option></select></label>
+                                            <label class="inline-label full-width"><span>備註</span><textarea name="fp_notes" maxlength="255" rows="2"></textarea></label>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="subsection work-order-edit-images-card hidden">
+                        <div class="subsection-body hidden" data-edit-images-section>
+                            <table>
+                                <tbody data-edit-images-rows></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="subsection work-order-edit-production-records" data-split-mode-hidden data-collapsible-section>
+                        <header class="subsection-header">
+                            <div class="subsection-actions">
+                                <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-production-records-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                            </div>
+                            <h4>生產記錄</h4>
+                        </header>
+                        <div class="subsection-body" data-edit-production-records-section>
+                            <input type="hidden" name="production_record_mode" value="preset">
+                            <div class="work-order-production-mode-tabs" role="tablist" aria-label="生產記錄模式">
+                                <button type="button" class="tab-btn active" data-action="switch-production-record-mode" data-mode="preset" aria-pressed="true">預設</button>
+                                <button type="button" class="tab-btn" data-action="switch-production-record-mode" data-mode="manual" aria-pressed="false">自行輸入</button>
+                            </div>
+
+                            <div class="work-order-production-mode-panel active" data-production-record-mode-panel="preset">
+                                <div class="work-order-production-mode-header">
+                                    <p class="text-muted small">依客戶批號的載具種類、載具數量與重量預設帶入；卡號會依總支數與載具數量自動分配。</p>
+                                    <button type="button" class="btn outline small" data-action="reset-production-records-preset">
+                                        <i class="fas fa-sync-alt"></i> 重新帶入訂單載具
+                                    </button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="data-table compact production-records-table">
+                                        <thead>
+                                            <tr>
+                                                <th>卡號</th>
+                                                <th>載具種類</th>
+                                                <th>載具重量(kg)</th>
+                                                <th>生產重量(kg)</th>
+                                                <th>日期</th>
+                                                <th>時間</th>
+                                                <th>機台編號</th>
+                                                <th>機台種類</th>
+                                                <th>登錄者</th>
+                                                <th>備註</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody data-edit-production-records-preset-rows>
+                                            <tr class="empty-row">
+                                                <td colspan="10" class="text-center">尚無預設生產記錄</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="work-order-production-mode-panel" data-production-record-mode-panel="manual">
+                                <div class="work-order-production-mode-header">
+                                    <p class="text-muted small">由現場依實際需要自行輸入載具種類與載具重量；卡號會依目前載具列數即時重算。</p>
+                                    <div class="subsection-actions">
+                                        <button type="button" class="btn outline small" data-action="add-manual-production-record">
+                                            <i class="fas fa-plus"></i> 新增載具列
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="data-table compact production-records-table">
+                                        <thead>
+                                            <tr>
+                                                <th>卡號</th>
+                                                <th>載具種類</th>
+                                                <th>載具重量(kg)</th>
+                                                <th>生產重量(kg)</th>
+                                                <th>日期</th>
+                                                <th>時間</th>
+                                                <th>機台編號</th>
+                                                <th>機台種類</th>
+                                                <th>登錄者</th>
+                                                <th>備註</th>
+                                                <th>操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody data-edit-production-records-manual-rows>
+                                            <tr class="empty-row">
+                                                <td colspan="11" class="text-center">尚無自行輸入的載具記錄</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
 
                 </div><!-- end .work-orders-modal-body -->
 
@@ -1206,6 +1041,10 @@
                                     <div class="metric">
                                         <span class="metric-label">載具總重 (kg)</span>
                                         <strong data-metric="edit-order-tool-weight">--</strong>
+                                    </div>
+                                    <div class="metric">
+                                        <span class="metric-label">載具類型統計</span>
+                                        <strong data-metric="edit-order-tool-statistics">--</strong>
                                     </div>
                                     <div class="metric">
                                         <span class="metric-label">總支數</span>
@@ -1235,16 +1074,8 @@
                                         <strong data-metric="edit-good-units" class="text-success">--</strong>
                                     </div>
                                     <div class="metric">
-                                        <span class="metric-label">不良品支數</span>
+                                        <span class="metric-label">不良品支數 (參考值)</span>
                                         <strong data-metric="edit-defect-units" class="text-danger">--</strong>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">分布合計支數</span>
-                                        <strong data-metric="edit-defect-units-distribution">--</strong>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">差異 (重量-分布)</span>
-                                        <strong data-metric="edit-defect-units-diff" class="diff-value">--</strong>
                                     </div>
                                     <div class="metric">
                                         <span class="metric-label">不良品重量 (kg)</span>
@@ -1253,29 +1084,6 @@
                                     <div class="metric">
                                         <span class="metric-label">總支數</span>
                                         <strong data-metric="edit-actual-total-units">--</strong>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">總重量 (kg)</span>
-                                        <strong data-metric="edit-actual-total-weight">--</strong>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- 差值 -->
-                            <div class="metrics-panel metrics-diff">
-                                <h5 class="metrics-subtitle">差值 (訂單 - 實際)</h5>
-                                <div class="metrics-grid">
-                                    <div class="metric">
-                                        <span class="metric-label">重量差 (kg)</span>
-                                        <strong data-metric="edit-weight-diff" class="diff-value">--</strong>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">載具數差</span>
-                                        <strong data-metric="edit-tool-diff" class="diff-value">--</strong>
-                                    </div>
-                                    <div class="metric">
-                                        <span class="metric-label">支數差</span>
-                                        <strong data-metric="edit-units-diff" class="diff-value">--</strong>
                                     </div>
                                 </div>
                             </div>

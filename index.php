@@ -374,15 +374,15 @@ $ver = $cacheVersion['version'];
                 <div class="version-details">
                     <div class="version-item">
                         <span class="version-label">版本號：</span>
-                        <span class="version-value" id="system-version">v1.0.0</span>
+                        <span class="version-value" id="system-version">v2.1.1</span>
                     </div>
                     <div class="version-item">
                         <span class="version-label">發布日期：</span>
-                        <span class="version-value" id="system-release-date">2026-02-10</span>
+                        <span class="version-value" id="system-release-date">2026-06-08</span>
                     </div>
                     <div class="version-item">
                         <span class="version-label">文件版本：</span>
-                        <span class="version-value" id="system-file-version">v1.0.0</span>
+                        <span class="version-value" id="system-file-version">20260608.1</span>
                     </div>
                 </div>
 

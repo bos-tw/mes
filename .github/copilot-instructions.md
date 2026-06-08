@@ -359,6 +359,23 @@ powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1 -DryRun
 2. 若腳本回報「未收錄 migration」，不得直接略過；需先補齊檢查規則再執行。
 3. 排查 API 500 時，先看 `C:\Apache24\logs\error.log`，再對照 migration。
 
+### Migration 排錯備忘（2026-05-31 新增，強制）
+
+1. 一鍵更新器會以 `PDO::exec()` 逐句執行 migration；條件式動態 SQL 的 no-op **禁止使用 `SELECT 1`**。
+2. 原因：`SELECT 1` 可能留下未讀取結果集，下一句 SQL 會在遠端套用時出現 `Cannot execute queries while other unbuffered queries are active`，造成「驗證通過但套用失敗」。
+3. migration no-op 必須使用不產生結果集的語句，例如 `DO 0`。
+4. 新增或調整 migration 後，必須用專案 PDO 連線重跑一次 smoke test，確認可重複執行：
+
+```powershell
+php -r "require 'api/bootstrap.php'; require 'api/system_update_common.php'; echo executeSqlMigrationFile(db(), 'migrations/YYYY_MM_DD_example.sql');"
+```
+
+5. 若一鍵更新失敗但 ZIP 驗證通過，優先檢查：
+    - `system_update_jobs` 最新任務狀態與錯誤訊息。
+    - `system_update_logs` 的 migration 執行紀錄。
+    - Apache error log 是否有 PDO/SQL 錯誤。
+    - migration 是否有已半套用後不可重複執行的語句。
+
 ### 適用範圍
 
 - 使用 `tools/build-update-package.ps1` 產生 `dist/update_*.zip` 並透過「安全設定 > 系統更新」上傳套用。
@@ -497,6 +514,19 @@ $zip = "dist/update_vX.Y.Z_YYYYMMDD_HHMMSS.zip"
 # 2) 可選：解壓後檢查 manifest.json 內容欄位
 # version_number / file_version / release_date / files_root / migrations
 ```
+
+#### 打包後內容一致性自檢（2026-05-31 新增，強制）
+
+1. 「上傳驗證通過」只代表 ZIP 格式正確，不代表一鍵套用一定成功。
+2. 打包後必須確認 ZIP 內檔案與本地工作區 hash 一致；若打包後又修改任何檔案（包含 `DEVELOPMENT_PROGRESS_SUMMARY.md`、change summary、migration），必須重新打包。
+3. 最終回報更新包前，必須確認：
+    - `manifest.json` 版本號與檔案版本符合本輪目標版本。
+    - ZIP 內 `files/` 檔案數與本輪納入清單一致。
+    - ZIP 內 migration 數量正確。
+    - 本地對 ZIP 內容比對結果為 `Mismatches=0`。
+4. `dist/*.zip` 受 `.gitignore` 忽略，通常不進 commit；但回報時必須清楚提供本地最新 `dist/update_vX.Y.Z_YYYYMMDD_HHMMSS.zip` 路徑，避免使用者誤拿舊包。
+5. 同版本若反覆打包，應以 `dist/` 最新修改時間的 ZIP 為準；文件可寫 `dist/update_vX.Y.Z_*.zip`，避免交接摘要因時間戳造成內容與包內文件互相追逐。
+6. 若 `tools/build-update-package-safe.ps1` 因 PowerShell 參數或環境問題失敗，可改用 `tools/build-update-package.ps1` 明確列出本輪檔案；但仍需完成 ZIP 內容與 hash 驗證。
 
 ### 版本更新內容顯示規範（強制）
 
