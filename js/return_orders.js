@@ -44,6 +44,18 @@
 
         let dataSyncHelper = null;
 
+        function getCurrentTabId() {
+            const tabContent = moduleRoot.closest('.tab-content[data-tab-id]');
+            return tabContent?.dataset.tabId || null;
+        }
+
+        function markCurrentTabChangesClean() {
+            const tabId = getCurrentTabId();
+            if (tabId && typeof window.markTabChangesClean === 'function') {
+                window.markTabChangesClean(tabId);
+            }
+        }
+
         // 載入篩選器選項（客戶）
         async function loadFilterOptions() {
             try {
@@ -438,6 +450,13 @@
             if (elements.modal) {
                 elements.modal.classList.add('hidden');
             }
+            if (elements.modalForm) {
+                elements.modalForm.reset();
+            }
+            state.editingId = null;
+            resetShippingItems();
+            hideAlert(true);
+            markCurrentTabChangesClean();
         }
 
         // 開啟詳情 Modal
@@ -689,6 +708,13 @@
             // 使用事件委派處理所有 data-action
             moduleRoot.addEventListener('click', handleModuleClick);
             document.addEventListener('click', handleDocumentClick);
+
+            if (elements.modalForm) {
+                elements.modalForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    saveData();
+                });
+            }
 
             // 新增按鈕（位於 moduleRoot 之外的 header）
             if (elements.createBtn) {

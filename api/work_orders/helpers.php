@@ -34,6 +34,8 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/../number_sequences/helpers.php';
+
 /**
  * Check if table has a specific column (cached per-request).
  */
@@ -1077,27 +1079,7 @@ function validateWorkOrderData(array $payload, bool $isUpdate = false): array
  */
 function generateWorkOrderNumber(PDO $pdo): string
 {
-    $date = date('Ymd');
-    $prefix = "WO-{$date}-";
-
-    $stmt = $pdo->prepare("
-        SELECT work_order_number
-        FROM work_orders
-        WHERE work_order_number LIKE :prefix
-        ORDER BY work_order_number DESC
-        LIMIT 1
-    ");
-    $stmt->execute(['prefix' => $prefix . '%']);
-    $lastNumber = $stmt->fetchColumn();
-
-    if ($lastNumber) {
-        $sequence = (int)substr($lastNumber, -4);
-        $newSequence = $sequence + 1;
-    } else {
-        $newSequence = 1;
-    }
-
-    return $prefix . str_pad((string)$newSequence, 4, '0', STR_PAD_LEFT);
+    return generateManagedDocumentNumber($pdo, 'WO');
 }
 
 /**

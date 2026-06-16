@@ -355,6 +355,7 @@ window.AppSecurityManager = (function () {
 
 document.addEventListener('DOMContentLoaded', async () => {
     const sidebarElement = document.querySelector('.sidebar');
+    ensureMachineCapabilitiesMenuItem(sidebarElement);
     const sidebarMenuLinks = document.querySelectorAll('.sidebar .menu-link');
     const sidebarSubmenuLinks = document.querySelectorAll('.sidebar .submenu a');
     const appContainer = document.querySelector('.app-container');
@@ -366,6 +367,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const moduleInitializers = {};
     const moduleContexts = new Map();
+    const unsavedChangesState = new Map();
 
     // Storage keys for persistence
     const STORAGE_KEYS = {
@@ -462,6 +464,213 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     const pendingActionNormalizationScopes = new Set();
     let isActionNormalizationScheduled = false;
+
+    function ensureMachineCapabilitiesMenuItem(sidebar) {
+        if (!(sidebar instanceof Element)) {
+            return;
+        }
+
+        if (sidebar.querySelector('[data-page="machine_capabilities"]')) {
+            return;
+        }
+
+        const equipmentMenu = sidebar.querySelector('[data-menu-id="equipment_management"]')?.closest('.menu-item');
+        const submenu = equipmentMenu ? equipmentMenu.querySelector('.submenu') : null;
+        if (!submenu) {
+            return;
+        }
+
+        const menuItem = document.createElement('li');
+        menuItem.innerHTML = '<a href="#" data-page="machine_capabilities" data-title="機台能力管理"><i class="fas fa-layer-group"></i> 機台能力管理</a>';
+
+        const machinesItem = submenu.querySelector('[data-page="machines"]')?.closest('li');
+        if (machinesItem && machinesItem.nextSibling) {
+            submenu.insertBefore(menuItem, machinesItem.nextSibling);
+        } else if (machinesItem) {
+            submenu.appendChild(menuItem);
+        } else {
+            submenu.prepend(menuItem);
+        }
+    }
+
+    function getTabContentElementById(tabId) {
+        return document.querySelector(`.tab-content[data-tab-id="${tabId}"]`);
+    }
+
+    function stableSerialize(value) {
+        if (Array.isArray(value)) {
+            return `[${value.map((item) => stableSerialize(item)).join(',')}]`;
+        }
+
+        if (value && typeof value === 'object') {
+            const keys = Object.keys(value).sort();
+            return `{${keys.map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(',')}}`;
+        }
+
+        return JSON.stringify(value);
+    }
+
+    function collectFormSnapshot(root) {
+        if (!(root instanceof Element)) {
+            return '[]';
+        }
+
+        const fields = Array.from(root.querySelectorAll('input, select, textarea')).filter((field) => {
+            return shouldTrackUnsavedField(field);
+        }).map((field) => {
+            const tagName = field.tagName.toLowerCase();
+            const type = field.type || '';
+            const key = field.name || field.id || field.dataset.field || '';
+            let value = '';
+
+            if (type === 'checkbox' || type === 'radio') {
+                value = field.checked ? '1' : '0';
+            } else if (type === 'file') {
+                value = Array.from(field.files || []).map((file) => ({
+                    name: file.name,
+                    size: file.size,
+                    type: file.type
+                }));
+            } else {
+                value = field.value ?? '';
+            }
+
+            return {
+                tagName,
+                type,
+                key,
+                value
+            };
+        });
+
+        return stableSerialize(fields);
+    }
+
+    function shouldTrackUnsavedField(field) {
+        if (!(field instanceof Element)) {
+            return false;
+        }
+
+        if (field.disabled || field.readOnly) {
+            return false;
+        }
+
+        if (field.matches('[data-ignore-unsaved], [data-action="select-row"], [data-action="select-all"], [data-column]')) {
+            return false;
+        }
+
+        if (field.closest('.filter-form, .filter-drawer, .column-selector, .column-selector-panel, .pagination, .table-pagination, .module-toolbar')) {
+            return false;
+        }
+
+        if (field.closest('table') && (field.matches('input[type="checkbox"], input[type="radio"]') || field.closest('thead'))) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function shouldHandleUnsavedInputEvent(event) {
+        if (!event.isTrusted) {
+            return false;
+        }
+
+        return shouldTrackUnsavedField(event.target);
+    }
+
+    function ensureUnsavedChangesEntry(tabId) {
+        if (!unsavedChangesState.has(tabId)) {
+            unsavedChangesState.set(tabId, {
+                baseline: '[]',
+                dirty: false,
+                tracking: false,
+                userInteracted: false
+            });
+        }
+
+        return unsavedChangesState.get(tabId);
+    }
+
+    function updateTabDirtyIndicator(tabId, dirty) {
+        const tabHeader = document.querySelector(`.tab-header[data-tab-id="${tabId}"]`);
+        if (!tabHeader) {
+            return;
+        }
+
+        tabHeader.classList.toggle('has-unsaved-changes', Boolean(dirty));
+        tabHeader.dataset.unsavedChanges = dirty ? 'true' : 'false';
+    }
+
+    function evaluateTabUnsavedChanges(tabId) {
+        const tabContent = getTabContentElementById(tabId);
+        const state = ensureUnsavedChangesEntry(tabId);
+
+        if (!tabContent || !state.tracking || !state.userInteracted) {
+            state.dirty = false;
+            updateTabDirtyIndicator(tabId, false);
+            return false;
+        }
+
+        const currentSnapshot = collectFormSnapshot(tabContent);
+        state.dirty = currentSnapshot !== state.baseline;
+        updateTabDirtyIndicator(tabId, state.dirty);
+        return state.dirty;
+    }
+
+    function markTabChangesClean(tabId) {
+        const tabContent = getTabContentElementById(tabId);
+        const state = ensureUnsavedChangesEntry(tabId);
+        state.baseline = collectFormSnapshot(tabContent);
+        state.dirty = false;
+        state.tracking = true;
+        state.userInteracted = false;
+        updateTabDirtyIndicator(tabId, false);
+    }
+
+    function initTabUnsavedChangesTracking(tabId, tabContentElement) {
+        const state = ensureUnsavedChangesEntry(tabId);
+        state.tracking = true;
+        state.baseline = collectFormSnapshot(tabContentElement);
+        state.dirty = false;
+        state.userInteracted = false;
+        updateTabDirtyIndicator(tabId, false);
+    }
+
+    function scheduleCleanBaselineRefresh(tabId, delay = 0) {
+        window.setTimeout(() => {
+            const tabContent = getTabContentElementById(tabId);
+            const state = ensureUnsavedChangesEntry(tabId);
+            if (!tabContent || state.userInteracted) {
+                return;
+            }
+
+            state.baseline = collectFormSnapshot(tabContent);
+            state.dirty = false;
+            state.tracking = true;
+            updateTabDirtyIndicator(tabId, false);
+        }, delay);
+    }
+
+    function markTabUserInteracted(tabId) {
+        if (!tabId) {
+            return;
+        }
+
+        const state = ensureUnsavedChangesEntry(tabId);
+        if (!state.tracking) {
+            state.baseline = collectFormSnapshot(getTabContentElementById(tabId));
+            state.tracking = true;
+        }
+        state.userInteracted = true;
+    }
+
+    function hasTrackedUnsavedChanges(tabId) {
+        return evaluateTabUnsavedChanges(tabId);
+    }
+
+    function confirmDiscardUnsavedTabChanges() {
+        return window.confirm('此分頁有尚未儲存的資料，若直接關閉將會遺失。確定要繼續關閉嗎？');
+    }
 
     function normalizeOperationActionElement(actionElement) {
         if (!(actionElement instanceof Element)) {
@@ -963,6 +1172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         work_order_first_piece_dimensions: 'manage_work_orders',
         work_order_images: 'manage_work_orders',
         machines: 'manage_machines',
+        machine_capabilities: 'manage_machines',
         machine_maintenance_tasks: 'manage_maintenance_tasks',
         daily_machine_inspections: 'manage_daily_inspections',
         daily_machine_inspection_items: 'manage_daily_inspections',
@@ -1003,6 +1213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         manage_departments: '部門基本資料',
         manage_employees: '員工基本資料',
         manage_machines: '機台設備管理',
+        'machine_capabilities.read': '機台能力管理',
         manage_tools: '載具管理',
         manage_screening_items: '受篩產品',
         manage_screening_services: '篩分服務項目',
@@ -1764,9 +1975,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         const tabHeaderToRemove = document.querySelector(`.tab-header[data-tab-id="${tabId}"]`);
         const tabContentToRemove = document.querySelector(`.tab-content[data-tab-id="${tabId}"]`);
 
+        if (tabContentToRemove) {
+            const beforeCloseEvent = new CustomEvent('module:before-close', {
+                bubbles: true,
+                cancelable: true,
+                detail: {
+                    tabId,
+                }
+            });
+
+            const canClose = tabContentToRemove.dispatchEvent(beforeCloseEvent);
+            if (!canClose) {
+                return false;
+            }
+        }
+
+        if (hasTrackedUnsavedChanges(tabId) && !confirmDiscardUnsavedTabChanges()) {
+            return false;
+        }
+
     if (tabHeaderToRemove) tabHeadersContainer.removeChild(tabHeaderToRemove);
     if (tabContentToRemove) tabContentArea.removeChild(tabContentToRemove);
     moduleContexts.delete(tabId);
+    unsavedChangesState.delete(tabId);
 
         // Remove from openTabs array
         openTabs = openTabs.filter(tab => tab.id !== tabId);
@@ -1792,6 +2023,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Update close all button state
         updateCloseAllButtonState();
+        return true;
     }
 
     // Function to close all tabs
@@ -1800,7 +2032,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Close all tabs
         while (openTabs.length > 0) {
-            closeTab(openTabs[0].id);
+            const closed = closeTab(openTabs[0].id);
+            if (closed === false) {
+                break;
+            }
         }
     }
 
@@ -1882,6 +2117,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     }));
                 }
+            }
+            if (moduleId) {
+                initTabUnsavedChangesTracking(moduleId, tabContentElement);
+                scheduleCleanBaselineRefresh(moduleId, 100);
+                scheduleCleanBaselineRefresh(moduleId, 800);
             }
             scheduleOperationActionButtonNormalization(tabContentElement);
         } catch (error) {
@@ -1967,6 +2207,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     registerModuleInitializer('order_items', window.initializeOrderItemsModule);
     registerModuleInitializer('screening_items', window.initializeScreeningItemsModule);
     registerModuleInitializer('machines', window.initializeMachinesModule);
+    registerModuleInitializer('machine_capabilities', window.initializeMachineCapabilitiesModule);
     registerModuleInitializer('tools', window.initializeToolsModule);
     registerModuleInitializer('screening_services', window.initializeScreeningServicesModule);
     registerModuleInitializer('audit_logs', window.initializeAuditLogsModule);
@@ -2035,8 +2276,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     observeOperationActionButtons();
     scheduleOperationActionButtonNormalization(tabContentArea || document);
 
+    document.addEventListener('input', (event) => {
+        const tabContent = event.target instanceof Element ? event.target.closest('.tab-content[data-tab-id]') : null;
+        if (!tabContent) {
+            return;
+        }
+
+        if (!shouldHandleUnsavedInputEvent(event)) {
+            return;
+        }
+
+        const tabId = tabContent.dataset.tabId || '';
+        markTabUserInteracted(tabId);
+        evaluateTabUnsavedChanges(tabId);
+    });
+
+    document.addEventListener('change', (event) => {
+        const tabContent = event.target instanceof Element ? event.target.closest('.tab-content[data-tab-id]') : null;
+        if (!tabContent) {
+            return;
+        }
+
+        if (!shouldHandleUnsavedInputEvent(event)) {
+            return;
+        }
+
+        const tabId = tabContent.dataset.tabId || '';
+        markTabUserInteracted(tabId);
+        evaluateTabUnsavedChanges(tabId);
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+        const hasUnsavedTabs = openTabs.some((tab) => hasTrackedUnsavedChanges(tab.id));
+        if (!hasUnsavedTabs) {
+            return;
+        }
+
+        event.preventDefault();
+        event.returnValue = '';
+    });
+
     // 暴露 openTab 函數到全域,供其他模組使用
     window.openTab = openTab;
+    window.markTabChangesClean = markTabChangesClean;
 
     /**
      * 開啟指定分頁並傳遞參數（跨模組導航用）

@@ -112,6 +112,7 @@ $ver = $cacheVersion['version'];
                             </a>
                             <ul class="submenu">
                                 <li><a href="#" data-page="machines" data-title="機台設備管理"><i class="fas fa-cog"></i> 機台設備管理</a></li>
+                                <li><a href="#" data-page="machine_capabilities" data-title="機台能力管理"><i class="fas fa-layer-group"></i> 機台能力管理</a></li>
                                 <li><a href="#" data-page="machine_maintenance_tasks" data-title="機台維修任務"><i class="fas fa-wrench"></i> 機台維修任務</a></li>
                                 <li><a href="#" data-page="daily_machine_inspections" data-title="每日機台檢驗"><i class="fas fa-clipboard-check"></i> 每日機台檢驗</a></li>
                                 <li><a href="#" data-page="daily_machine_inspection_items" data-title="機台檢驗項目明細設定"><i class="fas fa-tasks"></i> 機台檢驗項目明細設定</a></li>
@@ -374,15 +375,15 @@ $ver = $cacheVersion['version'];
                 <div class="version-details">
                     <div class="version-item">
                         <span class="version-label">版本號：</span>
-                        <span class="version-value" id="system-version">v2.1.1</span>
+                        <span class="version-value" id="system-version">v2.1.2</span>
                     </div>
                     <div class="version-item">
                         <span class="version-label">發布日期：</span>
-                        <span class="version-value" id="system-release-date">2026-06-08</span>
+                        <span class="version-value" id="system-release-date">2026-06-16</span>
                     </div>
                     <div class="version-item">
                         <span class="version-label">文件版本：</span>
-                        <span class="version-value" id="system-file-version">20260608.1</span>
+                        <span class="version-value" id="system-file-version">20260616.1</span>
                     </div>
                 </div>
 
@@ -422,6 +423,7 @@ $ver = $cacheVersion['version'];
     <script defer src="core/configs/employees.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/tools.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/machines.config.js?v=<?= $ver ?>"></script>
+    <script defer src="core/configs/machine_capabilities.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/suppliers.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/screening_services.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/screening_items.config.js?v=<?= $ver ?>"></script>
@@ -479,6 +481,7 @@ $ver = $cacheVersion['version'];
     <script defer src="js/screening_items.js?v=<?= $ver ?>"></script>
     <script defer src="js/screening_services.js?v=<?= $ver ?>"></script>
     <script defer src="js/machines.js?v=<?= $ver ?>"></script>
+    <script defer src="js/machine_capabilities.js?v=<?= $ver ?>"></script>
     <script defer src="js/tools.js?v=<?= $ver ?>"></script>
     <script defer src="js/audit_logs.js?v=<?= $ver ?>"></script>
     <script defer src="js/lookup_values.js?v=<?= $ver ?>"></script>

@@ -229,6 +229,18 @@ $migrationChecks = [ordered]@{
         CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'production_records' AND column_name = 'production_source_mode') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'production_records' AND column_name = 'tool_name') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'production_records' AND column_name = 'tool_weight_kg'), 1, 0);"
         Description = 'production_records source mode and tool fields'
     }
+    '2026_06_16_rebuild_number_sequences_management.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'number_sequences' AND column_name = 'seq_prefix') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'number_sequences' AND column_name = 'active_from') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'number_sequences' AND column_name = 'active_until') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'number_sequences' AND column_name = 'last_generated_on') AND NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'number_sequences' AND column_name = 'date_scope') AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'number_sequences' AND index_name = 'uk_number_sequences_seq_key_active_from') AND EXISTS(SELECT 1 FROM number_sequences WHERE seq_key IN ('ORDER','WO','INV','SO','RO','WOPR')), 1, 0);"
+        Description = 'number_sequences prefix and active-time management rebuild'
+    }
+    '2026_06_16_add_machine_capabilities_management.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'machine_capabilities') AND EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'machine_capability_assignments') AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'machine_capability_assignments' AND index_name = 'PRIMARY'), 1, 0);"
+        Description = 'machine capability master and assignment tables'
+    }
+    '2026_06_16_add_machine_capability_to_machines.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'machines' AND column_name = 'machine_capability_id') AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'machines' AND index_name = 'idx_machines_machine_capability_id') AND EXISTS(SELECT 1 FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'machines' AND constraint_name = 'fk_machines_machine_capability'), 1, 0);"
+        Description = 'machines.machine_capability_id one-to-many relation and GENERAL seed'
+    }
 }
 
 $migrationFiles = Get-ChildItem -LiteralPath $migrationsDir -File | Sort-Object Name

@@ -9,6 +9,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/../inventory_items/helpers.php';
+require_once __DIR__ . '/../number_sequences/helpers.php';
 
 requireAuth();
 requireMethod(['POST']);
@@ -31,21 +32,7 @@ if ($workOrderId === false) {
 
 function generatePartialReceiptNumber(PDO $pdo): string
 {
-    $today = date('Ymd');
-    $prefix = "WOPR-{$today}-";
-
-    $stmt = $pdo->prepare("
-        SELECT receipt_number
-        FROM work_order_partial_receipts
-        WHERE receipt_number LIKE :prefix
-        ORDER BY receipt_number DESC
-        LIMIT 1
-    ");
-    $stmt->execute(['prefix' => $prefix . '%']);
-    $lastNumber = $stmt->fetchColumn();
-    $sequence = $lastNumber ? ((int)substr((string)$lastNumber, -4) + 1) : 1;
-
-    return $prefix . str_pad((string)$sequence, 4, '0', STR_PAD_LEFT);
+    return generateManagedDocumentNumber($pdo, 'WOPR');
 }
 
 $pdo = db();

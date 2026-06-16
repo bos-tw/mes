@@ -455,7 +455,7 @@ ${fieldsHtml}
                         TEMPLATES.formSection(section, kebabId)
                     ).join('\n');
                     // 根據 sections 數量自動加上欄數 class
-                    const columnClass = row.sections.length >= 3 ? ' three-columns' : '';
+                    const columnClass = row.sections.length === 1 ? ' single-column' : (row.sections.length >= 3 ? ' three-columns' : '');
                     return `            <div class="form-row${columnClass}">
 ${sectionsHtml}
             </div>`;

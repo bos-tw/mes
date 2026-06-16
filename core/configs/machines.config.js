@@ -36,6 +36,13 @@ ModuleConfig.register('machines', {
             options: []
         },
         {
+            name: 'machine_capability_id',
+            label: '機台能力',
+            type: 'select',
+            placeholder: '全部能力',
+            options: []
+        },
+        {
             name: 'perPage',
             label: '每頁筆數',
             type: 'select',
@@ -57,6 +64,7 @@ ModuleConfig.register('machines', {
         { key: 'name', label: '名稱', sortable: false, selectable: true },
         { key: 'model', label: '型號', sortable: false, selectable: true },
         { key: 'department', label: '責任部門', sortable: false, selectable: true },
+        { key: 'capability_names', label: '機台能力', sortable: false, selectable: true },
         { key: 'lens_count', label: '鏡頭數', sortable: false, selectable: true },
         { key: 'length_mm', label: '長度 (mm)', sortable: false, selectable: true },
         { key: 'thread_outer_diameter_mm', label: '牙外徑 (mm)', sortable: false, selectable: true },
@@ -68,6 +76,7 @@ ModuleConfig.register('machines', {
     // Modal 表單 - 使用 formRows 模式（並排 section）
     modal: {
         title: '新增機台',
+        size: 'large',
         hiddenFields: ['id'],
         formRows: [
             {
@@ -79,7 +88,8 @@ ModuleConfig.register('machines', {
                             { name: 'name', label: '機台名稱', type: 'text', required: true, maxlength: 100, placeholder: '請輸入機台名稱' },
                             { name: 'model', label: '型號', type: 'text', maxlength: 100, placeholder: '請輸入機台型號' },
                             { name: 'department_id', label: '責任部門', type: 'select', placeholder: '請選擇部門', options: [] },
-                            { name: 'status_lookup_id', label: '機台狀態', type: 'select', dataAttr: 'data-lookup-domain="MACHINE_STATUS"', placeholder: '請選擇狀態', options: [] }
+                            { name: 'status_lookup_id', label: '機台狀態', type: 'select', dataAttr: 'data-lookup-domain="MACHINE_STATUS"', placeholder: '請選擇狀態', options: [] },
+                            { name: 'machine_capability_id', label: '機台能力', type: 'select', placeholder: '請選擇機台能力', options: [], helpText: '每台機台對應一種篩分能力類型。' }
                         ]
                     },
                     {

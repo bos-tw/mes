@@ -31,6 +31,7 @@
 
         const filterStatusSelect = filterForm ? filterForm.querySelector('select[name="status_lookup_id"]') : null;
         const filterDepartmentSelect = filterForm ? filterForm.querySelector('select[name="department_id"]') : null;
+        const filterCapabilitySelect = filterForm ? filterForm.querySelector('select[name="machine_capability_id"]') : null;
 
         const machineNumberInput = modalForm ? modalForm.querySelector('input[name="machine_number"]') : null;
         const nameInput = modalForm ? modalForm.querySelector('input[name="name"]') : null;
@@ -42,6 +43,7 @@
         const lengthInput = modalForm ? modalForm.querySelector('input[name="length_mm"]') : null;
         const threadDiameterInput = modalForm ? modalForm.querySelector('input[name="thread_outer_diameter_mm"]') : null;
         const notesTextarea = modalForm ? modalForm.querySelector('textarea[name="notes"]') : null;
+        const capabilitySelect = modalForm ? modalForm.querySelector('select[name="machine_capability_id"]') : null;
 
         const machinesCache = new Map();
         const state = {
@@ -55,6 +57,7 @@
 
         let isFormDirty = false;
         let cachedDepartments = null;
+        let cachedCapabilities = null;
 
         function showAlert(type, message) {
             if (!alertBox) {
@@ -220,6 +223,7 @@ function formatDecimal(value) {
                         <td>${escapeHtml(machine.name || '-')}</td>
                         <td>${escapeHtml(machine.model || '-')}</td>
                         <td>${escapeHtml(machine.department_name || '-')}</td>
+                        <td>${escapeHtml(machine.capability_names || '-')}</td>
                         <td>${formatInteger(machine.lens_count)}</td>
                         <td>${formatDecimal(machine.length_mm)}</td>
                         <td>${formatDecimal(machine.thread_outer_diameter_mm)}</td>
@@ -278,6 +282,34 @@ function formatDecimal(value) {
             return cachedDepartments;
         }
 
+        async function fetchCapabilities() {
+            if (cachedCapabilities !== null) {
+                return cachedCapabilities;
+            }
+
+            try {
+                const response = await fetch('api/machine_capabilities/index.php?perPage=1000&active_only=1', {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const result = await readJsonResponse(response, '載入機台能力失敗');
+                cachedCapabilities = Array.isArray(result.data) ? result.data : [];
+            } catch (error) {
+                console.error('載入機台能力時發生錯誤：', error);
+                cachedCapabilities = [];
+            }
+
+            return cachedCapabilities;
+        }
+
         async function populateDepartmentSelect(selectElement, placeholderText) {
             if (!selectElement) {
                 return;
@@ -296,6 +328,32 @@ function formatDecimal(value) {
                 const option = document.createElement('option');
                 option.value = String(department.id);
                 option.textContent = department.name;
+                selectElement.appendChild(option);
+            });
+
+            if (currentValue && selectElement.querySelector(`option[value="${currentValue}"]`)) {
+                selectElement.value = currentValue;
+            }
+        }
+
+        async function populateCapabilitySelect(selectElement, placeholderText) {
+            if (!selectElement) {
+                return;
+            }
+
+            const capabilities = await fetchCapabilities();
+            const currentValue = selectElement.value;
+
+            selectElement.innerHTML = '';
+            const placeholderOption = document.createElement('option');
+            placeholderOption.value = '';
+            placeholderOption.textContent = placeholderText;
+            selectElement.appendChild(placeholderOption);
+
+            capabilities.forEach((capability) => {
+                const option = document.createElement('option');
+                option.value = String(capability.id);
+                option.textContent = `${capability.capability_name} (${capability.capability_code})`;
                 selectElement.appendChild(option);
             });
 
@@ -367,8 +425,14 @@ function formatDecimal(value) {
             await populateDepartmentSelect(departmentSelect, '請選擇部門');
         }
 
+        async function initializeCapabilitySelects() {
+            await populateCapabilitySelect(filterCapabilitySelect, '全部能力');
+            await populateCapabilitySelect(capabilitySelect, '請選擇能力');
+        }
+
         const lookupInitPromise = initializeLookupSelects();
         const departmentInitPromise = initializeDepartmentSelects();
+        const capabilityInitPromise = initializeCapabilitySelects();
 
         function collectFilterValues() {
             if (!filterForm) {
@@ -376,6 +440,7 @@ function formatDecimal(value) {
                     keyword: '',
                     status_lookup_id: '',
                     department_id: '',
+                    machine_capability_id: '',
                     perPage: state.perPage,
                 };
             }
@@ -387,6 +452,7 @@ function formatDecimal(value) {
                 keyword: (formData.get('keyword') || '').toString().trim(),
                 status_lookup_id: (formData.get('status_lookup_id') || '').toString(),
                 department_id: (formData.get('department_id') || '').toString(),
+                machine_capability_id: (formData.get('machine_capability_id') || '').toString(),
                 perPage: Number.isFinite(perPageValue) && perPageValue > 0 ? perPageValue : 10,
             };
         }
@@ -414,6 +480,10 @@ function formatDecimal(value) {
 
             if (filters.department_id !== '') {
                 params.set('department_id', filters.department_id);
+            }
+
+            if (filters.machine_capability_id !== '') {
+                params.set('machine_capability_id', filters.machine_capability_id);
             }
 
             try {
@@ -477,6 +547,7 @@ function formatDecimal(value) {
                 length_mm: lengthInput ? lengthInput.value.trim() : '',
                 thread_outer_diameter_mm: threadDiameterInput ? threadDiameterInput.value.trim() : '',
                 notes: notesTextarea ? notesTextarea.value.trim() : '',
+                machine_capability_id: capabilitySelect ? capabilitySelect.value : '',
             };
         }
 
@@ -503,7 +574,7 @@ function formatDecimal(value) {
                 return;
             }
 
-            await Promise.all([lookupInitPromise, departmentInitPromise]);
+            await Promise.all([lookupInitPromise, departmentInitPromise, capabilityInitPromise]);
 
             modalForm.reset();
             state.currentEditingId = null;
@@ -527,11 +598,13 @@ function formatDecimal(value) {
                 if (lengthInput) lengthInput.value = machine.length_mm != null ? String(machine.length_mm) : '';
                 if (threadDiameterInput) threadDiameterInput.value = machine.thread_outer_diameter_mm != null ? String(machine.thread_outer_diameter_mm) : '';
                 if (notesTextarea) notesTextarea.value = machine.notes || '';
+                if (capabilitySelect) capabilitySelect.value = machine.machine_capability_id ? String(machine.machine_capability_id) : '';
             } else {
                 if (statusSelect) {
                     const operationalOption = statusSelect.querySelector('option[data-value-key="operational"]');
                     statusSelect.value = operationalOption ? operationalOption.value : '';
                 }
+                if (capabilitySelect) capabilitySelect.value = '';
             }
 
             modalOverlay.classList.remove('hidden');
@@ -709,6 +782,7 @@ function formatDecimal(value) {
                     length_mm: lengthInput ? lengthInput.value.trim() : '',
                     thread_outer_diameter_mm: threadDiameterInput ? threadDiameterInput.value.trim() : '',
                     notes: notesTextarea ? notesTextarea.value.trim() : '',
+                    machine_capability_id: capabilitySelect ? capabilitySelect.value : '',
                 };
 
                 hideAlert();
@@ -813,6 +887,13 @@ function formatDecimal(value) {
         if (typeof DataSync !== 'undefined') {
             DataSync.createModuleHelper('machines', {
                 onRefresh: () => loadMachines(state.page),
+                onDependencyUpdate: (sourceModule) => {
+                    if (sourceModule === 'machine_capabilities') {
+                        cachedCapabilities = null;
+                        initializeCapabilitySelects();
+                    }
+                    loadMachines(state.page);
+                },
                 debounceMs: 300
             });
         }

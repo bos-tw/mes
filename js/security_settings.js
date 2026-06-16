@@ -48,6 +48,13 @@
             if (alertBox) { alertBox.classList.add('hidden'); }
         }
 
+        function markCurrentTabChangesClean() {
+            const tabId = moduleRoot.closest('.tab-content[data-tab-id]')?.dataset.tabId || '';
+            if (tabId && typeof window.markTabChangesClean === 'function') {
+                window.markTabChangesClean(tabId);
+            }
+        }
+
         function setElementText(el, value) {
             if (!el) {
                 return;
@@ -614,6 +621,7 @@
 
                 // 套用 toggle 狀態（必須在填值之後）
                 initToggles();
+                markCurrentTabChangesClean();
 
             } catch (err) {
                 showAlert('載入安全設定失敗：' + err.message);
@@ -652,6 +660,7 @@
                 }
 
                 showAlert('安全設定已儲存。', false);
+                markCurrentTabChangesClean();
 
                 // 通知 script.js 的安全管理器重新讀取設定
                 if (typeof window.AppSecurityManager !== 'undefined') {

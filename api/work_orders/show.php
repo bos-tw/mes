@@ -111,53 +111,21 @@ try {
         jsonResponse(['success' => false, 'message' => '找不到該工單。'], 404);
     }
 
-    // Get tool statistics (載具類型統計) - 如果工單已有資料則使用,否則從 OrderItemTools 計算
-    if (empty($workOrder['tool_statistics'])) {
-        $toolsStmt = $pdo->prepare("
-            SELECT
-                t.name AS tool_name,
-                oit.quantity,
-                oit.total_weight
-            FROM order_item_tools oit
-            JOIN tools t ON oit.tool_id = t.id
-            WHERE oit.order_item_id = :order_item_id
-            ORDER BY t.name
-        ");
-        $toolsStmt->execute(['order_item_id' => $workOrder['order_item_id']]);
-        $tools = $toolsStmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $toolStatistics = [];
-        $totalToolWeight = 0.0;
-        foreach ($tools as $tool) {
-            $quantity = (int)$tool['quantity'];
-            $toolStatistics[] = $tool['tool_name'] . ' ' . $quantity . '個';
-            $totalToolWeight += (float)$tool['total_weight'];
-        }
-        $workOrder['tool_statistics'] = implode('、', $toolStatistics);
-        $workOrder['total_tool_weight'] = round($totalToolWeight, 2);
+    // 載具相關資訊一律以目前客戶批號設定即時計算，避免工單建立後調整載具造成欄位不一致
+    $orderItemMetrics = fetchOrderItemDetailsForWorkOrder($pdo, (int)$workOrder['order_item_id']);
+    if ($orderItemMetrics) {
+        $workOrder['tool_statistics'] = $orderItemMetrics['tool_statistics'] ?? '';
+        $workOrder['total_tool_weight'] = round((float)($orderItemMetrics['total_tool_weight'] ?? 0), 2);
+        $workOrder['tool_quantity'] = (int)($orderItemMetrics['tool_quantity'] ?? 0);
+        $workOrder['tool_details'] = $orderItemMetrics['tool_details'] ?? [];
+        $workOrder['drawings'] = $orderItemMetrics['drawings'] ?? fetchWorkOrderDrawings($pdo, (int)$workOrder['order_item_id']);
     } else {
-        // 如果 tool_statistics 已存在,仍需計算 total_tool_weight
-        $toolWeightStmt = $pdo->prepare("
-            SELECT SUM(oit.total_weight) AS total_weight
-            FROM order_item_tools oit
-            WHERE oit.order_item_id = :order_item_id
-        ");
-        $toolWeightStmt->execute(['order_item_id' => $workOrder['order_item_id']]);
-        $toolWeightData = $toolWeightStmt->fetch(PDO::FETCH_ASSOC);
-        $workOrder['total_tool_weight'] = round((float)($toolWeightData['total_weight'] ?? 0), 2);
+        $workOrder['tool_statistics'] = '';
+        $workOrder['total_tool_weight'] = 0.0;
+        $workOrder['tool_quantity'] = 0;
+        $workOrder['tool_details'] = [];
+        $workOrder['drawings'] = fetchWorkOrderDrawings($pdo, (int)$workOrder['order_item_id']);
     }
-
-    // Get tool quantity (載具總數量 = SUM(quantity)，而非種類數)
-    $toolsCountStmt = $pdo->prepare("
-        SELECT COALESCE(SUM(quantity), 0) AS tool_quantity
-        FROM order_item_tools
-        WHERE order_item_id = :order_item_id
-    ");
-    $toolsCountStmt->execute(['order_item_id' => $workOrder['order_item_id']]);
-    $toolData = $toolsCountStmt->fetch(PDO::FETCH_ASSOC);
-    $workOrder['tool_quantity'] = (int)($toolData['tool_quantity'] ?? 0);
-    $workOrder['tool_details'] = fetchWorkOrderToolDetails($pdo, (int)$workOrder['order_item_id']);
-    $workOrder['drawings'] = fetchWorkOrderDrawings($pdo, (int)$workOrder['order_item_id']);
 
     // 即時計算 total_units，確保使用最新的 weight_per_unit_g 和 tool_weight
     $totalWeight = isset($workOrder['total_weight_kg']) ? (float)$workOrder['total_weight_kg'] : 0.0;

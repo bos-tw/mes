@@ -20,32 +20,15 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/../number_sequences/helpers.php';
+
 /**
  * 產生退貨單號
  * Format: RO-YYYYMMDD-XXXX
  */
 function generateReturnOrderNumber(PDO $pdo): string
 {
-    $today = date('Ymd');
-    $prefix = "RO-{$today}-";
-
-    $stmt = $pdo->prepare("
-        SELECT return_order_number
-        FROM return_orders
-        WHERE return_order_number LIKE :prefix
-        ORDER BY return_order_number DESC
-        LIMIT 1
-    ");
-    $stmt->execute(['prefix' => $prefix . '%']);
-    $lastNumber = $stmt->fetchColumn();
-
-    if ($lastNumber) {
-        $sequence = (int)substr($lastNumber, -4) + 1;
-    } else {
-        $sequence = 1;
-    }
-
-    return $prefix . str_pad((string)$sequence, 4, '0', STR_PAD_LEFT);
+    return generateManagedDocumentNumber($pdo, 'RO');
 }
 
 /**

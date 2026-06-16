@@ -20,6 +20,8 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/../number_sequences/helpers.php';
+
 /**
  * 讀取訂單請求資料
  *
@@ -417,48 +419,7 @@ function transformOrder(array $row): array
  */
 function generateOrderNumber(PDO $pdo, ?string $date = null): string
 {
-    if ($date === null) {
-        $date = date('Y-m-d');
-    }
-
-    $dateFormatted = date('Ymd', strtotime($date));
-
-    // 使用基於資料庫查詢的方法來生成序號
-    try {
-        // 查詢當天已存在的最大訂單號碼
-        $stmt = $pdo->prepare(
-            'SELECT order_number FROM orders
-             WHERE order_number LIKE :pattern
-             AND deleted_at IS NULL
-             ORDER BY order_number DESC
-             LIMIT 1'
-        );
-        $pattern = 'ORDER-' . $dateFormatted . '-%';
-        $stmt->execute(['pattern' => $pattern]);
-
-        $lastOrderNumber = $stmt->fetchColumn();
-
-        if ($lastOrderNumber === false) {
-            // 當天沒有訂單，從0001開始
-            $nextSequence = 1;
-        } else {
-            // 從最後一個訂單號碼中提取序號
-            $parts = explode('-', $lastOrderNumber);
-            if (count($parts) === 3 && is_numeric($parts[2])) {
-                $lastSequence = (int)$parts[2];
-                $nextSequence = $lastSequence + 1;
-            } else {
-                // 格式異常，從0001開始
-                $nextSequence = 1;
-            }
-        }
-
-        // 格式: ORDER-YYYYMMDD-NNNN
-        return sprintf('ORDER-%s-%04d', $dateFormatted, $nextSequence);
-
-    } catch (Exception $e) {
-        throw new RuntimeException('訂單號碼生成失敗: ' . $e->getMessage());
-    }
+    return generateManagedDocumentNumber($pdo, 'ORDER', $date);
 }
 
 /**

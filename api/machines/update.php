@@ -79,18 +79,7 @@ switch ($method) {
 function handleShowMachine(int $id): void
 {
     $pdo = db();
-
-    $sql = 'SELECT m.id, m.machine_number, m.name, m.model, m.purchase_date, m.department_id, m.lens_count, m.length_mm, m.thread_outer_diameter_mm, m.notes, '
-        . 'm.status_lookup_id, m.created_at, m.updated_at, d.name AS department_name, lv.value_label AS status_label, lv.value_key AS status_key '
-        . 'FROM machines m '
-        . 'LEFT JOIN departments d ON d.id = m.department_id '
-        . 'LEFT JOIN lookup_values lv ON lv.id = m.status_lookup_id '
-    . 'WHERE m.id = ? LIMIT 1';
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$id]);
-
-    $machine = $stmt->fetch();
+    $machine = findMachine($pdo, $id);
     if (!$machine) {
         jsonResponse([
             'success' => false,
@@ -151,7 +140,7 @@ function handleUpdateMachine(int $id): void
             $setParts[] = $column . ' = ?';
             if ($value === null) {
                 $params[] = null;
-            } elseif (in_array($column, ['department_id', 'status_lookup_id', 'lens_count'], true)) {
+            } elseif (in_array($column, ['department_id', 'status_lookup_id', 'lens_count', 'machine_capability_id'], true)) {
                 $params[] = (int)$value;
             } else {
                 $params[] = $value;
@@ -159,11 +148,11 @@ function handleUpdateMachine(int $id): void
         }
         $params[] = $id;
 
-    $sql = 'UPDATE machines SET ' . implode(', ', $setParts) . ', updated_at = NOW() WHERE id = ?';
+        $sql = 'UPDATE machines SET ' . implode(', ', $setParts) . ', updated_at = NOW() WHERE id = ?';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
 
-        if ($stmt->rowCount() === 0) {
+        if ($stmt->rowCount() === 0 && !machineExists($pdo, $id)) {
             $pdo->rollBack();
             jsonResponse([
                 'success' => false,
@@ -173,7 +162,9 @@ function handleUpdateMachine(int $id): void
 
         $pdo->commit();
 
-        logAuditAction('Updated machine data', 'machines', $id, $data);
+        logAuditAction('Updated machine data', 'machines', $id, [
+            'machine' => $data,
+        ]);
 
         jsonResponse([
             'success' => true,

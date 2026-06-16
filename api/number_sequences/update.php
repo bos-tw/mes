@@ -64,13 +64,36 @@ if (empty($data)) {
 // 檢查是否重複（排除自己）
 $pdo = db();
 $checkSeqKey = $data['seq_key'] ?? $existing['seq_key'];
-$checkDateScope = $data['date_scope'] ?? $existing['date_scope'];
-$checkStmt = $pdo->prepare('SELECT id FROM number_sequences WHERE seq_key = :seq_key AND date_scope = :date_scope AND id != :id');
-$checkStmt->execute(['seq_key' => $checkSeqKey, 'date_scope' => $checkDateScope, 'id' => $id]);
+$checkActiveFrom = $data['active_from'] ?? $existing['active_from'];
+$checkStmt = $pdo->prepare('SELECT id FROM number_sequences WHERE seq_key = :seq_key AND active_from = :active_from AND id != :id');
+$checkStmt->execute(['seq_key' => $checkSeqKey, 'active_from' => $checkActiveFrom, 'id' => $id]);
 if ($checkStmt->fetch()) {
     jsonResponse([
         'success' => false,
-        'message' => '此序列鍵與日期範圍組合已存在。',
+        'message' => '此序列鍵與啟用時間組合已存在。',
+    ], 409);
+}
+
+$checkActiveUntil = array_key_exists('active_until', $data) ? $data['active_until'] : $existing['active_until'];
+$overlapStmt = $pdo->prepare("
+    SELECT id
+    FROM number_sequences
+    WHERE seq_key = :seq_key
+      AND id != :id
+      AND (active_until IS NULL OR active_until >= :active_from)
+      AND (:active_until IS NULL OR active_from <= :active_until)
+    LIMIT 1
+");
+$overlapStmt->execute([
+    'seq_key' => $checkSeqKey,
+    'id' => $id,
+    'active_from' => $checkActiveFrom,
+    'active_until' => $checkActiveUntil,
+]);
+if ($overlapStmt->fetch()) {
+    jsonResponse([
+        'success' => false,
+        'message' => '同一序列鍵的啟用/停用時間不可重疊。',
     ], 409);
 }
 

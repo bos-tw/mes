@@ -216,6 +216,9 @@ foreach ($orderItems as $item) {
         }
     }
 
+    $totalWeightKg = $item['total_weight_kg'] !== null ? (float)$item['total_weight_kg'] : null;
+    $netWeightKg = $totalWeightKg !== null ? round(max(0, $totalWeightKg - $totalToolWeight), 4) : null;
+
     $result[] = [
         'id' => $itemId,
         'order_id' => (int)$item['order_id'],
@@ -236,7 +239,7 @@ foreach ($orderItems as $item) {
         'customer_sample_status' => $item['customer_sample_status'],
         'delivery_location' => $item['delivery_location'],
         // 數量與價格
-        'total_weight_kg' => $item['total_weight_kg'] !== null ? (float)$item['total_weight_kg'] : null,
+        'total_weight_kg' => $totalWeightKg,
         'total_units' => $item['total_units'] !== null ? (float)$item['total_units'] : null,
         'total_price' => $item['total_price'] !== null ? (float)$item['total_price'] : null,
         'unit_price_per_thousand' => $item['unit_price_per_thousand'] !== null ? (float)$item['unit_price_per_thousand'] : null,
@@ -245,6 +248,10 @@ foreach ($orderItems as $item) {
         'tools_summary' => [
             'total_quantity' => $totalToolQuantity,
             'total_weight_kg' => round($totalToolWeight, 2),
+        ],
+        'totals' => [
+            'tool_weight_kg' => round($totalToolWeight, 2),
+            'net_weight_kg' => $netWeightKg,
         ],
         // 篩選細項
         'screening_details' => $screeningDetailsMap[$itemId] ?? [],

@@ -46,7 +46,7 @@ function handleListNumberSequences(): void
     $perPage = min($perPage, 100);
 
     $keyword = trim((string)($_GET['keyword'] ?? ''));
-    $dateScope = trim((string)($_GET['date_scope'] ?? ''));
+    $activeOn = trim((string)($_GET['active_on'] ?? ''));
 
     $conditions = ['1 = 1'];
     $params = [];
@@ -56,9 +56,10 @@ function handleListNumberSequences(): void
         $params['keyword'] = '%' . $keyword . '%';
     }
 
-    if ($dateScope !== '') {
-        $conditions[] = 'date_scope = :date_scope';
-        $params['date_scope'] = $dateScope;
+    if ($activeOn !== '') {
+        $conditions[] = 'active_from <= :active_on_end AND (active_until IS NULL OR active_until >= :active_on_start)';
+        $params['active_on_start'] = $activeOn . ' 00:00:00';
+        $params['active_on_end'] = $activeOn . ' 23:59:59';
     }
 
     $where = implode(' AND ', $conditions);
@@ -75,7 +76,7 @@ function handleListNumberSequences(): void
     $page = min($page, max(1, $totalPages));
     $offset = ($page - 1) * $perPage;
 
-    $sql = 'SELECT id, seq_key, date_scope, current_value, created_at, updated_at FROM number_sequences WHERE ' . $where . ' ORDER BY seq_key ASC, date_scope DESC LIMIT :limit OFFSET :offset';
+    $sql = 'SELECT id, seq_key, seq_prefix, active_from, active_until, current_value, last_generated_on, created_at, updated_at FROM number_sequences WHERE ' . $where . ' ORDER BY seq_key ASC, active_from DESC LIMIT :limit OFFSET :offset';
 
     $stmt = $pdo->prepare($sql);
     foreach ($params as $key => $value) {
@@ -117,12 +118,32 @@ function handleCreateNumberSequence(): void
     $data = $validated['data'];
 
     // 檢查是否重複
-    $checkStmt = $pdo->prepare('SELECT id FROM number_sequences WHERE seq_key = :seq_key AND date_scope = :date_scope');
-    $checkStmt->execute(['seq_key' => $data['seq_key'], 'date_scope' => $data['date_scope']]);
+    $checkStmt = $pdo->prepare('SELECT id FROM number_sequences WHERE seq_key = :seq_key AND active_from = :active_from');
+    $checkStmt->execute(['seq_key' => $data['seq_key'], 'active_from' => $data['active_from']]);
     if ($checkStmt->fetch()) {
         jsonResponse([
             'success' => false,
-            'message' => '此序列鍵與日期範圍組合已存在。',
+            'message' => '此序列鍵與啟用時間組合已存在。',
+        ], 409);
+    }
+
+    $overlapStmt = $pdo->prepare("
+        SELECT id
+        FROM number_sequences
+        WHERE seq_key = :seq_key
+          AND (active_until IS NULL OR active_until >= :active_from)
+          AND (:active_until IS NULL OR active_from <= :active_until)
+        LIMIT 1
+    ");
+    $overlapStmt->execute([
+        'seq_key' => $data['seq_key'],
+        'active_from' => $data['active_from'],
+        'active_until' => $data['active_until'] ?? null,
+    ]);
+    if ($overlapStmt->fetch()) {
+        jsonResponse([
+            'success' => false,
+            'message' => '同一序列鍵的啟用/停用時間不可重疊。',
         ], 409);
     }
 
@@ -130,14 +151,16 @@ function handleCreateNumberSequence(): void
     $maxIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM number_sequences');
     $newId = (int)$maxIdStmt->fetchColumn();
 
-    $sql = 'INSERT INTO number_sequences (id, seq_key, date_scope, current_value, created_at, updated_at) VALUES (:id, :seq_key, :date_scope, :current_value, NOW(), NOW())';
+    $sql = 'INSERT INTO number_sequences (id, seq_key, seq_prefix, active_from, active_until, current_value, last_generated_on, created_at, updated_at) VALUES (:id, :seq_key, :seq_prefix, :active_from, :active_until, :current_value, NULL, NOW(), NOW())';
 
     try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             'id' => $newId,
             'seq_key' => $data['seq_key'],
-            'date_scope' => $data['date_scope'],
+            'seq_prefix' => $data['seq_prefix'],
+            'active_from' => $data['active_from'],
+            'active_until' => $data['active_until'] ?? null,
             'current_value' => $data['current_value'] ?? 0,
         ]);
     } catch (PDOException $exception) {

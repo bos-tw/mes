@@ -3396,6 +3396,59 @@ td.actions-col {
     font-size: var(--font-sm);
 }
 
+.modal-window.number-sequences-modal .form-section {
+    width: 100%;
+}
+
+.modal-window.number-sequences-modal .form-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+}
+
+.modal-window.number-sequences-modal label.inline-label {
+    display: grid;
+    grid-template-columns: 160px minmax(0, 1fr);
+    gap: 0;
+    align-items: start;
+    margin-bottom: 0;
+}
+
+.modal-window.number-sequences-modal label.inline-label > span {
+    min-width: 0;
+    max-width: none;
+    min-height: 38px;
+    justify-content: flex-end;
+}
+
+.modal-window.number-sequences-modal label.inline-label > input,
+.modal-window.number-sequences-modal label.inline-label > select,
+.modal-window.number-sequences-modal label.inline-label > textarea {
+    min-width: 0;
+    min-height: 38px;
+}
+
+.modal-window.number-sequences-modal label.inline-label > small {
+    grid-column: 2;
+    margin-top: 6px;
+    line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+    .modal-window.number-sequences-modal label.inline-label {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-window.number-sequences-modal label.inline-label > span {
+        border-right: 1px solid #ced4da;
+        border-bottom: none;
+        justify-content: flex-start;
+    }
+
+    .modal-window.number-sequences-modal label.inline-label > small {
+        grid-column: 1;
+    }
+}
+
 /* Modal 內二欄佈局 */
 .modal-window .form-row {
     display: grid !important;
@@ -3403,6 +3456,10 @@ td.actions-col {
     gap: 24px;
     margin-bottom: 16px;
     width: 100%;
+}
+
+.modal-window .form-row.single-column {
+    grid-template-columns: 1fr !important;
 }
 
 /* Modal 內三欄佈局 */

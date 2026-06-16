@@ -5662,12 +5662,13 @@
                         "description": "keyword"
                     },
                     {
-                        "name": "date_scope",
+                        "name": "active_on",
                         "in": "query",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "format": "date"
                         },
-                        "description": "date_scope"
+                        "description": "涵蓋日期篩選（查詢當日生效的流水號設定）"
                     }
                 ]
             },
@@ -11566,8 +11567,20 @@
                     "seq_key": {
                         "type": "string"
                     },
-                    "date_scope": {
+                    "seq_prefix": {
                         "type": "string"
+                    },
+                    "active_from": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "active_until": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "current_value": {
+                        "type": "integer"
                     }
                 }
             },

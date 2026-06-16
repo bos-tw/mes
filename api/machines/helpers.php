@@ -218,6 +218,28 @@ function validateMachineData(array $payload, bool $isUpdate = false): array
         }
     }
 
+    if (array_key_exists('machine_capability_id', $payload)) {
+        $capabilityValue = $payload['machine_capability_id'];
+        if ($capabilityValue === null || $capabilityValue === '') {
+            $data['machine_capability_id'] = null;
+        } else {
+            $capabilityId = (int)$capabilityValue;
+            if ($capabilityId <= 0) {
+                $errors['machine_capability_id'] = '請選擇有效的機台能力。';
+            } else {
+                $pdo = db();
+                $stmt = $pdo->prepare('SELECT id FROM machine_capabilities WHERE id = ? AND is_active = 1');
+                $stmt->execute([$capabilityId]);
+                $exists = $stmt->fetchColumn();
+                if (!$exists) {
+                    $errors['machine_capability_id'] = '指定的機台能力不存在或已停用。';
+                } else {
+                    $data['machine_capability_id'] = $capabilityId;
+                }
+            }
+        }
+    }
+
     return ['data' => $data, 'errors' => $errors];
 }
 
@@ -244,6 +266,10 @@ function transformMachine(array $row): array
         'status_lookup_id' => isset($row['status_lookup_id']) ? (int)$row['status_lookup_id'] : null,
         'status_label' => $row['status_label'] ?? null,
         'status_key' => $row['status_key'] ?? null,
+        'machine_capability_id' => isset($row['machine_capability_id']) && $row['machine_capability_id'] !== null ? (int)$row['machine_capability_id'] : null,
+        'machine_capability_name' => $row['machine_capability_name'] ?? null,
+        'machine_capability_code' => $row['machine_capability_code'] ?? null,
+        'capability_names' => $row['machine_capability_name'] ?? '',
         'created_at' => $row['created_at'],
         'updated_at' => $row['updated_at'],
     ];
@@ -260,18 +286,24 @@ function findMachine(PDO $pdo, int $id): ?array
 {
     $sql = 'SELECT m.id, m.machine_number, m.name, m.model, m.purchase_date, m.department_id, '
         . 'm.lens_count, m.length_mm, m.thread_outer_diameter_mm, m.notes, '
-        . 'm.status_lookup_id, m.created_at, m.updated_at, '
-        . 'd.name AS department_name, lv.value_label AS status_label, lv.value_key AS status_key '
+        . 'm.status_lookup_id, m.machine_capability_id, m.created_at, m.updated_at, '
+        . 'd.name AS department_name, lv.value_label AS status_label, lv.value_key AS status_key, '
+        . 'mc.capability_name AS machine_capability_name, mc.capability_code AS machine_capability_code '
         . 'FROM machines m '
         . 'LEFT JOIN departments d ON d.id = m.department_id '
         . 'LEFT JOIN lookup_values lv ON lv.id = m.status_lookup_id '
+        . 'LEFT JOIN machine_capabilities mc ON mc.id = m.machine_capability_id '
         . 'WHERE m.id = :id' . machineActiveCondition($pdo, 'm') . ' LIMIT 1';
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['id' => $id]);
     $row = $stmt->fetch();
 
-    return $row !== false ? $row : null;
+    if ($row === false) {
+        return null;
+    }
+
+    return $row;
 }
 
 /**

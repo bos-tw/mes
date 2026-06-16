@@ -54,18 +54,7 @@ if ($id <= 0) {
 }
 
 $pdo = db();
-
-$sql = 'SELECT m.id, m.machine_number, m.name, m.model, m.purchase_date, m.department_id, m.lens_count, m.length_mm, m.thread_outer_diameter_mm, m.notes, '
-    . 'm.status_lookup_id, m.created_at, m.updated_at, d.name AS department_name, lv.value_label AS status_label, lv.value_key AS status_key '
-    . 'FROM machines m '
-    . 'LEFT JOIN departments d ON d.id = m.department_id '
-    . 'LEFT JOIN lookup_values lv ON lv.id = m.status_lookup_id '
-    . 'WHERE m.id = ? LIMIT 1';
-
-$stmt = $pdo->prepare($sql);
-$stmt->execute([$id]);
-
-$machine = $stmt->fetch();
+$machine = findMachine($pdo, $id);
 if (!$machine) {
     jsonResponse([
         'success' => false,

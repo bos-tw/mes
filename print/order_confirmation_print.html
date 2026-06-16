@@ -963,6 +963,9 @@
                         const toolWeight = Number(toolsSummary.total_weight_kg || 0);
                         const productWeight = Number(item.total_weight_kg || 0);
                         const totalWeightWithTool = productWeight + toolWeight;
+                        const netWeight = item.totals && item.totals.net_weight_kg != null
+                            ? Number(item.totals.net_weight_kg)
+                            : Math.max(0, productWeight - toolWeight);
 
                         // 載具數量顯示
                         let toolsDisplay = '';
@@ -1001,8 +1004,8 @@
                                             <td>${mapSampleStatusToZh(item.customer_sample_status) || '&nbsp;'}</td>
                                             <th>料號</th>
                                             <td>${item.part_number ? escapeHtml(item.part_number) : '&nbsp;'}</td>
-                                            <th>&nbsp;</th>
-                                            <td>&nbsp;</td>
+                                            <th>淨重(kg)</th>
+                                            <td class="text-right">${Number.isFinite(netWeight) ? formatNumber(netWeight, 2) : '&nbsp;'}</td>
                                         </tr>
                                         <tr>
                                             <th>指送地點</th>

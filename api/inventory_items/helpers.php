@@ -22,6 +22,8 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/../number_sequences/helpers.php';
+
 /**
  * Inventory Items Helper Functions
  */
@@ -32,26 +34,7 @@ declare(strict_types=1);
  */
 function generateInventoryNumber(PDO $pdo): string
 {
-    $today = date('Ymd');
-    $prefix = "INV-{$today}-";
-
-    $stmt = $pdo->prepare("
-        SELECT inventory_number
-        FROM inventory_items
-        WHERE inventory_number LIKE :prefix
-        ORDER BY inventory_number DESC
-        LIMIT 1
-    ");
-    $stmt->execute(['prefix' => $prefix . '%']);
-    $lastNumber = $stmt->fetchColumn();
-
-    if ($lastNumber) {
-        $sequence = (int)substr($lastNumber, -4) + 1;
-    } else {
-        $sequence = 1;
-    }
-
-    return $prefix . str_pad((string)$sequence, 4, '0', STR_PAD_LEFT);
+    return generateManagedDocumentNumber($pdo, 'INV');
 }
 
 /**

@@ -32,12 +32,32 @@
             total: 0,
             totalPages: 0,
             keyword: '',
-            dateScope: '',
+            activeOn: '',
             data: [],
             editingId: null,
         };
 
         let dataSyncHelper = null;
+        const managedSequenceDefaults = {
+            ORDER: { prefix: 'ORDER' },
+            WO: { prefix: 'WO' },
+            INV: { prefix: 'INV' },
+            SO: { prefix: 'SO' },
+            RO: { prefix: 'RO' },
+            WOPR: { prefix: 'WOPR' },
+        };
+
+        function getCurrentTabId() {
+            const tabContent = moduleRoot.closest('.tab-content[data-tab-id]');
+            return tabContent?.dataset.tabId || null;
+        }
+
+        function markCurrentTabChangesClean() {
+            const tabId = getCurrentTabId();
+            if (tabId && typeof window.markTabChangesClean === 'function') {
+                window.markTabChangesClean(tabId);
+            }
+        }
 
         // 工具函式
         function showAlert(type, message, isModal = false) {
@@ -72,7 +92,7 @@
                 perPage: state.perPage.toString(),
             });
             if (state.keyword) params.set('keyword', state.keyword);
-            if (state.dateScope) params.set('date_scope', state.dateScope);
+            if (state.activeOn) params.set('active_on', state.activeOn);
 
             try {
                 const response = await fetch(`api/number_sequences/?${params.toString()}`);
@@ -102,16 +122,18 @@
             if (!tableBody) return;
 
             if (state.data.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="6" class="text-center">目前沒有資料</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="7" class="text-center">目前沒有資料</td></tr>`;
                 return;
             }
 
             tableBody.innerHTML = state.data.map(item => `
                 <tr data-id="${item.id}">
                     <td>${escapeHtml(item.seq_key)}</td>
-                    <td>${escapeHtml(item.date_scope)}</td>
+                    <td>${escapeHtml(item.seq_prefix || '-')}</td>
+                    <td>${escapeHtml(formatDateTime(item.active_from) || '-')}</td>
+                    <td>${escapeHtml(formatDateTime(item.active_until) || '未停用')}</td>
                     <td>${escapeHtml(item.current_value)}</td>
-                    <td>${escapeHtml(item.updated_at ?? '-')}</td>
+                    <td>${escapeHtml(formatDateTime(item.updated_at) || '-')}</td>
                     <td class="actions">
                         <button type="button" class="btn text" data-action="edit" data-id="${item.id}" title="編輯">
                             <i class="fas fa-edit"></i>
@@ -147,9 +169,63 @@
             paginationContainer.innerHTML = html;
         }
 
+        function formatDateTime(value) {
+            if (!value) {
+                return '';
+            }
+
+            const date = new Date(String(value).replace(' ', 'T'));
+            if (Number.isNaN(date.getTime())) {
+                return String(value);
+            }
+
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hour = String(date.getHours()).padStart(2, '0');
+            const minute = String(date.getMinutes()).padStart(2, '0');
+            return `${year}/${month}/${day} ${hour}:${minute}`;
+        }
+
+        function toDateTimeLocalValue(value) {
+            if (!value) {
+                return '';
+            }
+
+            const date = value instanceof Date ? value : new Date(String(value).replace(' ', 'T'));
+            if (Number.isNaN(date.getTime())) {
+                return '';
+            }
+
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hour = String(date.getHours()).padStart(2, '0');
+            const minute = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hour}:${minute}`;
+        }
+
         function updateSummary() {
             if (!summaryLabel) return;
             summaryLabel.textContent = `共 ${state.total} 筆資料`;
+        }
+
+        function syncPrefixFromSeqKey() {
+            if (!modalForm) return;
+
+            const seqKeyField = modalForm.querySelector('[name="seq_key"]');
+            const prefixField = modalForm.querySelector('[name="seq_prefix"]');
+            if (!seqKeyField || !prefixField) return;
+
+            const selected = managedSequenceDefaults[String(seqKeyField.value || '').toUpperCase()];
+            if (!selected) return;
+
+            const currentValue = String(prefixField.value || '').trim().toUpperCase();
+            const knownPrefixes = Object.values(managedSequenceDefaults).map(item => item.prefix);
+
+            if (currentValue === '' || knownPrefixes.includes(currentValue)) {
+                prefixField.value = selected.prefix;
+            }
         }
 
         // Modal 操作
@@ -177,18 +253,26 @@
                 state.editingId = null;
                 if (modalTitle) modalTitle.textContent = '新增流水號';
                 setFieldValue('id', '');
-                // 設定預設日期為今天
-                const today = new Date().toISOString().split('T')[0];
-                setFieldValue('date_scope', today);
+                const now = new Date();
+                now.setSeconds(0, 0);
+                const localValue = toDateTimeLocalValue(now);
+                setFieldValue('seq_key', '');
+                setFieldValue('seq_prefix', '');
+                setFieldValue('active_from', localValue);
+                setFieldValue('active_until', '');
+                setFieldValue('current_value', 0);
             } else if (mode === 'edit' && data) {
                 state.editingId = data.id;
                 if (modalTitle) modalTitle.textContent = '編輯流水號';
                 setFieldValue('id', data.id);
                 setFieldValue('seq_key', data.seq_key);
-                setFieldValue('date_scope', data.date_scope);
+                setFieldValue('seq_prefix', data.seq_prefix);
+                setFieldValue('active_from', toDateTimeLocalValue(data.active_from));
+                setFieldValue('active_until', toDateTimeLocalValue(data.active_until));
                 setFieldValue('current_value', data.current_value || 0);
             }
 
+            syncPrefixFromSeqKey();
             modal.classList.remove('hidden');
         }
 
@@ -196,6 +280,7 @@
             if (!modal) return;
             modal.classList.add('hidden');
             state.editingId = null;
+            markCurrentTabChangesClean();
         }
 
         async function handleFormSubmit(e) {
@@ -205,7 +290,9 @@
             const formData = new FormData(modalForm);
             const payload = {
                 seq_key: formData.get('seq_key'),
-                date_scope: formData.get('date_scope'),
+                seq_prefix: formData.get('seq_prefix'),
+                active_from: formData.get('active_from'),
+                active_until: formData.get('active_until') || null,
                 current_value: parseInt(formData.get('current_value'), 10) || 0,
             };
 
@@ -298,7 +385,7 @@
             e.preventDefault();
             const formData = new FormData(filterForm);
             state.keyword = formData.get('keyword') || '';
-            state.dateScope = formData.get('date_scope') || '';
+            state.activeOn = formData.get('active_on') || '';
             state.page = 1;
             fetchData();
         }
@@ -306,7 +393,7 @@
         function handleReset() {
             if (filterForm) filterForm.reset();
             state.keyword = '';
-            state.dateScope = '';
+            state.activeOn = '';
             state.page = 1;
             fetchData();
         }
@@ -348,6 +435,11 @@
 
         if (modalForm) {
             modalForm.addEventListener('submit', handleFormSubmit);
+            modalForm.addEventListener('change', (e) => {
+                if (e.target?.name === 'seq_key') {
+                    syncPrefixFromSeqKey();
+                }
+            });
         }
 
         if (modal) {

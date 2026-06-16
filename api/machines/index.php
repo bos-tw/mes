@@ -18,6 +18,7 @@
  * | keyword          | string | N    | 關鍵字搜尋（編號、名稱、型號、備註）|
  * | status_lookup_id | int    | N    | 依狀態 lookup ID 篩選 |
  * | department_id    | int    | N    | 依部門 ID 篩選 |
+ * | machine_capability_id | int | N | 依機台能力篩選 |
  *
  * @input POST (JSON body)
  * | 參數                   | 類型    | 必填 | 說明 |
@@ -32,6 +33,7 @@
  * | length_mm              | decimal | N    | 長度(mm) |
  * | thread_outer_diameter_mm | decimal | N  | 螺牙外徑(mm) |
  * | notes                  | string  | N    | 備註 |
+ * | machine_capability_id    | int     | N    | 機台能力 ID |
  *
  * @output 成功回應 (GET)
  * ```json
@@ -86,10 +88,10 @@ function handleListMachines(): void
     $keyword = trim((string)($_GET['keyword'] ?? ''));
     $statusLookupId = (int)($_GET['status_lookup_id'] ?? 0);
     $departmentId = (int)($_GET['department_id'] ?? 0);
+    $machineCapabilityId = (int)($_GET['machine_capability_id'] ?? 0);
 
     $conditions = ['1 = 1'];
     $params = [];
-
     if ($keyword !== '') {
         $searchableColumns = ['m.machine_number', 'm.name', 'm.model', 'm.notes'];
         $likeParts = [];
@@ -114,6 +116,11 @@ function handleListMachines(): void
         $params['department_id'] = $departmentId;
     }
 
+    if ($machineCapabilityId > 0) {
+        $conditions[] = 'm.machine_capability_id = :machine_capability_id';
+        $params['machine_capability_id'] = $machineCapabilityId;
+    }
+
     $where = implode(' AND ', $conditions);
 
     $countSql = 'SELECT COUNT(*) FROM machines m';
@@ -129,10 +136,12 @@ function handleListMachines(): void
     $offset = ($page - 1) * $perPage;
 
     $sql = 'SELECT m.id, m.machine_number, m.name, m.model, m.purchase_date, m.department_id, m.lens_count, m.length_mm, m.thread_outer_diameter_mm, m.notes, '
-        . 'm.status_lookup_id, m.created_at, m.updated_at, d.name AS department_name, lv.value_label AS status_label, lv.value_key AS status_key '
+        . 'm.status_lookup_id, m.machine_capability_id, m.created_at, m.updated_at, d.name AS department_name, lv.value_label AS status_label, lv.value_key AS status_key, '
+        . 'mc.capability_name AS machine_capability_name, mc.capability_code AS machine_capability_code '
         . 'FROM machines m '
         . 'LEFT JOIN departments d ON d.id = m.department_id '
-        . 'LEFT JOIN lookup_values lv ON lv.id = m.status_lookup_id ';
+        . 'LEFT JOIN lookup_values lv ON lv.id = m.status_lookup_id '
+        . 'LEFT JOIN machine_capabilities mc ON mc.id = m.machine_capability_id ';
 
     if ($where !== '') {
         $sql .= 'WHERE ' . $where . ' ';
@@ -179,7 +188,6 @@ function handleCreateMachine(): void
     }
 
     $data = $validated['data'];
-
     $checkStmt = $pdo->prepare(
         'SELECT id FROM machines WHERE machine_number = :machine_number' . machineActiveCondition($pdo)
     );
@@ -191,30 +199,30 @@ function handleCreateMachine(): void
         ], 409);
     }
 
-    $columns = array_keys($data);
-    $placeholders = array_map(static fn(string $column): string => ':' . $column, $columns);
-
-    $sql = 'INSERT INTO machines (' . implode(', ', $columns) . ', created_at, updated_at) VALUES (' . implode(', ', $placeholders) . ', NOW(), NOW())';
-
     try {
+        $columns = array_keys($data);
+        $placeholders = array_map(static fn(string $column): string => ':' . $column, $columns);
+        $sql = 'INSERT INTO machines (' . implode(', ', $columns) . ', created_at, updated_at) VALUES (' . implode(', ', $placeholders) . ', NOW(), NOW())';
         $stmt = $pdo->prepare($sql);
         foreach ($data as $column => $value) {
             if ($value === null) {
                 $stmt->bindValue(':' . $column, null, PDO::PARAM_NULL);
-            } elseif (in_array($column, ['department_id', 'status_lookup_id', 'lens_count'], true)) {
+            } elseif (in_array($column, ['department_id', 'status_lookup_id', 'lens_count', 'machine_capability_id'], true)) {
                 $stmt->bindValue(':' . $column, (int)$value, PDO::PARAM_INT);
             } else {
                 $stmt->bindValue(':' . $column, $value);
             }
         }
         $stmt->execute();
+        $machineId = (int)$pdo->lastInsertId();
     } catch (PDOException $exception) {
         $response = handleMachineWriteException($exception);
         jsonResponse($response, 500);
     }
 
-    $machineId = (int)$pdo->lastInsertId();
-    logAuditAction('Added new machine', 'Machines', $machineId, $data);
+    logAuditAction('Added new machine', 'Machines', $machineId, [
+        'machine' => $data,
+    ]);
 
     jsonResponse([
         'success' => true,

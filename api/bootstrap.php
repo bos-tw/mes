@@ -884,6 +884,7 @@ function autoEnforcePermission(array $employee): void
         'work_order_first_piece_dimensions' => 'manage_work_orders',
         'work_order_images'             => 'manage_work_orders',
         'machines'                      => 'manage_machines',
+        'machine_capabilities'          => 'manage_machines',
         'machine_maintenance_tasks'     => 'manage_maintenance_tasks',
         'daily_machine_inspections'     => 'manage_daily_inspections',
         'daily_machine_inspection_items'=> 'manage_daily_inspections',

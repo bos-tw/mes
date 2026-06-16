@@ -52,6 +52,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../number_sequences/helpers.php';
 requireAuth();
 
 $method = requireMethod(['GET', 'POST']);
@@ -283,28 +284,7 @@ function handleCreate(): void
  */
 function generateShippingOrderNumber(PDO $pdo): string
 {
-    $prefix = 'SO';
-    $date = date('Ymd');
-
-    $sql = "
-        SELECT shipping_order_number
-        FROM shipping_orders
-        WHERE shipping_order_number LIKE :pattern
-        ORDER BY shipping_order_number DESC
-        LIMIT 1
-    ";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute(['pattern' => "{$prefix}-{$date}-%"]);
-    $last = $stmt->fetchColumn();
-
-    if ($last) {
-        $parts = explode('-', $last);
-        $seq = (int)end($parts) + 1;
-    } else {
-        $seq = 1;
-    }
-
-    return sprintf('%s-%s-%04d', $prefix, $date, $seq);
+    return generateManagedDocumentNumber($pdo, 'SO');
 }
 
 /**

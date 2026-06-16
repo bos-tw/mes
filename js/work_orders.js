@@ -89,7 +89,11 @@
         machines: [],
         employees: [],
         currentUser: null,
-        liveTimeIntervalId: null
+        liveTimeIntervalId: null,
+        formSnapshots: {
+            create: null,
+            edit: null
+        }
     };
 
     // Initialize
@@ -306,6 +310,110 @@
         return state.productionRecordModes[getProductionRecordContextKey(isEditMode)] || 'preset';
     }
 
+    function getFormSnapshotKey(isEditMode) {
+        return isEditMode ? 'edit' : 'create';
+    }
+
+    function stableStringify(value) {
+        if (Array.isArray(value)) {
+            return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+        }
+
+        if (value && typeof value === 'object') {
+            const keys = Object.keys(value).sort();
+            return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+        }
+
+        return JSON.stringify(value);
+    }
+
+    function normalizeSnapshotValue(value) {
+        if (value instanceof File) {
+            return {
+                name: value.name,
+                size: value.size,
+                type: value.type
+            };
+        }
+
+        return value == null ? '' : String(value);
+    }
+
+    function getOrderDrawingSnapshot() {
+        if (!elements.editOrderDrawingsRows) {
+            return {
+                rows: [],
+                deletedIds: []
+            };
+        }
+
+        const rows = Array.from(elements.editOrderDrawingsRows.querySelectorAll('.drawing-row')).map((row) => ({
+            drawingId: row.dataset.drawingId || '',
+            drawingNumber: row.querySelector('[data-field="drawing-number"]')?.value.trim() || '',
+            hasFileObject: Boolean(row.fileObject),
+            fileName: row.fileObject?.name || '',
+            fileSize: row.fileObject?.size || 0,
+            filePath: row.dataset.filePath || ''
+        }));
+
+        return {
+            rows,
+            deletedIds: [...state.deletedOrderDrawingIds].map((id) => String(id)).sort()
+        };
+    }
+
+    function buildWorkOrderFormSnapshot(isEditMode) {
+        const form = isEditMode ? elements.editModalForm : elements.createModalForm;
+        if (!form) {
+            return null;
+        }
+
+        if (isEditMode) {
+            syncProductionRecordBufferFromForm(true);
+        }
+
+        const formEntries = Array.from(new FormData(form).entries())
+            .map(([key, value]) => [key, normalizeSnapshotValue(value)]);
+
+        const snapshot = {
+            visible: isEditMode ? !elements.editModal.classList.contains('hidden') : !elements.createModal.classList.contains('hidden'),
+            formEntries,
+            orderItemId: getCurrentOrderItemId(),
+            sourceMode: isEditMode ? null : state.createSourceMode,
+            workOrderType: form.querySelector('[name="work_order_type"]')?.value || 'normal',
+            productionRecordMode: getProductionRecordMode(isEditMode),
+            productionRecordBuffers: getProductionRecordBuffers(isEditMode),
+            splitMachineRuns: getSplitRuns(isEditMode),
+            orderDrawings: isEditMode ? getOrderDrawingSnapshot() : null
+        };
+
+        return stableStringify(snapshot);
+    }
+
+    function resetWorkOrderFormSnapshot(isEditMode) {
+        state.formSnapshots[getFormSnapshotKey(isEditMode)] = buildWorkOrderFormSnapshot(isEditMode);
+    }
+
+    function hasUnsavedWorkOrderChanges(isEditMode) {
+        const form = isEditMode ? elements.editModalForm : elements.createModalForm;
+        const modal = isEditMode ? elements.editModal : elements.createModal;
+        if (!form || !modal || modal.classList.contains('hidden')) {
+            return false;
+        }
+
+        const currentSnapshot = buildWorkOrderFormSnapshot(isEditMode);
+        const baselineSnapshot = state.formSnapshots[getFormSnapshotKey(isEditMode)];
+        return currentSnapshot !== baselineSnapshot;
+    }
+
+    function hasAnyUnsavedWorkOrderChanges() {
+        return hasUnsavedWorkOrderChanges(false) || hasUnsavedWorkOrderChanges(true);
+    }
+
+    function confirmDiscardUnsavedWorkOrderChanges() {
+        return window.confirm('目前有尚未儲存的工單資料，若直接關閉將會遺失。確定要繼續關閉嗎？');
+    }
+
     function cloneProductionRecord(record = {}) {
         return {
             card_number: record.card_number || '',
@@ -405,9 +513,35 @@
         if (!drawings.length) tbody.innerHTML = '<tr class="empty-row"><td colspan="6" class="text-center">尚未上傳圖面</td></tr>';
     }
 
+    function getCurrentOrderItemId() {
+        const orderItemId = state.orderItemDetails?.order_item_id ?? state.orderItemDetails?.id ?? null;
+        const normalizedId = Number.parseInt(orderItemId, 10);
+        return Number.isInteger(normalizedId) && normalizedId > 0 ? normalizedId : null;
+    }
+
+    function hasPendingOrderDrawingChanges() {
+        if (!elements.editOrderDrawingsRows) {
+            return false;
+        }
+
+        if (state.deletedOrderDrawingIds.length > 0) {
+            return true;
+        }
+
+        return Array.from(elements.editOrderDrawingsRows.querySelectorAll('.drawing-row')).some((row) => {
+            const number = row.querySelector('[data-field="drawing-number"]')?.value.trim() || '';
+            return Boolean(row.fileObject) || Boolean(number && !row.dataset.drawingId);
+        });
+    }
+
     async function syncOrderItemDrawings() {
-        const orderItemId = state.orderItemDetails?.id || state.orderItemDetails?.order_item_id;
-        if (!orderItemId) return;
+        const orderItemId = getCurrentOrderItemId();
+        if (!orderItemId) {
+            if (hasPendingOrderDrawingChanges()) {
+                throw new Error('目前工單缺少對應的客戶批號 ID，無法儲存圖面附件。請重新開啟工單後再試。');
+            }
+            return;
+        }
         const formData = new FormData();
         formData.append('_method', 'PUT');
         const drawingNumbers = [];
@@ -1512,6 +1646,16 @@
     }
 
     function attachEventListeners() {
+        moduleRoot.addEventListener('module:before-close', (event) => {
+            if (!hasAnyUnsavedWorkOrderChanges()) {
+                return;
+            }
+
+            if (!confirmDiscardUnsavedWorkOrderChanges()) {
+                event.preventDefault();
+            }
+        });
+
         // Header buttons
         if (elements.createButton) {
             elements.createButton.addEventListener('click', () => openCreateModal());
@@ -2248,9 +2392,9 @@
                     }
                 }
                 if (isEditMode) {
-                    closeEditModal();
+                    closeEditModal(true);
                 } else {
-                    closeCreateModal();
+                    closeCreateModal(true);
                 }
                 loadWorkOrders();
             } else {
@@ -3367,6 +3511,7 @@
         renderImages(false);
 
         elements.createModal.classList.remove('hidden');
+        resetWorkOrderFormSnapshot(false);
     }
 
     // 開啟編輯工單 Modal (不含頁籤,直接編輯)
@@ -3387,9 +3532,14 @@
 
         elements.editModal.classList.remove('hidden');
         startLiveTimeTicker();
+        resetWorkOrderFormSnapshot(true);
     }
 
-    function closeCreateModal() {
+    function closeCreateModal(force = false) {
+        if (!force && hasUnsavedWorkOrderChanges(false) && !confirmDiscardUnsavedWorkOrderChanges()) {
+            return;
+        }
+
         elements.createModal.classList.add('hidden');
         hideModalAlert(false);
         elements.createModalForm.reset();
@@ -3402,9 +3552,14 @@
         state.productionRecordModes.create = 'preset';
         state.productionRecordBuffers.create = { preset: [], manual: [] };
         setSplitRuns(false, []);
+        state.formSnapshots.create = null;
     }
 
-    function closeEditModal() {
+    function closeEditModal(force = false) {
+        if (!force && hasUnsavedWorkOrderChanges(true) && !confirmDiscardUnsavedWorkOrderChanges()) {
+            return;
+        }
+
         elements.editModal.classList.add('hidden');
         hideModalAlert(true);
         elements.editModalForm.reset();
@@ -3419,6 +3574,7 @@
         state.productionRecordBuffers.edit = { preset: [], manual: [] };
         renderOrderDrawings([]);
         setSplitRuns(true, []);
+        state.formSnapshots.edit = null;
     }
 
     async function openModal(id = null) {
@@ -3622,6 +3778,7 @@
         // 儲存訂單資訊用於 Metrics Panel
         state.orderItemDetails = {
             ...data,
+            order_item_id: data.order_item_id || state.orderItemDetails?.order_item_id || null,
             tool_quantity: data.tool_quantity || 0,
             total_tool_weight: data.total_tool_weight || 0,
             weight_per_unit_g: data.weight_per_unit_g || 0,

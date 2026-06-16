@@ -272,6 +272,8 @@ const DataSync = (function() {
         'permissions': ['role_permissions'],
         // 機台變更
         'machines': ['work_orders', 'machine_maintenance_tasks', 'daily_machine_inspections', 'production_records', 'production_work_order_schedule'],
+        // 機台能力變更
+        'machine_capabilities': ['machines', 'work_orders', 'production_work_order_schedule'],
         // 工具變更
         'tools': ['work_orders', 'order_items'],
         // 訂單變更
