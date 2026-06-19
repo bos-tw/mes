@@ -213,7 +213,7 @@
                     : '<span class="status-badge read" title="已讀"><i class="fas fa-check"></i></span>';
 
                 const typeHtml = `<span class="type-badge"><i class="fas ${type.icon}"></i> ${type.text}</span>`;
-                const priorityHtml = `<span class="priority-badge ${priority.class}">${priority.text}</span>`;
+                const priorityHtml = `<span class="priority-badge ${escapeHtml(priority.class)}">${escapeHtml(priority.text)}</span>`;
 
                 let actionsHtml = `
                     <button type="button" class="btn text" data-action="view" data-id="${n.id}" title="檢視">
@@ -312,11 +312,11 @@
                 detailContent.innerHTML = `
                     <div class="detail-header">
                         <span class="detail-type"><i class="fas ${type.icon}"></i> ${type.text}</span>
-                        <span class="priority-badge ${priority.class}">${priority.text}</span>
+                        <span class="priority-badge ${escapeHtml(priority.class)}">${escapeHtml(priority.text)}</span>
                     </div>
                     <h4 class="detail-title">${escapeHtml(n.title)}</h4>
                     <div class="detail-meta">
-                        <span><i class="fas fa-user"></i> ${n.created_by_name || '系統'}</span>
+                        <span><i class="fas fa-user"></i> ${escapeHtml(n.created_by_name || '系統')}</span>
                         <span><i class="fas fa-clock"></i> ${formatDateTime(n.created_at)}</span>
                         ${n.expires_at ? `<span><i class="fas fa-hourglass-end"></i> 過期: ${formatDateTime(n.expires_at)}</span>` : ''}
                     </div>

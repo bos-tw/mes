@@ -90,9 +90,11 @@
 
 | 用途 | 類別 | 顏色 | 範例 |
 |------|------|------|------|
-| 一般操作 | `btn text` | 藍色 (#007bff) | 編輯、檢視、前往 |
-| 危險操作 | `btn text danger` | 紅色 (#dc3545) | 刪除 |
-| 列印操作 | `btn text` + `data-action="print"` | 青色 (#17a2b8) | 列印 |
+| 檢視 | `btn text` + 檢視類 `data-action` | teal (`#0f766e`) | 檢視、預覽 |
+| 編輯 | `btn text` + 編輯類 `data-action` | blue (`#2563eb`) | 編輯 |
+| 列印 | `btn text` + 列印類 `data-action` | purple (`#7c3aed`) | 列印 |
+| 刪除 | `btn text danger` + 刪除類 `data-action` | red (`#dc3545`) | 刪除 |
+| 停用/阻擋 | `disabled`、`aria-disabled`、`op-role-blocked` | gray (`#6c757d`) | 不可操作 |
 
 ```html
 <!-- ✅ 正確：標準樣式 -->
@@ -119,22 +121,25 @@
 
 **樣式規格：**
 
-- **`.btn.text`（一般操作）**：
-  - 背景：`#007bff`（藍色）
+- **`.btn.text`（操作按鈕基底）**：
+  - 實際背景由 `data-action` 對應的 `.op-role-*` 決定
   - 文字：白色
   - 尺寸：30x30px
   - 圓角：4px
-  - Hover：`#0056b3` + 輕微上移效果
+  - Hover：角色色加深 + 輕微上移效果
 
 - **`.btn.text.danger`（危險操作）**：
   - 背景：`#dc3545`（紅色）
   - Hover：`#a71d2a`
 
-- **特殊操作自動顏色**：
-  - `data-action="print"`：青色 (#17a2b8)
-  - `data-action="details"`：橘色 (#ff9800)
-  - `data-action="copy-order-item"`：紫色 (#9c27b0)
-  - `data-action="create-work-order"`：黃色 (#FFC107)
+- **語意角色自動顏色**：
+  - 列印：紫色
+  - 檢視：teal
+  - 編輯：藍色
+  - 刪除：紅色
+  - 新增：綠色
+  - 流程操作：棕橘色
+  - 灰色只允許停用或阻擋操作
 
 ### 4.5 圖示按鈕（Icon Button）
 - **尺寸**：36x36
@@ -197,7 +202,6 @@
 ## 8. 可重用樣式清單（重要）
 
 - `.btn.text`：表格操作按鈕-編輯（藍底白字 32x32）
-- `.btn.text.purple`：表格操作按鈕-檢視（紫底）
 - `.btn.text.danger`：表格操作按鈕-刪除（紅底）
 - `.status-badge`：狀態徽章
 - `.link-text`：藍色連結樣式

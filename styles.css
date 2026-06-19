@@ -2644,6 +2644,13 @@ td.actions-col {
     background: #a71d2a;
 }
 
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-blocked,
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-blocked:hover {
+    background: #6c757d;
+    cursor: help;
+    transform: none;
+}
+
 :is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-print {
     background: #7c3aed;
 }
@@ -2682,6 +2689,38 @@ td.actions-col {
 
 :is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-shipping:hover {
     background: #1e7e34;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-add {
+    background: #16a34a;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-add:hover {
+    background: #15803d;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-copy {
+    background: #c026d3;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-copy:hover {
+    background: #a21caf;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-state {
+    background: #16a34a;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-state:hover {
+    background: #15803d;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-state.warning {
+    background: #f97316;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-state.warning:hover {
+    background: #ea580c;
 }
 
 :is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-reply {
@@ -2728,11 +2767,11 @@ td.actions-col {
 }
 
 :is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-neutral {
-    background: #64748b;
+    background: #0f766e;
 }
 
 :is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-neutral:hover {
-    background: #475569;
+    background: #115e59;
 }
 
 /* 表格操作按鈕圖標樣式 */
@@ -9721,6 +9760,30 @@ select option:disabled {
     font-size: 12px;
     line-height: 1.4;
     white-space: nowrap;
+}
+
+.work-order-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.work-order-type-badge.normal {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #475569;
+}
+
+.work-order-type-badge.split {
+    background: #ecfeff;
+    border-color: #67e8f9;
+    color: #0e7490;
 }
 
 .production-schedule-table tbody tr.schedule-row.dragging {

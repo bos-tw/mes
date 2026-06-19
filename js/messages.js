@@ -248,7 +248,7 @@
                 // 收件匣顯示寄件人，寄件匣顯示收件人
                 let displayUser = '';
                 if (currentFolder === 'inbox') {
-                    displayUser = m.sender_name || '未知';
+                    displayUser = escapeHtml(m.sender_name || '未知');
                     // 標記全體員工發送
                     if (m.send_to_all) {
                         displayUser += ' <span class="badge-sm info">全體</span>';
@@ -257,7 +257,7 @@
                     if (m.send_to_all) {
                         displayUser = '<span class="badge-sm info">全體員工</span>';
                     } else if (m.recipients && m.recipients.length > 0) {
-                        const names = m.recipients.map(r => r.name).slice(0, 2).join(', ');
+                        const names = m.recipients.map(r => escapeHtml(r.name)).slice(0, 2).join(', ');
                         displayUser = m.recipients.length > 2 ? names + '...' : names;
                     } else {
                         displayUser = '未知';
@@ -503,7 +503,7 @@
                         </div>
                     </div>
                     <div class="message-detail-body">
-                        ${m.content}
+                        ${escapeHtml(m.content || '').replace(/\n/g, '<br>')}
                     </div>
                     ${attachmentsHtml}
                     ${m.reply_to_id ? `

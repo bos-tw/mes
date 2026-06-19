@@ -31,8 +31,8 @@ ModuleConfig.register('machine_capabilities', {
     ],
 
     columns: [
-        { key: 'capability_code', label: '能力代碼', sortable: false, selectable: true },
         { key: 'capability_name', label: '能力名稱', sortable: false, selectable: true },
+        { key: 'capability_code', label: '能力代碼', sortable: false, selectable: true },
         { key: 'description', label: '描述', sortable: false, selectable: true },
         { key: 'machine_count', label: '已套用機台數', sortable: false, selectable: true },
         { key: 'sort_order', label: '排序', sortable: false, selectable: true },

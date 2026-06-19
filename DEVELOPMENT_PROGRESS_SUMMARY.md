@@ -1,192 +1,107 @@
 # 開發進度摘要
 
-更新時間：2026-06-16 19:05  
-目前基底 commit：`edb4176`  
-本輪工作版本：`v2.1.2`  
+更新時間：2026-06-19
 目前分支：`main`
+本輪版本：`v2.1.3`
+本輪起始 commit：`8988e72`
 
 ## 1. 專案架構
 
-### 目錄結構與技術棧
+- 後端：PHP 8 + PDO，API 共用初始化位於 `api/bootstrap.php`。
+- 前端：原生 JavaScript、HTML、CSS，配置型模組由 `core/module-renderer.js` 與 `core/configs/*.config.js` 驅動。
+- 主入口：`index.php`；`index.html` 保留同步版本資訊。
+- 共用前端：
+  - 分頁、模組載入、操作按鈕標準化：`script.js`
+  - 欄位顯示設定：`api/common/column_manager.js`
+  - DataSync：`js/data-sync.js`
+- 審計工具：
+  - 總審計：`tools/audit-system-health.js`
+  - DataSync 專項：`tools/audit-data-sync.js`
+  - 配置模組驗證：`tools/validate-config-modules.js`
+  - 審計核心、規則、adapter、測試：`tools/audit/`
+- 資料庫：MySQL 8；本輪沒有 migration 或 schema 異動。
 
-- 後端：PHP 8 + PDO，API 入口與共用初始化集中在 `api/bootstrap.php`。
-- 前端：原生 JavaScript + 配置驅動模組渲染。
-  - 共用模組切換與頁籤控制：`script.js`
-  - 共用配置渲染：`core/module-renderer.js`
-  - 模組設定：`core/configs/*.config.js`
-  - 模組邏輯：`js/*.js`
-- 頁面入口：`index.php` 為主，`index.html` 保留同版結構與版本資訊。
-- 樣式：集中於 `styles.css`。
-- 資料庫：MySQL 8，migration 位於 `migrations/`。
-- 本機 schema 同步：`tools/sync-local-schema.ps1`
-- 更新包工具：
-  - `tools/build-update-package.ps1`
-  - `tools/build-update-package-safe.ps1`
-- 更新系統 API：
-  - `api/system_update_common.php`
-  - `api/system_update_*`
+### 本輪主要涉及範圍
 
-### 本輪主要涉及模組
-
-- 工單管理 / 生產作業
-- 退貨單
-- 流水號管理
-- 設備管理 / 機台設備管理
-- 新增：機台能力管理
-- 共用 tab 未儲存提醒與 modal 渲染機制
-
-### 本輪主要涉及資料表
-
-- `number_sequences`
-- `machine_capabilities`
-- `machine_capability_assignments`
-- `machines`
-- `return_orders` 相關資料流程
-- `work_orders`
-- `production_records`
-- 列印 / 出貨 / 訂單查詢所需關聯資料
+- 機台能力、機台設備、工單、生產排程。
+- 客戶、庫存、出貨、退貨、訊息、通知等列表與狀態顯示。
+- 共用欄位設定、列表操作按鈕、圖示與色彩規範。
+- 系統健康審計、DataSync 審計、GitHub Actions。
+- 涉及既有資料表語意：`machine_capabilities`、`machines`、`work_orders`、`inventory_items`、`shipping_orders`、`return_orders`；未修改資料表結構。
 
 ## 2. 已完成功能
 
-### 本次新增或修改項目
+- 機台能力選單改為中文優先，列表欄位保留並調整顯示順序。
+- 欄位設定改由共用 `column_manager.js` 自動管理，修正按鈕無反應、面板定位與表格欄位套用問題。
+- 統一列表操作按鈕的 `data-action`、Font Awesome 圖示與顏色；灰色僅用於停用或阻擋狀態。
+- 生產工單列表補上一般工單／拆分工單類型呈現。
+- 修正多個前端模組的 XSS 輸出風險，包括狀態 fallback、訊息內容、人員名稱、來源標籤與工單生產紀錄欄位。
+- 系統健康審計完成重構：
+  - 結構化 finding、severity、classification、confidence、fingerprint。
+  - JSON／Markdown 輸出、changed audit、Git 範圍、人工確認基準線。
+  - `F-1`、`J-2`、`M-1` 拆成規則模組。
+  - DataSync 改由專項工具 adapter 提供唯一 P0/P1 結果。
+  - 新增 `node tools/test-audit-system.js`。
+  - 新增 `.github/workflows/system-health-audit.yml`。
+- 正式審計基準線為 17 項，全部是 P2；P0/P1 為 0，J-2 為 0。
 
-- 完成全系統 tab 關閉前未儲存提醒補強。
-  - 補上共用 dirty-check 機制。
-  - 修正未輸入任何資料卻誤判為未儲存。
-  - 修正退貨單儲存成功後仍跳出未儲存提示。
+### 版本與更新包
 
-- 完成流水號管理重整。
-  - 支援 `ORDER`、`WO`、`INV`、`SO`、`RO`、`WOPR` 等前綴。
-  - 原本「日期範圍」改為 `active_from` / `active_until`。
-  - 補上 `seq_prefix`、`last_generated_on` 等欄位與索引邏輯。
-  - 修正對應 modal 版面與資料儲存流程。
-
-- 完成設備管理下的「機台能力管理」。
-  - 新增側邊欄入口。
-  - 新增 `machine_capabilities` API 與前端模組。
-  - 支援 CRUD。
-  - 機台設備管理改為一對多關聯中的「單機台指定單一能力」。
-  - 既有機台補上預設 `GENERAL` 能力。
-
-- 修正配置化 modal 單欄表單時全部擠在左側的共用版面問題。
-  - `core/module-renderer.js` 新增 `single-column` 版型判斷。
-  - `styles.css` 補上單欄 modal grid 規則。
-  - 影響流水號管理、機台能力管理等共用 modal。
-
-- 修正列印與統計資料顯示。
-  - 訂單確認單補上批號淨重顯示。
-  - 工單列印修正「載具統計」與「載具數量」不一致問題。
-  - 補強訂單 / 工單 / 出貨查詢鏈上的重量欄位整理。
-
-- 修正工單與生產資料流程。
-  - 修正編輯工單時找不到對應客戶批號而無法儲存的情況。
-  - 補強 `work_orders` / `production_records` / `inventory_items` 相關 helper 與回填邏輯。
-
-- 版本與交付物更新。
-  - `index.php` / `index.html` 版本資訊已更新為 `v2.1.2`。
-  - 新增：
-    - `release-notes/2026-06-16-v2.1.2.txt`
-    - `docs/change-summary-2026-06-16-v2.1.2.md`
-  - 已產生更新包：
-    - `dist/update_v2.1.2_20260616_185618.zip`
-
-### 本輪資料庫 migration
-
-- `migrations/2026_06_16_rebuild_number_sequences_management.sql`
-- `migrations/2026_06_16_add_machine_capabilities_management.sql`
-- `migrations/2026_06_16_add_machine_capability_to_machines.sql`
+- `index.html`、`index.php` 已同步更新為：
+  - 版本：`v2.1.3`
+  - 發布日期：`2026-06-19`
+  - 文件版本：`20260619.1`
+- Release note：`release-notes/2026-06-19-v2.1.3.txt`
+- 更新包：`dist/update_v2.1.3_*.zip`（以 `dist/` 最新的 v2.1.3 檔案為交付包）
+- 更新包包含 58 個檔案、0 個 migration；`manifest.json` 已由系統更新解析器驗證。
 
 ## 3. 待修 Bug
 
-### 已知問題與重現條件
-
-- P1：`tools/build-update-package-safe.ps1` 在目前 PowerShell 呼叫情境下會於 git 參數收集階段失敗。
-  - 重現：
-    - 在 repo 根目錄直接執行 safe wrapper
-    - wrapper 內 `Get-GitLines` 呼叫失敗
-  - 目前 workaround：
-    - 改用 `tools/build-update-package.ps1` 並明確傳入檔案清單
-
-- P1：機台能力 migration 目前仍保留 `machine_capability_assignments` 舊式對應表，但實際邏輯已改為 `machines.machine_capability_id` 單一能力。
-  - 風險：
-    - 下一輪若有人誤讀 schema，可能以為仍採多對多
-  - 現況：
-    - 系統功能使用的是單一能力關聯
-
-- P1：tab 未儲存偵測雖已修正主要誤判，但仍缺少跨模組完整人工回歸。
-  - 重現建議：
-    - 逐一開啟系統設定、退貨單、工單、機台能力管理
-    - 不輸入直接關 tab
-    - 輸入後儲存再關 tab
-    - 驗證提醒是否符合實際 dirty state
-
-- P2：列印與重量數值已補強，但仍需遠端真實資料驗證。
-  - 重現建議：
-    - 用已有批號、已有載具與重量資料的訂單/工單列印
-    - 比對畫面、列印頁與 DB 數值是否一致
+- 目前沒有已知 P0/P1 審計錯誤。
+- P2 審計技術債共 17 項：
+  - 13 個 JavaScript 模組超過建議行數。
+  - `api/status_board/update.php`、`delete.php` 仍接受 POST fallback。
+  - `modules/order_items.html` 尚有 inline style。
+  - 部分 API 同時使用 `status` 與 `status_lookup_id`。
+- DataSync P2 共 10 項，原因為 CRUD 模組沒有宣告下游相依；目前未判定為 P0/P1。
 
 ## 4. 下一步任務
 
-### P0
-
-- 遠端套用 `dist/update_v2.1.2_20260616_185618.zip`
-- 驗證遠端更新任務成功：
-  - `system_update_jobs.status = success`
-  - `version_number = v2.1.2`
-- 驗證遠端 migration 結果：
-  - `number_sequences` 新欄位 / 索引存在
-  - `machine_capabilities` / `machines.machine_capability_id` 存在
-  - `GENERAL` 預設能力已建立
-
-### P1
-
-- 進行跨模組未儲存提醒人工回歸。
-- 驗證機台能力管理 CRUD 與機台設備管理指定能力的完整流程。
-- 驗證流水號管理在新增、編輯、停用、重新產號時的實際行為。
-- 驗證退貨單、工單、訂單確認單、工單列印在遠端真實資料下的顯示與儲存結果。
-
-### P2
-
-- 修正 `tools/build-update-package-safe.ps1`，讓 safe wrapper 可直接用於日後打包。
-- 視需求移除或弱化 `machine_capability_assignments` 舊表，避免 schema 誤導。
-- 若後續工單功能持續擴充，考慮拆分 `js/work_orders.js` 的狀態管理。
+- P0：無。
+- P1：
+  - 在目標環境透過「系統更新」實際套用 `v2.1.3` 更新包。
+  - 套用後回歸機台能力、欄位設定、生產工單類型、列表操作按鈕及工單／庫存／出貨流程。
+  - 確認 GitHub Actions 在遠端 PR／main push 環境可正常執行。
+- P2：
+  - 分批拆分 `work_orders.js`、`order_items.js`、`shipping_orders.js` 等大型模組。
+  - 移除 status board POST fallback。
+  - 清理 `order_items.html` inline style。
+  - 規劃 `status`／`status_lookup_id` 欄位口徑收斂。
+  - 人工審查 DataSync 10 項 `crud_module_without_dependents` 是否需新增相依。
 
 ## 5. 驗證狀態
 
-### 已執行
+已通過：
 
-- `php -l`
-  - `index.php`
-  - `api/machines/index.php`
-  - `api/machines/helpers.php`
-  - `api/machine_capabilities/index.php`
-  - `api/machine_capabilities/helpers.php`
-  - `api/number_sequences/helpers.php`
-  - `api/return_orders/helpers.php`
-  - `api/work_orders/helpers.php`
-- `node --check`
-  - `script.js`
-  - `core/module-renderer.js`
-  - `js/machines.js`
-  - `js/machine_capabilities.js`
-  - `js/number_sequences.js`
-  - `js/return_orders.js`
-  - `js/work_orders.js`
-- `powershell -ExecutionPolicy Bypass -File .\\tools\\sync-local-schema.ps1`
-  - 結果：`Applied: 15, Pending: 0`
-- 使用更新器重跑 migration：
-  - `2026_06_16_rebuild_number_sequences_management.sql`
-  - `2026_06_16_add_machine_capabilities_management.sql`
-  - `2026_06_16_add_machine_capability_to_machines.sql`
-  - 結果：可重複執行
-- 更新包驗證：
-  - ZIP 內 `42` 個程式/文件檔 + `3` 個 migration
-  - 與工作區 SHA256 比對結果：`Mismatches=0`
-  - 更新包 SHA256：
-    - `9CD51F72092194D9502688733D0E6833CAF5CF8D0E062D75EB215E02B70A7BBC`
+- `node tools/test-audit-system.js`
+- `node tools/validate-config-modules.js`
+- `node tools/audit-system-health.js`
+  - 0 errors / 17 warnings / 11 infos
+- `node tools/audit-system-health.js --changed --base origin/main`
+  - 0 new / 0 blocking
+- `node tools/audit-data-sync.js --write docs/data-sync-audit.md`
+  - P0=0 / P1=0 / P2=10
+- 40 個本輪異動 JavaScript 檔案的 `node --check`
+- `php -l index.php`
+- `git diff --check`
+- 更新包 ZIP：
+  - 根目錄存在 `manifest.json`
+  - 版本、日期與 0 migration 正確
+  - 包內 58 個檔案與工作樹清單一致
+  - `parseSystemUpdateManifestFromZip()` 驗證通過
 
-### 未執行
+尚未驗證：
 
-- 未做完整瀏覽器人工回歸。
-- 未做遠端一鍵更新實機測試。
-- 未做完整列印資料與現場資料交叉驗證。
+- 尚未在遠端／正式環境實際套用更新包。
+- 尚未完成完整瀏覽器人工回歸。
+- GitHub Actions 尚未經遠端 push 實際觸發。

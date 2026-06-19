@@ -353,7 +353,7 @@ function formatDecimal(value) {
             capabilities.forEach((capability) => {
                 const option = document.createElement('option');
                 option.value = String(capability.id);
-                option.textContent = `${capability.capability_name} (${capability.capability_code})`;
+                option.textContent = capability.capability_name || capability.capability_code || '';
                 selectElement.appendChild(option);
             });
 

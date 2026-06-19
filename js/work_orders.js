@@ -2429,7 +2429,7 @@
             }).join('');
             overlay.innerHTML = `
                 <div class="modal-window ${modalSizeClass}" role="dialog" aria-modal="true" aria-labelledby="work-order-choice-title" style="max-height: none;">
-                    <h3 id="work-order-choice-title">${title}</h3>
+                    <h3 id="work-order-choice-title">${escapeHtml(title)}</h3>
                     <div style="margin-bottom: 1.25rem; color: var(--color-text); line-height: 1.6;">
                         ${message}
                     </div>
@@ -3265,9 +3265,10 @@
             }
 
             const csvRows = [
-                ['工單號碼', '訂單號碼', '客戶名稱', '受篩產品', '機台', '開始日期', '結束日期', '狀態'],
+                ['工單號碼', '工單類型', '訂單號碼', '客戶名稱', '受篩產品', '機台', '開始日期', '結束日期', '狀態'],
                 ...rows.map((row) => [
                     row.work_order_number || '',
+                    row.work_order_type === 'split' ? '拆分工單' : '一般工單',
                     row.order_number || '',
                     row.customer_name || '',
                     row.screening_item_name || '',
@@ -3319,7 +3320,7 @@
         workOrdersCache.clear();
 
         if (!data || data.length === 0) {
-            elements.tbody.innerHTML = '<tr><td colspan="10" class="text-center">無資料</td></tr>';
+            elements.tbody.innerHTML = '<tr><td colspan="11" class="text-center">無資料</td></tr>';
             updateSelectionUI();
             return;
         }
@@ -3357,11 +3358,18 @@
 
             // checkbox 狀態
             const isChecked = selectedWorkOrders.has(item.id) ? 'checked' : '';
+            const isSplitWorkOrder = item.work_order_type === 'split';
+            const machineRunCount = Math.max(0, Number.parseInt(item.machine_run_count, 10) || 0);
+            const workOrderTypeLabel = isSplitWorkOrder
+                ? `拆分工單${machineRunCount > 0 ? ` (${machineRunCount} 台)` : ''}`
+                : '一般工單';
+            const workOrderTypeClass = isSplitWorkOrder ? 'split' : 'normal';
 
             return `
             <tr data-id="${item.id}" data-status-key="${statusKeyAttr}" data-status-label="${statusLabelAttr}"${completedRowClass}>
                 <td class="checkbox-col"><input type="checkbox" data-action="select-row" ${isChecked}></td>
                 <td>${escapeHtml(item.work_order_number)}</td>
+                <td><span class="work-order-type-badge ${workOrderTypeClass}">${escapeHtml(workOrderTypeLabel)}</span></td>
                 <td>${escapeHtml(item.order_number || '')}</td>
                 <td>${customerDisplay}</td>
                 <td>${escapeHtml(item.screening_item_name || '')}</td>
@@ -3870,8 +3878,8 @@
                     <input type="text" name="pr_machine_type[]" readonly class="form-control-plaintext" style="width: 100px;">
                 </td>
                 <td>
-                    <span class="current-user-name">${state.currentUser?.name || '當前用戶'}</span>
-                    <input type="hidden" name="pr_operator_name[]" value="${state.currentUser?.name || ''}">
+                    <span class="current-user-name">${escapeHtml(state.currentUser?.name || '當前用戶')}</span>
+                    <input type="hidden" name="pr_operator_name[]" value="${escapeHtml(state.currentUser?.name || '')}">
                 </td>
                 <td>
                     <input type="text" name="pr_notes[]" class="form-control" placeholder="備註">
@@ -3903,16 +3911,16 @@
             html += `
             <tr class="production-record-row">
                 <td>
-                    <input type="text" name="pr_card_number[]" value="${record.card_number || ''}" readonly class="form-control-plaintext" style="width: 80px;">
+                    <input type="text" name="pr_card_number[]" value="${escapeHtml(record.card_number || '')}" readonly class="form-control-plaintext" style="width: 80px;">
                 </td>
                 <td>
                     <input type="number" name="pr_weight_kg[]" value="${record.weight_kg || ''}" step="0.01" class="form-control" style="width: 80px;" placeholder="重量">
                 </td>
                 <td>
-                    <input type="date" name="pr_date[]" value="${record.production_date || ''}" class="form-control" style="width: 130px;">
+                    <input type="date" name="pr_date[]" value="${escapeHtml(record.production_date || '')}" class="form-control" style="width: 130px;">
                 </td>
                 <td>
-                    <input type="time" name="pr_time[]" value="${record.production_time ? record.production_time.substring(0, 5) : ''}" class="form-control" style="width: 110px;">
+                    <input type="time" name="pr_time[]" value="${escapeHtml(record.production_time ? record.production_time.substring(0, 5) : '')}" class="form-control" style="width: 110px;">
                 </td>
                 <td>
                     <select name="pr_machine_id[]" class="form-control" style="width: 120px;" onchange="updateMachineType(this)">
@@ -3921,14 +3929,14 @@
                     </select>
                 </td>
                 <td>
-                    <input type="text" name="pr_machine_type[]" value="${record.machine_type || ''}" readonly class="form-control-plaintext" style="width: 100px;">
+                    <input type="text" name="pr_machine_type[]" value="${escapeHtml(record.machine_type || '')}" readonly class="form-control-plaintext" style="width: 100px;">
                 </td>
                 <td>
-                    <span class="current-user-name">${record.employee_name || state.currentUser?.name || ''}</span>
-                    <input type="hidden" name="pr_operator_name[]" value="${record.employee_name || state.currentUser?.name || ''}">
+                    <span class="current-user-name">${escapeHtml(record.employee_name || state.currentUser?.name || '')}</span>
+                    <input type="hidden" name="pr_operator_name[]" value="${escapeHtml(record.employee_name || state.currentUser?.name || '')}">
                 </td>
                 <td>
-                    <input type="text" name="pr_notes[]" value="${record.notes || ''}" class="form-control" placeholder="備註">
+                    <input type="text" name="pr_notes[]" value="${escapeHtml(record.notes || '')}" class="form-control" placeholder="備註">
                 </td>
                 <td>
                     <button type="button" class="btn icon danger" onclick="this.closest('tr').remove()">
@@ -3994,10 +4002,10 @@
                     <input type="number" name="pr_weight_kg[]" value="${existingRecord.weight_kg || ''}" step="0.01" class="form-control" style="width: 80px;" placeholder="重量">
                 </td>
                 <td>
-                    <input type="date" name="pr_date[]" value="${existingRecord.production_date || ''}" class="form-control" style="width: 130px;">
+                    <input type="date" name="pr_date[]" value="${escapeHtml(existingRecord.production_date || '')}" class="form-control" style="width: 130px;">
                 </td>
                 <td>
-                    <input type="time" name="pr_time[]" value="${existingRecord.production_time ? existingRecord.production_time.substring(0, 5) : ''}" class="form-control" style="width: 110px;">
+                    <input type="time" name="pr_time[]" value="${escapeHtml(existingRecord.production_time ? existingRecord.production_time.substring(0, 5) : '')}" class="form-control" style="width: 110px;">
                 </td>
                 <td>
                     <select name="pr_machine_id[]" class="form-control" style="width: 120px;" onchange="updateMachineType(this)">
@@ -4006,14 +4014,14 @@
                     </select>
                 </td>
                 <td>
-                    <input type="text" name="pr_machine_type[]" value="${existingRecord.machine_type || ''}" readonly class="form-control-plaintext" style="width: 100px;">
+                    <input type="text" name="pr_machine_type[]" value="${escapeHtml(existingRecord.machine_type || '')}" readonly class="form-control-plaintext" style="width: 100px;">
                 </td>
                 <td>
-                    <span class="current-user-name">${existingRecord.employee_name || state.currentUser?.name || '當前用戶'}</span>
-                    <input type="hidden" name="pr_operator_name[]" value="${existingRecord.employee_name || state.currentUser?.name || ''}">
+                    <span class="current-user-name">${escapeHtml(existingRecord.employee_name || state.currentUser?.name || '當前用戶')}</span>
+                    <input type="hidden" name="pr_operator_name[]" value="${escapeHtml(existingRecord.employee_name || state.currentUser?.name || '')}">
                 </td>
                 <td>
-                    <input type="text" name="pr_notes[]" value="${existingRecord.notes || ''}" class="form-control" placeholder="備註">
+                    <input type="text" name="pr_notes[]" value="${escapeHtml(existingRecord.notes || '')}" class="form-control" placeholder="備註">
                 </td>
                 <td>
                     <button type="button" class="btn icon danger" onclick="this.closest('tr').remove()">
@@ -4741,7 +4749,7 @@
             'setup': '機台設定',
             'sample': '樣品/客戶提供'
         };
-        return labels[type] || type;
+        return escapeHtml(labels[type] || type || '-');
     }
 
     // Format datetime

@@ -752,7 +752,7 @@ function updateButtons() {
                         <td class="text-right">${getWeightVarianceCell(item)}</td>
                         <td>${item.tools && item.tools.length > 0 ? [...new Set(item.tools.map(t => escapeHtml(t.tool_type || '')).filter(Boolean))].join(', ') || '-' : '-'}</td>
                         <td class="text-right">${item.tools && item.tools.length > 0 ? item.tools.map(t => formatNumber(t.weight_kg ?? 0, 4)).join(', ') : '-'}</td>
-                        <td class="text-right">${item.tools && item.tools.length > 0 ? item.tools.map(t => t.quantity ?? 0).join(', ') : '-'}</td>
+                        <td class="text-right">${item.tools && item.tools.length > 0 ? item.tools.map(t => Number(t.quantity) || 0).join(', ') : '-'}</td>
                         <td class="table-actions">
                             <button type="button" class="btn text" data-action="create-work-order" title="${workOrderBtnTitle}" ${workOrderBtnAttr}>
                                 <i class="fas fa-cogs"></i>
@@ -1709,7 +1709,7 @@ function updateButtons() {
             const badges = Array.from(typeMap.entries())
                 .map(([type, qty]) => `
                     <span class="type-badge">
-                        <span class="type-name">${type}</span>
+                        <span class="type-name">${escapeHtml(type)}</span>
                         <span class="type-count">${Math.round(qty)}</span>
                     </span>
                 `).join('');

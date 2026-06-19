@@ -12,13 +12,11 @@
  * ============================================================
  *
  * 快速指南：
- * 1. 在下方 SUPPORTED_MODULES 陣列加入模組名稱
- * 2. 在 _getManagerKey 的 keyMap 加入對應的 key
- * 3. 在模組 HTML 加入：
+ * 1. 在模組 HTML 加入：
  *    - data-module="模組名稱"
  *    - data-模組名稱-column-selector (欄位選擇器)
  *    - data-模組名稱-table (表格)
- * 4. 表格更新後呼叫 manager.onTableUpdated()
+ * 2. 表格更新後呼叫 manager.onTableUpdated()
  *
  * 注意：模組名稱用 snake_case，data 屬性用 kebab-case
  * 例如：order_items -> data-order-items-table
@@ -29,51 +27,6 @@
 
     // 使用 WeakMap 追蹤已初始化的模組元素，避免記憶體洩漏
     const initializedModules = new WeakMap();
-
-    /**
-     * 支援欄位管理的模組清單
-     * 【新增模組時】在此加入模組名稱（snake_case 格式）
-     */
-    const SUPPORTED_MODULES = [
-        'customers',
-        'suppliers',
-        'orders',
-        'order_items',
-        'employees',
-        'machines',
-        'tools',
-        'screening_items',
-        'screening_services',
-        'work_orders',
-        'inventory_items',
-        'audit_logs',
-        'companies',
-        'departments',
-        'shipping_orders',
-        'shipping_order_items',
-        'inventory_transactions',
-        'production_quality_records',
-        'return_orders',
-        'roles',
-        'permissions',
-        'role_permissions',
-        'lookup_domains',
-        'number_sequences',
-        'employee_roles',
-        'calendar_event_participants',
-        'calendar_event_reminders',
-        'daily_machine_inspection_items',
-        'daily_machine_inspections',
-        'dashboard_calendar_events',
-        'domain_event_outbox',
-        'machine_maintenance_tasks',
-        'production_records',
-        'quality_issue_reports',
-        'shipping_quality_inspections',
-        'system_parameters',
-        'work_order_first_piece_dimensions'
-        // 新增模組時在此加入
-    ];
 
     /**
      * 欄位管理器類別
@@ -117,7 +70,7 @@
             this._bindAction('toggle-column-selector', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this._toggleColumnSelector();
+                this._toggleColumnSelector(e.currentTarget);
             });
 
             // 關閉欄位選擇器
@@ -166,7 +119,7 @@
             });
         }
 
-        _toggleColumnSelector() {
+        _toggleColumnSelector(triggerButton) {
             if (this.columnSelector) {
                 // 統一用 hidden class 控制顯隱，不設定 inline display style
                 // 這樣 CSS 的 display: flex 才能正確生效，避免覆蓋為 block 導致佈局錯誤
@@ -175,17 +128,48 @@
                 if (isHidden) {
                     this.columnSelector.classList.remove('hidden');
                     this.columnSelector.style.display = '';  // 清除 inline style，讓 CSS flex 生效
+                    this._positionColumnSelector(triggerButton);
                 } else {
-                    this.columnSelector.classList.add('hidden');
-                    this.columnSelector.style.display = '';  // 清除 inline style
+                    this._closeColumnSelector();
                 }
             }
+        }
+
+        _positionColumnSelector(triggerButton) {
+            if (!this.columnSelector || !triggerButton) return;
+
+            const triggerRect = triggerButton.getBoundingClientRect();
+            const panelWidth = this.columnSelector.offsetWidth || 280;
+            const panelHeight = this.columnSelector.offsetHeight || 320;
+            const viewportPadding = 12;
+            const left = Math.max(
+                viewportPadding,
+                Math.min(triggerRect.right - panelWidth, window.innerWidth - panelWidth - viewportPadding)
+            );
+            const spaceBelow = window.innerHeight - triggerRect.bottom - viewportPadding;
+            const spaceAbove = triggerRect.top - viewportPadding;
+            const openAbove = spaceBelow < Math.min(panelHeight, 240) && spaceAbove > spaceBelow;
+            const availableHeight = Math.max(160, openAbove ? spaceAbove - 8 : spaceBelow - 8);
+            const top = openAbove
+                ? Math.max(viewportPadding, triggerRect.top - Math.min(panelHeight, availableHeight) - 8)
+                : triggerRect.bottom + 8;
+
+            this.columnSelector.style.top = `${top}px`;
+            this.columnSelector.style.left = `${left}px`;
+            this.columnSelector.style.right = 'auto';
+            this.columnSelector.style.transform = 'none';
+            this.columnSelector.style.maxHeight = `${availableHeight}px`;
         }
 
         _closeColumnSelector() {
             if (this.columnSelector) {
                 this.columnSelector.classList.add('hidden');
                 this.columnSelector.style.display = '';  // 清除 inline style
+                this.columnSelector.style.top = '';
+                this.columnSelector.style.left = '';
+                this.columnSelector.style.right = '';
+                this.columnSelector.style.transform = '';
+                this.columnSelector.style.maxHeight = '';
             }
         }
 
@@ -307,11 +291,6 @@
             const moduleName = moduleRoot.dataset.module;
             if (!moduleName) return null;
 
-            // 檢查是否在支援清單中
-            if (!SUPPORTED_MODULES.includes(moduleName)) {
-                return null;
-            }
-
             // 建立欄位管理器
             const manager = new ColumnManager(moduleName, moduleRoot);
 
@@ -331,7 +310,7 @@
 
         /**
          * 取得管理器在 window 上的 key
-         * 【新增模組時】在 keyMap 加入對應的 key
+         * 既有模組沿用舊全域名稱；新模組自動轉成 camelCase。
          */
         _getManagerKey(moduleName) {
             // 模組名稱 -> window 變數名稱 (camelCase + ColumnManager)
@@ -375,18 +354,16 @@
                 'work_order_first_piece_dimensions': 'workOrderFirstPieceDimensionColumnManager'
                 // 新增模組時在此加入
             };
-            return keyMap[moduleName] || `${moduleName}ColumnManager`;
+            const camelName = moduleName.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+            return keyMap[moduleName] || `${camelName}ColumnManager`;
         },
 
         /**
          * 掃描並初始化所有模組
          */
         scanAndInit() {
-            SUPPORTED_MODULES.forEach(moduleName => {
-                const modules = document.querySelectorAll(`[data-module="${moduleName}"]`);
-                modules.forEach(moduleRoot => {
-                    this.initModule(moduleRoot);
-                });
+            document.querySelectorAll('[data-module]').forEach(moduleRoot => {
+                this.initModule(moduleRoot);
             });
         },
 

@@ -178,7 +178,7 @@
                     <td>${escapeHtml(r.role_name)}</td>
                     <td>
                         <button type="button" class="btn text danger" data-action="delete" data-employee-id="${r.employee_id}" data-role-id="${r.role_id}" title="刪除">
-                            <i class="fas fa-trash-alt"></i>
+                            <i class="fas fa-trash"></i>
                         </button>
                     </td>
                 </tr>

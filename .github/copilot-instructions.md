@@ -79,7 +79,7 @@
 1. `git diff -- index.html index.php` 確認雙入口一致。
 2. 執行：
     - `powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1`
-    - `node tools/audit-system-health.js`
+    - `node tools/audit-system-health.js --changed --base origin/main`
 3. 以至少兩種角色驗證：
     - 有權限：看得到側邊欄功能。
     - 無權限：看不到側邊欄功能。
@@ -242,25 +242,37 @@ node tools/validate-config-modules.js
 4. ✅ 混合模式必須有對應的 HTML 檔案
 5. ✅ Modal 尺寸必須使用標準值
 6. ✅ 表格操作按鈕必須使用標準樣式
+7. ✅ 表格操作按鈕必須有 `data-action`、禁止 inline `onclick`、禁止衝突色彩 class，且 action 與 Font Awesome icon 必須一致
 
 ---
 
 #### 工具 2：系統健康度審計（新增或修改功能模組時必跑）
 
-**所有 AI Agent 在新增或修改功能模組（API、前端 JS、HTML、列印範本）前後，必須執行審計工具：**
+**所有 AI Agent 在新增或修改功能模組（API、前端 JS、HTML、列印範本）前後，必須執行 changed audit：**
 
 ```bash
-# 開始修改前，先執行審計
-node tools/audit-system-health.js
+# 開始修改前，確認目前相對 main 沒有新增問題
+node tools/audit-system-health.js --changed --base origin/main
 
-# 修改後，再次執行審計（確認未引入新問題）
-node tools/audit-system-health.js
+# 修改後，再次執行（必須為 0 new / 0 blocking）
+node tools/audit-system-health.js --changed --base origin/main
 
-# 顯示詳細修復建議
+# 完整盤點與修復提示（會包含已知歷史問題）
 node tools/audit-system-health.js --fix-hints
+
+# 產生完整 Markdown 報告
+node tools/audit-system-health.js --write docs/system-health-audit.md
 ```
 
-**如果審計出現 ❌ 錯誤，必須修復後才能繼續！⚠️ 警告應盡快處理。**
+強制判定：
+
+1. changed audit 的 `new` 與 `blocking` 必須為 `0`。
+2. P0 安全、權限與資料破壞問題永遠阻擋，不得寫入基準線。
+3. 完整審計中的 `existing` 是已登錄歷史債務，不可因本輪修改增加。
+4. 禁止為了讓檢查通過而自行執行 `--update-baseline`、刪除基準項目、修改 fingerprint 或放寬規則。
+5. 基準線只能在人工確認新增、已解決與誤判項目後，以 `--update-baseline --confirm-reviewed-baseline` 明確執行，並必須檢查 `tools/audit-baseline.json` 差異。
+6. 修改審計框架本身時，必須執行 `node tools/test-audit-system.js`。
+7. Pull Request 由 `.github/workflows/system-health-audit.yml` 自動執行核心測試、配置驗證、DataSync、完整審計與 changed audit。
 
 ##### 工具 2 審計涵蓋範圍
 
@@ -296,10 +308,10 @@ node tools/audit-system-health.js --fix-hints
 
 ```bash
 # 一次執行兩個工具
-node tools/validate-config-modules.js && node tools/audit-system-health.js
+node tools/validate-config-modules.js && node tools/audit-system-health.js --changed --base origin/main
 ```
 
-**如果任何驗證失敗，必須修復後才能繼續！**
+**如果配置驗證失敗，或 changed audit 出現新增／阻擋項目，必須修復後才能繼續。**
 
 ---
 
@@ -385,7 +397,7 @@ php -r "require 'api/bootstrap.php'; require 'api/system_update_common.php'; ech
 1. 進入專案根目錄 `C:\Apache24\htdocs\mes`。
 2. 建立或更新 release note 檔案（放在 `release-notes/`）。
 3. release note 內容 **固定只保留最新三筆**（每行一筆）。
-4. 執行審計工具（`node tools/audit-system-health.js`）並記錄結果。
+4. 執行 changed audit（`node tools/audit-system-health.js --changed --base origin/main`）並確認無新增問題；另執行完整審計並記錄歷史債務結果。
 5. 若有變更 PHP API，至少執行 `php -l` 做語法檢查。
 
 ### 打包命令規範（強制）
@@ -772,6 +784,10 @@ iconClass: 'fas fa-search'
 5. 若同時有 `title` / `aria-label`，需符合下列統一命名；不得混用「查看 / 明細 / 詳情」等多種詞。
 6. 停用的「圖示操作按鈕」若需要滑鼠提示文字（tooltip），禁止只加原生 `disabled`；需使用 `aria-disabled="true"` 並保留 hover 能力。
 7. 狀態型提示（例如：`已轉為庫存項目`、`不可刪除原因`）不得只依賴按鈕本體 `title`，需放在外層包裝節點，避免被瀏覽器停用行為或全域標準化覆蓋。
+8. 同一 `data-action` 必須使用同一顏色與 Font Awesome icon；顏色與 icon 由 `script.js` 的全域操作按鈕標準化映射及 `styles.css` 的 `.op-role-*` 統一控制。
+9. 模組不得自行加入 `purple`、`success`、`warning`、`danger` 等 class 改寫已納管 action 的顏色；狀態切換是唯一可保留 `success` / `warning` 輔助語意的例外。
+10. 可正常操作的按鈕不得使用灰色；灰色只適用於 `disabled`、`aria-disabled="true"`，或仍需點擊查看阻擋原因的 `op-role-blocked`。
+11. 表格操作按鈕必須使用 `data-action`，禁止只靠 inline `onclick`；共用標準化器會自動補上 `.table-actions`、統一 tooltip、顏色與 icon。
 
 ##### 停用圖示按鈕 Tooltip 防呆（2026-05-31 新增，強制）
 
@@ -885,31 +901,32 @@ iconClass: 'fas fa-search'
 系統使用 `api/common/column_manager.js` 提供表格欄位顯示/隱藏功能。
 **此功能完全自動初始化，不需要在模組 JS 中寫任何初始化程式碼。**
 
+### 共用模組強制規則（2026-06-19 新增）
+
+1. 欄位設定是全系統共用功能，開關面板、全選、全不選、套用、localStorage 儲存、點擊外部關閉、面板定位與欄位顯示/隱藏，一律由 `api/common/column_manager.js` 負責。
+2. 禁止在 `js/{module}.js` 重新實作上述行為，也禁止建立模組專用的欄位設定 storage key、事件處理器或面板定位邏輯。
+3. `api/common/column_manager.js` 必須以 `[data-module]` 與對應的 `data-{module}-column-selector`、`data-{module}-table` 標記自動偵測，不得改回人工維護模組白名單；人工白名單容易造成新頁面有按鈕但功能未初始化。
+4. 配置化模組只需在 config 設定：
+    - `hasColumnSelector: true`
+    - 欲提供選擇的欄位設定 `selectable: true`
+    - 操作欄、checkbox、內部 ID 等不可選欄位設定 `selectable: false`
+5. 模組動態重繪 `<tbody>` 後，唯一允許的模組端欄位設定程式碼是通知共用管理器重新套用可見性：
+
+```javascript
+const manager = window.ColumnManagerAutoInit?.getManager('module_name');
+if (manager) {
+    manager.onTableUpdated();
+}
+```
+
+6. 若欄位設定按鈕無反應、面板位置錯誤、設定無法保存或套用後欄位錯位，必須優先修正共用管理器或 Renderer，不可先在單一模組加入補丁。
+7. 修改欄位設定共用功能後，至少選兩個配置化模組實際驗證，且必須包含本次回報問題的模組。
+
 ### 如何為新頁面加入欄位設定功能
 
-#### 步驟 1：在 column_manager.js 註冊模組
+#### 步驟 1：在模組 HTML 中加入必要的 data 屬性
 
-編輯 `api/common/column_manager.js`，在 `SUPPORTED_MODULES` 陣列中加入新模組名稱：
-
-```javascript
-const SUPPORTED_MODULES = [
-    'customers',
-    'suppliers',
-    // ... 其他模組
-    'your_new_module'  // <-- 加入這裡
-];
-```
-
-同時在 `_getManagerKey` 方法的 `keyMap` 中加入對應的 key：
-
-```javascript
-const keyMap = {
-    // ... 其他模組
-    'your_new_module': 'yourNewModuleColumnManager'
-};
-```
-
-#### 步驟 2：在模組 HTML 中加入必要的 data 屬性
+`api/common/column_manager.js` 會自動掃描所有 `[data-module]`，不需要另外維護模組白名單或初始化函式。
 
 ```html
 <!-- 模組根元素必須有 data-module 屬性 -->
@@ -956,7 +973,7 @@ const keyMap = {
 </div>
 ```
 
-#### 步驟 3：表格更新後重新套用可見性
+#### 步驟 2：表格更新後重新套用可見性
 
 如果模組 JS 中有動態更新表格內容（例如載入資料後 render），需要在更新後呼叫：
 
@@ -994,6 +1011,18 @@ if (manager) {
 3. **CSS 類別**：確保 `styles.css` 中有 `.hidden-column { display: none; }` 樣式
 
 4. **localStorage**：設定會自動儲存在 `{模組名稱}_visible_columns` key 中
+
+### 驗收清單（必做）
+
+- [ ] 點擊「欄位設定」後，面板顯示於觸發按鈕附近且不超出視窗。
+- [ ] 「全選」、「全不選」、「套用」功能正常。
+- [ ] 套用後表頭與資料欄位保持對齊。
+- [ ] 重新整理或重新開啟分頁後，欄位設定仍保留。
+- [ ] 動態重新載入列表後，隱藏欄位設定仍正確套用。
+- [ ] 模組 JS 沒有自行處理 `toggle-column-selector`、`select-all-columns`、`deselect-all-columns`、`apply-column-settings`。
+- [ ] 執行 `node --check api/common/column_manager.js`。
+- [ ] 執行 `node tools/validate-config-modules.js`。
+- [ ] 執行 `node tools/audit-system-health.js --changed --base origin/main`，確認 `new` 與 `blocking` 均為 0。
 
 ---
 
@@ -2345,7 +2374,7 @@ node tools/audit-data-sync.js --write docs/data-sync-audit.md
 2. 分布表合計與佔比計算使用 `defect_units_distribution`。
 3. 人工調整分布後，主值仍維持重量口徑，不得被分布合計覆蓋。
 4. 執行：
-    - `node tools/audit-system-health.js`
+    - `node tools/audit-system-health.js --changed --base origin/main`
     - `node --check js/work_orders.js`
     - `php -l api/reports/screening_inspection.php`
 

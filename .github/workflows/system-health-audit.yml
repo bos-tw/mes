@@ -1,0 +1,40 @@
+name: System Health Audit
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Test audit framework
+        run: node tools/test-audit-system.js
+
+      - name: Validate config modules
+        run: node tools/validate-config-modules.js
+
+      - name: Audit DataSync
+        run: node tools/audit-data-sync.js
+
+      - name: Run full system audit
+        run: node tools/audit-system-health.js
+
+      - name: Block changed regressions
+        if: github.event_name == 'pull_request'
+        run: node tools/audit-system-health.js --changed --base origin/${{ github.base_ref }}

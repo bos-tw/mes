@@ -289,8 +289,8 @@
                     <td data-column="total_quantity">${item.total_quantity || 0}</td>
                     <td data-column="processing_status">${getStatusBadge(item.processing_status)}</td>
                     <td data-column="created_at">${formatDateTime(item.created_at)}</td>
-                    <td>
-                        <button type="button" class="btn text" onclick="window.returnOrdersModule.print(${item.id})" title="列印">
+                    <td class="table-actions">
+                        <button type="button" class="btn text" data-action="print" data-id="${item.id}" title="列印">
                             <i class="fas fa-print"></i>
                         </button>
                         <button type="button" class="btn text" data-action="view" data-id="${item.id}" title="檢視">
@@ -335,7 +335,7 @@
                 'completed': '<span class="badge bg-success">已完成</span>',
                 'cancelled': '<span class="badge bg-secondary">已取消</span>',
             };
-            return statusMap[status] || `<span class="badge bg-secondary">${status || '未知'}</span>`;
+            return statusMap[status] || `<span class="badge bg-secondary">${escapeHtml(status || '未知')}</span>`;
         }
 
         // 渲染分頁
@@ -502,7 +502,7 @@
                 shippingOrderInfo = `
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <span><strong>${escapeHtml(data.shipping_order_number)}</strong></span>
-                        <button type="button" class="btn text" onclick="window.returnOrdersModule.goToShippingOrder(${data.original_shipping_order_id})" title="查看出貨單">
+                        <button type="button" class="btn text" data-action="goto-shipping-order" data-id="${data.original_shipping_order_id}" title="查看出貨單">
                             <i class="fas fa-external-link-alt"></i> 查看
                         </button>
                     </div>
@@ -881,6 +881,9 @@
                 case 'delete':
                     if (id) deleteData(id);
                     break;
+                case 'print':
+                    if (id) printReturnOrder(id);
+                    break;
             }
         }
 
@@ -912,6 +915,13 @@
                     closeDetailModal();
                     if (state.viewingId) openEditModal(state.viewingId);
                     break;
+                case 'goto-shipping-order': {
+                    const shippingOrderId = Number.parseInt(actionBtn.dataset.id || '', 10);
+                    if (Number.isInteger(shippingOrderId)) {
+                        goToShippingOrder(shippingOrderId);
+                    }
+                    break;
+                }
             }
         }
 

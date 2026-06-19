@@ -104,39 +104,19 @@ body {
 }
 ```
 
-### 2.3 連結按鈕（表格操作用）
+### 2.3 表格操作按鈕
 
 ```css
-.link {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #007bff;
-    padding: 4px 8px;
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
-}
-
-.link:hover {
-    background-color: rgba(0, 123, 255, 0.1);
-}
-
-.link.danger {
-    color: #dc3545;
-}
-
-.link.danger:hover {
-    background-color: rgba(220, 53, 69, 0.1);
-}
-
-.link.success {
-    color: #4CAF50;
-}
-
-.link.warning {
-    color: #ff9800;
-}
+.btn.text { /* 30x30 操作按鈕基底，實際顏色由 .op-role-* 控制 */ }
+.btn.text.danger { /* 刪除操作 */ }
+.op-role-print { background: #7c3aed; }
+.op-role-view { background: #0f766e; }
+.op-role-edit { background: #2563eb; }
 ```
+
+- 表格操作按鈕必須有 `data-action`，不得只使用 inline `onclick`。
+- 禁止以 `purple`、`success`、`warning` 等 class 自訂已納管 action 的顏色。
+- 可正常操作的按鈕不得使用灰色；灰色只用於停用或阻擋狀態。
 
 ---
 

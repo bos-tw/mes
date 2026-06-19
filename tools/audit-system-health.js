@@ -9,6 +9,10 @@
  * 使用方式：
  *   node tools/audit-system-health.js
  *   node tools/audit-system-health.js --fix-hints   (顯示更詳細的修復說明)
+ *   node tools/audit-system-health.js --format json
+ *   node tools/audit-system-health.js --write docs/system-health-audit.md
+ *   node tools/audit-system-health.js --changed --base origin/main
+ *   node tools/audit-system-health.js --update-baseline --confirm-reviewed-baseline
  *
  * 整合 validate-config-modules.js 之後，完整檢查請執行：
  *   node tools/validate-config-modules.js && node tools/audit-system-health.js
@@ -18,9 +22,44 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { createFinding } = require('./audit/core/finding');
+const {
+    buildReport,
+    renderJson,
+    writeReport
+} = require('./audit/core/reporter');
+const {
+    DEFAULT_BASELINE_PATH,
+    compareWithBaseline,
+    createBaseline,
+    loadBaseline,
+    writeBaseline
+} = require('./audit/core/baseline');
+const {
+    findingTouchesChangedFile,
+    getChangedFiles
+} = require('./audit/core/git-scope');
+const {
+    checkJsXssRisk: runJsXssRiskRule
+} = require('./audit/rules/frontend-xss');
+const {
+    checkJsFileSize: runJsFileSizeRule,
+    checkModuleHtmlStyle: runModuleHtmlStyleRule
+} = require('./audit/rules/frontend-quality');
+const {
+    checkDataSyncIntegration: runDataSyncAudit
+} = require('./audit/adapters/data-sync');
 
 const ROOT = path.resolve(__dirname, '..');
 const SHOW_FIX_HINTS = process.argv.includes('--fix-hints');
+const OUTPUT_FORMAT = getOptionValue('--format') || 'human';
+const OUTPUT_PATH = getOptionValue('--write');
+const BASELINE_PATH = getOptionValue('--baseline') || DEFAULT_BASELINE_PATH;
+const BASE_REF = getOptionValue('--base');
+const CHANGED_MODE = process.argv.includes('--changed');
+const UPDATE_BASELINE = process.argv.includes('--update-baseline');
+const CONFIRM_BASELINE_REVIEW = process.argv.includes('--confirm-reviewed-baseline');
+const IS_MACHINE_OUTPUT = OUTPUT_FORMAT === 'json';
 
 const ERRORS   = [];
 const WARNINGS = [];
@@ -30,16 +69,47 @@ const INFOS    = [];
 // 輔助函式
 // ─────────────────────────────────────────────
 
+function getOptionValue(optionName) {
+    const inlinePrefix = `${optionName}=`;
+    const inlineArg = process.argv.find(arg => arg.startsWith(inlinePrefix));
+    if (inlineArg) return inlineArg.slice(inlinePrefix.length);
+
+    const optionIndex = process.argv.indexOf(optionName);
+    if (optionIndex === -1) return null;
+
+    const value = process.argv[optionIndex + 1];
+    return value && !value.startsWith('--') ? value : null;
+}
+
 function err(category, file, rule, message, fix) {
-    ERRORS.push({ category, file, rule, message, fix });
+    ERRORS.push(createFinding({
+        level: 'error',
+        category,
+        file,
+        rule,
+        message,
+        fix
+    }));
 }
 
 function warn(category, file, rule, message, fix) {
-    WARNINGS.push({ category, file, rule, message, fix });
+    WARNINGS.push(createFinding({
+        level: 'warning',
+        category,
+        file,
+        rule,
+        message,
+        fix
+    }));
 }
 
 function info(category, file, note) {
-    INFOS.push({ category, file, note });
+    INFOS.push(createFinding({
+        level: 'info',
+        category,
+        file,
+        note
+    }));
 }
 
 function readFile(rel) {
@@ -285,27 +355,11 @@ function checkMethodFallback() {
 // F-1  JS 檔案過大
 // ─────────────────────────────────────────────
 function checkJsFileSize() {
-    console.log('🔍 [F-1] 檢查 JS 檔案大小...');
-
-    const WARN_LINES  = 1000;
-    const ERROR_LINES = 2000;
-
-    const jsDir = path.join(ROOT, 'js');
-    if (!fs.existsSync(jsDir)) return;
-
-    fs.readdirSync(jsDir).filter(f => f.endsWith('.js')).forEach(fname => {
-        const content = fs.readFileSync(path.join(jsDir, fname), 'utf-8');
-        const lines = content.split('\n').length;
-
-        if (lines >= ERROR_LINES) {
-            err('前端', `js/${fname}`, 'F-1 JS 檔案過大',
-                `${fname} 有 ${lines} 行，超過建議上限 ${ERROR_LINES} 行`,
-                '將模組拆分為：資料存取層、業務邏輯層、UI 渲染層，分別存放在不同檔案中');
-        } else if (lines >= WARN_LINES) {
-            warn('前端', `js/${fname}`, 'F-1 JS 檔案過大',
-                `${fname} 有 ${lines} 行，接近建議上限（${WARN_LINES} 行）`,
-                '考慮將部分功能（例如列印、匯出、詳情顯示）拆分到獨立模組');
-        }
+    runJsFileSizeRule({
+        root: ROOT,
+        reportError: err,
+        reportWarning: warn,
+        log: console.log
     });
 }
 
@@ -421,47 +475,11 @@ function checkJsModuleStructure() {
 // J-2  JS 模組 XSS 風險（innerHTML 未用 escapeHtml）
 // ─────────────────────────────────────────────
 function checkJsXssRisk() {
-    console.log('🔍 [J-2] 檢查 JS innerHTML XSS 風險...');
-
-    const jsDir = path.join(ROOT, 'js');
-    if (!fs.existsSync(jsDir)) return;
-
-    const EXCLUDE = ['utils.js', 'data-sync.js', 'column_manager.js'];
-
-    // 安全的插值：純數字/布林/格式化函數輸出/data-id 屬性
-    const SAFE_CONTEXT = /formatDate|formatNumber|formatCurrency|formatDateTime|\.textContent|data-id=|data-page=|data-action=|item\.id\b|data\.id\b|record\.id\b|row\.id\b|\|\|\s*0|\|\|\s*'-'|parseInt|parseFloat|Number\(/;
-
-    fs.readdirSync(jsDir)
-        .filter(f => f.endsWith('.js') && !f.endsWith('.bak') && !EXCLUDE.includes(f))
-        .forEach(fname => {
-            const lines = fs.readFileSync(path.join(jsDir, fname), 'utf-8').split('\n');
-            const hits = [];
-
-            lines.forEach((line, i) => {
-                const trimmed = line.trim();
-                // 跳過註解行
-                if (trimmed.startsWith('//')) return;
-                // ① 單行 innerHTML 賦值含有模板插值
-                if (/innerHTML\s*[+]?=/.test(trimmed) && /\$\{/.test(trimmed)) {
-                    if (!trimmed.includes('escapeHtml') && !SAFE_CONTEXT.test(trimmed)) {
-                        hits.push(`L${i + 1}`);
-                    }
-                }
-                // ② 多行模板字串內部行：HTML 標籤直接包裹未逸出的插值
-                // 典型模式：`<td>${item.name}</td>`、`<span>${data.customer}</span>`
-                if (/<(?:td|th|span|div|p|li|a|label|h[1-6]|strong|em)[^>]*>\$\{/.test(trimmed)) {
-                    if (!trimmed.includes('escapeHtml') && !SAFE_CONTEXT.test(trimmed)) {
-                        hits.push(`L${i + 1}`);
-                    }
-                }
-            });
-
-            if (hits.length > 0) {
-                err('前端', `js/${fname}`, 'J-2 XSS 風險：innerHTML 未用 escapeHtml',
-                    `${fname} 在 ${hits.join(', ')} 行直接將伺服器資料插入 innerHTML 而未呼叫 escapeHtml()，可能導致 XSS`,
-                    '所有插入 innerHTML 的使用者提供的字串欄位（名稱、地址、備註等）必須用 escapeHtml() 包裹');
-            }
-        });
+    runJsXssRiskRule({
+        root: ROOT,
+        reportError: err,
+        log: console.log
+    });
 }
 
 // ─────────────────────────────────────────────
@@ -854,83 +872,12 @@ function checkConfigFileFormat() {
 // M-1  modules/*.html 模組 HTML 樣式規範
 // ─────────────────────────────────────────────
 function checkModuleHtmlStyle() {
-    console.log('🔍 [M-1] 檢查 modules/ HTML 樣式規範...');
-
-    const modulesDir = path.join(ROOT, 'modules');
-    if (!fs.existsSync(modulesDir)) return;
-
-    // 按鈕 class 含有 btn-style 關鍵字但缺少 "btn" 前綴（支援多個類別，如 class="primary large"）
-    // 正確用法是 class="btn primary"、class="btn outline"
-    const BTN_ALONE_REGEX = /class=["'](?![^"']*\bbtn\b)[^"']*(primary|outline|danger|secondary|ghost|text)(?![a-z-])[^"']*["']/;
-
-    // 舊式/已棄用的按鈕樣式類別
-    const DEPRECATED_BTN_REGEX = /class=["'][^"']*(btn-icon|icon-btn|btn-primary|btn-danger|btn-default)[^"']*["']/;
-
-    // Bootstrap 表格類別（此系統不使用 Bootstrap）
-    const BOOTSTRAP_TABLE_REGEX = /class=["'][^"']*(table-bordered|table-hover|table-striped|table-condensed)[^"']*["']/;
-
-    // inline style：僅排除整個 style 值恰好為 "display:none"（JS 隱藏用途），其餘均視為違規
-    const INLINE_STYLE_REGEX = /style="(?!display:\s*none\s*;?\s*")/;
-
-    fs.readdirSync(modulesDir)
-        .filter(f => f.endsWith('.html') && !f.endsWith('.bak'))
-        .forEach(fname => {
-            const filePath = path.join(modulesDir, fname);
-            const lines = fs.readFileSync(filePath, 'utf-8').split('\n');
-            const btnErrors = [];
-            const deprecatedBtnErrors = [];
-            const bootstrapErrors = [];
-            const inlineStyleWarnings = [];
-
-            lines.forEach((line, i) => {
-                const trimmed = line.trim();
-                if (trimmed.startsWith('<!--')) return; // 跳過 HTML 注釋行
-
-                // 檢查按鈕缺少 btn 前綴（只檢查 <button 標籤）
-                if (/<button/.test(trimmed)) {
-                    if (BTN_ALONE_REGEX.test(trimmed)) {
-                        btnErrors.push(`L${i + 1}`);
-                    }
-                    if (DEPRECATED_BTN_REGEX.test(trimmed)) {
-                        deprecatedBtnErrors.push(`L${i + 1}`);
-                    }
-                }
-
-                // 檢查 Bootstrap 表格類別
-                if (BOOTSTRAP_TABLE_REGEX.test(trimmed)) {
-                    bootstrapErrors.push(`L${i + 1}`);
-                }
-
-                // 檢查 inline style（排除 display:none）
-                if (INLINE_STYLE_REGEX.test(trimmed)) {
-                    inlineStyleWarnings.push(`L${i + 1}`);
-                }
-            });
-
-            if (btnErrors.length > 0) {
-                err('前端', `modules/${fname}`, 'M-1 按鈕缺少 btn 前綴',
-                    `${fname} 在 ${btnErrors.join(', ')} 行的按鈕 class 缺少 btn 前綴（如 class="outline" 應為 class="btn outline"）`,
-                    '所有按鈕必須使用 class="btn primary"、class="btn outline" 等完整樣式，不可只用 class="primary"');
-            }
-
-            if (deprecatedBtnErrors.length > 0) {
-                warn('前端', `modules/${fname}`, 'M-1 已棄用的按鈕樣式',
-                    `${fname} 在 ${deprecatedBtnErrors.join(', ')} 行使用了已棄用的按鈕類別（btn-icon、icon-btn 等）`,
-                    '改用 class="btn text" 或 class="btn text danger"，移除 btn-icon、icon-btn 等已棄用樣式');
-            }
-
-            if (bootstrapErrors.length > 0) {
-                err('前端', `modules/${fname}`, 'M-1 Bootstrap 表格類別',
-                    `${fname} 在 ${bootstrapErrors.join(', ')} 行使用了 Bootstrap 表格類別（系統不使用 Bootstrap）`,
-                    '改用系統表格類別 class="data-table"，移除 table-bordered、table-hover、table-striped 等 Bootstrap 類別');
-            }
-
-            if (inlineStyleWarnings.length > 0) {
-                warn('前端', `modules/${fname}`, 'M-1 HTML 內聯樣式',
-                    `${fname} 在 ${inlineStyleWarnings.join(', ')} 行有 inline style（除 display:none 外均應移至 CSS）`,
-                    '將 inline style 移至 styles.css，欄位寬度使用 .col-80/.col-100 等工具類別，佈局用 .subsection-header/.info-box 等語義類別');
-            }
-        });
+    runModuleHtmlStyleRule({
+        root: ROOT,
+        reportError: err,
+        reportWarning: warn,
+        log: console.log
+    });
 }
 
 // ─────────────────────────────────────────────
@@ -996,42 +943,51 @@ function checkPhpApiSecurity() {
 // DS-1  DataSync 跨分頁同步整合檢查
 // ─────────────────────────────────────────────
 function checkDataSyncIntegration() {
-    console.log('🔍 [DS-1] 檢查 DataSync 跨分頁同步整合...');
+    runDataSyncAudit({
+        reportError: err,
+        reportInfo: info,
+        log: console.log
+    });
+}
 
-    const jsDir = path.join(ROOT, 'js');
-    if (!fs.existsSync(jsDir)) return;
+function getCurrentCommit() {
+    try {
+        return require('child_process')
+            .execFileSync('git', ['rev-parse', 'HEAD'], {
+                cwd: ROOT,
+                encoding: 'utf8',
+                stdio: ['ignore', 'pipe', 'pipe']
+            })
+            .trim();
+    } catch (error) {
+        return null;
+    }
+}
 
-    const EXCLUDE = ['utils.js', 'data-sync.js', 'column_manager.js'];
+function printChangedSummary(report) {
+    const comparison = report.comparison;
+    const scope = report.scope;
 
-    fs.readdirSync(jsDir)
-        .filter(f => f.endsWith('.js') && !f.endsWith('.bak') && !EXCLUDE.includes(f))
-        .forEach(fname => {
-            const content = fs.readFileSync(path.join(jsDir, fname), 'utf-8');
+    console.log('\n📊 基準線比較結果\n');
+    console.log(`  新增: ${comparison.summary.new}`);
+    console.log(`  既有: ${comparison.summary.existing}`);
+    console.log(`  已解決: ${comparison.summary.resolved}`);
+    console.log(`  阻擋: ${comparison.summary.blocking}`);
+    console.log(`  變更檔案: ${scope.changedFiles.length}`);
 
-            // 只檢查有初始化函數的模組（功能模組，非工具腳本）
-            const hasInit = /window\.initialize\w+/.test(content);
-            if (!hasInit) return;
-
-            const hasDataSync = content.includes('DataSync.createModuleHelper') ||
-                                content.includes('dataSyncHelper');
-
-            if (!hasDataSync) {
-                warn('架構', `js/${fname}`, 'DS-1 缺少 DataSync 整合',
-                    `${fname} 有初始化函數但未使用 DataSync.createModuleHelper()，其他分頁的相同模組不會自動同步`,
-                    `在模組初始化時加入:\n  dataSyncHelper = DataSync.createModuleHelper('模組名稱', { onRefresh: () => loadData() });`);
-                return;
-            }
-
-            // 有 DataSync 但 CRUD 成功後未 notify
-            const hasCrudPost = /method\s*:\s*['"](?:POST|PUT|DELETE)['"]/.test(content);
-            const hasNotify   = /dataSyncHelper\.notify(?:Created|Updated|Deleted)/.test(content);
-
-            if (hasCrudPost && !hasNotify) {
-                warn('架構', `js/${fname}`, 'DS-1 CRUD 後未呼叫 notify',
-                    `${fname} 有 POST/PUT/DELETE 操作但找不到 dataSyncHelper.notify*() 呼叫，其他分頁不會收到更新通知`,
-                    'CRUD 成功回調後加入 dataSyncHelper.notifyCreated/Updated/Deleted(data)');
-            }
+    if (comparison.new.length > 0) {
+        console.log('\n【本次新增或不可基準化】');
+        comparison.new.forEach((finding, index) => {
+            const scopeLabel = finding.inChangedScope ? '變更範圍內' : '全域';
+            console.log(`  ${index + 1}. [${finding.severity}] [${finding.rule}] (${scopeLabel})`);
+            console.log(`      檔案: ${finding.file}`);
+            console.log(`      問題: ${finding.message || finding.note}`);
         });
+    }
+
+    if (comparison.resolved.length > 0) {
+        console.log(`\n✅ 已解決 ${comparison.resolved.length} 項歷史問題，可在確認後更新基準線。`);
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -1229,38 +1185,176 @@ function checkSplitWorkOrderIntegrity() {
 // ─────────────────────────────────────────────
 function runAllChecks() {
     const sep = '═'.repeat(65);
-    console.log(`\n${sep}`);
-    console.log('  MES 系統健康度審計工具 v1.3');
-    console.log(`${sep}\n`);
+    const originalConsoleLog = console.log;
 
-    checkHardcodedCredentials();
-    checkPermissionSystem();
-    checkRoleFiles();
-    checkPrintTemplateCredentials();
-    checkLoginStatusCheck();
-    checkReportDescriptionsNaming();
-    checkMissingDeleteEndpoints();
-    checkMethodFallback();
-    checkJsFileSize();
-    checkJsConsoleLog();
-    checkJsModuleStructure();
-    checkJsXssRisk();
-    checkPrintTemplateCsrf();
-    checkDualStatusFields();
-    checkOrderItemsSoftDelete();
-    checkApiModuleStructure();
-    showDatabaseHints();
-    checkPrintApiPaths();
-    checkConfigFilesLoadedInIndex();
-    checkExportEndpoints();
-    checkHelpDirectoryIntegrity();
-    checkCoreScriptLoadOrder();
-    checkConfigFileFormat();
-    checkModuleHtmlStyle();
-    checkPhpApiSecurity();
-    checkDataSyncIntegration();
-    checkWorkflowDeleteGuard();
-    checkSplitWorkOrderIntegrity();
+    if (!IS_MACHINE_OUTPUT) {
+        console.log(`\n${sep}`);
+        console.log('  MES 系統健康度審計工具 v1.4');
+        console.log(`${sep}\n`);
+    }
+
+    if (IS_MACHINE_OUTPUT || CHANGED_MODE || UPDATE_BASELINE) {
+        console.log = () => {};
+    }
+
+    try {
+        checkHardcodedCredentials();
+        checkPermissionSystem();
+        checkRoleFiles();
+        checkPrintTemplateCredentials();
+        checkLoginStatusCheck();
+        checkReportDescriptionsNaming();
+        checkMissingDeleteEndpoints();
+        checkMethodFallback();
+        checkJsFileSize();
+        checkJsConsoleLog();
+        checkJsModuleStructure();
+        checkJsXssRisk();
+        checkPrintTemplateCsrf();
+        checkDualStatusFields();
+        checkOrderItemsSoftDelete();
+        checkApiModuleStructure();
+        showDatabaseHints();
+        checkPrintApiPaths();
+        checkConfigFilesLoadedInIndex();
+        checkExportEndpoints();
+        checkHelpDirectoryIntegrity();
+        checkCoreScriptLoadOrder();
+        checkConfigFileFormat();
+        checkModuleHtmlStyle();
+        checkPhpApiSecurity();
+        checkDataSyncIntegration();
+        checkWorkflowDeleteGuard();
+        checkSplitWorkOrderIntegrity();
+    } finally {
+        console.log = originalConsoleLog;
+    }
+
+    const report = buildReport(ERRORS, WARNINGS, INFOS);
+    let exitCode = ERRORS.length > 0 ? 1 : 0;
+
+    if (UPDATE_BASELINE) {
+        if (!CONFIRM_BASELINE_REVIEW) {
+            report.baselineUpdate = {
+                written: false,
+                reason: 'review-confirmation-required',
+                blockedBy: []
+            };
+            exitCode = 2;
+        } else {
+            const nonBaselineable = report.findings.filter(finding =>
+                finding.severity !== 'Info' &&
+                (finding.severity === 'P0' || !finding.baselineAllowed)
+            );
+
+            if (nonBaselineable.length > 0) {
+                report.baselineUpdate = {
+                    written: false,
+                    reason: 'non-baselineable-findings',
+                    blockedBy: nonBaselineable.map(finding => finding.fingerprint)
+                };
+                exitCode = 1;
+            } else {
+                const baseline = createBaseline(report, {
+                    sourceCommit: getCurrentCommit()
+                });
+                const writtenPath = writeBaseline(ROOT, BASELINE_PATH, baseline);
+                report.baselineUpdate = {
+                    written: true,
+                    path: path.relative(ROOT, writtenPath),
+                    findings: baseline.summary.findings
+                };
+                exitCode = 0;
+            }
+        }
+    }
+
+    if (CHANGED_MODE) {
+        let baseline;
+        try {
+            baseline = loadBaseline(ROOT, BASELINE_PATH);
+        } catch (error) {
+            report.auditError = {
+                code: 'INVALID_BASELINE',
+                message: error.message
+            };
+            exitCode = 2;
+        }
+
+        if (!baseline && !report.auditError) {
+            report.auditError = {
+                code: 'BASELINE_NOT_FOUND',
+                message: `找不到審計基準線：${BASELINE_PATH}`
+            };
+            exitCode = 2;
+        }
+
+        if (baseline) {
+            try {
+                const changedFiles = getChangedFiles(ROOT, BASE_REF);
+                const comparison = compareWithBaseline(report, baseline);
+
+                comparison.new = comparison.new.map(finding => ({
+                    ...finding,
+                    inChangedScope: findingTouchesChangedFile(finding, changedFiles)
+                }));
+                comparison.blocking = comparison.blocking.map(finding => ({
+                    ...finding,
+                    inChangedScope: findingTouchesChangedFile(finding, changedFiles)
+                }));
+
+                report.scope = {
+                    baseRef: BASE_REF || null,
+                    changedFiles
+                };
+                report.comparison = comparison;
+                exitCode = comparison.summary.blocking > 0 ? 1 : 0;
+            } catch (error) {
+                report.auditError = {
+                    code: 'GIT_SCOPE_FAILED',
+                    message: error.message
+                };
+                exitCode = 2;
+            }
+        }
+    }
+
+    if (OUTPUT_PATH) {
+        const writtenPath = writeReport(ROOT, OUTPUT_PATH, report);
+        if (!IS_MACHINE_OUTPUT) {
+            console.log(`\n📝 審計報告已寫入：${path.relative(ROOT, writtenPath)}`);
+        }
+    }
+
+    if (IS_MACHINE_OUTPUT) {
+        process.stdout.write(renderJson(report));
+        process.exit(exitCode);
+    }
+
+    if (UPDATE_BASELINE) {
+        if (report.baselineUpdate.written) {
+            console.log(`\n✅ 審計基準線已寫入：${report.baselineUpdate.path}`);
+            console.log(`   已收錄 ${report.baselineUpdate.findings} 項可基準化歷史問題。`);
+        } else if (report.baselineUpdate.reason === 'review-confirmation-required') {
+            console.log('\n❌ 基準線未更新：缺少 --confirm-reviewed-baseline。');
+            console.log('   請先人工確認新增、已解決與誤判項目，再明確確認更新。');
+        } else {
+            console.log('\n❌ 基準線未更新：目前存在不可基準化的 P0 問題。');
+        }
+        process.exit(exitCode);
+    }
+
+    if (CHANGED_MODE) {
+        if (report.auditError) {
+            console.log(`\n❌ ${report.auditError.message}`);
+        } else {
+            printChangedSummary(report);
+            console.log(exitCode === 0
+                ? '\n✅ 本次變更未新增審計問題。\n'
+                : '\n❌ 本次變更新增或暴露不可基準化問題。\n');
+        }
+        process.exit(exitCode);
+    }
 
     // ── 輸出報告 ──────────────────────────────
     console.log(`\n${sep}`);

@@ -156,7 +156,7 @@
     function formatResult(result) {
         const map = { 'pass': '合格', 'fail': '不合格', 'conditional': '有條件合格' };
         const cls = result === 'pass' ? 'active' : (result === 'fail' ? 'inactive' : 'pending');
-        return `<span class="status-badge ${cls}">${map[result] || result}</span>`;
+        return `<span class="status-badge ${cls}">${escapeHtml(map[result] || result || '-')}</span>`;
     }
 
     function renderPagination() {

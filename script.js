@@ -381,11 +381,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         'op-role-view',
         'op-role-edit',
         'op-role-delete',
+        'op-role-blocked',
         'op-role-print',
         'op-role-screening-report',
         'op-role-expand',
         'op-role-order-items',
         'op-role-shipping',
+        'op-role-add',
+        'op-role-copy',
+        'op-role-state',
         'op-role-reply',
         'op-role-mark-read',
         'op-role-workflow',
@@ -401,6 +405,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         show: 'view',
         preview: 'view',
         'preview-logo': 'view',
+        'view-work-order': 'view',
+        'view-shipping-order': 'view',
+        'view-return-orders': 'view',
+        'open-attachment': 'view',
+        'open-invoice-stamp': 'view',
         'open-order-items': 'order-items',
         edit: 'edit',
         'edit-draft': 'edit',
@@ -417,18 +426,80 @@ document.addEventListener('DOMContentLoaded', async () => {
         'delete-selected': 'delete',
         'delete-image': 'delete',
         'delete-logo': 'delete',
+        'clear-attachment': 'delete',
+        'clear-invoice-stamp': 'delete',
+        'delete-blocked': 'blocked',
+        'delete-item': 'delete',
         print: 'print',
         'print-detail': 'print',
         'print-single': 'print',
         'print-work-order': 'print',
         'print-screening-report': 'screening-report',
+        'add-item': 'add',
+        'copy-order-item': 'copy',
+        'toggle-active': 'state',
+        'set-active-logo': 'state',
         'create-work-order': 'workflow',
         'convert-to-inventory': 'workflow',
+        'remove-from-machine-schedule': 'workflow',
+        'quick-return': 'workflow',
         'add-to-shipping': 'shipping',
         'goto-work-order': 'navigate',
         'go-work-order': 'navigate',
+        'goto-shipping-order': 'navigate',
         reply: 'reply',
         'mark-read': 'mark-read',
+    });
+    const OPERATION_ACTION_ICON_MAP = Object.freeze({
+        view: 'fa-eye',
+        'view-detail': 'fa-eye',
+        'view-details': 'fa-eye',
+        detail: 'fa-eye',
+        show: 'fa-eye',
+        preview: 'fa-eye',
+        'preview-logo': 'fa-eye',
+        'view-work-order': 'fa-eye',
+        'view-shipping-order': 'fa-eye',
+        'view-return-orders': 'fa-eye',
+        'open-attachment': 'fa-external-link-alt',
+        'open-invoice-stamp': 'fa-external-link-alt',
+        'open-order-items': 'fa-list-ul',
+        edit: 'fa-edit',
+        'edit-draft': 'fa-edit',
+        'edit-from-detail': 'fa-edit',
+        'edit-order-item': 'fa-edit',
+        'edit-order-item-inline': 'fa-edit',
+        'edit-screening-item': 'fa-edit',
+        'edit-work-order': 'fa-edit',
+        delete: 'fa-trash',
+        'delete-order-item': 'fa-trash',
+        'delete-order-item-inline': 'fa-trash',
+        'delete-screening-item': 'fa-trash',
+        'delete-work-order': 'fa-trash',
+        'delete-selected': 'fa-trash',
+        'delete-image': 'fa-trash',
+        'delete-logo': 'fa-trash',
+        'clear-attachment': 'fa-trash',
+        'clear-invoice-stamp': 'fa-trash',
+        'delete-blocked': 'fa-trash',
+        'delete-item': 'fa-trash',
+        print: 'fa-print',
+        'print-detail': 'fa-print',
+        'print-single': 'fa-print',
+        'print-work-order': 'fa-print',
+        'print-screening-report': 'fa-file-medical-alt',
+        'add-item': 'fa-plus',
+        'copy-order-item': 'fa-copy',
+        'create-work-order': 'fa-industry',
+        'convert-to-inventory': 'fa-cogs',
+        'remove-from-machine-schedule': 'fa-undo',
+        'quick-return': 'fa-undo',
+        'add-to-shipping': 'fa-truck',
+        'goto-work-order': 'fa-external-link-alt',
+        'go-work-order': 'fa-external-link-alt',
+        'goto-shipping-order': 'fa-external-link-alt',
+        reply: 'fa-reply',
+        'mark-read': 'fa-check',
     });
     const OPERATION_ACTION_LABEL_MAP = Object.freeze({
         view: '檢視',
@@ -438,6 +509,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         show: '檢視',
         preview: '檢視',
         'preview-logo': '檢視',
+        'view-work-order': '檢視',
+        'view-shipping-order': '檢視出貨單',
+        'view-return-orders': '檢視退貨單',
+        'open-attachment': '開啟附件',
+        'open-invoice-stamp': '開啟附件',
         'open-order-items': '客戶批號',
         edit: '編輯',
         'edit-draft': '編輯',
@@ -454,11 +530,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         'delete-selected': '刪除',
         'delete-image': '刪除',
         'delete-logo': '刪除',
+        'clear-attachment': '移除附件',
+        'clear-invoice-stamp': '移除附件',
+        'delete-blocked': '無法刪除',
+        'delete-item': '刪除',
         print: '列印',
         'print-detail': '列印',
         'print-single': '列印',
         'print-work-order': '列印工單',
         'print-screening-report': '列印篩分檢驗結果報表',
+        'add-item': '新增項目',
+        'copy-order-item': '複製',
+        'remove-from-machine-schedule': '移回待排程',
+        'quick-return': '快速退貨',
+        'goto-shipping-order': '前往出貨單',
         reply: '回覆',
         'mark-read': '標記已讀',
     });
@@ -682,16 +767,29 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        actionElement.classList.add('op-action-btn');
+        actionElement.classList.add('btn', 'text', 'op-action-btn');
+        actionElement.classList.remove('btn-icon', 'icon-button', 'icon-btn', 'link', 'purple');
         OPERATION_ACTION_ROLE_CLASSES.forEach(roleClass => actionElement.classList.remove(roleClass));
 
         const role = OPERATION_ACTION_ROLE_MAP[action] || 'neutral';
+        if (role !== 'state') {
+            actionElement.classList.remove('success', 'warning', 'danger');
+        }
         actionElement.classList.add(`op-role-${role}`);
 
         if (Object.prototype.hasOwnProperty.call(OPERATION_ACTION_LABEL_MAP, action)) {
             const label = OPERATION_ACTION_LABEL_MAP[action];
             actionElement.setAttribute('title', label);
             actionElement.setAttribute('aria-label', label);
+        }
+
+        const iconClass = OPERATION_ACTION_ICON_MAP[action];
+        const icon = iconClass ? actionElement.querySelector('i') : null;
+        if (icon) {
+            Array.from(icon.classList)
+                .filter(className => className.startsWith('fa-') && className !== 'fa-fw')
+                .forEach(className => icon.classList.remove(className));
+            icon.classList.add('fas', iconClass);
         }
     }
 
@@ -700,21 +798,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             return [];
         }
 
-        const cells = [];
+        const cells = new Set();
+
+        const addCandidateCells = (root) => {
+            root.querySelectorAll?.('td').forEach(cell => {
+                if (cell.querySelector(':scope > .btn.text[data-action], :scope > .op-disabled-title-wrap .btn.text[data-action]')) {
+                    cells.add(cell);
+                }
+            });
+        };
 
         if (scope instanceof Element) {
             if (scope.matches(OPERATION_ACTION_CELL_SELECTOR)) {
-                cells.push(scope);
+                cells.add(scope);
             }
-            cells.push(...scope.querySelectorAll(OPERATION_ACTION_CELL_SELECTOR));
-            return cells;
+            scope.querySelectorAll(OPERATION_ACTION_CELL_SELECTOR).forEach(cell => cells.add(cell));
+            addCandidateCells(scope);
+            return Array.from(cells);
         }
 
         if (scope instanceof Document || scope instanceof DocumentFragment) {
-            cells.push(...scope.querySelectorAll(OPERATION_ACTION_CELL_SELECTOR));
+            scope.querySelectorAll(OPERATION_ACTION_CELL_SELECTOR).forEach(cell => cells.add(cell));
+            addCandidateCells(scope);
         }
 
-        return cells;
+        return Array.from(cells);
     }
 
     function normalizeOperationActionButtons(scope = document) {
@@ -724,6 +832,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         actionCells.forEach(cell => {
+            cell.classList.add('table-actions');
             cell.querySelectorAll(OPERATION_ACTION_SELECTOR).forEach(normalizeOperationActionElement);
         });
     }

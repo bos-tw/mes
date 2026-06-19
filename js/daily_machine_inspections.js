@@ -227,7 +227,7 @@
                             <i class="fas fa-edit"></i>
                         </button>
                         <button type="button" class="btn text danger" data-action="delete" data-id="${r.id}" title="刪除">
-                            <i class="fas fa-trash-alt"></i>
+                            <i class="fas fa-trash"></i>
                         </button>
                     </td>
                 </tr>

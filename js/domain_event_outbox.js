@@ -80,7 +80,7 @@
                 'failed': { class: 'cancelled', text: '失敗' },
             };
             const info = statusMap[status] || { class: 'pending', text: status || '-' };
-            return `<span class="status-badge ${info.class}">${info.text}</span>`;
+            return `<span class="status-badge ${info.class}">${escapeHtml(info.text)}</span>`;
         }
 
         // API 請求

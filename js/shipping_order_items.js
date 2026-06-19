@@ -77,6 +77,18 @@
                         loadItems();
                     });
                 });
+
+                elements.table.addEventListener('click', (event) => {
+                    const actionButton = event.target.closest('button[data-action="view-shipping-order"]');
+                    if (!actionButton) {
+                        return;
+                    }
+
+                    const orderId = Number.parseInt(actionButton.dataset.orderId || '', 10);
+                    if (Number.isInteger(orderId)) {
+                        viewOrder(orderId);
+                    }
+                });
             }
         }
 
@@ -205,7 +217,7 @@ function renderTable(items) {
                     <td><span class="status-badge ${statusClass}">${getStatusLabel(item.order_status)}</span></td>
                     <td>${formatDateTime(item.created_at)}</td>
                     <td class="table-actions">
-                        <button type="button" class="btn text" title="檢視出貨單" onclick="window.shippingOrderItemsModule.viewOrder(${item.shipping_order_id})">
+                        <button type="button" class="btn text" data-action="view-shipping-order" data-order-id="${item.shipping_order_id}" title="檢視出貨單">
                             <i class="fas fa-eye"></i>
                         </button>
                     </td>
@@ -320,7 +332,7 @@ function renderTable(items) {
 
         function getStatusLabel(status) {
             const found = state.shippingStatuses.find(s => s.value_key === status);
-            if (found) return found.value_label;
+            if (found) return escapeHtml(found.value_label);
 
             const labels = {
                 'draft': '草稿',
@@ -331,7 +343,7 @@ function renderTable(items) {
                 'delivered': '已送達',
                 'cancelled': '已取消'
             };
-            return labels[status] || status || '-';
+            return escapeHtml(labels[status] || status || '-');
         }
 
         function getStatusClass(status) {

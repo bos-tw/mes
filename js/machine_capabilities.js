@@ -131,8 +131,8 @@
 
             tableBody.innerHTML = state.data.map((item) => `
                 <tr data-id="${item.id}">
-                    <td>${escapeHtml(item.capability_code || '-')}</td>
                     <td>${escapeHtml(item.capability_name || '-')}</td>
+                    <td>${escapeHtml(item.capability_code || '-')}</td>
                     <td>${escapeHtml(item.description || '-')}</td>
                     <td>${escapeHtml(String(item.machine_count ?? 0))}</td>
                     <td>${escapeHtml(String(item.sort_order ?? 0))}</td>
@@ -144,6 +144,11 @@
                     </td>
                 </tr>
             `).join('');
+
+            const columnManager = window.ColumnManagerAutoInit?.getManager('machine_capabilities');
+            if (columnManager) {
+                columnManager.onTableUpdated();
+            }
         }
 
         function renderPagination() {

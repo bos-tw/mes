@@ -67,6 +67,17 @@ input:focus, select:focus, textarea:focus {
 .btn.text.danger { color: var(--danger); background: transparent; }
 ```
 
+## 表格操作按鈕語意（強制）
+
+- 列印：紫色 `#7c3aed`，圖示 `fa-print`
+- 檢視：teal `#0f766e`，圖示 `fa-eye`
+- 編輯：藍色 `#2563eb`，圖示 `fa-edit`
+- 刪除：紅色 `#dc3545`，圖示 `fa-trash`
+- 新增：綠色，圖示 `fa-plus`
+- 流程操作：棕橘色
+- 灰色只允許 `disabled`、`aria-disabled="true"` 或阻擋操作
+- 顏色與圖示由 `data-action` 的共用映射控制，模組不得自行覆寫
+
 ## 狀態標籤（Badge）
 
 ```css

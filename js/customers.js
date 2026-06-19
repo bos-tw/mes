@@ -800,12 +800,13 @@ function setFieldValue(name, value, form = modalForm) {
                 const nameDisplay = isActive
                     ? escapeHtml(customer.name)
                     : `${escapeHtml(customer.name)} <span class="text-muted">(已停用)</span>`;
+                const renderedName = customer.name ? nameDisplay : '-';
 
                 return `
                     <tr data-id="${customer.id}" class="${isActive ? '' : 'row-inactive'}">
                         <td class="checkbox-col"><input type="checkbox" data-action="select-row" aria-label="選擇客戶 ${escapeHtml(customer.customer_number || customer.id)}" ${isChecked}></td>
                         <td>${customer.customer_number ? escapeHtml(customer.customer_number) : '-'}</td>
-                        <td>${customer.name ? nameDisplay : '-'}</td>
+                        <td>${renderedName}</td>
                         <td>${statusBadge}</td>
                         <td>${customer.contact_person ? escapeHtml(customer.contact_person) : '-'}</td>
                         <td>${customer.phone ? escapeHtml(customer.phone) : '-'}</td>
@@ -815,7 +816,7 @@ function setFieldValue(name, value, form = modalForm) {
                         <td>${formatBillingDay(customer.billing_day)}</td>
                         <td>${customer.payment_method ? escapeHtml(customer.payment_method) : '-'}</td>
                         <td>${formatCurrency(customer.minimum_order_amount)}</td>
-                        <td>${customer.weight_tolerance_percentage != null ? customer.weight_tolerance_percentage + '%' : '3%'}</td>
+                        <td>${customer.weight_tolerance_percentage != null ? formatNumber(customer.weight_tolerance_percentage) + '%' : '3%'}</td>
                         <td>${customer.tax_id ? escapeHtml(customer.tax_id) : '-'}</td>
                         <td>${formatNotes(customer.notes)}</td>
                         <td>${formatDateTime(customer.created_at)}</td>

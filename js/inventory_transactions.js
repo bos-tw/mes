@@ -156,7 +156,7 @@
     
 function renderDetailContent(item) {
             if (!elements.detailContent) return;
-            const directionLabel = item.direction_label || getDirectionLabel(item.direction);
+            const directionLabel = escapeHtml(item.direction_label || getDirectionLabel(item.direction));
             const directionClass = getDirectionClass(item.direction);
             const sourceInfo = buildSourceInfo(item);
 
@@ -267,7 +267,7 @@ function renderDetailContent(item) {
             }
 
             elements.tbody.innerHTML = items.map(item => {
-                const directionLabel = item.direction_label || getDirectionLabel(item.direction);
+                const directionLabel = escapeHtml(item.direction_label || getDirectionLabel(item.direction));
                 const directionClass = getDirectionClass(item.direction);
                 const qty = formatNumber(item.quantity);
                 const afterQty = formatNumber(item.after_quantity);
@@ -359,14 +359,14 @@ function renderDetailContent(item) {
         function buildSourceDisplay(item) {
             // 優先顯示工單號，其次訂單號，最後 ref_type
             if (item.work_order_number) {
-                return `<span class="source-tag work-order">工單 ${item.work_order_number}</span>`;
+                return `<span class="source-tag work-order">工單 ${escapeHtml(item.work_order_number)}</span>`;
             }
             if (item.order_number) {
-                return `<span class="source-tag order">訂單 ${item.order_number}</span>`;
+                return `<span class="source-tag order">訂單 ${escapeHtml(item.order_number)}</span>`;
             }
             const refLabel = getRefTypeLabel(item.ref_type);
             if (item.ref_type && item.ref_id) {
-                return `<span class="source-tag">${refLabel} #${item.ref_id}</span>`;
+                return `<span class="source-tag">${escapeHtml(refLabel)} #${Number(item.ref_id) || 0}</span>`;
             }
             return refLabel || '-';
         }
@@ -389,7 +389,7 @@ function renderDetailContent(item) {
             inventory_transactions: '庫存異動',
             adjustment: '手動調整',
         };
-        return map[refType] || refType;
+        return escapeHtml(map[refType] || refType || '-');
     }
 
     function getDirectionLabel(direction) {

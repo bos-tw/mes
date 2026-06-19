@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-06-19T03:16:59.643Z",
+  "sourceCommit": "8988e72280ce00da3190e991d38030e7e8cd0919",
+  "reviewed": true,
+  "summary": {
+    "findings": 17,
+    "bySeverity": {
+      "P2": 17
+    }
+  },
+  "findings": [
+    {
+      "fingerprint": "2569531724d46504f495",
+      "ruleId": "A-3",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "架構",
+      "file": "api/status_board/delete.php",
+      "message": "api/status_board/delete.php 允許 POST 作為 PUT/DELETE 的替代方法（HTTP 方法偽裝）",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "28b22f715d7ef38e8814",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/order_items.js",
+      "message": "order_items.js 有 3408 行，超過建議上限 2000 行",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "2df35344dd8a47875497",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/production_work_order_schedule.js",
+      "message": "production_work_order_schedule.js 有 1612 行，接近建議上限（1000 行）",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "3b32cc62081808ba46a0",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/suppliers.js",
+      "message": "suppliers.js 有 1213 行，接近建議上限（1000 行）",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "536b0d46eca4f5dfd2b8",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/orders.js",
+      "message": "orders.js 有 2128 行，超過建議上限 2000 行",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "63364875d47341b7f895",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/employees.js",
+      "message": "employees.js 有 1156 行，接近建議上限（1000 行）",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "671f1038e7c5eef2226d",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/inventory_items.js",
+      "message": "inventory_items.js 有 1924 行，接近建議上限（1000 行）",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "962579225d213a1ee189",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/companies.js",
+      "message": "companies.js 有 1175 行，接近建議上限（1000 行）",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "a9629ac8b1bb132a29cc",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/messages.js",
+      "message": "messages.js 有 1447 行，接近建議上限（1000 行）",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "ad07d9d7485250a033a9",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/shipping_orders.js",
+      "message": "shipping_orders.js 有 2255 行，超過建議上限 2000 行",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "ad468ee41e962907e41c",
+      "ruleId": "D-3",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "資料完整性",
+      "file": "api/employees, api/login.php, api/reports, api/return_orders, api/work_orders",
+      "message": "以下模組同時使用 status（varchar）和 status_lookup_id（FK），造成欄位語意重複：api/employees, api/login.php, api/reports, api/return_orders, api/work_orders",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "c5aa25e3e7cd31e552ac",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/dashboard.js",
+      "message": "dashboard.js 有 1405 行，接近建議上限（1000 行）",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "c5dfb2b53dfd5b86d3c9",
+      "ruleId": "M-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "modules/order_items.html",
+      "message": "order_items.html 在 L427, L429, L430, L431, L432, L457, L458, L459, L460, L491, L492, L493, L494, L495, L496, L527, L528, L529, L530, L531, L532, L533, L534 行有 inline style（除 display:none 外均應移至 CSS）",
+      "confidence": "medium"
+    },
+    {
+      "fingerprint": "cd5869224e355d0acfc6",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/work_orders.js",
+      "message": "work_orders.js 有 4880 行，超過建議上限 2000 行",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "ddc3fe8b308a56b26ea8",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/customers.js",
+      "message": "customers.js 有 1672 行，接近建議上限（1000 行）",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "dfd2f21be2345767c3c5",
+      "ruleId": "F-1",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "前端",
+      "file": "js/return_orders.js",
+      "message": "return_orders.js 有 1256 行，接近建議上限（1000 行）",
+      "confidence": "high"
+    },
+    {
+      "fingerprint": "f5bc802e4552a0645e23",
+      "ruleId": "A-3",
+      "severity": "P2",
+      "classification": "policy-debt",
+      "domain": "架構",
+      "file": "api/status_board/update.php",
+      "message": "api/status_board/update.php 允許 POST 作為 PUT/DELETE 的替代方法（HTTP 方法偽裝）",
+      "confidence": "high"
+    }
+  ]
+}

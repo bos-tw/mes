@@ -129,6 +129,37 @@
                     loadInventoryItems();
                 });
             });
+
+            elements.table.addEventListener('click', (event) => {
+                const actionButton = event.target.closest('button[data-action]');
+                const row = actionButton?.closest('tr[data-id]');
+                if (!actionButton || !row || !elements.tbody?.contains(row)) {
+                    return;
+                }
+
+                const id = normalizeInventoryItemId(row.dataset.id);
+                if (!id) {
+                    return;
+                }
+
+                switch (actionButton.dataset.action) {
+                    case 'delete-blocked':
+                        showDeleteBlocked(id);
+                        break;
+                    case 'delete':
+                        handleDelete(id);
+                        break;
+                    case 'add-to-shipping':
+                        openShippingModal(id);
+                        break;
+                    case 'view':
+                        openDetailModal(id);
+                        break;
+                    case 'edit':
+                        openEditModal(id);
+                        break;
+                }
+            });
         }
 
         // Modal close buttons
@@ -546,10 +577,10 @@ function renderTable(items) {
                 state.deleteBlockReasons.set(Number(item.id), deleteBlockReason.alert);
             }
             const deleteButton = deleteBlockReason
-                ? `<button type="button" class="btn text op-action-btn op-role-delete" data-action="delete-blocked" title="${escapeHtml(deleteBlockReason.tooltip)}" aria-label="${escapeHtml(deleteBlockReason.tooltip)}" onclick="window.inventoryItemsModule.showDeleteBlocked(${item.id})">
+                ? `<button type="button" class="btn text op-action-btn op-role-blocked" data-action="delete-blocked" title="${escapeHtml(deleteBlockReason.tooltip)}" aria-label="${escapeHtml(deleteBlockReason.tooltip)}">
                         <i class="fas fa-trash"></i>
                     </button>`
-                : `<button type="button" class="btn text danger op-action-btn op-role-delete" data-action="delete" title="刪除" aria-label="刪除" onclick="window.inventoryItemsModule.delete(${item.id})">
+                : `<button type="button" class="btn text danger op-action-btn op-role-delete" data-action="delete" title="刪除" aria-label="刪除">
                         <i class="fas fa-trash"></i>
                     </button>`;
 
@@ -562,19 +593,19 @@ function renderTable(items) {
                 <td>${escapeHtml(item.screening_item_name) || '-'}</td>
                 <td>${formatNumber(item.quantity_on_hand)}</td>
                 <td>${parseFloat(item.net_weight_kg).toFixed(2)}</td>
-                <td><span class="status-badge ${qualityClass}">${getQualityStatusLabel(item.quality_status)}</span></td>
-                <td><span class="status-badge ${statusClass}">${getStatusLabel(item.status)}</span></td>
+                <td><span class="status-badge ${getQualityStatusClass(item.quality_status)}">${getQualityStatusLabel(item.quality_status)}</span></td>
+                <td><span class="status-badge ${getStatusClass(item.status)}">${getStatusLabel(item.status)}</span></td>
                 <td>${formatDateTime(item.received_at)}</td>
                 <td class="table-actions">
                     ${canShip ? `
-                    <button type="button" class="btn text op-action-btn op-role-shipping" data-action="add-to-shipping" title="${escapeHtml(shippingBtnTitle)}" onclick="window.inventoryItemsModule.openShippingModal(${item.id})">
+                    <button type="button" class="btn text op-action-btn op-role-shipping" data-action="add-to-shipping" title="${escapeHtml(shippingBtnTitle)}">
                         <i class="fas fa-shipping-fast"></i>
                     </button>
                     ` : ''}
-                    <button type="button" class="btn text op-action-btn op-role-view" data-action="view" title="檢視" aria-label="檢視" onclick="window.inventoryItemsModule.viewDetail(${item.id})">
+                    <button type="button" class="btn text op-action-btn op-role-view" data-action="view" title="檢視" aria-label="檢視">
                         <i class="fas fa-eye"></i>
                     </button>
-                    <button type="button" class="btn text op-action-btn op-role-edit" data-action="edit" title="編輯" aria-label="編輯" onclick="window.inventoryItemsModule.edit(${item.id})">
+                    <button type="button" class="btn text op-action-btn op-role-edit" data-action="edit" title="編輯" aria-label="編輯">
                         <i class="fas fa-edit"></i>
                     </button>
                     ${deleteButton}
@@ -647,11 +678,11 @@ function renderTable(items) {
                 </div>
                 <div>
                     <dt>庫存狀態</dt>
-                    <dd><span class="status-badge ${item.status ? item.status.toLowerCase().replace(/_/g, '-') : 'in-stock'}">${getStatusLabel(item.status)}</span></dd>
+                    <dd><span class="status-badge ${getStatusClass(item.status)}">${getStatusLabel(item.status)}</span></dd>
                 </div>
                 <div>
                     <dt>質量狀態</dt>
-                    <dd><span class="status-badge ${item.quality_status ? item.quality_status.toLowerCase().replace(/_/g, '-') : 'qualified'}">${getQualityStatusLabel(item.quality_status)}</span></dd>
+                    <dd><span class="status-badge ${getQualityStatusClass(item.quality_status)}">${getQualityStatusLabel(item.quality_status)}</span></dd>
                 </div>
             </dl>
 
@@ -851,7 +882,7 @@ function renderTable(items) {
             ${item.notes ? `
             <div class="detail-section">
                 <h4>備註</h4>
-                <p>${item.notes}</p>
+                        <p>${escapeHtml(item.notes)}</p>
             </div>
             ` : ''}
         `;
@@ -1715,7 +1746,7 @@ function renderTable(items) {
             'shipped': '已出貨',
             'consumed': '已耗用',
         };
-        return labels[status] || status;
+        return escapeHtml(labels[status] || status || '-');
     }
 
     function getQualityStatusClass(status) {
@@ -1735,7 +1766,7 @@ function renderTable(items) {
             'quarantine': '隔離',
             'rejected': '拒收',
         };
-        return labels[status] || status;
+        return escapeHtml(labels[status] || status || '-');
     }
 
     function buildWorkflowBlockedAlertMessage(type) {
@@ -1780,7 +1811,7 @@ function renderTable(items) {
             'return_order': '退貨單',
             'adjustment': '庫存調整',
         };
-        return labels[refType] || refType;
+        return escapeHtml(labels[refType] || refType || '-');
     }
 
     function getShippingStatusLabel(status) {

@@ -503,8 +503,32 @@ function printSplitWorkOrderDataSyncSummary(dependencies) {
     return issues;
 }
 
+function runAudit() {
+    const dependencies = parseDependencies();
+    const inverseDependencies = invertDependencies(dependencies);
+    const results = listModuleFiles()
+        .map((fileName) => analyzeModule(fileName, dependencies, inverseDependencies))
+        .sort((a, b) => priorityWeight(a.priority) - priorityWeight(b.priority) || a.moduleName.localeCompare(b.moduleName));
+    const splitWorkOrderIssues = checkSplitWorkOrderDataSync(dependencies);
+    const counts = results.reduce((summary, result) => {
+        summary[result.priority] = (summary[result.priority] || 0) + 1;
+        return summary;
+    }, { P0: 0, P1: 0, P2: 0, OK: 0 });
+
+    return {
+        schemaVersion: 1,
+        generatedAt: new Date().toISOString(),
+        counts,
+        dependencies,
+        results,
+        splitWorkOrderIssues
+    };
+}
+
 function main() {
     const args = process.argv.slice(2);
+    const jsonOutput = args.includes('--format=json') ||
+        (args.includes('--format') && args[args.indexOf('--format') + 1] === 'json');
     const writeIndex = args.findIndex((arg) => arg === '--write' || arg.startsWith('--write='));
     let reportPath = null;
 
@@ -517,23 +541,30 @@ function main() {
         }
     }
 
-    const dependencies = parseDependencies();
-    const inverseDependencies = invertDependencies(dependencies);
-    const results = listModuleFiles()
-        .map((fileName) => analyzeModule(fileName, dependencies, inverseDependencies))
-        .sort((a, b) => priorityWeight(a.priority) - priorityWeight(b.priority) || a.moduleName.localeCompare(b.moduleName));
-
-    printConsoleSummary(results);
-    printSplitWorkOrderDataSyncSummary(dependencies);
+    const audit = runAudit();
 
     if (reportPath) {
         fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-        fs.writeFileSync(reportPath, buildMarkdownReport(results, dependencies), 'utf8');
-        console.log(`Report written: ${path.relative(ROOT, reportPath)}`);
+        fs.writeFileSync(reportPath, buildMarkdownReport(audit.results, audit.dependencies), 'utf8');
     }
 
-    const hasP0 = results.some((result) => result.priority === 'P0');
-    process.exitCode = hasP0 ? 1 : 0;
+    if (jsonOutput) {
+        process.stdout.write(`${JSON.stringify(audit, null, 2)}\n`);
+    } else {
+        printConsoleSummary(audit.results);
+        printSplitWorkOrderDataSyncSummary(audit.dependencies);
+        if (reportPath) {
+            console.log(`Report written: ${path.relative(ROOT, reportPath)}`);
+        }
+    }
+
+    process.exitCode = audit.counts.P0 > 0 || audit.counts.P1 > 0 ? 1 : 0;
 }
 
-main();
+if (require.main === module) {
+    main();
+}
+
+module.exports = {
+    runAudit
+};

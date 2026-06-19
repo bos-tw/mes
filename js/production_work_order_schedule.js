@@ -530,7 +530,7 @@
                     <button type="button" class="btn text" data-action="edit-work-order" title="編輯" aria-label="編輯">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button type="button" class="btn text danger" data-action="remove-from-machine-schedule" title="移回待排程" aria-label="移回待排程">
+                    <button type="button" class="btn text" data-action="remove-from-machine-schedule" title="移回待排程" aria-label="移回待排程">
                         <i class="fas fa-reply"></i>
                     </button>
                     <button type="button" class="btn text" data-action="goto-work-order" title="前往工單" aria-label="前往工單">

@@ -203,6 +203,39 @@
                         updateSelectionState();
                     }
                 });
+
+                elements.table.addEventListener('click', (event) => {
+                    const actionButton = event.target.closest('button[data-action]');
+                    const row = actionButton?.closest('tr[data-id]');
+                    if (!actionButton || !row || !elements.tbody?.contains(row)) {
+                        return;
+                    }
+
+                    const id = Number.parseInt(row.dataset.id || '', 10);
+                    if (!Number.isInteger(id)) {
+                        return;
+                    }
+
+                    switch (actionButton.dataset.action) {
+                        case 'print':
+                            printShippingOrder(id);
+                            break;
+                        case 'view-details':
+                            openDetailModal(id);
+                            break;
+                        case 'edit':
+                            openEditModal(id);
+                            break;
+                        case 'add-item': {
+                            const customerId = Number.parseInt(actionButton.dataset.customerId || '', 10);
+                            openAddItemModal(id, Number.isInteger(customerId) ? customerId : null);
+                            break;
+                        }
+                        case 'delete':
+                            deleteShippingOrder(id);
+                            break;
+                    }
+                });
             }
 
             if (elements.selectAllCheckbox) {
@@ -227,6 +260,34 @@
                     });
 
                     updateSelectionState();
+                });
+            }
+
+            if (elements.detailContent) {
+                elements.detailContent.addEventListener('click', (event) => {
+                    const actionButton = event.target.closest('button[data-action]');
+                    if (!actionButton) {
+                        return;
+                    }
+
+                    const orderId = Number.parseInt(actionButton.dataset.orderId || '', 10);
+                    const itemId = Number.parseInt(actionButton.dataset.itemId || '', 10);
+
+                    switch (actionButton.dataset.action) {
+                        case 'delete-item':
+                            if (Number.isInteger(itemId) && Number.isInteger(orderId)) {
+                                handleDeleteItem(itemId, orderId);
+                            }
+                            break;
+                        case 'quick-return':
+                            if (Number.isInteger(orderId) && Number.isInteger(itemId)) {
+                                quickReturnItem(orderId, itemId);
+                            }
+                            break;
+                        case 'view-return-orders':
+                            window.openTab?.('return_orders', '退貨單', 'modules/return_orders.html');
+                            break;
+                    }
                 });
             }
 
@@ -603,21 +664,21 @@ function renderTable(items) {
                     <td><span class="status-badge ${statusClass}">${getStatusLabel(item.status)}</span></td>
                     <td>${formatDateTime(item.created_at)}</td>
                     <td class="table-actions">
-                        <button type="button" class="btn text" title="列印" onclick="window.shippingOrdersModule.print(${item.id})">
+                        <button type="button" class="btn text" data-action="print" title="列印">
                             <i class="fas fa-print"></i>
                         </button>
-                        <button type="button" class="btn text" title="項目/明細" onclick="window.shippingOrdersModule.viewDetail(${item.id})">
-                            <i class="fas fa-list"></i>
+                        <button type="button" class="btn text" data-action="view-details" title="項目/明細">
+                            <i class="fas fa-eye"></i>
                         </button>
-                        <button type="button" class="btn text" title="編輯" onclick="window.shippingOrdersModule.edit(${item.id})">
+                        <button type="button" class="btn text" data-action="edit" title="編輯">
                             <i class="fas fa-edit"></i>
                         </button>
                         ${item.status === 'draft' ? `
-                        <button type="button" class="btn text" title="新增項目" onclick="window.shippingOrdersModule.openAddItem(${item.id}, ${item.customer_id || 'null'})">
+                        <button type="button" class="btn text" data-action="add-item" data-customer-id="${item.customer_id || ''}" title="新增項目">
                             <i class="fas fa-plus"></i>
                         </button>
                         ` : ''}
-                        <button type="button" class="btn text danger" title="刪除" onclick="window.shippingOrdersModule.delete(${item.id})">
+                        <button type="button" class="btn text danger" data-action="delete" title="刪除">
                             <i class="fas fa-trash"></i>
                         </button>
                     </td>
@@ -871,6 +932,10 @@ function renderTable(items) {
                     returnStatusBadge = '<span class="status-badge success" style="margin-left: 0.5rem;"><i class="fas fa-check-circle"></i> 全部退貨</span>';
                 }
             }
+            const returnStatusClass = order.return_status === 'partial' ? 'warning' : 'success';
+            const returnStatusLabel = order.return_status === 'partial'
+                ? '部分退貨'
+                : (order.return_status === 'full' ? '全部退貨' : '無退貨');
 
             // 計算退貨統計
             const returnedItems = items.filter(item => parseFloat(item.total_returned || 0) > 0);
@@ -987,7 +1052,7 @@ function renderTable(items) {
                                         <td>${item.net_weight_kg ? parseFloat(item.net_weight_kg).toFixed(4) : '-'} kg</td>
                                         ${order.status === 'draft' ? `
                                         <td>
-                                            <button type="button" class="btn text danger" title="刪除" onclick="window.shippingOrdersModule.deleteItem(${item.id}, ${order.id})">
+                                            <button type="button" class="btn text danger" data-action="delete-item" data-item-id="${item.id}" data-order-id="${order.id}" title="刪除">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                         </td>
@@ -995,7 +1060,7 @@ function renderTable(items) {
                                         ${(order.status === 'shipped' || order.status === 'delivered') ? `
                                         <td>
                                             ${!isFullyReturned ? `
-                                            <button type="button" class="btn text" title="快速退貨" onclick="window.shippingOrdersModule.quickReturnItem(${order.id}, ${item.id})">
+                                            <button type="button" class="btn text" data-action="quick-return" data-order-id="${order.id}" data-item-id="${item.id}" title="快速退貨">
                                                 <i class="fas fa-undo"></i>
                                             </button>
                                             ` : ''}
@@ -1032,7 +1097,7 @@ function renderTable(items) {
                                         <td><span class="status-badge">${ro.processing_status || '-'}</span></td>
                                         <td>${formatNumber(ro.total_quantity || 0)}</td>
                                         <td>
-                                            <button type="button" class="btn text" title="查看退貨單" onclick="window.openTab('return_orders', '退貨單', 'modules/return_orders.html')">
+                                            <button type="button" class="btn text" data-action="view-return-orders" title="查看退貨單">
                                                 <i class="fas fa-eye"></i>
                                             </button>
                                         </td>
@@ -1598,7 +1663,7 @@ function renderTable(items) {
         function getStatusLabel(status) {
             // 先從 state.shippingStatuses 中查找
             const found = state.shippingStatuses.find(s => s.value_key === status);
-            if (found) return found.value_label;
+            if (found) return escapeHtml(found.value_label);
 
             // 備用靜態對應
             const labels = {
@@ -1610,7 +1675,7 @@ function renderTable(items) {
                 'delivered': '已送達',
                 'cancelled': '已取消'
             };
-            return labels[status] || status || '-';
+            return escapeHtml(labels[status] || status || '-');
         }
 
         function getStatusClass(status) {
@@ -1632,7 +1697,7 @@ function renderTable(items) {
                 'delivery': '宅配',
                 'freight': '貨運'
             };
-            return labels[method] || method || '-';
+            return escapeHtml(labels[method] || method || '-');
         }
 
         // ===== 退貨功能 =====
@@ -1738,7 +1803,7 @@ function renderTable(items) {
                     </div>
                     <div class="detail-item">
                         <span class="detail-label">退貨狀態</span>
-                        <span class="detail-value"><span class="status-badge ${order.return_status === 'partial' ? 'warning' : 'success'}">${order.return_status === 'partial' ? '部分退貨' : order.return_status === 'full' ? '全部退貨' : '無退貨'}</span></span>
+                        <span class="detail-value"><span class="status-badge ${returnStatusClass}">${returnStatusLabel}</span></span>
                     </div>
                 `;
 

@@ -399,10 +399,10 @@
 <button type="button" class="btn success">確認</button>
 
 <!-- 文字按鈕（表格內操作） -->
-<button type="button" class="link" data-action="edit" title="編輯">
+<button type="button" class="btn text" data-action="edit" title="編輯">
     <i class="fas fa-edit"></i>
 </button>
-<button type="button" class="link danger" data-action="delete" title="刪除">
+<button type="button" class="btn text danger" data-action="delete" title="刪除">
     <i class="fas fa-trash"></i>
 </button>
 ```

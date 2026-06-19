@@ -211,6 +211,147 @@ function checkTableButtonStyles() {
 }
 
 // ============================================
+// 規則 7: 操作按鈕語意、事件與圖示必須一致
+// ============================================
+function checkOperationButtonSemantics() {
+    console.log('\n🔍 檢查規則 7: 操作按鈕語意、事件與圖示必須一致...');
+
+    const scanTargets = [
+        { dir: 'js', extensions: ['.js'] },
+        { dir: 'modules', extensions: ['.html'] },
+        { dir: 'core/configs', extensions: ['.js'] }
+    ];
+    const expectedIcons = {
+        print: 'fa-print',
+        'print-detail': 'fa-print',
+        'print-single': 'fa-print',
+        'print-work-order': 'fa-print',
+        'print-screening-report': 'fa-file-medical-alt',
+        view: 'fa-eye',
+        'view-detail': 'fa-eye',
+        'view-details': 'fa-eye',
+        'view-work-order': 'fa-eye',
+        'view-shipping-order': 'fa-eye',
+        'view-return-orders': 'fa-eye',
+        edit: 'fa-edit',
+        'edit-work-order': 'fa-edit',
+        'edit-order-item': 'fa-edit',
+        'edit-order-item-inline': 'fa-edit',
+        'edit-screening-item': 'fa-edit',
+        delete: 'fa-trash',
+        'delete-item': 'fa-trash',
+        'delete-work-order': 'fa-trash',
+        'delete-order-item': 'fa-trash',
+        'delete-order-item-inline': 'fa-trash',
+        'delete-screening-item': 'fa-trash',
+        'delete-blocked': 'fa-trash',
+        'copy-order-item': 'fa-copy'
+    };
+    const semanticIcons = new Set(Object.values(expectedIcons));
+
+    scanTargets.forEach(({ dir, extensions }) => {
+        const absoluteDir = path.join(__dirname, '..', dir);
+        if (!fs.existsSync(absoluteDir)) return;
+
+        fs.readdirSync(absoluteDir)
+            .filter(file => extensions.includes(path.extname(file)))
+            .forEach(file => {
+                const filePath = path.join(absoluteDir, file);
+                const relativePath = `${dir}/${file}`.replace(/\\/g, '/');
+                const content = fs.readFileSync(filePath, 'utf-8');
+                const buttonPattern = /<button\b([^>]*)>([\s\S]*?)<\/button>/gi;
+                let match;
+
+                while ((match = buttonPattern.exec(content)) !== null) {
+                    const attributes = match[1];
+                    const body = match[2];
+                    const classMatch = attributes.match(/class=["']([^"']*)["']/i);
+                    const classNames = classMatch ? classMatch[1].split(/\s+/).filter(Boolean) : [];
+                    const isTableActionButton = classNames.includes('btn') && classNames.includes('text');
+                    if (!isTableActionButton) continue;
+
+                    const line = content.slice(0, match.index).split('\n').length;
+                    const action = attributes.match(/data-action=["']([^"']+)["']/i)?.[1] || '';
+                    const iconClasses = body.match(/<i\b[^>]*class=["']([^"']*)["']/i)?.[1]
+                        ?.split(/\s+/)
+                        .filter(Boolean) || [];
+                    const semanticIcon = iconClasses.find(icon => semanticIcons.has(icon));
+
+                    if (/\sonclick\s*=/i.test(attributes)) {
+                        ERRORS.push({
+                            file: relativePath,
+                            line,
+                            rule: '操作按鈕禁止 inline onclick',
+                            message: '表格操作按鈕使用 inline onclick，會繞過共用事件與樣式標準化',
+                            code: match[0].replace(/\s+/g, ' ').trim().substring(0, 120),
+                            fix: '改用 data-action 並在模組根節點或表格使用事件委派'
+                        });
+                    }
+
+                    if (semanticIcon && !action) {
+                        ERRORS.push({
+                            file: relativePath,
+                            line,
+                            rule: '操作按鈕必須有 data-action',
+                            message: `使用 ${semanticIcon} 圖示的表格按鈕缺少 data-action`,
+                            code: match[0].replace(/\s+/g, ' ').trim().substring(0, 120),
+                            fix: '加入符合語意的 data-action，交由全域操作按鈕標準化器處理'
+                        });
+                    }
+
+                    const expectedIcon = expectedIcons[action];
+                    if (expectedIcon && !iconClasses.includes(expectedIcon)) {
+                        ERRORS.push({
+                            file: relativePath,
+                            line,
+                            rule: '操作按鈕 icon 必須一致',
+                            message: `data-action="${action}" 必須使用 ${expectedIcon}`,
+                            code: match[0].replace(/\s+/g, ' ').trim().substring(0, 120),
+                            fix: `將 Font Awesome icon 改為 fas ${expectedIcon}`
+                        });
+                    }
+
+                    if (classNames.includes('purple')) {
+                        ERRORS.push({
+                            file: relativePath,
+                            line,
+                            rule: '操作按鈕禁止自訂顏色',
+                            message: '發現 purple 自訂色彩 class',
+                            fix: '移除自訂色彩 class，依 data-action 由 .op-role-* 統一套色'
+                        });
+                    }
+
+                    ['success', 'warning'].forEach(colorClass => {
+                        const stateAction = action === 'toggle-active' || action === 'set-active-logo';
+                        if (classNames.includes(colorClass) && !stateAction) {
+                            ERRORS.push({
+                                file: relativePath,
+                                line,
+                                rule: '操作按鈕禁止自訂顏色',
+                                message: `${colorClass} 僅允許用於狀態切換 action`,
+                                fix: '移除自訂色彩 class，依 data-action 由 .op-role-* 統一套色'
+                            });
+                        }
+                    });
+
+                    const isDeleteAction = action === 'delete'
+                        || action.startsWith('delete-')
+                        || action.startsWith('clear-');
+                    if (classNames.includes('danger') && !isDeleteAction) {
+                        ERRORS.push({
+                            file: relativePath,
+                            line,
+                            rule: '操作按鈕禁止自訂顏色',
+                            message: `data-action="${action || '(缺少)'}" 不得使用 danger`,
+                            fix: '移除 danger，依 data-action 的語意角色統一套色'
+                        });
+                    }
+                }
+            });
+    });
+}
+
+// ============================================
 // 執行所有檢查
 // ============================================
 function runAllChecks() {
@@ -223,6 +364,7 @@ function runAllChecks() {
     checkMixedModeHtmlFiles();
     checkModalSize();
     checkTableButtonStyles();
+    checkOperationButtonSemantics();
 
     console.log('\n' + '='.repeat(60));
     console.log('\n📊 驗證結果：\n');
