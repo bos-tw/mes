@@ -325,6 +325,27 @@ function formatList(items) {
     return items.length > 0 ? items.join(', ') : '-';
 }
 
+function translateIssue(issue) {
+    const labels = {
+        crud_module_without_dependents: 'CRUD 模組未設定相依刷新目標',
+        crud_module_without_notify: 'CRUD 模組未發送 DataSync 通知',
+        notify_module_without_dependencies: '通知模組未設定相依關係',
+        dependency_source_without_refresh_handler: '相依來源未設定刷新處理'
+    };
+    return labels[issue] || issue;
+}
+
+function translateSignal(signal) {
+    const labels = {
+        cache: '快取',
+        expanded_row: '展開列',
+        detail_modal: '明細視窗',
+        edit_modal: '編輯視窗',
+        button_state: '按鈕狀態'
+    };
+    return labels[signal] || signal;
+}
+
 function buildMarkdownReport(results, dependencies) {
     const generatedAt = new Date().toISOString();
     const counts = results.reduce((acc, result) => {
@@ -333,22 +354,22 @@ function buildMarkdownReport(results, dependencies) {
     }, {});
 
     const lines = [];
-    lines.push('# DataSync Audit Report');
+    lines.push('# DataSync 稽核報告');
     lines.push('');
-    lines.push(`Generated at: ${generatedAt}`);
+    lines.push(`產生時間：${generatedAt}`);
     lines.push('');
-    lines.push('## Summary');
+    lines.push('## 摘要');
     lines.push('');
     lines.push(`- P0: ${counts.P0 || 0}`);
     lines.push(`- P1: ${counts.P1 || 0}`);
     lines.push(`- P2: ${counts.P2 || 0}`);
-    lines.push(`- OK: ${counts.OK || 0}`);
-    lines.push(`- Dependency sources: ${Object.keys(dependencies).length}`);
-    lines.push(`- Stateful refresh review: ${results.filter((result) => result.statefulRefreshRisk).length}`);
+    lines.push(`- 通過：${counts.OK || 0}`);
+    lines.push(`- 相依來源數：${Object.keys(dependencies).length}`);
+    lines.push(`- 狀態型介面刷新檢查數：${results.filter((result) => result.statefulRefreshRisk).length}`);
     lines.push('');
-    lines.push('## Module Matrix');
+    lines.push('## 模組矩陣');
     lines.push('');
-    lines.push('| Priority | Module | Helper | CRUD | Notify | Dependents | Dependency Sources | Issues |');
+    lines.push('| 優先級 | 模組 | 輔助模組 | CRUD 方法 | 通知模組 | 相依刷新目標 | 相依來源 | 問題 |');
     lines.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
 
     results.forEach((result) => {
@@ -360,26 +381,26 @@ function buildMarkdownReport(results, dependencies) {
             formatList(result.notifyModules),
             formatList(result.dependents),
             formatList(result.dependencySources),
-            formatList(result.issues)
+            formatList(result.issues.map(translateIssue))
         ].map((value) => String(value).replace(/\|/g, '\\|')).join(' | ').replace(/^/, '| ').replace(/$/, ' |'));
     });
 
     lines.push('');
-    lines.push('## Recommended Order');
+    lines.push('## 建議處理順序');
     lines.push('');
     results
         .filter((result) => result.priority !== 'OK')
         .sort((a, b) => priorityWeight(a.priority) - priorityWeight(b.priority) || a.moduleName.localeCompare(b.moduleName))
         .forEach((result) => {
-            lines.push(`- ${result.priority} ${result.moduleName}: ${formatList(result.issues)}`);
+            lines.push(`- ${result.priority} ${result.moduleName}：${formatList(result.issues.map(translateIssue))}`);
         });
 
     lines.push('');
-    lines.push('## Stateful Refresh Review');
+    lines.push('## 狀態型介面刷新檢查');
     lines.push('');
-    lines.push('These modules keep local UI state such as caches, expanded rows, open detail modals, edit modals, or action buttons. When dependencies change, manual review must confirm the open state is refreshed, not only the main list.');
+    lines.push('以下模組會保留快取、展開列、明細視窗、編輯視窗或按鈕狀態等本機介面狀態。相依資料變更時，需人工確認目前開啟的介面狀態會同步刷新，而不只是重新載入主列表。');
     lines.push('');
-    lines.push('| Module | Signals | Dependency Sources | Has onDependencyUpdate | Notes |');
+    lines.push('| 模組 | 狀態訊號 | 相依來源 | 有 onDependencyUpdate | 備註 |');
     lines.push('| --- | --- | --- | --- | --- |');
 
     results
@@ -387,13 +408,13 @@ function buildMarkdownReport(results, dependencies) {
         .sort((a, b) => a.moduleName.localeCompare(b.moduleName))
         .forEach((result) => {
             const notes = result.dependencyHandler
-                ? 'verify open state refresh path'
-                : 'uses generic onRefresh; inspect open state manually';
+                ? '請確認目前開啟狀態的刷新路徑'
+                : '使用通用 onRefresh，需人工檢查開啟中的介面狀態';
             lines.push([
                 result.moduleName,
-                formatList(result.statefulSignals),
+                formatList(result.statefulSignals.map(translateSignal)),
                 formatList(result.dependencySources),
-                result.dependencyHandler ? 'yes' : 'no',
+                result.dependencyHandler ? '是' : '否',
                 notes
             ].map((value) => String(value).replace(/\|/g, '\\|')).join(' | ').replace(/^/, '| ').replace(/$/, ' |'));
         });

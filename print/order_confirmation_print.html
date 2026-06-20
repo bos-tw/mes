@@ -866,8 +866,11 @@
 
         if (normalized === 'yes') return '有';
         if (normalized === 'no') return '無';
-        if (['yes_return', 'yes_need_return', 'need_return', 'return'].includes(normalized)) {
+        if (['yes_return', 'yes_need_return', 'need_return', 'return', 'return_required'].includes(normalized)) {
             return '有，須歸還';
+        }
+        if (['no_return', 'return_not_required', 'no_need_return'].includes(normalized)) {
+            return '有，不須歸還';
         }
 
         return raw;
@@ -1001,7 +1004,7 @@
                                             <th>支數</th>
                                             <td class="text-right">${item.total_units ? formatNumber(Math.round(item.total_units)) : '&nbsp;'}</td>
                                             <th>樣品狀態</th>
-                                            <td>${mapSampleStatusToZh(item.customer_sample_status) || '&nbsp;'}</td>
+                                            <td>${escapeHtml(item.customer_sample_status_label || mapSampleStatusToZh(item.customer_sample_status) || '') || '&nbsp;'}</td>
                                             <th>料號</th>
                                             <td>${item.part_number ? escapeHtml(item.part_number) : '&nbsp;'}</td>
                                             <th>淨重(kg)</th>

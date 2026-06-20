@@ -92,6 +92,33 @@
         const defaultServicesTableHtml = servicesTableBody ? servicesTableBody.innerHTML : '';
         const defaultAttachmentsTableHtml = attachmentsTableBody ? attachmentsTableBody.innerHTML : '';
 
+        function getSampleStatusLabel(status, label) {
+            if (label !== null && label !== undefined && String(label).trim() !== '') {
+                return String(label).trim();
+            }
+
+            if (status === null || status === undefined) {
+                return '';
+            }
+
+            const raw = String(status).trim();
+            if (!raw) {
+                return '';
+            }
+
+            const normalized = raw.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+            if (normalized === 'yes') return '有';
+            if (normalized === 'no') return '無';
+            if (['yes_return', 'yes_need_return', 'need_return', 'return', 'return_required'].includes(normalized)) {
+                return '有，須歸還';
+            }
+            if (['no_return', 'return_not_required', 'no_need_return'].includes(normalized)) {
+                return '有，不須歸還';
+            }
+
+            return raw;
+        }
+
         function normalizeOrderContext(context) {
             if (!context || !context.orderId) {
                 return null;
@@ -702,7 +729,7 @@ function updateButtons() {
 
             const rowsHtml = sortedItems.map((item) => {
                 const statusLabel = item.status_label || item.status || '-';
-                const sampleLabel = item.customer_sample_status_label || item.customer_sample_status || '-';
+                const sampleLabel = getSampleStatusLabel(item.customer_sample_status, item.customer_sample_status_label) || '-';
                 const totals = item.totals || {};
                 const updatedAtLabel = formatDateTime(item.updated_at);
                 const screeningLabel = getOrderItemScreeningLabel(item);

@@ -241,6 +241,10 @@ $migrationChecks = [ordered]@{
         CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'machines' AND column_name = 'machine_capability_id') AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'machines' AND index_name = 'idx_machines_machine_capability_id') AND EXISTS(SELECT 1 FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'machines' AND constraint_name = 'fk_machines_machine_capability'), 1, 0);"
         Description = 'machines.machine_capability_id one-to-many relation and GENERAL seed'
     }
+    '2026_06_20_add_work_order_order_item_unique.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'work_orders' AND index_name = 'uk_work_orders_order_item_active' AND non_unique = 0), 1, 0);"
+        Description = 'one active work order per order item unique index'
+    }
 }
 
 $migrationFiles = Get-ChildItem -LiteralPath $migrationsDir -File | Sort-Object Name

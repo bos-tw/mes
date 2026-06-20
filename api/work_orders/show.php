@@ -81,7 +81,9 @@ try {
             oi.total_units,
             oi.customer_sample_status,
             lv_sample.value_label AS customer_sample_status_label,
+            m.machine_number,
             m.name AS machine_name,
+            mc.capability_name AS machine_capability_name,
             e1.name AS assigned_employee_name,
             e2.name AS calibration_employee_name,
             lv.value_key AS status_key,
@@ -95,6 +97,7 @@ try {
         LEFT JOIN customers c ON o.customer_id = c.id
         LEFT JOIN screening_items si ON oi.screening_item_id = si.id
         LEFT JOIN machines m ON wo.machine_id = m.id
+        LEFT JOIN machine_capabilities mc ON m.machine_capability_id = mc.id
         LEFT JOIN employees e1 ON wo.assigned_employee_id = e1.id
         LEFT JOIN employees e2 ON wo.calibration_employee_id = e2.id
         LEFT JOIN lookup_values lv ON wo.status_lookup_id = lv.id
@@ -257,7 +260,9 @@ try {
     $machineRunsStmt = $pdo->prepare("
         SELECT
             womr.*,
+            m.machine_number,
             m.name AS machine_name,
+            mc.capability_name AS machine_capability_name,
             e1.name AS assigned_employee_name,
             e2.name AS created_by_name,
             {$machineRunCalibrationSelect}
@@ -266,6 +271,7 @@ try {
             COALESCE(receipts.partial_receipt_units, 0) AS partial_receipt_units
         FROM work_order_machine_runs womr
         LEFT JOIN machines m ON womr.machine_id = m.id
+        LEFT JOIN machine_capabilities mc ON m.machine_capability_id = mc.id
         LEFT JOIN employees e1 ON womr.assigned_employee_id = e1.id
         LEFT JOIN employees e2 ON womr.created_by_employee_id = e2.id
         {$machineRunCalibrationJoin}

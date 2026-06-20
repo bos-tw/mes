@@ -4410,6 +4410,29 @@ td.actions-col {
     order: 30;
 }
 
+.work-order-schedule-section label.inline-label {
+    display: grid;
+    grid-template-columns: minmax(118px, auto) minmax(0, 1fr) 44px;
+    width: 100%;
+    gap: 0;
+    margin-bottom: 0;
+}
+
+.work-order-schedule-section label.inline-label > span {
+    min-width: 0;
+    max-width: none;
+}
+
+.work-order-schedule-section label.inline-label input,
+.work-order-schedule-section label.inline-label select {
+    min-width: 0;
+}
+
+.work-order-schedule-section .weekday-badge {
+    min-width: 44px;
+    padding: 4px 6px;
+}
+
 .work-orders-section-right {
     order: 40;
 }

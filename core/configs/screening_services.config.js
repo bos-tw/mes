@@ -78,6 +78,7 @@
         // Modal 配置 - 使用 formRows 模式（並排 section）
         modal: {
             title: '新增篩分服務項目',
+            size: 'medium',
             hiddenFields: ['id'],
             // formRows: 每個 row 內的 sections 會並排顯示
             formRows: [
@@ -104,14 +105,9 @@
                             ]
                         },
                         {
-                            title: '啟用設定',
+                            title: '公差與啟用設定',
                             fields: [
-                                { name: 'is_active', label: '啟用', type: 'checkbox', checked: true }
-                            ]
-                        },
-                        {
-                            title: '公差設定',
-                            fields: [
+                                { name: 'is_active', label: '啟用', type: 'checkbox', checked: true },
                                 { name: 'tolerance_plus_value', label: '公差(+)', type: 'number', step: 0.0001, placeholder: '請輸入正公差值' },
                                 { name: 'tolerance_plus_over', label: '正值(+)', type: 'number', step: 0.0001, placeholder: '請輸入正值' },
                                 { name: 'tolerance_minus_value', label: '公差(-)', type: 'number', step: 0.0001, placeholder: '請輸入負公差值' },

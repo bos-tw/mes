@@ -120,6 +120,33 @@
         alertBox.textContent = '';
     }
 
+    function getSampleStatusLabel(status, label) {
+        if (label !== null && label !== undefined && String(label).trim() !== '') {
+            return String(label).trim();
+        }
+
+        if (status === null || status === undefined) {
+            return '';
+        }
+
+        const raw = String(status).trim();
+        if (!raw) {
+            return '';
+        }
+
+        const normalized = raw.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+        if (normalized === 'yes') return '有';
+        if (normalized === 'no') return '無';
+        if (['yes_return', 'yes_need_return', 'need_return', 'return', 'return_required'].includes(normalized)) {
+            return '有，須歸還';
+        }
+        if (['no_return', 'return_not_required', 'no_need_return'].includes(normalized)) {
+            return '有，不須歸還';
+        }
+
+        return raw;
+    }
+
     function init() {
         loadCurrentUser();
         loadMachines();
@@ -2881,6 +2908,8 @@
             prRows.forEach(row => {
                 const cardInput = row.querySelector('[name="pr_card_number[]"]');
                 const weightInput = row.querySelector('[name="pr_weight_kg[]"]');
+                const toolNameInput = row.querySelector('[name="pr_tool_name[]"]');
+                const toolWeightInput = row.querySelector('[name="pr_tool_weight_kg[]"]');
                 const dateInput = row.querySelector('[name="pr_date[]"]');
                 const timeInput = row.querySelector('[name="pr_time[]"]');
                 const machineSelect = row.querySelector('[name="pr_machine_id[]"]');
@@ -2890,12 +2919,15 @@
                 if (cardInput) {
                     const record = {
                         card_number: cardInput.value,
+                        tool_name: toolNameInput ? toolNameInput.value : null,
+                        tool_weight_kg: toolWeightInput ? toolWeightInput.value : null,
                         weight_kg: weightInput ? weightInput.value : null,
                         production_date: dateInput ? dateInput.value : null,
                         production_time: timeInput ? timeInput.value : null,
                         machine_id: machineSelect ? machineSelect.value : null,
                         operator_name: operatorInput ? operatorInput.value : (state.currentUser?.name || ''),
-                        notes: notesInput ? notesInput.value : null
+                        notes: notesInput ? notesInput.value : null,
+                        production_source_mode: 'preset'
                     };
 
                     if (hasSubmittedValue(record.card_number) && isMeaningfulProductionRecord(record)) {
@@ -3743,7 +3775,7 @@
             'part_number': data.part_number,
             'drawing_number': data.drawing_number,
             'screening_item_name': data.screening_item_name,
-            'customer_sample_status': data.customer_sample_status_label || data.customer_sample_status || '',
+            'customer_sample_status': getSampleStatusLabel(data.customer_sample_status, data.customer_sample_status_label),
             'delivery_location': data.delivery_location,
             'total_weight_kg': (((parseFloat(data.total_weight_kg) || 0) - (parseFloat(data.total_tool_weight) || 0)).toFixed(2)),
             'weight_per_unit_g': data.weight_per_unit_g,

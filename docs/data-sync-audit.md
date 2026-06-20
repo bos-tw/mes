@@ -1,30 +1,30 @@
-# DataSync Audit Report
+# DataSync 稽核報告
 
-Generated at: 2026-06-19T05:51:35.476Z
+產生時間：2026-06-20T08:42:40.677Z
 
-## Summary
+## 摘要
 
 - P0: 0
 - P1: 0
 - P2: 10
-- OK: 36
-- Dependency sources: 34
-- Stateful refresh review: 34
+- 通過：36
+- 相依來源數：34
+- 狀態型介面刷新檢查數：34
 
-## Module Matrix
+## 模組矩陣
 
-| Priority | Module | Helper | CRUD | Notify | Dependents | Dependency Sources | Issues |
+| 優先級 | 模組 | 輔助模組 | CRUD 方法 | 通知模組 | 相依刷新目標 | 相依來源 | 問題 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| P2 | audit_logs | audit_logs | DELETE | (helper) | - | - | crud_module_without_dependents |
-| P2 | calendar_event_participants | calendar_event_participants | POST, DELETE | (helper) | - | dashboard_calendar_events, employees | crud_module_without_dependents |
-| P2 | dashboard | dashboard | POST | notifications | - | dashboard_calendar_events, notifications, orders, quality_issue_reports, shipping_orders, work_orders | crud_module_without_dependents |
-| P2 | domain_event_outbox | domain_event_outbox | DELETE | (helper) | - | - | crud_module_without_dependents |
-| P2 | messages | messages | POST, DELETE | (helper) | - | employees | crud_module_without_dependents |
-| P2 | number_sequences | number_sequences | DELETE | (helper) | - | - | crud_module_without_dependents |
-| P2 | production_work_order_schedule | production_work_order_schedule | PUT | (helper), work_orders | - | machine_capabilities, machines, work_orders | crud_module_without_dependents |
-| P2 | report_descriptions | report_descriptions | DELETE | (helper) | - | - | crud_module_without_dependents |
-| P2 | security_settings | security_settings | POST | (helper) | - | - | crud_module_without_dependents |
-| P2 | system_parameters | system_parameters | DELETE | (helper) | - | - | crud_module_without_dependents |
+| P2 | audit_logs | audit_logs | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
+| P2 | calendar_event_participants | calendar_event_participants | POST, DELETE | (helper) | - | dashboard_calendar_events, employees | CRUD 模組未設定相依刷新目標 |
+| P2 | dashboard | dashboard | POST | notifications | - | dashboard_calendar_events, notifications, orders, quality_issue_reports, shipping_orders, work_orders | CRUD 模組未設定相依刷新目標 |
+| P2 | domain_event_outbox | domain_event_outbox | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
+| P2 | messages | messages | POST, DELETE | (helper) | - | employees | CRUD 模組未設定相依刷新目標 |
+| P2 | number_sequences | number_sequences | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
+| P2 | production_work_order_schedule | production_work_order_schedule | PUT | (helper), work_orders | - | machine_capabilities, machines, work_orders | CRUD 模組未設定相依刷新目標 |
+| P2 | report_descriptions | report_descriptions | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
+| P2 | security_settings | security_settings | POST | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
+| P2 | system_parameters | system_parameters | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
 | OK | calendar_event_reminders | calendar_event_reminders | DELETE | (helper) | dashboard_calendar_events | dashboard_calendar_events, employees | - |
 | OK | companies | companies | POST, PUT, DELETE | companies | employees, customers, suppliers | - | - |
 | OK | customers | customers | POST, PATCH, DELETE | customers | orders, screening_services, return_orders | companies, lookup_values | - |
@@ -62,56 +62,56 @@ Generated at: 2026-06-19T05:51:35.476Z
 | OK | work_order_images | work_order_images | - | - | work_orders | work_orders | - |
 | OK | work_orders | work_orders | POST, DELETE | inventory_items, work_orders | order_items, orders, work_order_images, work_order_first_piece_dimensions, inventory_items, inventory_transactions, dashboard, production_records, production_work_order_schedule | employees, inventory_items, lookup_values, machine_capabilities, machines, order_items, orders, production_quality_records, tools, work_order_first_piece_dimensions, work_order_images | - |
 
-## Recommended Order
+## 建議處理順序
 
-- P2 audit_logs: crud_module_without_dependents
-- P2 calendar_event_participants: crud_module_without_dependents
-- P2 dashboard: crud_module_without_dependents
-- P2 domain_event_outbox: crud_module_without_dependents
-- P2 messages: crud_module_without_dependents
-- P2 number_sequences: crud_module_without_dependents
-- P2 production_work_order_schedule: crud_module_without_dependents
-- P2 report_descriptions: crud_module_without_dependents
-- P2 security_settings: crud_module_without_dependents
-- P2 system_parameters: crud_module_without_dependents
+- P2 audit_logs：CRUD 模組未設定相依刷新目標
+- P2 calendar_event_participants：CRUD 模組未設定相依刷新目標
+- P2 dashboard：CRUD 模組未設定相依刷新目標
+- P2 domain_event_outbox：CRUD 模組未設定相依刷新目標
+- P2 messages：CRUD 模組未設定相依刷新目標
+- P2 number_sequences：CRUD 模組未設定相依刷新目標
+- P2 production_work_order_schedule：CRUD 模組未設定相依刷新目標
+- P2 report_descriptions：CRUD 模組未設定相依刷新目標
+- P2 security_settings：CRUD 模組未設定相依刷新目標
+- P2 system_parameters：CRUD 模組未設定相依刷新目標
 
-## Stateful Refresh Review
+## 狀態型介面刷新檢查
 
-These modules keep local UI state such as caches, expanded rows, open detail modals, edit modals, or action buttons. When dependencies change, manual review must confirm the open state is refreshed, not only the main list.
+以下模組會保留快取、展開列、明細視窗、編輯視窗或按鈕狀態等本機介面狀態。相依資料變更時，需人工確認目前開啟的介面狀態會同步刷新，而不只是重新載入主列表。
 
-| Module | Signals | Dependency Sources | Has onDependencyUpdate | Notes |
+| 模組 | 狀態訊號 | 相依來源 | 有 onDependencyUpdate | 備註 |
 | --- | --- | --- | --- | --- |
-| calendar_event_participants | edit_modal, button_state | dashboard_calendar_events, employees | yes | verify open state refresh path |
-| calendar_event_reminders | edit_modal, button_state | dashboard_calendar_events, employees | yes | verify open state refresh path |
-| customers | cache, detail_modal, edit_modal, button_state | companies, lookup_values | no | uses generic onRefresh; inspect open state manually |
-| daily_machine_inspection_items | edit_modal, button_state | daily_machine_inspections, employees | no | uses generic onRefresh; inspect open state manually |
-| daily_machine_inspections | edit_modal, button_state | daily_machine_inspection_items, employees, machines | no | uses generic onRefresh; inspect open state manually |
-| dashboard | edit_modal, button_state | dashboard_calendar_events, notifications, orders, quality_issue_reports, shipping_orders, work_orders | yes | verify open state refresh path |
-| dashboard_calendar_events | edit_modal, button_state | calendar_event_reminders | no | uses generic onRefresh; inspect open state manually |
-| employee_roles | edit_modal, button_state | employees, roles | no | uses generic onRefresh; inspect open state manually |
-| employees | cache, edit_modal, button_state | companies, departments, employee_roles, lookup_values | no | uses generic onRefresh; inspect open state manually |
-| inventory_items | detail_modal, edit_modal, button_state | order_items, return_orders, screening_items, shipping_order_items, shipping_orders, suppliers, work_orders | yes | verify open state refresh path |
-| inventory_transactions | detail_modal, edit_modal, button_state | inventory_items, return_orders, shipping_order_items, shipping_orders, work_orders | no | uses generic onRefresh; inspect open state manually |
-| lookup_values | button_state | lookup_domains | no | uses generic onRefresh; inspect open state manually |
-| machine_maintenance_tasks | edit_modal, button_state | employees, machines | no | uses generic onRefresh; inspect open state manually |
-| machines | cache, edit_modal, button_state | machine_capabilities, machine_maintenance_tasks | yes | verify open state refresh path |
-| messages | detail_modal, edit_modal, button_state | employees | yes | verify open state refresh path |
-| notifications | detail_modal, edit_modal, button_state | departments, employees, roles | no | uses generic onRefresh; inspect open state manually |
-| order_items | edit_modal, button_state | orders, screening_items, screening_services, shipping_order_items, shipping_orders, tools, work_orders | yes | verify open state refresh path |
-| orders | cache, expanded_row, edit_modal, button_state | customers, employees, lookup_values, order_items, screening_services, suppliers, work_orders | yes | verify open state refresh path |
-| permissions | cache, edit_modal, button_state | role_permissions | no | uses generic onRefresh; inspect open state manually |
-| production_records | cache, detail_modal, edit_modal, button_state | employees, machines, work_orders | yes | verify open state refresh path |
-| production_work_order_schedule | expanded_row, edit_modal, button_state | machine_capabilities, machines, work_orders | yes | verify open state refresh path |
-| quality_issue_reports | detail_modal, edit_modal, button_state | departments, employees | no | uses generic onRefresh; inspect open state manually |
-| return_orders | detail_modal, edit_modal, button_state | customers, shipping_order_items, shipping_orders | yes | verify open state refresh path |
-| role_permissions | edit_modal, button_state | permissions, roles | no | uses generic onRefresh; inspect open state manually |
-| roles | cache, edit_modal, button_state | employee_roles, role_permissions | no | uses generic onRefresh; inspect open state manually |
-| screening_items | edit_modal, button_state | lookup_values | no | uses generic onRefresh; inspect open state manually |
-| screening_services | cache, edit_modal, button_state | customers, screening_items | no | uses generic onRefresh; inspect open state manually |
-| shipping_order_items | edit_modal, button_state | inventory_items, return_orders, shipping_orders | yes | verify open state refresh path |
-| shipping_orders | detail_modal, edit_modal, button_state | inventory_items, return_orders, shipping_order_items, shipping_quality_inspections | yes | verify open state refresh path |
-| shipping_quality_inspections | cache, detail_modal, edit_modal, button_state | employees, shipping_orders | yes | verify open state refresh path |
-| suppliers | cache, edit_modal, button_state | companies, lookup_values | no | uses generic onRefresh; inspect open state manually |
-| work_order_first_piece_dimensions | detail_modal, edit_modal, button_state | employees, work_orders | yes | verify open state refresh path |
-| work_order_images | edit_modal, button_state | work_orders | no | uses generic onRefresh; inspect open state manually |
-| work_orders | cache, edit_modal, button_state | employees, inventory_items, lookup_values, machine_capabilities, machines, order_items, orders, production_quality_records, tools, work_order_first_piece_dimensions, work_order_images | yes | verify open state refresh path |
+| calendar_event_participants | 編輯視窗, 按鈕狀態 | dashboard_calendar_events, employees | 是 | 請確認目前開啟狀態的刷新路徑 |
+| calendar_event_reminders | 編輯視窗, 按鈕狀態 | dashboard_calendar_events, employees | 是 | 請確認目前開啟狀態的刷新路徑 |
+| customers | 快取, 明細視窗, 編輯視窗, 按鈕狀態 | companies, lookup_values | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| daily_machine_inspection_items | 編輯視窗, 按鈕狀態 | daily_machine_inspections, employees | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| daily_machine_inspections | 編輯視窗, 按鈕狀態 | daily_machine_inspection_items, employees, machines | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| dashboard | 編輯視窗, 按鈕狀態 | dashboard_calendar_events, notifications, orders, quality_issue_reports, shipping_orders, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| dashboard_calendar_events | 編輯視窗, 按鈕狀態 | calendar_event_reminders | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| employee_roles | 編輯視窗, 按鈕狀態 | employees, roles | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| employees | 快取, 編輯視窗, 按鈕狀態 | companies, departments, employee_roles, lookup_values | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| inventory_items | 明細視窗, 編輯視窗, 按鈕狀態 | order_items, return_orders, screening_items, shipping_order_items, shipping_orders, suppliers, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| inventory_transactions | 明細視窗, 編輯視窗, 按鈕狀態 | inventory_items, return_orders, shipping_order_items, shipping_orders, work_orders | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| lookup_values | 按鈕狀態 | lookup_domains | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| machine_maintenance_tasks | 編輯視窗, 按鈕狀態 | employees, machines | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| machines | 快取, 編輯視窗, 按鈕狀態 | machine_capabilities, machine_maintenance_tasks | 是 | 請確認目前開啟狀態的刷新路徑 |
+| messages | 明細視窗, 編輯視窗, 按鈕狀態 | employees | 是 | 請確認目前開啟狀態的刷新路徑 |
+| notifications | 明細視窗, 編輯視窗, 按鈕狀態 | departments, employees, roles | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| order_items | 編輯視窗, 按鈕狀態 | orders, screening_items, screening_services, shipping_order_items, shipping_orders, tools, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| orders | 快取, 展開列, 編輯視窗, 按鈕狀態 | customers, employees, lookup_values, order_items, screening_services, suppliers, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| permissions | 快取, 編輯視窗, 按鈕狀態 | role_permissions | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| production_records | 快取, 明細視窗, 編輯視窗, 按鈕狀態 | employees, machines, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| production_work_order_schedule | 展開列, 編輯視窗, 按鈕狀態 | machine_capabilities, machines, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| quality_issue_reports | 明細視窗, 編輯視窗, 按鈕狀態 | departments, employees | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| return_orders | 明細視窗, 編輯視窗, 按鈕狀態 | customers, shipping_order_items, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| role_permissions | 編輯視窗, 按鈕狀態 | permissions, roles | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| roles | 快取, 編輯視窗, 按鈕狀態 | employee_roles, role_permissions | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| screening_items | 編輯視窗, 按鈕狀態 | lookup_values | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| screening_services | 快取, 編輯視窗, 按鈕狀態 | customers, screening_items | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| shipping_order_items | 編輯視窗, 按鈕狀態 | inventory_items, return_orders, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| shipping_orders | 明細視窗, 編輯視窗, 按鈕狀態 | inventory_items, return_orders, shipping_order_items, shipping_quality_inspections | 是 | 請確認目前開啟狀態的刷新路徑 |
+| shipping_quality_inspections | 快取, 明細視窗, 編輯視窗, 按鈕狀態 | employees, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| suppliers | 快取, 編輯視窗, 按鈕狀態 | companies, lookup_values | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| work_order_first_piece_dimensions | 明細視窗, 編輯視窗, 按鈕狀態 | employees, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| work_order_images | 編輯視窗, 按鈕狀態 | work_orders | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| work_orders | 快取, 編輯視窗, 按鈕狀態 | employees, inventory_items, lookup_values, machine_capabilities, machines, order_items, orders, production_quality_records, tools, work_order_first_piece_dimensions, work_order_images | 是 | 請確認目前開啟狀態的刷新路徑 |

@@ -788,6 +788,32 @@ function validateWorkOrderData(array $payload, bool $isUpdate = false): array
     $errors = [];
     $data = [];
 
+    // Accept the nested payload used by the work-order form while preserving
+    // compatibility with legacy flat fp_* fields.
+    if (isset($payload['first_piece_dimensions']) && is_array($payload['first_piece_dimensions'])) {
+        $nestedFirstPieceFields = [
+            'head_height' => 'fp_head_height',
+            'head_width' => 'fp_head_width',
+            'length' => 'fp_length',
+            'thread_outer_diameter' => 'fp_thread_outer_diameter',
+            'washer_diameter' => 'fp_washer_diameter',
+            'outer_diameter' => 'fp_outer_diameter',
+            'hole_diameter' => 'fp_hole_diameter',
+            'thickness' => 'fp_thickness',
+            'measured_at' => 'fp_measured_at',
+            'measured_by_employee_id' => 'fp_measured_by_employee_id',
+            'notes' => 'fp_notes',
+        ];
+
+        foreach ($nestedFirstPieceFields as $nestedKey => $flatKey) {
+            if (array_key_exists($nestedKey, $payload['first_piece_dimensions'])
+                && !array_key_exists($flatKey, $payload)) {
+                $payload[$flatKey] = $payload['first_piece_dimensions'][$nestedKey];
+            }
+        }
+    }
+    unset($payload['first_piece_dimensions']);
+
     // 工單號碼 - 由系統自動生成
     if (array_key_exists('work_order_number', $payload)) {
         unset($payload['work_order_number']);

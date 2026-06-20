@@ -487,6 +487,21 @@ function handleCreateWorkOrder(PDO $pdo): void
             $pdo->rollBack();
         }
 
+        if ($t instanceof PDOException
+            && $t->getCode() === '23000'
+            && str_contains($t->getMessage(), 'uk_work_orders_order_item_active')) {
+            $existingStmt = $pdo->prepare(
+                "SELECT work_order_number FROM work_orders WHERE order_item_id = :order_item_id AND deleted_at IS NULL LIMIT 1"
+            );
+            $existingStmt->execute(['order_item_id' => $data['order_item_id']]);
+            jsonResponse([
+                'success' => false,
+                'message' => '此客戶批號已建立工單，請勿重複建立。',
+                'work_order_number' => $existingStmt->fetchColumn() ?: null,
+            ], 409);
+            return;
+        }
+
         // 記錄詳細錯誤資訊到 error_log
         error_log('Create work order error: ' . $t->getMessage());
         error_log('File: ' . $t->getFile() . ' Line: ' . $t->getLine());
