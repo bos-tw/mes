@@ -203,6 +203,16 @@ function handleListWorkOrders(PDO $pdo): void
             lv.value_key AS status_key,
             CASE WHEN wo.completed_at IS NOT NULL THEN 1 ELSE 0 END AS lifecycle_locked,
             CASE WHEN ii_check.id IS NOT NULL THEN 1 ELSE 0 END AS has_inventory,
+            (
+                COALESCE(woi_summary.legacy_image_count, 0)
+                + COALESCE(woci_summary.completion_image_count, 0)
+                + COALESCE(wodi_summary.defect_image_count, 0)
+                + COALESCE(wotci_summary.tool_condition_image_count, 0)
+            ) AS total_image_count,
+            COALESCE(woi_summary.legacy_image_count, 0) AS legacy_image_count,
+            COALESCE(woci_summary.completion_image_count, 0) AS completion_image_count,
+            COALESCE(wodi_summary.defect_image_count, 0) AS defect_image_count,
+            COALESCE(wotci_summary.tool_condition_image_count, 0) AS tool_condition_image_count,
             COALESCE(womr_summary.machine_run_count, 0) AS machine_run_count,
             COALESCE(womr_summary.scheduled_machine_run_count, 0) AS scheduled_machine_run_count,
             COALESCE(womr_summary.completed_net_weight_kg, 0) AS machine_runs_completed_net_weight_kg
@@ -216,6 +226,30 @@ function handleListWorkOrders(PDO $pdo): void
         LEFT JOIN employees e2 ON wo.calibration_employee_id = e2.id
         LEFT JOIN lookup_values lv ON wo.status_lookup_id = lv.id
         LEFT JOIN inventory_items ii_check ON ii_check.work_order_id = wo.id AND ii_check.deleted_at IS NULL
+        LEFT JOIN (
+            SELECT work_order_id, COUNT(*) AS legacy_image_count
+            FROM work_order_images
+            WHERE deleted_at IS NULL
+            GROUP BY work_order_id
+        ) woi_summary ON woi_summary.work_order_id = wo.id
+        LEFT JOIN (
+            SELECT work_order_id, COUNT(*) AS completion_image_count
+            FROM work_order_completion_images
+            WHERE deleted_at IS NULL
+            GROUP BY work_order_id
+        ) woci_summary ON woci_summary.work_order_id = wo.id
+        LEFT JOIN (
+            SELECT work_order_id, COUNT(*) AS defect_image_count
+            FROM work_order_defect_images
+            WHERE deleted_at IS NULL
+            GROUP BY work_order_id
+        ) wodi_summary ON wodi_summary.work_order_id = wo.id
+        LEFT JOIN (
+            SELECT work_order_id, COUNT(*) AS tool_condition_image_count
+            FROM work_order_tool_condition_images
+            WHERE deleted_at IS NULL
+            GROUP BY work_order_id
+        ) wotci_summary ON wotci_summary.work_order_id = wo.id
         LEFT JOIN (
             SELECT
                 work_order_id,

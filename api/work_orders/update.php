@@ -42,6 +42,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/../work_order_operation_logs_helper.php';
 
 /**
  * Work Order Update API Endpoint
@@ -129,6 +130,8 @@ try {
 
     $oldStatusLookupId = (int)$existingWorkOrder['status_lookup_id'];
     $newStatusLookupId = isset($data['status_lookup_id']) ? (int)$data['status_lookup_id'] : $oldStatusLookupId;
+    $oldStatusSnapshot = resolveWorkOrderStatusSnapshot($pdo, $oldStatusLookupId, $existingWorkOrder['status'] ?? null);
+    $newStatusSnapshot = resolveWorkOrderStatusSnapshot($pdo, $newStatusLookupId, $data['status'] ?? $existingWorkOrder['status'] ?? null);
     $oldIsCompleted = isCompletedWorkOrderStatus($pdo, $oldStatusLookupId, $existingWorkOrder['status'] ?? null);
     $newIsCompleted = isCompletedWorkOrderStatus($pdo, $newStatusLookupId, $data['status'] ?? $existingWorkOrder['status'] ?? null);
     $hasCompletedAt = !empty($existingWorkOrder['completed_at']);
@@ -577,6 +580,43 @@ try {
                 }
             }
         }
+    }
+
+    if ($newStatusLookupId !== $oldStatusLookupId) {
+        $actionKey = 'status_changed';
+        $actionLabel = '工單狀態更新';
+
+        if (($oldStatusSnapshot['key'] ?? '') === 'pending' && ($newStatusSnapshot['key'] ?? '') === 'in_progress') {
+            $actionKey = 'start';
+            $actionLabel = '工單開工';
+        } elseif (($oldStatusSnapshot['key'] ?? '') === 'paused' && ($newStatusSnapshot['key'] ?? '') === 'in_progress') {
+            $actionKey = 'resume';
+            $actionLabel = '工單恢復';
+        } elseif (($newStatusSnapshot['key'] ?? '') === 'paused') {
+            $actionKey = 'pause';
+            $actionLabel = '工單暫停';
+        } elseif (($newStatusSnapshot['key'] ?? '') === 'completed') {
+            $actionKey = 'complete';
+            $actionLabel = '工單完工';
+        }
+
+        $statusNotes = null;
+        if ($actionKey === 'complete') {
+            $statusNotes = $autoCreateInventory ? '依既有流程自動入庫。' : '本次僅更新工單狀態，不自動入庫。';
+        }
+
+        appendWorkOrderOperationLog($pdo, $id, $actionKey, $actionLabel, [
+            'status_from_key' => $oldStatusSnapshot['key'],
+            'status_from_label' => $oldStatusSnapshot['label'],
+            'status_to_key' => $newStatusSnapshot['key'],
+            'status_to_label' => $newStatusSnapshot['label'],
+            'notes' => $statusNotes,
+            'payload' => [
+                'auto_create_inventory' => $autoCreateInventory,
+                'inventory_created' => $createdInventoryItemId !== null,
+                'inventory_deleted' => $deletedInventoryItemId !== null,
+            ],
+        ]);
     }
 
     // Log audit

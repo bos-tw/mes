@@ -10,6 +10,7 @@ require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/../inventory_items/helpers.php';
 require_once __DIR__ . '/../number_sequences/helpers.php';
+require_once __DIR__ . '/../work_order_operation_logs_helper.php';
 
 requireAuth();
 requireMethod(['POST']);
@@ -289,6 +290,20 @@ try {
         'inventory_item_id' => $inventoryItemId,
         'net_weight_kg' => $receiptNetWeightKg,
         'calculated_units' => $calculatedUnits,
+    ]);
+
+    appendWorkOrderOperationLog($pdo, $workOrderId, 'partial_receipt', '工單部分完工', [
+        'related_table' => 'work_order_partial_receipts',
+        'related_id' => $partialReceiptId,
+        'notes' => $notes === '' ? null : $notes,
+        'payload' => [
+            'machine_run_id' => $machineRunId,
+            'inventory_item_id' => $inventoryItemId,
+            'inventory_number' => $inventoryNumber,
+            'receipt_number' => $receiptNumber,
+            'net_weight_kg' => $receiptNetWeightKg,
+            'calculated_units' => $calculatedUnits,
+        ],
     ]);
 
     $pdo->commit();

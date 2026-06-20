@@ -1,0 +1,2175 @@
+(function () {
+    'use strict';
+
+    const bootstrapEl = document.getElementById('mobile-bootstrap');
+    const bootstrap = bootstrapEl ? JSON.parse(bootstrapEl.textContent || '{}') : {};
+    const state = {
+        mode: bootstrap.authenticated ? 'app' : 'guest',
+        csrfToken: bootstrap.csrfToken || '',
+        basePath: bootstrap.basePath || '../',
+        currentUser: bootstrap.currentUser || null,
+        statuses: [],
+        statusByKey: {},
+        machines: [],
+        workOrders: [],
+        pagination: null,
+        selectedWorkOrderId: null,
+        currentWorkOrder: null,
+        modalAction: null,
+        pendingUploadWorkOrderId: null,
+        uploadDraft: [],
+        currentSection: bootstrap.requestedSection || 'work_orders',
+        inspections: [],
+        inspectionsPagination: null,
+        inspectionsMeta: {
+            machines: [],
+            employees: [],
+        },
+        qualityIssueMeta: {
+            departments: [],
+            statusOptions: [],
+            sourceTypeOptions: [],
+        },
+    };
+
+    const MOBILE_SECTION_META = {
+        work_orders: {
+            title: '生產工單',
+            kicker: 'WORK ORDERS',
+            subtitle: '現場工單清單、開工、部分完工、完工、異常與拍照回報。',
+            emptyTitle: '手機版生產工單已可使用',
+            emptyText: '此頁面已完成第一版手機操作流程，供現場人員直接使用。',
+        },
+        machines: {
+            title: '機台設備管理',
+            kicker: 'MACHINES',
+            subtitle: '預留手機版機台資訊入口，後續可補上查詢與點檢相關操作。',
+            emptyTitle: '機台設備管理手機頁面已建立入口',
+            emptyText: '目前先保留手機版頁面位置，後續可逐步補上查詢、狀態查看與現場操作。',
+        },
+        machine_capabilities: {
+            title: '機台能力管理',
+            kicker: 'CAPABILITIES',
+            subtitle: '預留手機版機台能力管理入口。',
+            emptyTitle: '機台能力管理手機頁面已建立入口',
+            emptyText: '目前先提供手機版導覽與頁面骨架，後續可接續補齊功能。',
+        },
+        machine_maintenance_tasks: {
+            title: '機台維修任務',
+            kicker: 'MAINTENANCE',
+            subtitle: '預留手機版維修任務入口，供後續擴充。',
+            emptyTitle: '機台維修任務手機頁面已建立入口',
+            emptyText: '目前先保留手機版頁面位置，後續可接續補上任務查詢與回報。',
+        },
+        daily_machine_inspections: {
+            title: '每日機台檢驗',
+            kicker: 'INSPECTIONS',
+            subtitle: '現場每日檢驗查詢、新增與修正紀錄。',
+            emptyTitle: '每日機台檢驗已可於手機操作',
+            emptyText: '可直接在手機建立與更新每日機台檢驗紀錄，方便現場巡檢。',
+        },
+        production_work_order_schedule: {
+            title: '生產工單排程',
+            kicker: 'SCHEDULE',
+            subtitle: '預留手機版工單排程入口。',
+            emptyTitle: '生產工單排程手機頁面已建立入口',
+            emptyText: '目前先提供手機版導覽入口，後續可補上行動版排程檢視。',
+        },
+    };
+
+    const API_BASE = `${state.basePath}api`;
+    const MOBILE_INDEX_URL = `${window.location.pathname}${window.location.search}`;
+    const MOBILE_DATA_SYNC_DEPENDENCIES = {
+        work_order_completion_images: ['work_orders'],
+        work_order_defect_images: ['work_orders'],
+        work_order_tool_condition_images: ['work_orders'],
+        work_orders: ['order_items', 'orders', 'work_order_images', 'work_order_first_piece_dimensions', 'inventory_items', 'inventory_transactions', 'dashboard', 'production_records', 'production_work_order_schedule'],
+        quality_issue_reports: ['dashboard'],
+        daily_machine_inspections: ['daily_machine_inspection_items'],
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (state.mode === 'guest') {
+            initGuestMode();
+            return;
+        }
+
+        initAppMode();
+    });
+
+    function initGuestMode() {
+        const form = document.getElementById('mobile-login-form');
+        const accountInput = document.getElementById('mobile-account');
+        const passwordInput = document.getElementById('mobile-password');
+        const rememberCheckbox = document.getElementById('mobile-remember-me');
+        const submitButton = form ? form.querySelector('button[type="submit"]') : null;
+        const yearEl = document.getElementById('mobile-login-year');
+
+        if (yearEl) {
+            yearEl.textContent = String(new Date().getFullYear());
+        }
+
+        loadCompanyBranding();
+        initFuiParticles();
+        renderGuestReasonNotice();
+        bindPasswordToggle(passwordInput, document.getElementById('mobile-toggle-password'));
+
+        if (!form || !accountInput || !passwordInput || !rememberCheckbox) {
+            showGuestFeedback('error', '登入表單載入失敗，請重新整理頁面。');
+            return;
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const account = accountInput.value.trim();
+            const password = passwordInput.value;
+            const rememberMe = rememberCheckbox.checked;
+
+            if (!account || !password) {
+                showGuestFeedback('error', '請輸入帳號與密碼。');
+                return;
+            }
+
+            toggleGuestSubmitting(true, submitButton);
+
+            try {
+                const result = await fetchJson(`${API_BASE}/login.php`, {
+                    method: 'POST',
+                    body: {
+                        account,
+                        password,
+                        rememberMe,
+                    },
+                });
+
+                if (result.csrf_token) {
+                    sessionStorage.setItem('csrf_token', result.csrf_token);
+                }
+
+                showGuestFeedback('success', result.message || '登入成功，正在進入手機版...');
+                window.setTimeout(() => {
+                    window.location.href = MOBILE_INDEX_URL;
+                }, 500);
+            } catch (error) {
+                showGuestFeedback('error', error.message || '登入失敗，請稍後再試。');
+            } finally {
+                toggleGuestSubmitting(false, submitButton);
+            }
+        });
+    }
+
+    async function initAppMode() {
+        const refreshButton = document.getElementById('mobile-refresh-button');
+        const filterForm = document.getElementById('mobile-filter-form');
+        const resetButton = document.getElementById('mobile-filter-reset-button');
+        const logoutButton = document.getElementById('mobile-logout-button');
+        const menuButton = document.getElementById('mobile-menu-button');
+        const detailSheet = document.getElementById('mobile-detail-sheet');
+        const actionModal = document.getElementById('mobile-action-modal');
+        const drawer = document.getElementById('mobile-drawer');
+        const actionForm = document.getElementById('mobile-action-form');
+        const inspectionsRefreshButton = document.getElementById('mobile-inspections-refresh-button');
+        const inspectionsCreateButton = document.getElementById('mobile-inspections-create-button');
+        const inspectionsFilterForm = document.getElementById('mobile-inspections-filter-form');
+        const inspectionsResetButton = document.getElementById('mobile-inspections-filter-reset-button');
+
+        if (sessionStorage.getItem('csrf_token') && !state.csrfToken) {
+            state.csrfToken = sessionStorage.getItem('csrf_token') || '';
+        }
+
+        if (!state.csrfToken) {
+            try {
+                const sessionResult = await fetchJson(`${API_BASE}/session.php`);
+                state.csrfToken = sessionResult.csrf_token || '';
+            } catch (_error) {
+                // 留給後續寫入操作時再處理
+            }
+        }
+
+        loadCompanyBranding();
+
+        refreshButton?.addEventListener('click', () => loadWorkOrders(true));
+        resetButton?.addEventListener('click', handleFilterReset);
+        filterForm?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            loadWorkOrders(true);
+        });
+        inspectionsRefreshButton?.addEventListener('click', () => loadDailyInspections(true));
+        inspectionsCreateButton?.addEventListener('click', () => openInspectionModal('create'));
+        inspectionsResetButton?.addEventListener('click', handleInspectionFilterReset);
+        inspectionsFilterForm?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            loadDailyInspections(true);
+        });
+        logoutButton?.addEventListener('click', handleLogout);
+        menuButton?.addEventListener('click', toggleDrawer);
+        window.addEventListener('scroll', syncTopbarCompactState, { passive: true });
+        window.addEventListener('popstate', () => {
+            const section = new URL(window.location.href).searchParams.get('section') || 'work_orders';
+            applySectionState(section, { replaceHistory: true });
+        });
+        syncTopbarCompactState();
+
+        drawer?.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) {
+                return;
+            }
+            if (target.dataset.action === 'close-drawer') {
+                closeDrawer();
+                return;
+            }
+
+            const link = target.closest('.mobile-drawer-link');
+            if (link instanceof HTMLAnchorElement) {
+                event.preventDefault();
+                closeDrawer();
+                applySectionState(link.dataset.section || 'work_orders', { pushHistory: true });
+            }
+        });
+
+        detailSheet?.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) {
+                return;
+            }
+            if (target.dataset.action === 'close-detail') {
+                closeDetailSheet();
+            }
+        });
+
+        actionModal?.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) {
+                return;
+            }
+            if (target.dataset.action === 'close-modal') {
+                closeActionModal();
+                return;
+            }
+            if (target.dataset.action === 'remove-upload-file') {
+                event.preventDefault();
+                removeUploadDraftFile(target.dataset.uploadDraftId || '');
+            }
+        });
+
+        actionForm?.addEventListener('submit', handleActionSubmit);
+        actionForm?.addEventListener('change', handleActionFormChange);
+
+        document.getElementById('mobile-work-order-list')?.addEventListener('click', handleListActionClick);
+        document.getElementById('mobile-detail-content')?.addEventListener('click', handleDetailActionClick);
+        document.getElementById('mobile-inspections-list')?.addEventListener('click', handleInspectionListClick);
+
+        await Promise.all([loadStatuses(), loadMachines(), loadQualityIssueMeta()]);
+        applySectionState(state.currentSection, { replaceHistory: true });
+        await loadWorkOrders(true);
+
+        const requestedId = parseInt(new URLSearchParams(window.location.search).get('work_order_id') || '', 10);
+        if (requestedId > 0) {
+            openWorkOrderDetail(requestedId);
+        }
+    }
+
+    async function loadStatuses() {
+        const result = await fetchJson(`${API_BASE}/lookup_values/index.php?domain_key=status_work_order`);
+        state.statuses = Array.isArray(result.data) ? result.data : [];
+        state.statusByKey = {};
+        state.statuses.forEach((status) => {
+            state.statusByKey[String(status.value_key || '')] = status;
+        });
+
+        const select = document.getElementById('mobile-filter-status');
+        if (select) {
+            select.innerHTML = '<option value="">全部狀態</option>' + state.statuses
+                .map((status) => `<option value="${escapeHtml(String(status.value_key || ''))}">${escapeHtml(String(status.value_label || ''))}</option>`)
+                .join('');
+        }
+    }
+
+    async function loadMachines() {
+        const result = await fetchJson(`${API_BASE}/machines/index.php?perPage=500`);
+        state.machines = Array.isArray(result.data) ? result.data : [];
+
+        const select = document.getElementById('mobile-filter-machine');
+        if (select) {
+            select.innerHTML = '<option value="">全部機台</option>' + state.machines
+                .map((machine) => `<option value="${escapeHtml(String(machine.id || ''))}">${escapeHtml(String(machine.name || '未命名機台'))}</option>`)
+                .join('');
+        }
+    }
+
+    async function loadQualityIssueMeta() {
+        try {
+            const result = await fetchJson(`${API_BASE}/quality_issue_reports/index.php?perPage=1`);
+            state.qualityIssueMeta.departments = Array.isArray(result.departments) ? result.departments : [];
+            state.qualityIssueMeta.statusOptions = Array.isArray(result.statusOptions) ? result.statusOptions : [];
+            state.qualityIssueMeta.sourceTypeOptions = Array.isArray(result.sourceTypeOptions) ? result.sourceTypeOptions : [];
+        } catch (_error) {
+            state.qualityIssueMeta.departments = [];
+            state.qualityIssueMeta.statusOptions = [];
+            state.qualityIssueMeta.sourceTypeOptions = [];
+        }
+    }
+
+    async function loadDailyInspections(resetSelection) {
+        const params = new URLSearchParams();
+        const machineId = getInputValue('mobile-inspections-filter-machine');
+        const isQualified = getInputValue('mobile-inspections-filter-qualified');
+        const dateFrom = getInputValue('mobile-inspections-filter-date-from');
+        const dateTo = getInputValue('mobile-inspections-filter-date-to');
+
+        if (machineId) params.set('machine_id', machineId);
+        if (isQualified !== '') params.set('is_qualified', isQualified);
+        if (dateFrom) params.set('date_from', dateFrom);
+        if (dateTo) params.set('date_to', dateTo);
+        params.set('perPage', '50');
+
+        setInspectionListState('載入每日機台檢驗中...');
+
+        try {
+            const result = await fetchJson(`${API_BASE}/daily_machine_inspections/index.php?${params.toString()}`);
+            state.inspections = Array.isArray(result.data) ? result.data : [];
+            state.inspectionsPagination = result.pagination || null;
+            state.inspectionsMeta.machines = Array.isArray(result.machines) ? result.machines : [];
+            state.inspectionsMeta.employees = Array.isArray(result.employees) ? result.employees : [];
+
+            populateInspectionMachineFilter();
+            renderInspectionCards(state.inspections);
+            setInspectionListState(`目前共 ${state.inspectionsPagination?.total ?? state.inspections.length} 筆每日機台檢驗`);
+
+            if (resetSelection && state.modalAction?.type === 'inspection_edit') {
+                const exists = state.inspections.some((item) => Number(item.id) === Number(state.modalAction.inspectionId));
+                if (!exists) {
+                    closeActionModal();
+                }
+            }
+        } catch (error) {
+            state.inspections = [];
+            renderInspectionCards([]);
+            setInspectionListState(error.message || '載入每日機台檢驗失敗。');
+        }
+    }
+
+    async function loadWorkOrders(resetSelection) {
+        const params = new URLSearchParams();
+        const keyword = getInputValue('mobile-filter-keyword');
+        const status = getInputValue('mobile-filter-status');
+        const machineId = getInputValue('mobile-filter-machine');
+        const startDate = getInputValue('mobile-filter-start-date');
+        const endDate = getInputValue('mobile-filter-end-date');
+
+        if (keyword) params.set('keyword', keyword);
+        if (status) params.set('status', status);
+        if (machineId) params.set('machine_id', machineId);
+        if (startDate) params.set('start_date', startDate);
+        if (endDate) params.set('end_date', endDate);
+        params.set('perPage', '50');
+        params.set('sortBy', 'id');
+        params.set('sortOrder', 'DESC');
+
+        setListState('載入工單中...');
+
+        try {
+            const result = await fetchJson(`${API_BASE}/work_orders/index.php?${params.toString()}`);
+            state.workOrders = Array.isArray(result.data) ? result.data : [];
+            state.pagination = result.pagination || null;
+            renderSummary(state.workOrders);
+            renderWorkOrderCards(state.workOrders);
+            setListState(`目前共 ${state.pagination?.total ?? state.workOrders.length} 張工單`);
+
+            if (resetSelection && state.selectedWorkOrderId) {
+                const stillExists = state.workOrders.some((item) => Number(item.id) === Number(state.selectedWorkOrderId));
+                if (!stillExists) {
+                    closeDetailSheet();
+                }
+            }
+        } catch (error) {
+            state.workOrders = [];
+            renderSummary([]);
+            renderWorkOrderCards([]);
+            setListState(error.message || '載入工單失敗。');
+        }
+    }
+
+    function renderSummary(workOrders) {
+        const summary = {
+            total: workOrders.length,
+            inProgress: 0,
+            paused: 0,
+            completed: 0,
+        };
+
+        workOrders.forEach((item) => {
+            const key = String(item.status_key || '');
+            if (key === 'in_progress') summary.inProgress += 1;
+            if (key === 'paused') summary.paused += 1;
+            if (key === 'completed') summary.completed += 1;
+        });
+
+        setText('mobile-summary-total', String(summary.total));
+        setText('mobile-summary-in-progress', String(summary.inProgress));
+        setText('mobile-summary-paused', String(summary.paused));
+        setText('mobile-summary-completed', String(summary.completed));
+    }
+
+    function renderWorkOrderCards(workOrders) {
+        const container = document.getElementById('mobile-work-order-list');
+        if (!container) {
+            return;
+        }
+
+        container.dataset.initialised = 'true';
+
+        if (!workOrders.length) {
+            container.innerHTML = '<div class="mobile-empty-state"><strong>查無符合條件的工單</strong><p class="mobile-empty-text">你可以調整搜尋條件，或直接重新整理清單。</p></div>';
+            return;
+        }
+
+        container.innerHTML = workOrders.map((item) => {
+            const actions = buildActionButtons(item);
+            return `
+                <article class="mobile-work-order-card" data-work-order-id="${item.id}">
+                    <div class="mobile-card-header">
+                        <div>
+                            <h3 class="mobile-card-title">${escapeHtml(item.work_order_number || '未命名工單')}</h3>
+                            <p class="mobile-card-subtitle">${escapeHtml(item.customer_name || '未指定客戶')} / ${escapeHtml(item.screening_item_name || '未指定品項')}</p>
+                        </div>
+                        ${renderStatusBadge(item.status_key, item.status_label)}
+                    </div>
+
+                    <div class="mobile-chip-row">
+                        ${item.work_order_type === 'split' ? '<span class="mobile-chip">拆分工單</span>' : '<span class="mobile-chip">一般工單</span>'}
+                        ${item.machine_name ? `<span class="mobile-chip">${escapeHtml(item.machine_name)}</span>` : ''}
+                        ${item.has_inventory ? '<span class="mobile-chip">已有入庫</span>' : ''}
+                        ${Number(item.total_image_count || 0) > 0 ? `<span class="mobile-chip">現場照片 ${escapeHtml(String(item.total_image_count || 0))}</span>` : ''}
+                    </div>
+
+                    <div class="mobile-card-meta">
+                        <span>訂單：${escapeHtml(item.order_number || '-')}</span>
+                        <span>開始：${escapeHtml(formatDateTime(item.actual_start_date) || '-')}</span>
+                        <span>完成：${escapeHtml(formatDateTime(item.actual_end_date) || '-')}</span>
+                    </div>
+
+                    ${
+                        Number(item.total_image_count || 0) > 0
+                            ? `
+                                <div class="mobile-detail-note">
+                                    已回傳
+                                    完工 ${escapeHtml(String(item.completion_image_count || 0))} 張 /
+                                    不良 ${escapeHtml(String(item.defect_image_count || 0))} 張 /
+                                    載具 ${escapeHtml(String(item.tool_condition_image_count || 0))} 張
+                                </div>
+                            `
+                            : ''
+                    }
+
+                    <div class="mobile-card-actions">
+                        <button type="button" class="mobile-secondary-button" data-action="view" data-id="${item.id}">
+                            <i class="fas fa-eye"></i>
+                            查看詳情
+                        </button>
+                        ${actions}
+                    </div>
+                </article>
+            `;
+        }).join('');
+    }
+
+    function populateInspectionMachineFilter() {
+        const select = document.getElementById('mobile-inspections-filter-machine');
+        if (!(select instanceof HTMLSelectElement)) {
+            return;
+        }
+
+        const currentValue = select.value;
+        const machineOptions = (state.inspectionsMeta.machines.length ? state.inspectionsMeta.machines : state.machines)
+            .map((machine) => {
+                const id = String(machine.id || '');
+                const label = machine.machine_number
+                    ? `${String(machine.machine_number)} / ${String(machine.name || '未命名機台')}`
+                    : String(machine.name || '未命名機台');
+                return `<option value="${escapeAttribute(id)}">${escapeHtml(label)}</option>`;
+            })
+            .join('');
+
+        select.innerHTML = '<option value="">全部機台</option>' + machineOptions;
+        select.value = currentValue;
+    }
+
+    function renderInspectionCards(inspections) {
+        const container = document.getElementById('mobile-inspections-list');
+        if (!container) {
+            return;
+        }
+
+        if (!inspections.length) {
+            container.innerHTML = '<div class="mobile-empty-state"><strong>查無符合條件的檢驗紀錄</strong><p class="mobile-empty-text">你可以調整查詢條件，或直接新增今日巡檢。</p></div>';
+            return;
+        }
+
+        container.innerHTML = inspections.map((item) => `
+            <article class="mobile-work-order-card" data-inspection-id="${item.id}">
+                <div class="mobile-card-header">
+                    <div>
+                        <h3 class="mobile-card-title">${escapeHtml(item.machine_name || '未指定機台')}</h3>
+                        <p class="mobile-card-subtitle">${escapeHtml(item.machine_code || '未設定機台編號')} / 檢驗人：${escapeHtml(item.inspector_name || '未指定')}</p>
+                    </div>
+                    ${renderInspectionBadge(item.is_qualified)}
+                </div>
+
+                <div class="mobile-card-meta">
+                    <span>檢驗日期：${escapeHtml(item.inspection_date || '-')}</span>
+                    <span>建立時間：${escapeHtml(formatDateTime(item.created_at) || '-')}</span>
+                    <span>更新時間：${escapeHtml(formatDateTime(item.updated_at) || '-')}</span>
+                </div>
+
+                <div class="mobile-detail-note">${escapeHtml(item.notes || '未填寫備註')}</div>
+
+                <div class="mobile-card-actions">
+                    <button type="button" class="mobile-secondary-button" data-action="inspection-edit" data-id="${item.id}">
+                        <i class="fas fa-pen"></i>
+                        編輯檢驗
+                    </button>
+                </div>
+            </article>
+        `).join('');
+    }
+
+    function buildActionButtons(item) {
+        const statusKey = String(item.status_key || '');
+        const buttons = [];
+
+        if (statusKey === 'pending') {
+            buttons.push(renderActionButton('start', item.id, 'fa-play', '開工', 'mobile-primary-button'));
+        }
+        if (statusKey === 'in_progress') {
+            buttons.push(renderActionButton('pause', item.id, 'fa-pause', '暫停', 'mobile-secondary-button'));
+            buttons.push(renderActionButton('partial', item.id, 'fa-box-open', '部分完工', 'mobile-ghost-button'));
+            buttons.push(renderActionButton('complete', item.id, 'fa-flag-checkered', '完工', 'mobile-primary-button'));
+        }
+        if (statusKey === 'paused') {
+            buttons.push(renderActionButton('resume', item.id, 'fa-play', '恢復', 'mobile-primary-button'));
+            buttons.push(renderActionButton('partial', item.id, 'fa-box-open', '部分完工', 'mobile-ghost-button'));
+        }
+        if (statusKey === 'completed') {
+            buttons.push(renderActionButton('upload', item.id, 'fa-camera', '補傳照片', 'mobile-secondary-button'));
+        } else {
+            buttons.push(renderActionButton('upload', item.id, 'fa-camera', '拍照', 'mobile-secondary-button'));
+            buttons.push(renderActionButton('issue', item.id, 'fa-triangle-exclamation', '異常回報', 'mobile-secondary-button'));
+        }
+
+        return buttons.join('');
+    }
+
+    function renderActionButton(action, id, icon, label, className, extraAttributes = '') {
+        return `
+            <button type="button" class="${className}" data-action="${action}" data-id="${id}" ${extraAttributes}>
+                <i class="fas ${icon}"></i>
+                ${label}
+            </button>
+        `;
+    }
+
+    async function openWorkOrderDetail(id) {
+        state.selectedWorkOrderId = Number(id);
+        const sheet = document.getElementById('mobile-detail-sheet');
+        sheet?.classList.remove('hidden');
+        sheet?.setAttribute('aria-hidden', 'false');
+        setText('mobile-detail-title', '工單詳情');
+        setText('mobile-detail-subtitle', '讀取中...');
+        const content = document.getElementById('mobile-detail-content');
+        if (content) {
+            content.innerHTML = '<div class="mobile-detail-loading">載入工單明細中...</div>';
+        }
+
+        try {
+            const result = await fetchJson(`${API_BASE}/work_orders/show.php?id=${id}`);
+            state.currentWorkOrder = result.data || null;
+            renderWorkOrderDetail(result.data || null);
+        } catch (error) {
+            if (content) {
+                content.innerHTML = `<div class="mobile-empty-state"><strong>載入失敗</strong><p class="mobile-empty-text">${escapeHtml(error.message || '無法取得工單明細。')}</p></div>`;
+            }
+        }
+    }
+
+    function renderWorkOrderDetail(workOrder) {
+        const content = document.getElementById('mobile-detail-content');
+        if (!content || !workOrder) {
+            return;
+        }
+
+        setText('mobile-detail-title', workOrder.work_order_number || '工單詳情');
+        setText(
+            'mobile-detail-subtitle',
+            `${workOrder.customer_name || '未指定客戶'} / ${workOrder.screening_item_name || '未指定品項'}`
+        );
+
+        const actionButtons = buildDetailActionButtons(workOrder);
+        const screeningServices = Array.isArray(workOrder.screening_services_details) ? workOrder.screening_services_details : [];
+        const images = Array.isArray(workOrder.images) ? workOrder.images : [];
+        const completionImages = Array.isArray(workOrder.completion_images) ? workOrder.completion_images : [];
+        const defectImages = Array.isArray(workOrder.defect_images) ? workOrder.defect_images : [];
+        const toolConditionImages = Array.isArray(workOrder.tool_condition_images) ? workOrder.tool_condition_images : [];
+        const operationLogs = Array.isArray(workOrder.operation_logs) ? workOrder.operation_logs : [];
+        const productionRecords = Array.isArray(workOrder.production_records) ? workOrder.production_records : [];
+        const machineRuns = Array.isArray(workOrder.machine_runs) ? workOrder.machine_runs : [];
+
+        content.innerHTML = `
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-grid">
+                    <article class="mobile-detail-card">
+                        <span>工單狀態</span>
+                        <strong>${escapeHtml(workOrder.status_label || '-')}</strong>
+                    </article>
+                    <article class="mobile-detail-card">
+                        <span>指定機台</span>
+                        <strong>${escapeHtml(workOrder.machine_name || '-')}</strong>
+                    </article>
+                    <article class="mobile-detail-card">
+                        <span>預計淨重</span>
+                        <strong>${escapeHtml(formatWeight(workOrder.net_weight))}</strong>
+                    </article>
+                    <article class="mobile-detail-card">
+                        <span>預計支數</span>
+                        <strong>${escapeHtml(formatNumber(workOrder.total_units))}</strong>
+                    </article>
+                </div>
+            </section>
+
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-section-header">
+                    <h3>現場操作</h3>
+                    ${renderStatusBadge(workOrder.status_key, workOrder.status_label)}
+                </div>
+                <div class="mobile-inline-actions">
+                    ${actionButtons}
+                </div>
+            </section>
+
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-section-header">
+                    <h3>工單資訊</h3>
+                </div>
+                <div class="mobile-info-list">
+                    ${renderInfoCard('訂單號', workOrder.order_number)}
+                    ${renderInfoCard('客戶批號', workOrder.customer_batch_number)}
+                    ${renderInfoCard('圖號', workOrder.drawing_number)}
+                    ${renderInfoCard('客戶', workOrder.customer_name)}
+                    ${renderInfoCard('產品 / 規格', workOrder.screening_item_name)}
+                    ${renderInfoCard('機台能力', workOrder.machine_capability_name)}
+                    ${renderInfoCard('單重 (g)', formatNumber(workOrder.weight_per_unit_g))}
+                    ${renderInfoCard('載具統計', workOrder.tool_statistics || '-')}
+                    ${renderInfoCard('實際開始', formatDateTime(workOrder.actual_start_date))}
+                    ${renderInfoCard('實際完成', formatDateTime(workOrder.actual_end_date))}
+                    ${renderInfoCard('備註', workOrder.other_notes || '-')}
+                </div>
+            </section>
+
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-section-header">
+                    <h3>篩分服務</h3>
+                </div>
+                ${
+                    screeningServices.length
+                        ? screeningServices.map((service) => `
+                            <article class="mobile-record-card">
+                                <strong>${escapeHtml(service.custom_service_name || service.screening_service_name || '未命名服務')}</strong>
+                                <div class="mobile-card-meta">
+                                    <span>+公差：${escapeHtml(service.tolerance_plus_value || '-')}</span>
+                                    <span>-公差：${escapeHtml(service.tolerance_minus_value || '-')}</span>
+                                    <span>PPM：${escapeHtml(service.ppm_standard || '-')}</span>
+                                </div>
+                            </article>
+                        `).join('')
+                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">此工單目前沒有篩分服務明細。</p></div>'
+                }
+            </section>
+
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-section-header">
+                    <h3>生產紀錄</h3>
+                </div>
+                ${
+                    productionRecords.length
+                        ? productionRecords.map((record) => `
+                            <article class="mobile-record-card">
+                                <strong>${escapeHtml(record.machine_name || workOrder.machine_name || '未指定機台')}</strong>
+                                <div class="mobile-card-meta">
+                                    <span>日期：${escapeHtml(record.production_date || '-')}</span>
+                                    <span>時間：${escapeHtml(record.production_time || '-')}</span>
+                                    <span>重量：${escapeHtml(formatWeight(record.weight_kg))}</span>
+                                    <span>操作人：${escapeHtml(record.employee_name || record.operator_name || '-')}</span>
+                                </div>
+                                <p class="mobile-detail-note">${escapeHtml(record.notes || '無備註')}</p>
+                            </article>
+                        `).join('')
+                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">尚未建立生產紀錄。</p></div>'
+                }
+            </section>
+
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-section-header">
+                    <h3>操作紀錄</h3>
+                </div>
+                ${
+                    operationLogs.length
+                        ? renderOperationLogList(operationLogs)
+                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">尚未建立操作紀錄。</p></div>'
+                }
+            </section>
+
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-section-header">
+                    <h3>拆分機台 / 部分入庫</h3>
+                </div>
+                ${
+                    machineRuns.length
+                        ? machineRuns.map((run) => `
+                            <article class="mobile-run-card">
+                                <strong>${escapeHtml(run.run_label || run.machine_name || '拆分機台')}</strong>
+                                <div class="mobile-card-meta">
+                                    <span>機台：${escapeHtml(run.machine_name || '-')}</span>
+                                    <span>狀態：${escapeHtml(run.status || '-')}</span>
+                                    <span>完成淨重：${escapeHtml(formatWeight(run.completed_net_weight_kg))}</span>
+                                    <span>已部分入庫：${escapeHtml(formatWeight(run.partial_receipt_net_weight_kg))}</span>
+                                </div>
+                                <div class="mobile-run-actions">
+                                    <button type="button" class="mobile-ghost-button" data-action="partial-run" data-id="${workOrder.id}" data-run-id="${run.id}">
+                                        <i class="fas fa-box-open"></i>
+                                        此機台部分完工
+                                    </button>
+                                </div>
+                            </article>
+                        `).join('')
+                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">目前沒有拆分機台資料；一般工單可直接使用「部分完工」功能。</p></div>'
+                }
+            </section>
+
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-section-header">
+                    <h3>完工圖片</h3>
+                    <button type="button" class="mobile-secondary-button" data-action="upload" data-id="${workOrder.id}" data-upload-target="completion">
+                        <i class="fas fa-camera"></i>
+                        上傳完工圖片
+                    </button>
+                </div>
+                ${
+                    completionImages.length
+                        ? renderExecutionImageGrid(completionImages)
+                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">尚未上傳完工圖片。</p></div>'
+                }
+            </section>
+
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-section-header">
+                    <h3>不良品圖片</h3>
+                    <button type="button" class="mobile-secondary-button" data-action="upload" data-id="${workOrder.id}" data-upload-target="defect">
+                        <i class="fas fa-camera"></i>
+                        上傳不良品圖片
+                    </button>
+                </div>
+                ${
+                    defectImages.length
+                        ? renderExecutionImageGrid(defectImages)
+                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">尚未上傳不良品圖片。</p></div>'
+                }
+            </section>
+
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-section-header">
+                    <h3>載具狀況圖片</h3>
+                    <button type="button" class="mobile-secondary-button" data-action="upload" data-id="${workOrder.id}" data-upload-target="tool_condition">
+                        <i class="fas fa-camera"></i>
+                        上傳載具圖片
+                    </button>
+                </div>
+                ${
+                    toolConditionImages.length
+                        ? renderExecutionImageGrid(toolConditionImages)
+                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">尚未上傳載具狀況圖片。</p></div>'
+                }
+            </section>
+
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-section-header">
+                    <h3>既有工單圖片</h3>
+                </div>
+                ${
+                    images.length
+                        ? renderLegacyImageGrid(images)
+                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">尚未保留任何舊版工單圖片。</p></div>'
+                }
+                <div class="mobile-info-card">
+                    <strong>舊流程資料</strong>
+                    <p class="mobile-detail-note">此區保留桌面既有工單圖片的唯讀顯示；手機現場回傳請改用上方三個新圖片區塊。</p>
+                </div>
+            </section>
+        `;
+    }
+
+    function renderExecutionImageGrid(images) {
+        return `<div class="mobile-photo-grid">${images.map((image) => `
+            <article class="mobile-photo-card">
+                <strong>${escapeHtml(image.file_name || '工單圖片')}</strong>
+                <span>${escapeHtml(formatDateTime(image.uploaded_at) || '-')}</span>
+                <img src="${escapeAttribute(state.basePath + String(image.file_path || '').replace(/^\/+/, ''))}" alt="${escapeAttribute(image.description || image.file_name || '工單圖片')}">
+                <p class="mobile-detail-note">${escapeHtml(image.description || '無照片說明')}</p>
+                <p class="mobile-detail-note">上傳者：${escapeHtml(image.uploaded_by_name || '-')}</p>
+                <a class="mobile-photo-link" href="${escapeAttribute(state.basePath + String(image.file_path || '').replace(/^\/+/, ''))}" target="_blank" rel="noopener">
+                    開啟原圖
+                </a>
+            </article>
+        `).join('')}</div>`;
+    }
+
+    function renderLegacyImageGrid(images) {
+        return `<div class="mobile-photo-grid">${images.map((image) => `
+            <article class="mobile-photo-card">
+                <strong>${escapeHtml(getImageTypeLabel(image.image_type))}</strong>
+                <span>${escapeHtml(formatDateTime(image.uploaded_at) || '-')}</span>
+                <img src="${escapeAttribute(state.basePath + String(image.file_path || '').replace(/^\/+/, ''))}" alt="${escapeAttribute(image.description || image.image_type || '工單照片')}">
+                <p class="mobile-detail-note">${escapeHtml(image.description || '無照片說明')}</p>
+                <p class="mobile-detail-note">上傳者：${escapeHtml(image.uploaded_by_name || '-')}</p>
+                <a class="mobile-photo-link" href="${escapeAttribute(state.basePath + String(image.file_path || '').replace(/^\/+/, ''))}" target="_blank" rel="noopener">
+                    開啟原圖
+                </a>
+            </article>
+        `).join('')}</div>`;
+    }
+
+    function renderOperationLogList(logs) {
+        return logs.map((log) => `
+            <article class="mobile-record-card">
+                <strong>${escapeHtml(log.action_label || '操作紀錄')}</strong>
+                <div class="mobile-card-meta">
+                    <span>時間：${escapeHtml(formatDateTime(log.created_at) || '-')}</span>
+                    <span>人員：${escapeHtml(log.created_by_name || '-')}</span>
+                    ${
+                        log.status_to_label
+                            ? `<span>狀態：${escapeHtml(log.status_from_label || '-') } -> ${escapeHtml(log.status_to_label || '-')}</span>`
+                            : ''
+                    }
+                </div>
+                <p class="mobile-detail-note">${escapeHtml(log.notes || '無補充說明')}</p>
+            </article>
+        `).join('');
+    }
+
+    function buildDetailActionButtons(workOrder) {
+        const buttons = [
+            renderActionButton('view', workOrder.id, 'fa-rotate-right', '重新載入', 'mobile-secondary-button'),
+            renderActionButton('upload', workOrder.id, 'fa-camera', '拍照 / 上傳', 'mobile-secondary-button'),
+            renderActionButton('issue', workOrder.id, 'fa-triangle-exclamation', '異常回報', 'mobile-secondary-button'),
+        ];
+
+        const statusKey = String(workOrder.status_key || '');
+        if (statusKey === 'pending') {
+            buttons.unshift(renderActionButton('start', workOrder.id, 'fa-play', '開工', 'mobile-primary-button'));
+        }
+        if (statusKey === 'in_progress') {
+            buttons.unshift(renderActionButton('complete', workOrder.id, 'fa-flag-checkered', '完工', 'mobile-primary-button'));
+            buttons.unshift(renderActionButton('partial', workOrder.id, 'fa-box-open', '部分完工', 'mobile-ghost-button'));
+            buttons.unshift(renderActionButton('pause', workOrder.id, 'fa-pause', '暫停', 'mobile-secondary-button'));
+        }
+        if (statusKey === 'paused') {
+            buttons.unshift(renderActionButton('partial', workOrder.id, 'fa-box-open', '部分完工', 'mobile-ghost-button'));
+            buttons.unshift(renderActionButton('resume', workOrder.id, 'fa-play', '恢復', 'mobile-primary-button'));
+        }
+
+        return buttons.join('');
+    }
+
+    function renderInfoCard(label, value) {
+        return `
+            <article class="mobile-info-card">
+                <strong>${escapeHtml(label)}</strong>
+                <p class="mobile-detail-note">${escapeHtml(value || '-')}</p>
+            </article>
+        `;
+    }
+
+    function handleListActionClick(event) {
+        const button = event.target instanceof HTMLElement ? event.target.closest('button[data-action]') : null;
+        if (!button) {
+            return;
+        }
+        handleActionClick(button);
+    }
+
+    function handleDetailActionClick(event) {
+        const button = event.target instanceof HTMLElement ? event.target.closest('button[data-action]') : null;
+        if (!button) {
+            return;
+        }
+        handleActionClick(button);
+    }
+
+    function handleInspectionListClick(event) {
+        const button = event.target instanceof HTMLElement ? event.target.closest('button[data-action]') : null;
+        if (!button) {
+            return;
+        }
+
+        const action = button.dataset.action || '';
+        const id = Number(button.dataset.id || 0);
+        if (action !== 'inspection-edit' || !id) {
+            return;
+        }
+
+        const inspection = state.inspections.find((item) => Number(item.id) === id) || null;
+        openInspectionModal('edit', inspection);
+    }
+
+    function handleActionClick(button) {
+        const action = button.dataset.action || '';
+        const id = Number(button.dataset.id || 0);
+        const runId = Number(button.dataset.runId || 0);
+        const uploadTarget = String(button.dataset.uploadTarget || '').trim();
+
+        if (action === 'view') {
+            if (state.currentWorkOrder && state.currentWorkOrder.id === id) {
+                openWorkOrderDetail(id);
+                return;
+            }
+            openWorkOrderDetail(id);
+            return;
+        }
+
+        if (!id) {
+            return;
+        }
+
+        if (action === 'start') {
+            executeStatusAction(id, 'in_progress', {
+                actual_start_date: getCurrentDateTimeString(),
+            }, '已開始生產。');
+            return;
+        }
+
+        if (action === 'pause') {
+            executeStatusAction(id, 'paused', {}, '工單已暫停。');
+            return;
+        }
+
+        if (action === 'resume') {
+            executeStatusAction(id, 'in_progress', {}, '工單已恢復生產。');
+            return;
+        }
+
+        if (action === 'partial') {
+            openActionModal({
+                type: 'partial',
+                workOrderId: id,
+                machineRunId: null,
+            });
+            return;
+        }
+
+        if (action === 'partial-run') {
+            openActionModal({
+                type: 'partial',
+                workOrderId: id,
+                machineRunId: runId || null,
+            });
+            return;
+        }
+
+        if (action === 'complete') {
+            openActionModal({
+                type: 'complete',
+                workOrderId: id,
+            });
+            return;
+        }
+
+        if (action === 'upload') {
+            openActionModal({
+                type: 'upload',
+                workOrderId: id,
+                uploadTarget: uploadTarget || 'completion',
+            });
+            return;
+        }
+
+        if (action === 'issue') {
+            openActionModal({
+                type: 'issue',
+                workOrderId: id,
+            });
+        }
+    }
+
+    async function executeStatusAction(workOrderId, statusKey, extraPayload, successMessage) {
+        const status = state.statusByKey[statusKey];
+        if (!status || !status.id) {
+            window.alert('找不到對應的工單狀態設定，請先確認狀態 lookup。');
+            return;
+        }
+
+        try {
+            await fetchJson(`${API_BASE}/work_orders/update.php?id=${workOrderId}`, {
+                method: 'PUT',
+                body: {
+                    status_lookup_id: status.id,
+                    ...extraPayload,
+                },
+                withCsrf: true,
+            });
+            await refreshAfterMutation(workOrderId, successMessage);
+        } catch (error) {
+            window.alert(error.message || '更新工單狀態失敗。');
+        }
+    }
+
+    function openInspectionModal(mode, inspection) {
+        const employees = state.inspectionsMeta.employees.length ? state.inspectionsMeta.employees : [];
+        const machines = state.inspectionsMeta.machines.length ? state.inspectionsMeta.machines : state.machines;
+        const currentUserId = Number(state.currentUser?.id || 0);
+
+        openActionModal({
+            type: mode === 'edit' ? 'inspection_edit' : 'inspection_create',
+            inspectionId: inspection?.id || null,
+            values: {
+                inspection_date: inspection?.inspection_date || getCurrentDateString(),
+                machine_id: String(inspection?.machine_id || ''),
+                inspector_id: String(inspection?.inspector_id || currentUserId || ''),
+                is_qualified: inspection ? (inspection.is_qualified ? '1' : '0') : '1',
+                notes: inspection?.notes || '',
+            },
+            machines,
+            employees,
+        });
+    }
+
+    function openActionModal(config) {
+        state.modalAction = config;
+        const modal = document.getElementById('mobile-action-modal');
+        const title = document.getElementById('mobile-action-title');
+        const kicker = document.getElementById('mobile-action-kicker');
+        const body = document.getElementById('mobile-action-body');
+        const submit = document.getElementById('mobile-action-submit');
+        const feedback = document.getElementById('mobile-action-feedback');
+
+        if (!modal || !title || !kicker || !body || !submit || !feedback) {
+            return;
+        }
+
+        feedback.className = 'mobile-action-feedback';
+        feedback.textContent = '';
+
+        if (config.type === 'partial') {
+            title.textContent = '部分完工回報';
+            kicker.textContent = 'PARTIAL RECEIPT';
+            submit.textContent = '送出部分完工';
+            body.innerHTML = `
+                <div class="mobile-action-grid">
+                    <label class="mobile-field">
+                        <span>本次完成淨重 (kg)</span>
+                        <input type="number" name="net_weight_kg" min="0.01" step="0.01" placeholder="例如 25.50" required>
+                    </label>
+                    ${
+                        config.machineRunId
+                            ? `<div class="mobile-info-card"><strong>來源機台頁籤</strong><p class="mobile-detail-note">機台明細 ID：${escapeHtml(String(config.machineRunId))}</p></div>`
+                            : ''
+                    }
+                    <label class="mobile-field">
+                        <span>備註</span>
+                        <textarea name="notes" placeholder="可填寫本次部分完工說明、交班資訊或異常狀況"></textarea>
+                    </label>
+                </div>
+            `;
+        } else if (config.type === 'complete') {
+            title.textContent = '完工回報';
+            kicker.textContent = 'COMPLETE';
+            submit.textContent = '確認完工';
+            body.innerHTML = `
+                <div class="mobile-action-grid">
+                    <div class="mobile-info-card">
+                        <strong>完工說明</strong>
+                        <p class="mobile-detail-note">送出後會把工單狀態更新為「已完成」，並依既有工單流程自動處理最終入庫。</p>
+                    </div>
+                    <label class="mobile-field">
+                        <span>完工備註</span>
+                        <textarea name="notes" placeholder="可補充完工狀況、交接資訊或照片說明"></textarea>
+                    </label>
+                    <label class="mobile-field">
+                        <span>入庫設定</span>
+                        <select name="auto_create_inventory">
+                            <option value="1">完工後依既有邏輯自動入庫</option>
+                            <option value="0">只更新工單狀態，不自動入庫</option>
+                        </select>
+                    </label>
+                </div>
+            `;
+        } else if (config.type === 'upload') {
+            const uploadTarget = String(config.uploadTarget || 'completion');
+            const uploadConfig = getExecutionImageUploadConfig(uploadTarget);
+            title.textContent = `上傳${uploadConfig.label}`;
+            kicker.textContent = 'PHOTO UPLOAD';
+            submit.textContent = `上傳${uploadConfig.label}`;
+            resetUploadDraft();
+            body.innerHTML = `
+                <div class="mobile-action-grid">
+                    <div class="mobile-info-card">
+                        <strong>手機拍照上傳</strong>
+                        <p class="mobile-detail-note">可直接拍照，或從手機相簿一次選多張圖片後一起送出。</p>
+                    </div>
+                    <label class="mobile-field">
+                        <span>圖片用途</span>
+                        <select name="upload_target">
+                            <option value="completion"${uploadTarget === 'completion' ? ' selected' : ''}>完工圖片</option>
+                            <option value="defect"${uploadTarget === 'defect' ? ' selected' : ''}>不良品圖片</option>
+                            <option value="tool_condition"${uploadTarget === 'tool_condition' ? ' selected' : ''}>載具狀況圖片</option>
+                        </select>
+                    </label>
+                    <label class="mobile-field">
+                        <span>照片說明</span>
+                        <textarea name="description" placeholder="例如：完工包裝、現場首件、異常位置"></textarea>
+                    </label>
+                    <label class="mobile-field">
+                        <span>直接拍照</span>
+                        <input type="file" name="camera_image" accept="image/*" capture="environment">
+                    </label>
+                    <label class="mobile-field">
+                        <span>相簿 / 多張選取</span>
+                        <input type="file" name="gallery_images" accept="image/*" multiple>
+                    </label>
+                    <div class="mobile-upload-queue" id="mobile-upload-queue">
+                        <div class="mobile-empty-state">
+                            <strong>尚未選擇照片</strong>
+                            <p class="mobile-empty-text">請先拍照，或從手機相簿選取要上傳的圖片。</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (config.type === 'inspection_create' || config.type === 'inspection_edit') {
+            const values = config.values || {};
+            const machineOptions = ['<option value="">請選擇機台</option>']
+                .concat((config.machines || []).map((machine) => {
+                    const machineId = String(machine.id || '');
+                    const label = machine.machine_number
+                        ? `${String(machine.machine_number)} / ${String(machine.name || '未命名機台')}`
+                        : String(machine.name || '未命名機台');
+                    return `
+                        <option value="${escapeAttribute(machineId)}"${machineId === String(values.machine_id || '') ? ' selected' : ''}>
+                            ${escapeHtml(label)}
+                        </option>
+                    `;
+                }))
+                .join('');
+            const employeeOptions = ['<option value="">請選擇檢驗人</option>']
+                .concat((config.employees || []).map((employee) => {
+                    const employeeId = String(employee.id || '');
+                    const label = employee.employee_number
+                        ? `${String(employee.employee_number)} / ${String(employee.name || '未命名人員')}`
+                        : String(employee.name || '未命名人員');
+                    return `
+                        <option value="${escapeAttribute(employeeId)}"${employeeId === String(values.inspector_id || '') ? ' selected' : ''}>
+                            ${escapeHtml(label)}
+                        </option>
+                    `;
+                }))
+                .join('');
+
+            title.textContent = config.type === 'inspection_edit' ? '編輯每日機台檢驗' : '新增每日機台檢驗';
+            kicker.textContent = 'DAILY INSPECTION';
+            submit.textContent = config.type === 'inspection_edit' ? '儲存檢驗' : '建立檢驗';
+            body.innerHTML = `
+                <div class="mobile-action-grid">
+                    <label class="mobile-field">
+                        <span>檢驗日期</span>
+                        <input type="date" name="inspection_date" value="${escapeAttribute(String(values.inspection_date || ''))}" required>
+                    </label>
+                    <label class="mobile-field">
+                        <span>機台</span>
+                        <select name="machine_id" required>
+                            ${machineOptions}
+                        </select>
+                    </label>
+                    <label class="mobile-field">
+                        <span>檢驗人</span>
+                        <select name="inspector_id" required>
+                            ${employeeOptions}
+                        </select>
+                    </label>
+                    <label class="mobile-field">
+                        <span>檢驗結果</span>
+                        <select name="is_qualified">
+                            <option value="1"${String(values.is_qualified || '1') === '1' ? ' selected' : ''}>合格</option>
+                            <option value="0"${String(values.is_qualified || '1') === '0' ? ' selected' : ''}>不合格</option>
+                        </select>
+                    </label>
+                    <label class="mobile-field">
+                        <span>備註</span>
+                        <textarea name="notes" placeholder="可填寫巡檢觀察、異常位置、後續追蹤事項">${escapeHtml(String(values.notes || ''))}</textarea>
+                    </label>
+                </div>
+            `;
+        } else if (config.type === 'issue') {
+            const sourceTypeOptions = (state.qualityIssueMeta.sourceTypeOptions.length
+                ? state.qualityIssueMeta.sourceTypeOptions
+                : [
+                    { value: 'process_inspection', label: '製程檢驗' },
+                    { value: 'other', label: '其他' },
+                ])
+                .map((option) => `
+                    <option value="${escapeAttribute(option.value)}"${option.value === 'process_inspection' ? ' selected' : ''}>
+                        ${escapeHtml(option.label)}
+                    </option>
+                `)
+                .join('');
+            const statusOptions = (state.qualityIssueMeta.statusOptions.length
+                ? state.qualityIssueMeta.statusOptions
+                : [{ value: 'pending', label: '待處理' }])
+                .map((option) => `
+                    <option value="${escapeAttribute(option.value)}"${option.value === 'pending' ? ' selected' : ''}>
+                        ${escapeHtml(option.label)}
+                    </option>
+                `)
+                .join('');
+            const departmentOptions = ['<option value="">未指定責任部門</option>']
+                .concat(
+                    state.qualityIssueMeta.departments.map((department) => `
+                        <option value="${escapeAttribute(String(department.id || ''))}">
+                            ${escapeHtml(String(department.name || '未命名部門'))}
+                        </option>
+                    `)
+                )
+                .join('');
+
+            title.textContent = '異常回報';
+            kicker.textContent = 'QUALITY ISSUE';
+            submit.textContent = '送出異常';
+            body.innerHTML = `
+                <div class="mobile-action-grid">
+                    <div class="mobile-info-card">
+                        <strong>回報工單</strong>
+                        <p class="mobile-detail-note">工單 ID：${escapeHtml(String(config.workOrderId))}</p>
+                    </div>
+                    <label class="mobile-field">
+                        <span>異常來源類型</span>
+                        <select name="issue_source_type">
+                            ${sourceTypeOptions}
+                        </select>
+                    </label>
+                    <label class="mobile-field">
+                        <span>責任部門</span>
+                        <select name="responsible_department_id">
+                            ${departmentOptions}
+                        </select>
+                    </label>
+                    <label class="mobile-field">
+                        <span>處理狀態</span>
+                        <select name="status">
+                            ${statusOptions}
+                        </select>
+                    </label>
+                    <label class="mobile-field">
+                        <span>異常描述</span>
+                        <textarea name="issue_description" placeholder="請描述異常狀況、影響範圍、批號或現場觀察" required></textarea>
+                    </label>
+                    <label class="mobile-field">
+                        <span>原因分析</span>
+                        <textarea name="root_cause_analysis" placeholder="可先填現場初步判斷，若尚未確認可留空"></textarea>
+                    </label>
+                    <label class="mobile-field">
+                        <span>暫時處置</span>
+                        <textarea name="corrective_actions" placeholder="例如：暫停生產、隔離批次、通知班長"></textarea>
+                    </label>
+                    <label class="mobile-field">
+                        <span>預防措施</span>
+                        <textarea name="preventive_actions" placeholder="若目前尚無，可先留空，後續由主管補充"></textarea>
+                    </label>
+                    <div class="mobile-info-card">
+                        <strong>補充說明</strong>
+                        <p class="mobile-detail-note">若需要附照片，送出異常後可再用「拍照 / 上傳」補工單現場照片。</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeActionModal() {
+        const modal = document.getElementById('mobile-action-modal');
+        const form = document.getElementById('mobile-action-form');
+        const feedback = document.getElementById('mobile-action-feedback');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        if (form) {
+            form.reset();
+        }
+        if (feedback) {
+            feedback.className = 'mobile-action-feedback';
+            feedback.textContent = '';
+        }
+        resetUploadDraft();
+        state.modalAction = null;
+    }
+
+    function closeDetailSheet() {
+        const sheet = document.getElementById('mobile-detail-sheet');
+        if (sheet) {
+            sheet.classList.add('hidden');
+            sheet.setAttribute('aria-hidden', 'true');
+        }
+        state.selectedWorkOrderId = null;
+        state.currentWorkOrder = null;
+    }
+
+    async function handleActionSubmit(event) {
+        event.preventDefault();
+        if (!state.modalAction) {
+            return;
+        }
+
+        const form = event.currentTarget;
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const submitButton = document.getElementById('mobile-action-submit');
+        toggleActionSubmitting(true, submitButton);
+
+        try {
+            if (state.modalAction.type === 'partial') {
+                await submitPartialReceipt(form, state.modalAction);
+                return;
+            }
+            if (state.modalAction.type === 'inspection_create' || state.modalAction.type === 'inspection_edit') {
+                await submitInspectionAction(form, state.modalAction);
+                return;
+            }
+            if (state.modalAction.type === 'complete') {
+                await submitCompleteAction(form, state.modalAction);
+                return;
+            }
+            if (state.modalAction.type === 'upload') {
+                await submitPhotoUpload(form, state.modalAction);
+                return;
+            }
+            if (state.modalAction.type === 'issue') {
+                await submitQualityIssueReport(form, state.modalAction);
+            }
+        } finally {
+            toggleActionSubmitting(false, submitButton);
+        }
+    }
+
+    function handleActionFormChange(event) {
+        if (!state.modalAction || state.modalAction.type !== 'upload') {
+            return;
+        }
+
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement) || target.type !== 'file') {
+            return;
+        }
+
+        const files = Array.from(target.files || []);
+        if (!files.length) {
+            return;
+        }
+
+        appendUploadDraftFiles(files);
+        target.value = '';
+    }
+
+    function appendUploadDraftFiles(files) {
+        const allowedMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']);
+        const nextItems = [];
+
+        files.forEach((file) => {
+            if (!(file instanceof File)) {
+                return;
+            }
+            if (!allowedMimeTypes.has(file.type)) {
+                showActionFeedback('error', `不支援的圖片格式：${file.name}`);
+                return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                showActionFeedback('error', `圖片不可超過 10MB：${file.name}`);
+                return;
+            }
+
+            nextItems.push({
+                id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+                file,
+                previewUrl: URL.createObjectURL(file),
+            });
+        });
+
+        if (!nextItems.length) {
+            renderUploadDraftQueue();
+            return;
+        }
+
+        state.uploadDraft = state.uploadDraft.concat(nextItems);
+        showActionFeedback('success', `已加入 ${nextItems.length} 張待上傳照片。`);
+        renderUploadDraftQueue();
+    }
+
+    function removeUploadDraftFile(draftId) {
+        const nextDraft = [];
+        state.uploadDraft.forEach((item) => {
+            if (item.id === draftId) {
+                if (item.previewUrl) {
+                    URL.revokeObjectURL(item.previewUrl);
+                }
+                return;
+            }
+            nextDraft.push(item);
+        });
+        state.uploadDraft = nextDraft;
+        renderUploadDraftQueue();
+    }
+
+    function resetUploadDraft() {
+        state.uploadDraft.forEach((item) => {
+            if (item.previewUrl) {
+                URL.revokeObjectURL(item.previewUrl);
+            }
+        });
+        state.uploadDraft = [];
+    }
+
+    function renderUploadDraftQueue() {
+        const queue = document.getElementById('mobile-upload-queue');
+        if (!(queue instanceof HTMLElement)) {
+            return;
+        }
+
+        if (!state.uploadDraft.length) {
+            queue.innerHTML = `
+                <div class="mobile-empty-state">
+                    <strong>尚未選擇照片</strong>
+                    <p class="mobile-empty-text">請先拍照，或從手機相簿選取要上傳的圖片。</p>
+                </div>
+            `;
+            return;
+        }
+
+        queue.innerHTML = `
+            <div class="mobile-upload-queue-header">
+                <strong>待上傳 ${state.uploadDraft.length} 張</strong>
+                <span class="mobile-empty-text">送出前可先刪除不要的照片</span>
+            </div>
+            <div class="mobile-upload-preview-grid">
+                ${state.uploadDraft.map((item, index) => `
+                    <article class="mobile-upload-preview-card">
+                        <button type="button" class="mobile-upload-remove" data-action="remove-upload-file" data-upload-draft-id="${escapeAttribute(item.id)}" aria-label="移除此照片">
+                            <i class="fas fa-xmark"></i>
+                        </button>
+                        <img src="${escapeAttribute(item.previewUrl)}" alt="${escapeAttribute(item.file.name || `照片 ${index + 1}`)}">
+                        <div class="mobile-upload-preview-meta">
+                            <strong>${escapeHtml(item.file.name || `照片 ${index + 1}`)}</strong>
+                            <span>${escapeHtml(formatFileSize(item.file.size))}</span>
+                        </div>
+                    </article>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    async function submitPartialReceipt(form, action) {
+        const weightValue = String(new FormData(form).get('net_weight_kg') || '').trim();
+        if (!weightValue) {
+            showActionFeedback('error', '請填寫本次完成淨重。');
+            return;
+        }
+
+        const notes = String(new FormData(form).get('notes') || '').trim();
+        const payload = {
+            work_order_id: action.workOrderId,
+            net_weight_kg: parseFloat(weightValue),
+            notes,
+        };
+
+        if (action.machineRunId) {
+            payload.machine_run_id = action.machineRunId;
+        }
+
+        try {
+            const result = await fetchJson(`${API_BASE}/work_orders/partial_receipt.php`, {
+                method: 'POST',
+                body: payload,
+                withCsrf: true,
+            });
+            await refreshAfterMutation(action.workOrderId, result.message || '部分完工回報成功。', true);
+        } catch (error) {
+            showActionFeedback('error', error.message || '部分完工回報失敗。');
+        }
+    }
+
+    async function submitCompleteAction(form, action) {
+        const formData = new FormData(form);
+        const notes = String(formData.get('notes') || '').trim();
+        const autoCreateInventory = String(formData.get('auto_create_inventory') || '1') !== '0';
+        const existingNotes = state.currentWorkOrder?.other_notes || '';
+        const mergedNotes = mergeOperationalNote(existingNotes, '完工回報', notes);
+        const status = state.statusByKey.completed;
+
+        if (!status || !status.id) {
+            showActionFeedback('error', '找不到已完成狀態設定。');
+            return;
+        }
+
+        try {
+            const result = await fetchJson(`${API_BASE}/work_orders/update.php?id=${action.workOrderId}`, {
+                method: 'PUT',
+                body: {
+                    status_lookup_id: status.id,
+                    actual_end_date: getCurrentDateTimeString(),
+                    auto_create_inventory: autoCreateInventory,
+                    other_notes: mergedNotes || undefined,
+                },
+                withCsrf: true,
+            });
+            await refreshAfterMutation(action.workOrderId, result.message || '工單已完工。', true);
+        } catch (error) {
+            showActionFeedback('error', error.message || '完工回報失敗。');
+        }
+    }
+
+    async function submitPhotoUpload(form, action) {
+        const formData = new FormData(form);
+        if (!state.uploadDraft.length) {
+            showActionFeedback('error', '請先拍照或選擇要上傳的照片。');
+            return;
+        }
+
+        try {
+            const uploadTarget = String(formData.get('upload_target') || 'completion');
+            const description = String(formData.get('description') || '').trim();
+            const uploadConfig = getExecutionImageUploadConfig(uploadTarget);
+
+            for (let index = 0; index < state.uploadDraft.length; index += 1) {
+                const draft = state.uploadDraft[index];
+                const uploadData = new FormData();
+                uploadData.append('work_order_id', String(action.workOrderId));
+                uploadData.append('description', description);
+                uploadData.append('sort_order', String(index + 1));
+                uploadData.append('image', draft.file);
+
+                showActionFeedback('success', `正在上傳第 ${index + 1} / ${state.uploadDraft.length} 張${uploadConfig.label}...`);
+                await fetchJson(`${API_BASE}/${uploadConfig.endpoint}/index.php`, {
+                    method: 'POST',
+                    body: uploadData,
+                    withCsrf: true,
+                    isFormData: true,
+                });
+            }
+
+            emitMobileDataSyncWithDependencies(uploadConfig.endpoint, 'created', {
+                work_order_id: action.workOrderId,
+                upload_target: uploadTarget,
+                image_count: state.uploadDraft.length,
+            });
+
+            await refreshAfterMutation(
+                action.workOrderId,
+                state.uploadDraft.length > 1 ? `已上傳 ${state.uploadDraft.length} 張${uploadConfig.label}。` : `${uploadConfig.label}上傳成功。`,
+                true
+            );
+        } catch (error) {
+            showActionFeedback('error', error.message || '圖片上傳失敗。');
+        }
+    }
+
+    async function submitQualityIssueReport(form, action) {
+        const formData = new FormData(form);
+        const issueDescription = String(formData.get('issue_description') || '').trim();
+        if (!issueDescription) {
+            showActionFeedback('error', '請填寫異常描述。');
+            return;
+        }
+
+        const payload = {
+            report_datetime: getCurrentDateTimeString(),
+            reported_by_employee_id: Number(state.currentUser?.id || 0),
+            issue_source_type: String(formData.get('issue_source_type') || 'process_inspection'),
+            issue_source_id: action.workOrderId,
+            issue_description: issueDescription,
+            root_cause_analysis: String(formData.get('root_cause_analysis') || '').trim(),
+            corrective_actions: String(formData.get('corrective_actions') || '').trim(),
+            preventive_actions: String(formData.get('preventive_actions') || '').trim(),
+            responsible_department_id: String(formData.get('responsible_department_id') || '').trim() || null,
+            status: String(formData.get('status') || 'pending'),
+            completion_date: null,
+        };
+
+        try {
+            const result = await fetchJson(`${API_BASE}/quality_issue_reports/index.php`, {
+                method: 'POST',
+                body: payload,
+                withCsrf: true,
+            });
+            await refreshAfterMutation(action.workOrderId, result.message || '異常回報已送出。', true);
+        } catch (error) {
+            showActionFeedback('error', error.message || '異常回報失敗。');
+        }
+    }
+
+    async function submitInspectionAction(form, action) {
+        const formData = new FormData(form);
+        const payload = {
+            inspection_date: String(formData.get('inspection_date') || '').trim(),
+            machine_id: Number(formData.get('machine_id') || 0),
+            inspector_id: Number(formData.get('inspector_id') || 0),
+            is_qualified: String(formData.get('is_qualified') || '1') !== '0',
+            notes: String(formData.get('notes') || '').trim(),
+        };
+
+        if (!payload.inspection_date) {
+            showActionFeedback('error', '請選擇檢驗日期。');
+            return;
+        }
+        if (!payload.machine_id) {
+            showActionFeedback('error', '請選擇機台。');
+            return;
+        }
+        if (!payload.inspector_id) {
+            showActionFeedback('error', '請選擇檢驗人。');
+            return;
+        }
+
+        try {
+            const isEdit = action.type === 'inspection_edit' && action.inspectionId;
+            const result = await fetchJson(
+                isEdit
+                    ? `${API_BASE}/daily_machine_inspections/update.php?id=${action.inspectionId}`
+                    : `${API_BASE}/daily_machine_inspections/index.php`,
+                {
+                    method: isEdit ? 'PUT' : 'POST',
+                    body: payload,
+                    withCsrf: true,
+                }
+            );
+            await loadDailyInspections(false);
+            closeActionModal();
+            window.alert(result.message || (isEdit ? '每日機台檢驗更新成功。' : '每日機台檢驗新增成功。'));
+        } catch (error) {
+            showActionFeedback('error', error.message || '每日機台檢驗送出失敗。');
+        }
+    }
+
+    async function refreshAfterMutation(workOrderId, successMessage, closeModalAfterSuccess) {
+        await loadWorkOrders(false);
+        if (workOrderId) {
+            await openWorkOrderDetail(workOrderId);
+            emitMobileDataSyncWithDependencies('work_orders', 'updated', { id: workOrderId });
+        }
+
+        if (closeModalAfterSuccess) {
+            closeActionModal();
+        }
+
+        if (successMessage) {
+            window.alert(successMessage);
+        }
+    }
+
+    async function handleLogout() {
+        try {
+            await fetchJson(`${API_BASE}/logout.php`, {
+                method: 'POST',
+                body: {},
+                withCsrf: true,
+            });
+        } catch (_error) {
+            // 即使失敗也回到登入頁，避免把使用者困在頁面上
+        } finally {
+            sessionStorage.removeItem('csrf_token');
+            window.location.href = `${window.location.pathname}?reason=manual_logout`;
+        }
+    }
+
+    function handleFilterReset() {
+        ['mobile-filter-keyword', 'mobile-filter-status', 'mobile-filter-machine', 'mobile-filter-start-date', 'mobile-filter-end-date']
+            .forEach((id) => {
+                const field = document.getElementById(id);
+                if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+                    field.value = '';
+                }
+            });
+        loadWorkOrders(true);
+    }
+
+    function handleInspectionFilterReset() {
+        [
+            'mobile-inspections-filter-machine',
+            'mobile-inspections-filter-qualified',
+            'mobile-inspections-filter-date-from',
+            'mobile-inspections-filter-date-to',
+        ].forEach((id) => {
+            const field = document.getElementById(id);
+            if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+                field.value = '';
+            }
+        });
+        loadDailyInspections(true);
+    }
+
+    function applySectionState(section, options = {}) {
+        const resolvedSection = MOBILE_SECTION_META[section] ? section : 'work_orders';
+        state.currentSection = resolvedSection;
+        const implementedSections = new Set(['work_orders', 'daily_machine_inspections']);
+        const visibleSection = implementedSections.has(resolvedSection) ? resolvedSection : 'placeholder';
+
+        document.querySelectorAll('[data-mobile-section]').forEach((element) => {
+            if (element instanceof HTMLElement) {
+                element.classList.toggle('hidden', element.dataset.mobileSection !== visibleSection);
+            }
+        });
+
+        if (resolvedSection !== 'work_orders') {
+            closeDetailSheet();
+        }
+
+        document.querySelectorAll('.mobile-drawer-link').forEach((link) => {
+            if (link instanceof HTMLElement) {
+                link.classList.toggle('active', link.dataset.section === resolvedSection);
+            }
+        });
+
+        const meta = MOBILE_SECTION_META[resolvedSection] || MOBILE_SECTION_META.work_orders;
+        setText('mobile-placeholder-kicker', meta.kicker);
+        setText('mobile-placeholder-title', meta.title);
+        setText('mobile-placeholder-subtitle', meta.subtitle);
+        setText('mobile-placeholder-empty-title', meta.emptyTitle);
+        setText('mobile-placeholder-empty-text', meta.emptyText);
+
+        const url = new URL(window.location.href);
+        if (resolvedSection === 'work_orders') {
+            url.searchParams.delete('section');
+        } else {
+            url.searchParams.set('section', resolvedSection);
+        }
+
+        if (options.pushHistory) {
+            window.history.pushState({}, document.title, url.toString());
+        } else if (options.replaceHistory) {
+            window.history.replaceState({}, document.title, url.toString());
+        }
+
+        if (resolvedSection === 'daily_machine_inspections') {
+            loadDailyInspections(true);
+        }
+    }
+
+    function emitMobileDataSync(module, action, data = null) {
+        const timestamp = Date.now();
+        const eventDetail = {
+            module,
+            action,
+            data,
+            timestamp,
+            eventId: `${timestamp}_mobile_${module}_${action}_${Math.random().toString(36).slice(2, 8)}`,
+            sourceTabId: `mobile_${Math.random().toString(36).slice(2, 10)}`,
+        };
+
+        try {
+            window.dispatchEvent(new CustomEvent('dataSync', { detail: eventDetail }));
+            localStorage.setItem('dataSync', JSON.stringify(eventDetail));
+            localStorage.removeItem('dataSync');
+        } catch (error) {
+            console.error('[MobileDataSync] 發送通知失敗:', error);
+        }
+    }
+
+    function emitMobileDataSyncWithDependencies(module, action, data = null) {
+        emitMobileDataSync(module, action, data);
+        const dependents = MOBILE_DATA_SYNC_DEPENDENCIES[module] || [];
+        dependents.forEach((dependentModule) => {
+            emitMobileDataSync(dependentModule, 'dependency_updated', {
+                sourceModule: module,
+                sourceAction: action,
+                sourceData: data,
+            });
+        });
+    }
+
+    function syncTopbarCompactState() {
+        const topbar = document.querySelector('.mobile-topbar');
+        if (!(topbar instanceof HTMLElement)) {
+            return;
+        }
+
+        const shouldCompact = window.scrollY > 12;
+        topbar.classList.toggle('compact', shouldCompact);
+    }
+
+    function toggleDrawer() {
+        const drawer = document.getElementById('mobile-drawer');
+        const menuButton = document.getElementById('mobile-menu-button');
+        if (!(drawer instanceof HTMLElement) || !(menuButton instanceof HTMLElement)) {
+            return;
+        }
+
+        const isHidden = drawer.classList.contains('hidden');
+        if (isHidden) {
+            drawer.classList.remove('hidden');
+            drawer.setAttribute('aria-hidden', 'false');
+            menuButton.setAttribute('aria-expanded', 'true');
+        } else {
+            closeDrawer();
+        }
+    }
+
+    function closeDrawer() {
+        const drawer = document.getElementById('mobile-drawer');
+        const menuButton = document.getElementById('mobile-menu-button');
+        if (drawer instanceof HTMLElement) {
+            drawer.classList.add('hidden');
+            drawer.setAttribute('aria-hidden', 'true');
+        }
+        if (menuButton instanceof HTMLElement) {
+            menuButton.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    async function fetchJson(url, options = {}) {
+        const requestOptions = {
+            method: options.method || 'GET',
+            credentials: 'include',
+            headers: {
+                Accept: 'application/json',
+            },
+        };
+
+        if (options.withCsrf && state.csrfToken) {
+            requestOptions.headers['X-CSRF-Token'] = state.csrfToken;
+        }
+
+        if (options.isFormData) {
+            requestOptions.body = options.body;
+        } else if (options.body !== undefined) {
+            requestOptions.headers['Content-Type'] = 'application/json';
+            requestOptions.body = JSON.stringify(options.body);
+        }
+
+        const response = await fetch(url, requestOptions);
+        const rawText = await response.text();
+        let result;
+
+        try {
+            result = rawText ? JSON.parse(rawText) : {};
+        } catch (_error) {
+            throw new Error(`伺服器回應格式異常（HTTP ${response.status}）。`);
+        }
+
+        if (!response.ok || result.success === false) {
+            if (response.status === 401 && state.mode === 'app') {
+                window.location.href = `${window.location.pathname}?reason=session_expired`;
+                throw new Error('登入已過期，請重新登入。');
+            }
+            throw new Error(result.message || `請求失敗（HTTP ${response.status}）。`);
+        }
+
+        return result;
+    }
+
+    function loadCompanyBranding() {
+        Promise.allSettled([
+            fetch(`${API_BASE}/companies/public_info.php?id=1`, { credentials: 'include' }),
+            fetch(`${API_BASE}/companies/public_logo.php?company_id=1`, { credentials: 'include' }),
+        ]).then(async ([infoResult, logoResult]) => {
+            if (infoResult.status === 'fulfilled' && infoResult.value.ok) {
+                const info = await infoResult.value.json().catch(() => null);
+                if (info?.success && info.data?.name) {
+                    const nameEl = document.getElementById('company-full-name');
+                    if (nameEl) {
+                        nameEl.textContent = info.data.name;
+                    }
+                }
+            }
+
+            if (logoResult.status === 'fulfilled' && logoResult.value.ok) {
+                const logo = await logoResult.value.json().catch(() => null);
+                if (logo?.success && logo.data?.file_path) {
+                    const wrap = document.getElementById('company-logo-wrap');
+                    const fallback = document.getElementById('company-logo-fallback');
+                    if (wrap) {
+                        const img = document.createElement('img');
+                        img.src = `${state.basePath}${String(logo.data.file_path).replace(/^\/+/, '')}`;
+                        img.alt = '公司 LOGO';
+                        img.className = 'company-logo-img';
+                        img.onerror = function () {
+                            img.remove();
+                            if (fallback) {
+                                fallback.style.display = '';
+                            }
+                        };
+                        if (fallback) {
+                            fallback.style.display = 'none';
+                        }
+                        wrap.appendChild(img);
+                    }
+                }
+            }
+        }).catch(() => {
+            // 保持預設外觀
+        });
+    }
+
+    function renderGuestReasonNotice() {
+        const noticeEl = document.getElementById('login-timeout-notice');
+        if (!(noticeEl instanceof HTMLElement)) {
+            return;
+        }
+
+        const reason = noticeEl.dataset.loginReason || '';
+        if (reason === 'idle_timeout' || reason === 'session_expired' || reason === 'manual_logout') {
+            noticeEl.textContent = '你已經登出，請再次登入手機版。';
+            noticeEl.style.display = 'block';
+        }
+    }
+
+    function bindPasswordToggle(passwordInput, toggleButton) {
+        if (!(passwordInput instanceof HTMLInputElement) || !(toggleButton instanceof HTMLElement)) {
+            return;
+        }
+
+        toggleButton.addEventListener('click', () => {
+            const isPassword = passwordInput.type === 'password';
+            passwordInput.type = isPassword ? 'text' : 'password';
+            const icon = toggleButton.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-eye');
+                icon.classList.toggle('fa-eye-slash');
+            }
+        });
+    }
+
+    function toggleGuestSubmitting(isSubmitting, button) {
+        if (!(button instanceof HTMLButtonElement)) {
+            return;
+        }
+        button.disabled = isSubmitting;
+        button.textContent = isSubmitting ? '登入中...' : '登入手機版';
+    }
+
+    function toggleActionSubmitting(isSubmitting, button) {
+        if (!(button instanceof HTMLButtonElement)) {
+            return;
+        }
+        button.disabled = isSubmitting;
+        if (isSubmitting) {
+            button.dataset.originalText = button.textContent;
+            button.textContent = '送出中...';
+        } else if (button.dataset.originalText) {
+            button.textContent = button.dataset.originalText;
+        }
+    }
+
+    function showGuestFeedback(type, message) {
+        const errorEl = document.getElementById('mobile-login-error');
+        const successEl = document.getElementById('mobile-login-success');
+        if (errorEl) {
+            errorEl.style.display = 'none';
+            errorEl.textContent = '';
+        }
+        if (successEl) {
+            successEl.style.display = 'none';
+            successEl.textContent = '';
+        }
+
+        const target = type === 'error' ? errorEl : successEl;
+        if (target) {
+            target.textContent = message;
+            target.style.display = 'block';
+        }
+    }
+
+    function showActionFeedback(type, message) {
+        const feedback = document.getElementById('mobile-action-feedback');
+        if (!feedback) {
+            return;
+        }
+        feedback.className = `mobile-action-feedback is-${type}`;
+        feedback.textContent = message;
+    }
+
+    function setListState(message) {
+        setText('mobile-list-state', message);
+    }
+
+    function setInspectionListState(message) {
+        setText('mobile-inspections-list-state', message);
+    }
+
+    function setText(id, value) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
+        }
+    }
+
+    function getInputValue(id) {
+        const element = document.getElementById(id);
+        if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement) {
+            return element.value.trim();
+        }
+        return '';
+    }
+
+    function mergeOperationalNote(existingNotes, label, note) {
+        const trimmedNote = String(note || '').trim();
+        if (!trimmedNote) {
+            return existingNotes || undefined;
+        }
+
+        const operatorName = state.currentUser?.name ? ` / ${state.currentUser.name}` : '';
+        const stamp = formatDateTime(getCurrentDateTimeString()) || getCurrentDateTimeString();
+        const appended = `[${stamp}] ${label}${operatorName}\n${trimmedNote}`;
+        return [String(existingNotes || '').trim(), appended].filter(Boolean).join('\n\n');
+    }
+
+    function renderStatusBadge(statusKey, statusLabel) {
+        const key = String(statusKey || '').trim();
+        const safeClass = key ? `mobile-status-${escapeAttribute(key)}` : 'mobile-status-default';
+        return `<span class="mobile-status-badge ${safeClass}">${escapeHtml(statusLabel || '未設定')}</span>`;
+    }
+
+    function renderInspectionBadge(isQualified) {
+        return isQualified
+            ? '<span class="mobile-status-badge mobile-status-completed">合格</span>'
+            : '<span class="mobile-status-badge mobile-status-cancelled">不合格</span>';
+    }
+
+    function formatDateTime(value) {
+        if (!value) {
+            return '';
+        }
+        const normalized = String(value).replace(' ', 'T');
+        const date = new Date(normalized);
+        if (Number.isNaN(date.getTime())) {
+            return String(value);
+        }
+        return new Intl.DateTimeFormat('zh-TW', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        }).format(date);
+    }
+
+    function formatWeight(value) {
+        const numeric = Number(value || 0);
+        if (!Number.isFinite(numeric) || numeric <= 0) {
+            return '0 kg';
+        }
+        return `${numeric.toFixed(2)} kg`;
+    }
+
+    function formatNumber(value) {
+        const numeric = Number(value || 0);
+        if (!Number.isFinite(numeric)) {
+            return '0';
+        }
+        return new Intl.NumberFormat('zh-TW', {
+            maximumFractionDigits: 2,
+        }).format(numeric);
+    }
+
+    function formatFileSize(value) {
+        const bytes = Number(value || 0);
+        if (!Number.isFinite(bytes) || bytes <= 0) {
+            return '0 KB';
+        }
+        if (bytes >= 1024 * 1024) {
+            return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        }
+        return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    }
+
+    function getCurrentDateTimeString() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hour = String(now.getHours()).padStart(2, '0');
+        const minute = String(now.getMinutes()).padStart(2, '0');
+        const second = String(now.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+    }
+
+    function getCurrentDateString() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function getImageTypeLabel(type) {
+        const labels = {
+            general: '一般紀錄',
+            defect: '異常 / 不良',
+            setup: '機台設定',
+            sample: '樣品 / 成品',
+        };
+        return labels[type] || type || '照片';
+    }
+
+    function getExecutionImageUploadConfig(target) {
+        const configs = {
+            completion: {
+                endpoint: 'work_order_completion_images',
+                label: '完工圖片',
+            },
+            defect: {
+                endpoint: 'work_order_defect_images',
+                label: '不良品圖片',
+            },
+            tool_condition: {
+                endpoint: 'work_order_tool_condition_images',
+                label: '載具狀況圖片',
+            },
+        };
+        return configs[target] || configs.completion;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function escapeAttribute(value) {
+        return escapeHtml(value).replace(/`/g, '&#96;');
+    }
+
+    function initFuiParticles() {
+        const container = document.getElementById('fui-particles');
+        if (!container) {
+            return;
+        }
+        const count = 24;
+        for (let index = 0; index < count; index += 1) {
+            const particle = document.createElement('span');
+            const isGray = Math.random() < 0.3;
+            const size = Math.random() > 0.66 ? 3 : 2;
+            particle.className = `fui-particle${isGray ? ' fui-particle-gray' : ''}`;
+            particle.style.cssText = [
+                `left:${Math.random() * 100}vw`,
+                `width:${size}px`,
+                `height:${size}px`,
+                `animation-duration:${12 + Math.random() * 18}s`,
+                `animation-delay:${Math.random() * 14}s`,
+                `opacity:${0.25 + Math.random() * 0.75}`,
+            ].join(';');
+            container.appendChild(particle);
+        }
+    }
+})();

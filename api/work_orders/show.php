@@ -41,6 +41,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/../work_order_operation_logs_helper.php';
 
 /**
  * Work Order Details API Endpoint
@@ -204,6 +205,10 @@ try {
     ");
     $imagesStmt->execute(['work_order_id' => $id]);
     $workOrder['images'] = $imagesStmt->fetchAll(PDO::FETCH_ASSOC);
+    $workOrder['completion_images'] = fetchWorkOrderExecutionImages($pdo, 'work_order_completion_images', $id);
+    $workOrder['defect_images'] = fetchWorkOrderExecutionImages($pdo, 'work_order_defect_images', $id);
+    $workOrder['tool_condition_images'] = fetchWorkOrderExecutionImages($pdo, 'work_order_tool_condition_images', $id);
+    $workOrder['operation_logs'] = fetchWorkOrderOperationLogs($pdo, $id, 50);
 
     // Get production records
     $productionSourceModeSelect = workOrderTableHasColumn($pdo, 'production_records', 'production_source_mode')

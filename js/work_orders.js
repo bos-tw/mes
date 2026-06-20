@@ -44,6 +44,9 @@
         productionRecordsSection: moduleRoot.querySelector('[data-production-records-section]'),
         imagesRows: moduleRoot.querySelector('[data-images-rows]'),
         editImagesRows: moduleRoot.querySelector('[data-edit-images-rows]'),
+        editCompletionImagesRows: moduleRoot.querySelector('[data-edit-completion-images-rows]'),
+        editDefectImagesRows: moduleRoot.querySelector('[data-edit-defect-images-rows]'),
+        editToolConditionImagesRows: moduleRoot.querySelector('[data-edit-tool-condition-images-rows]'),
         editOrderDrawingsRows: moduleRoot.querySelector('[data-edit-order-drawings-rows]'),
         screeningServicesTable: moduleRoot.querySelector('[data-screening-services-table]'),
         screeningServicesBody: moduleRoot.querySelector('[data-screening-services-body]'),
@@ -2007,6 +2010,11 @@
                     toggleSectionBody(inspectionToggleButton, elements.editModalForm.querySelector('[data-edit-inspection-section]'));
                     return;
                 }
+                const executionImagesToggleButton = e.target.closest('[data-action="toggle-execution-images-section"]');
+                if (executionImagesToggleButton) {
+                    toggleSectionBody(executionImagesToggleButton, elements.editModalForm.querySelector('[data-edit-execution-images-section]'));
+                    return;
+                }
                 const productionRecordsToggleButton = e.target.closest('[data-action="toggle-production-records-section"]');
                 if (productionRecordsToggleButton) {
                     toggleSectionBody(productionRecordsToggleButton, elements.editModalForm.querySelector('[data-edit-production-records-section]'));
@@ -2135,6 +2143,15 @@
         }
         if (elements.editImagesRows) {
             elements.editImagesRows.addEventListener('click', handleImageAction);
+        }
+        if (elements.editCompletionImagesRows) {
+            elements.editCompletionImagesRows.addEventListener('click', handleImageAction);
+        }
+        if (elements.editDefectImagesRows) {
+            elements.editDefectImagesRows.addEventListener('click', handleImageAction);
+        }
+        if (elements.editToolConditionImagesRows) {
+            elements.editToolConditionImagesRows.addEventListener('click', handleImageAction);
         }
 
         // Table row actions
@@ -3638,6 +3655,21 @@
                 state.images = result.data.images || [];
                 renderImages(true);
                 renderOrderDrawings(result.data.drawings || []);
+                renderExecutionImageRows(
+                    elements.editCompletionImagesRows,
+                    result.data.completion_images || [],
+                    '尚未上傳完工圖片'
+                );
+                renderExecutionImageRows(
+                    elements.editDefectImagesRows,
+                    result.data.defect_images || [],
+                    '尚未上傳不良品圖片'
+                );
+                renderExecutionImageRows(
+                    elements.editToolConditionImagesRows,
+                    result.data.tool_condition_images || [],
+                    '尚未上傳載具狀況圖片'
+                );
 
                 // Load work order images
                 await loadWorkOrderImages(id, true);
@@ -4722,6 +4754,75 @@
                 handleDeleteImage(imageId, workOrderId, isEditMode);
             }
         }
+    }
+
+    function renderExecutionImageRows(tbody, images, emptyMessage) {
+        if (!tbody) {
+            return;
+        }
+
+        if (!Array.isArray(images) || images.length === 0) {
+            tbody.innerHTML = `
+                <tr class="empty-row">
+                    <td colspan="5" class="text-center">${escapeHtml(emptyMessage || '尚未上傳圖片')}</td>
+                </tr>
+            `;
+            return;
+        }
+
+        const fragment = document.createDocumentFragment();
+
+        images.forEach((image) => {
+            const filePath = String(image.file_path || '');
+            const fileName = String(image.file_name || '現場圖片');
+            const description = String(image.description || '-');
+            const uploadedAt = formatDateTime(image.uploaded_at);
+            const uploadedBy = String(image.uploaded_by_name || image.uploaded_by_employee_name || '-');
+
+            const row = document.createElement('tr');
+            row.dataset.imageId = String(image.id || '');
+            row.dataset.filePath = filePath;
+
+            const previewCell = document.createElement('td');
+            const previewImage = document.createElement('img');
+            previewImage.src = filePath;
+            previewImage.alt = fileName;
+            previewImage.style.width = '60px';
+            previewImage.style.height = '60px';
+            previewImage.style.objectFit = 'cover';
+            previewImage.style.cursor = 'pointer';
+            previewImage.addEventListener('click', () => {
+                window.open(filePath, '_blank');
+            });
+            previewCell.appendChild(previewImage);
+
+            const descriptionCell = document.createElement('td');
+            descriptionCell.textContent = description;
+
+            const uploadedAtCell = document.createElement('td');
+            uploadedAtCell.textContent = uploadedAt;
+
+            const uploadedByCell = document.createElement('td');
+            uploadedByCell.textContent = uploadedBy;
+
+            const actionCell = document.createElement('td');
+            const previewButton = document.createElement('button');
+            previewButton.type = 'button';
+            previewButton.className = 'btn ghost small';
+            previewButton.dataset.action = 'preview-image';
+            previewButton.title = '預覽';
+            previewButton.innerHTML = '<i class="fas fa-eye"></i>';
+            actionCell.appendChild(previewButton);
+
+            row.appendChild(previewCell);
+            row.appendChild(descriptionCell);
+            row.appendChild(uploadedAtCell);
+            row.appendChild(uploadedByCell);
+            row.appendChild(actionCell);
+            fragment.appendChild(row);
+        });
+
+        tbody.replaceChildren(fragment);
     }
 
     // Load work order images

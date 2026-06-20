@@ -1,0 +1,3 @@
+1. 新增手機版 `/mobile` 生產工單入口、工單清單/明細、開工/暫停/恢復/部分完工/完工/異常回報與三類現場圖片上傳流程。
+2. 新增 `work_order_completion_images`、`work_order_defect_images`、`work_order_tool_condition_images` 與 `work_order_operation_logs`，並完成桌面工單明細唯讀整合與操作追溯。
+3. 補強工單圖片/狀態的 DataSync、手機清單照片統計、一鍵更新包 `mobile/` 路徑檢查與遠端部署驗證文件。

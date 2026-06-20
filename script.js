@@ -2293,6 +2293,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     case 'open-messages':
                         openTab('messages', '我的留言', 'modules/messages.html');
                         break;
+                    case 'open-mobile-work-orders':
+                        window.open('mobile/', '_blank', 'noopener');
+                        break;
                 }
                 return;
             }

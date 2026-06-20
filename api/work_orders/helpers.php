@@ -143,6 +143,43 @@ function fetchWorkOrderDrawings(PDO $pdo, int $orderItemId): array
 }
 
 /**
+ * Fetch work-order execution image records from a dedicated image table.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function fetchWorkOrderExecutionImages(PDO $pdo, string $tableName, int $workOrderId): array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            i.*,
+            e.name AS uploaded_by_name
+        FROM {$tableName} i
+        LEFT JOIN employees e ON i.uploaded_by_employee_id = e.id
+        WHERE i.work_order_id = :work_order_id
+          AND i.deleted_at IS NULL
+        ORDER BY i.sort_order ASC, i.id ASC
+    ");
+    $stmt->execute(['work_order_id' => $workOrderId]);
+
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    return array_map(static function (array $row): array {
+        return [
+            'id' => (int)($row['id'] ?? 0),
+            'work_order_id' => (int)($row['work_order_id'] ?? 0),
+            'file_name' => (string)($row['file_name'] ?? ''),
+            'file_path' => (string)($row['file_path'] ?? ''),
+            'file_size' => isset($row['file_size']) ? (int)$row['file_size'] : 0,
+            'mime_type' => (string)($row['mime_type'] ?? ''),
+            'sort_order' => isset($row['sort_order']) ? (int)$row['sort_order'] : 0,
+            'description' => $row['description'] ?? null,
+            'uploaded_at' => $row['uploaded_at'] ?? null,
+            'uploaded_by_employee_id' => isset($row['uploaded_by_employee_id']) ? (int)$row['uploaded_by_employee_id'] : null,
+            'uploaded_by_name' => $row['uploaded_by_name'] ?? null,
+        ];
+    }, $rows);
+}
+
+/**
  * Retrieve request payload supporting JSON and form submissions.
  *
  * @return array<string,mixed>

@@ -298,6 +298,10 @@ const DataSync = (function() {
         'work_order_first_piece_dimensions': ['work_orders'],
         // 工單圖片變更（會影響工單列表顯示/附件操作狀態）
         'work_order_images': ['work_orders'],
+        // 工單現場圖片變更（手機上傳後，工單相關畫面需刷新）
+        'work_order_completion_images': ['work_orders'],
+        'work_order_defect_images': ['work_orders'],
+        'work_order_tool_condition_images': ['work_orders'],
         // 每日機台檢驗項目變更 → 上層檢驗紀錄需刷新
         'daily_machine_inspection_items': ['daily_machine_inspections'],
         // 員工角色指派變更 → 員工清單、角色清單需刷新

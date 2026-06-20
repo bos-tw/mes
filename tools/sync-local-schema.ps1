@@ -245,6 +245,14 @@ $migrationChecks = [ordered]@{
         CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'work_orders' AND index_name = 'uk_work_orders_order_item_active' AND non_unique = 0), 1, 0);"
         Description = 'one active work order per order item unique index'
     }
+    '2026_06_20_add_work_order_execution_image_tables.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'work_order_completion_images') AND EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'work_order_defect_images') AND EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'work_order_tool_condition_images') AND EXISTS(SELECT 1 FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'work_order_completion_images' AND constraint_name = 'fk_woci_work_order') AND EXISTS(SELECT 1 FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'work_order_defect_images' AND constraint_name = 'fk_wodi_work_order') AND EXISTS(SELECT 1 FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'work_order_tool_condition_images' AND constraint_name = 'fk_wotci_work_order'), 1, 0);"
+        Description = 'work order completion, defect, and tool condition image tables'
+    }
+    '2026_06_20_add_work_order_operation_logs.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'work_order_operation_logs') AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'work_order_operation_logs' AND index_name = 'idx_wool_work_order_id') AND EXISTS(SELECT 1 FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'work_order_operation_logs' AND constraint_name = 'fk_wool_work_order'), 1, 0);"
+        Description = 'work order operation logs table'
+    }
 }
 
 $migrationFiles = Get-ChildItem -LiteralPath $migrationsDir -File | Sort-Object Name

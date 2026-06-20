@@ -39,6 +39,9 @@ $ver = $cacheVersion['version'];
                     <a href="status_board.html?v=<?= $ver ?>" target="_blank" class="top-icon-item" title="現場狀態看板">
                         <i class="fas fa-tv"></i> 現場狀態看板
                     </a>
+                    <a href="mobile/?v=<?= $ver ?>" target="_blank" class="top-icon-item" title="生產工單手機版">
+                        <i class="fas fa-mobile-alt"></i> 生產工單手機版
+                    </a>
                     <a href="help/index.html?v=<?= $ver ?>" target="_blank" class="top-icon-item" title="系統使用指南">
                         <i class="fas fa-book"></i> 系統使用指南
                     </a>

@@ -10,6 +10,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/../work_order_operation_logs_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 requireAuth();
@@ -187,6 +188,21 @@ SQL;
         ]);
 
         $record = findQualityIssueReport($pdo, $newId);
+        $issueSourceType = (string)($data['issue_source_type'] ?? '');
+        $issueSourceId = (int)($data['issue_source_id'] ?? 0);
+        if ($issueSourceId > 0 && in_array($issueSourceType, ['process_inspection', 'work_order', 'production_work_order'], true)) {
+            appendWorkOrderOperationLog($pdo, $issueSourceId, 'issue_reported', '品質異常回報', [
+                'related_table' => 'quality_issue_reports',
+                'related_id' => $newId,
+                'notes' => $data['issue_description'],
+                'payload' => [
+                    'status' => $data['status'],
+                    'responsible_department_id' => $data['responsible_department_id'],
+                    'issue_source_type' => $issueSourceType,
+                ],
+                'created_by_employee_id' => (int)$data['reported_by_employee_id'],
+            ]);
+        }
 
         jsonResponse([
             'success' => true,
