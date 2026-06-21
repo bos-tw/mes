@@ -50,7 +50,11 @@
         editOrderDrawingsRows: moduleRoot.querySelector('[data-edit-order-drawings-rows]'),
         screeningServicesTable: moduleRoot.querySelector('[data-screening-services-table]'),
         screeningServicesBody: moduleRoot.querySelector('[data-screening-services-body]'),
-        liveTimeLabel: moduleRoot.querySelector('[data-work-orders-live-time]')
+        liveTimeLabel: moduleRoot.querySelector('[data-work-orders-live-time]'),
+        mobileQuickEntryQr: moduleRoot.querySelector('[data-work-order-mobile-qr]'),
+        mobileQuickEntryText: moduleRoot.querySelector('[data-work-order-mobile-qr-text]'),
+        mobileQuickEntryOpenButton: moduleRoot.querySelector('[data-action="open-mobile-quick-entry"]'),
+        mobileQuickEntryCopyButton: moduleRoot.querySelector('[data-action="copy-mobile-quick-entry"]')
     };
 
     const createModalAlertBox = elements.createModal?.querySelector('[data-work-orders-create-modal-alert]');
@@ -96,7 +100,9 @@
         formSnapshots: {
             create: null,
             edit: null
-        }
+        },
+        mobileQuickEntryUrl: '',
+        qrCodeLibraryPromise: null
     };
 
     // Initialize
@@ -150,12 +156,169 @@
         return raw;
     }
 
+    function getMobileQuickEntryBaseUrl() {
+        return new URL('mobile/', window.location.href).toString();
+    }
+
+    function buildMobileQuickEntryUrl(workOrderId) {
+        const normalizedId = Number.parseInt(workOrderId, 10) || 0;
+        if (normalizedId <= 0) {
+            return '';
+        }
+
+        const url = new URL(getMobileQuickEntryBaseUrl());
+        url.searchParams.set('work_order_id', String(normalizedId));
+        return url.toString();
+    }
+
+    function buildWorkOrderPrintUrl(params) {
+        const url = new URL('print/work_order_print.html', window.location.href);
+        Object.entries(params).forEach(([key, value]) => {
+            url.searchParams.set(key, String(value));
+        });
+        url.searchParams.set('mobile_base', getMobileQuickEntryBaseUrl());
+        return url.toString();
+    }
+
+    function ensureQrCodeLibrary() {
+        if (window.QRCode) {
+            return Promise.resolve(window.QRCode);
+        }
+        if (state.qrCodeLibraryPromise) {
+            return state.qrCodeLibraryPromise;
+        }
+
+        state.qrCodeLibraryPromise = new Promise((resolve, reject) => {
+            const existingScript = document.querySelector('script[data-qrcodejs-loader="true"]');
+            if (existingScript) {
+                existingScript.addEventListener('load', () => resolve(window.QRCode));
+                existingScript.addEventListener('error', () => reject(new Error('QR Code 套件載入失敗。')));
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+            script.async = true;
+            script.dataset.qrcodejsLoader = 'true';
+            script.addEventListener('load', () => {
+                if (window.QRCode) {
+                    resolve(window.QRCode);
+                    return;
+                }
+                reject(new Error('QR Code 套件載入後未初始化。'));
+            });
+            script.addEventListener('error', () => reject(new Error('QR Code 套件載入失敗。')));
+            document.head.appendChild(script);
+        }).catch((error) => {
+            state.qrCodeLibraryPromise = null;
+            throw error;
+        });
+
+        return state.qrCodeLibraryPromise;
+    }
+
+    function setMobileQuickEntryPlaceholder(message) {
+        if (!elements.mobileQuickEntryQr) {
+            return;
+        }
+        elements.mobileQuickEntryQr.innerHTML = `<div class="work-order-mobile-quick-entry-placeholder">${escapeHtml(message)}</div>`;
+    }
+
+    function resetMobileQuickEntry() {
+        state.mobileQuickEntryUrl = '';
+        setMobileQuickEntryPlaceholder('請先載入工單');
+        if (elements.mobileQuickEntryText) {
+            elements.mobileQuickEntryText.textContent = '掃描 QR Code 或開啟手機版，即可直接進入此工單的手機上傳頁面。';
+        }
+        if (elements.mobileQuickEntryOpenButton) {
+            elements.mobileQuickEntryOpenButton.disabled = true;
+        }
+        if (elements.mobileQuickEntryCopyButton) {
+            elements.mobileQuickEntryCopyButton.disabled = true;
+        }
+    }
+
+    async function renderMobileQuickEntry(workOrder) {
+        const workOrderId = Number.parseInt(workOrder?.id, 10) || 0;
+        const workOrderNumber = String(workOrder?.work_order_number || '').trim();
+        const quickEntryUrl = buildMobileQuickEntryUrl(workOrderId);
+
+        state.mobileQuickEntryUrl = quickEntryUrl;
+        if (!quickEntryUrl) {
+            resetMobileQuickEntry();
+            return;
+        }
+
+        if (elements.mobileQuickEntryOpenButton) {
+            elements.mobileQuickEntryOpenButton.disabled = false;
+        }
+        if (elements.mobileQuickEntryCopyButton) {
+            elements.mobileQuickEntryCopyButton.disabled = false;
+        }
+        if (elements.mobileQuickEntryText) {
+            elements.mobileQuickEntryText.textContent = workOrderNumber
+                ? `掃描後可直接開啟工單 ${workOrderNumber} 的手機頁面，進行完工、不良品或載具狀況圖片回傳。`
+                : '掃描後可直接進入此工單的手機頁面。';
+        }
+        setMobileQuickEntryPlaceholder('QR Code 產生中...');
+
+        try {
+            const QRCode = await ensureQrCodeLibrary();
+            if (!elements.mobileQuickEntryQr) {
+                return;
+            }
+            elements.mobileQuickEntryQr.innerHTML = '';
+            new QRCode(elements.mobileQuickEntryQr, {
+                text: quickEntryUrl,
+                width: 200,
+                height: 200,
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        } catch (error) {
+            console.error('Render mobile quick entry QR failed:', error);
+            setMobileQuickEntryPlaceholder('QR Code 載入失敗，請改用下方按鈕開啟或複製連結。');
+        }
+    }
+
+    function openMobileQuickEntry() {
+        if (!state.mobileQuickEntryUrl) {
+            showAlert('找不到手機快速入口連結', 'warning');
+            return;
+        }
+        window.open(state.mobileQuickEntryUrl, '_blank', 'noopener');
+    }
+
+    async function copyMobileQuickEntry() {
+        if (!state.mobileQuickEntryUrl) {
+            showAlert('找不到手機快速入口連結', 'warning');
+            return;
+        }
+
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(state.mobileQuickEntryUrl);
+            } else {
+                const tempInput = document.createElement('input');
+                tempInput.value = state.mobileQuickEntryUrl;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+            }
+            showAlert('手機快速入口連結已複製', 'success');
+        } catch (error) {
+            console.error('Copy mobile quick entry failed:', error);
+            showAlert('複製手機快速入口連結失敗', 'error');
+        }
+    }
+
     function init() {
         loadCurrentUser();
         loadMachines();
         loadEmployees();
         loadStatuses();
         loadWorkOrders();
+        resetMobileQuickEntry();
         attachEventListeners();
         setupMirroredFormFields(elements.createModalForm, ['machine_id', 'assigned_employee_id', 'calibration_employee_id']);
         setupMirroredFormFields(elements.editModalForm, ['machine_id', 'assigned_employee_id', 'calibration_employee_id']);
@@ -2153,6 +2316,14 @@
         if (elements.editToolConditionImagesRows) {
             elements.editToolConditionImagesRows.addEventListener('click', handleImageAction);
         }
+        if (elements.mobileQuickEntryOpenButton) {
+            elements.mobileQuickEntryOpenButton.addEventListener('click', openMobileQuickEntry);
+        }
+        if (elements.mobileQuickEntryCopyButton) {
+            elements.mobileQuickEntryCopyButton.addEventListener('click', () => {
+                copyMobileQuickEntry();
+            });
+        }
 
         // Table row actions
         if (elements.tbody) {
@@ -3222,7 +3393,7 @@
             const workOrder = workOrdersCache.get(parseInt(workOrderId));
 
             // 開啟列印頁面
-            const printUrl = `print/work_order_print.html?id=${workOrderId}`;
+            const printUrl = buildWorkOrderPrintUrl({ id: workOrderId });
             window.open(printUrl, '_blank');
 
             // 標記為已列印
@@ -3259,7 +3430,7 @@
         try {
             // 將選取的 ID 組合成參數
             const ids = Array.from(selectedWorkOrders).join(',');
-            const printUrl = `print/work_order_print.html?ids=${ids}`;
+            const printUrl = buildWorkOrderPrintUrl({ ids });
             window.open(printUrl, '_blank');
 
             // 逐筆標記為已列印
@@ -3574,6 +3745,7 @@
     // 開啟編輯工單 Modal (不含頁籤,直接編輯)
     async function openEditModal(id) {
         state.editingId = id;
+        resetMobileQuickEntry();
 
         // Reset UI
         elements.editModalForm.reset();
@@ -3630,6 +3802,7 @@
         state.productionRecordModes.edit = 'preset';
         state.productionRecordBuffers.edit = { preset: [], manual: [] };
         renderOrderDrawings([]);
+        resetMobileQuickEntry();
         setSplitRuns(true, []);
         state.formSnapshots.edit = null;
     }
@@ -3670,6 +3843,7 @@
                     result.data.tool_condition_images || [],
                     '尚未上傳載具狀況圖片'
                 );
+                await renderMobileQuickEntry(result.data);
 
                 // Load work order images
                 await loadWorkOrderImages(id, true);

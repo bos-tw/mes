@@ -5584,6 +5584,59 @@ td.actions-col {
     padding: 50px 12px 10px;
 }
 
+.work-order-mobile-quick-entry-card {
+    margin-top: 14px;
+    padding-top: 2px;
+}
+
+.work-order-mobile-quick-entry-body {
+    display: grid;
+    gap: 10px;
+}
+
+.work-order-mobile-quick-entry-qr {
+    min-height: 232px;
+    border: 1px dashed #d1d5db;
+    border-radius: 10px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+}
+
+.work-order-mobile-quick-entry-qr canvas,
+.work-order-mobile-quick-entry-qr img {
+    display: block;
+    width: 100%;
+    max-width: 200px;
+    height: auto;
+}
+
+.work-order-mobile-quick-entry-placeholder {
+    font-size: var(--font-sm);
+    color: var(--color-text-muted);
+    text-align: center;
+    line-height: 1.6;
+}
+
+.work-order-mobile-quick-entry-text {
+    margin: 0;
+    font-size: var(--font-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+}
+
+.work-order-mobile-quick-entry-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.work-order-mobile-quick-entry-actions .btn {
+    justify-content: center;
+}
+
 [data-work-orders-edit-modal] .work-order-edit-summary-section,
 [data-work-orders-edit-modal] .work-order-edit-detail-section,
 [data-work-orders-edit-modal] .work-order-edit-drawing-card,

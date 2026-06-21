@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>生產命令單</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <style>
         @page {
             size: A4 portrait;
@@ -80,11 +81,12 @@
         }
 
         .document-header {
-            min-height: 19mm;
+            min-height: 18mm;
             display: grid;
-            grid-template-columns: 1fr 82mm;
+            grid-template-columns: minmax(0, 1fr) 68mm 18mm;
             align-items: center;
-            padding: 0 2mm 1mm;
+            gap: 1.5mm;
+            padding: 0 .4mm .6mm 0;
         }
 
         .document-title {
@@ -95,14 +97,61 @@
 
         .document-meta {
             text-align: right;
+            justify-self: start;
+            width: 100%;
         }
 
         .document-number {
             border-bottom: var(--outer-line) solid var(--heading-line);
-            padding: 0 1mm 1mm;
-            font-size: 16pt;
-            letter-spacing: .4px;
+            padding: 0 0 .7mm;
+            font-size: 11pt;
+            letter-spacing: .1px;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .document-dates {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1mm;
+            padding-top: .8mm;
+            font-size: 6.5pt;
+            line-height: 1.2;
             white-space: nowrap;
+        }
+
+        .document-dates strong {
+            font-weight: 700;
+        }
+
+        .document-due-date {
+            font-size: 7.2pt;
+            font-weight: 700;
+        }
+
+        .document-qr {
+            width: 18mm;
+            display: flex;
+            justify-content: flex-end;
+            justify-self: end;
+        }
+
+        .document-qr-box {
+            width: 16mm;
+            height: 16mm;
+            border: var(--outer-line) solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            overflow: hidden;
+        }
+
+        .document-qr-box canvas,
+        .document-qr-box img {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
         }
 
         .split-marker {
@@ -119,23 +168,19 @@
         }
 
         .document-info-bar {
-            min-height: 7mm;
-            display: grid;
-            grid-template-columns: 1fr 41mm 41mm;
+            min-height: 2mm;
             border-top: var(--thick-line) solid var(--heading-line);
             border-bottom: var(--outer-line) solid var(--line);
         }
 
-        .document-info-bar > div {
-            display: flex;
-            align-items: center;
-            padding: 1mm 2mm;
+        .document-info-bar.has-split {
+            min-height: 7mm;
         }
 
-        .document-info-bar .date-cell {
-            justify-content: flex-end;
-            white-space: nowrap;
-            font-size: 8.5pt;
+        .document-info-bar .split-marker {
+            display: flex;
+            align-items: center;
+            padding: 1mm .8mm;
         }
 
         .section {
@@ -490,6 +535,34 @@
         return `../${String(path).replace(/^\/+/, '')}`;
     }
 
+    function getMobileQuickEntryBaseUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const providedBase = String(params.get('mobile_base') || '').trim();
+        if (providedBase) {
+            try {
+                const url = new URL(providedBase, window.location.href);
+                if (url.origin === window.location.origin && /^https?:$/.test(url.protocol)) {
+                    url.search = '';
+                    url.hash = '';
+                    return url.toString();
+                }
+            } catch (error) {
+                console.warn('忽略無效的手機快速入口基底網址:', error);
+            }
+        }
+        return new URL('../mobile/', window.location.href).toString();
+    }
+
+    function buildMobileQuickEntryUrl(workOrderId) {
+        const normalizedId = Number.parseInt(workOrderId, 10) || 0;
+        if (normalizedId <= 0) {
+            return '';
+        }
+        const url = new URL(getMobileQuickEntryBaseUrl());
+        url.searchParams.set('work_order_id', String(normalizedId));
+        return url.toString();
+    }
+
     function buildTolerance(service) {
         const plus = service.tolerance_plus_value;
         const minus = service.tolerance_minus_value;
@@ -614,6 +687,7 @@
         const cardRows = buildCardRows(wo, context.run, context.cardRowCount);
         const serviceCount = Array.isArray(wo.screening_services_details) ? wo.screening_services_details.length : 0;
         const densityClass = cardRows.rowCount > 8 || serviceCount > 8 ? ' dense-sheet' : '';
+        const mobileQuickEntryUrl = buildMobileQuickEntryUrl(wo.id);
         const notes = [
             context.run?.notes ? `【拆分機台備註】${context.run.notes}` : '',
             wo.customer_instructions ? `【客戶交辦】${wo.customer_instructions}` : '',
@@ -639,12 +713,17 @@
             <div class="document-title">生產命令單</div>
             <div class="document-meta">
                 <div class="document-number">${escapeHtml(context.displayNumber)}</div>
+                <div class="document-dates">
+                    <div><strong>製單日期：</strong>${formatDateWithWeekday(wo.created_at)}</div>
+                    <div class="document-due-date"><strong>預計交期：</strong>${formatDateWithWeekday(wo.expected_delivery_date)}</div>
+                </div>
+            </div>
+            <div class="document-qr">
+                <div class="document-qr-box" data-mobile-qr-url="${escapeHtml(mobileQuickEntryUrl)}"></div>
             </div>
         </header>
-        <div class="document-info-bar">
+        <div class="document-info-bar${context.isSplit ? ' has-split' : ''}">
             ${splitMarker}
-            <div class="date-cell">製單日期：${formatDateWithWeekday(wo.created_at)}</div>
-            <div class="date-cell"><strong>預計交期：</strong>${formatDateWithWeekday(wo.expected_delivery_date)}</div>
         </div>
 
         <section class="section">
@@ -900,6 +979,27 @@
         ));
     }
 
+    function renderPrintedQrCodes() {
+        if (typeof QRCode === 'undefined') {
+            return;
+        }
+
+        document.querySelectorAll('[data-mobile-qr-url]').forEach((container) => {
+            const targetUrl = String(container.getAttribute('data-mobile-qr-url') || '').trim();
+            if (!targetUrl) {
+                container.textContent = '無 QR';
+                return;
+            }
+            container.innerHTML = '';
+            new QRCode(container, {
+                text: targetUrl,
+                width: 96,
+                height: 96,
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        });
+    }
+
     async function loadWorkOrders() {
         const ids = getRequestedIds();
         const content = document.getElementById('content');
@@ -916,6 +1016,7 @@
             }
             const pages = workOrders.flatMap(buildPagesForWorkOrder);
             content.innerHTML = pages.join('');
+            renderPrintedQrCodes();
 
             const totalPages = content.querySelectorAll('.sheet').length;
             document.title = workOrders.length === 1

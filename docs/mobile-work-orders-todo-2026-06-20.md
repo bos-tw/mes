@@ -2,7 +2,7 @@
 
 更新日期：2026-06-20
 對應文件：`docs/mobile-work-orders-spec-2026-06-20.md`
-狀態：已開始實作，第一版入口、手機上傳與桌面唯讀整合已落地
+狀態：第一版本機開發大致完成，現階段以遠端驗證、實機回歸與細部 UI 修整為主
 
 ## 1. 產品決策基線
 
@@ -89,7 +89,7 @@
 - [x] 修改功能模組前執行 `node tools/audit-system-health.js --changed --base origin/main`
 - [x] 修改功能模組後執行 `node tools/audit-system-health.js --changed --base origin/main`
 - [ ] 若修改配置型模組，修改前後執行 `node tools/validate-config-modules.js`
-- [ ] 若涉及前端 CRUD / 狀態 / DataSync，執行：
+- [x] 若涉及前端 CRUD / 狀態 / DataSync，執行：
 - [x] `node --check js/data-sync.js`
 - [x] `node --check tools/audit-data-sync.js`
 - [x] `node tools/audit-data-sync.js --write docs/data-sync-audit.md`
@@ -99,6 +99,7 @@
 - [ ] 驗證遠端部署後 `https://mes.sort.com.tw/mobile` 可正常開啟
 - [x] 新圖片表納入 DataSync，至少刷新 `work_orders` 相關畫面
 - [ ] 驗證手機上傳後桌面版工單明細可正常讀取三類新圖片
+- [ ] 以真實手機畫面驗證上傳 modal、預覽、送出按鈕與長內容捲動體驗
 
 ## 8. 建議開發順序
 
@@ -149,6 +150,10 @@
   - `php -l` / `node --check` 對應異動檔案
   - `powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1`
 - 已補手機版跨頁資料同步通知，手機操作後可發送 `work_orders` 與新圖片模組的 DataSync 事件。
+- 已微調手機版上傳 modal：
+  - 內容區改為可捲動
+  - 底部按鈕區維持可見
+  - 小螢幕間距、textarea 與預覽區高度已壓縮
 - 已完成一鍵更新包本機預檢：
   - 更新包：`dist/update_v2.1.5-mobile-precheck_20260620_221849.zip`
   - 已確認 ZIP 內保留 `files/mobile/index.php`、`files/mobile/mobile.css`、`files/mobile/mobile.js`
@@ -158,10 +163,11 @@
 ## 10. 目前真正剩餘的重點缺口
 
 - 待決策：
-  - 暫無，本輪主要產品決策已補齊
+  - 暫無明確阻塞性產品決策；若要收斂第一版，僅剩 QR Code 實裝完成度與圖片區後續體驗優化可再確認
 - 待實作：
   - 遠端 `/mobile` 部署驗證
   - 驗證手機上傳後桌面版工單明細實機讀取
+  - 依實機結果微調手機版 UI / UX
 
 ## 11. 本輪最新確認
 
@@ -172,6 +178,6 @@
 - QR Code / 直達工單入口列入第一版。
 - 第一版不新增獨立權限鍵 `mobile_work_orders.*`。
 - 三張新圖片表第一版不保留更細事件關聯欄位。
-- 異常追溯第一版不另建新主表；操作追溯仍需補操作紀錄資料表。
+- 異常追溯第一版不另建新主表；操作追溯已補上 `work_order_operation_logs`。
 - 工單清單第一版不額外加上「是否有異常」標記。
 - 推進順序採：先把本機功能補完整，再整理遠端 `/mobile` 驗證與上線。
