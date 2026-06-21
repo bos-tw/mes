@@ -270,6 +270,22 @@ function setFieldValue(name, value, form = modalForm) {
             });
         }
 
+        function formatPercentage(value, fallback = '3%') {
+            if (value === null || value === undefined || value === '') {
+                return fallback;
+            }
+
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) {
+                return fallback;
+            }
+
+            return `${numeric.toLocaleString('zh-TW', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2
+            })}%`;
+        }
+
         // Modal 內部錯誤訊息顯示
         function showModalAlert(type, message, autoHide = true) {
             if (!modalAlertBox) {
@@ -616,7 +632,7 @@ function setFieldValue(name, value, form = modalForm) {
                     <td>${formatBillingDay(customer.billing_day)}</td>
                     <td>${valueOrDash(customer.payment_method)}</td>
                     <td>${formatCurrency(customer.minimum_order_amount)}</td>
-                    <td>${customer.weight_tolerance_percentage != null ? escapeHtml(customer.weight_tolerance_percentage + '%') : '3%'}</td>
+                    <td>${escapeHtml(formatPercentage(customer.weight_tolerance_percentage))}</td>
                     <td>${valueOrDash(customer.address)}</td>
                 </tr>
             `).join('');
@@ -700,7 +716,7 @@ function setFieldValue(name, value, form = modalForm) {
                     { label: '統一編號', value: valueOrDash(customer.tax_id) },
                     { label: '付款方式', value: valueOrDash(customer.payment_method) },
                     { label: '最低委託額度', value: formatCurrency(customer.minimum_order_amount) },
-                    { label: '重量公差', value: customer.weight_tolerance_percentage != null ? escapeHtml(customer.weight_tolerance_percentage + '%') : '3%' },
+                    { label: '重量公差', value: escapeHtml(formatPercentage(customer.weight_tolerance_percentage)) },
                     { label: '發票印章附件', value: valueOrDash(customer.invoice_attachment_path) },
                 ]),
                 renderDetailSection('其他資訊', [
@@ -816,7 +832,7 @@ function setFieldValue(name, value, form = modalForm) {
                         <td>${formatBillingDay(customer.billing_day)}</td>
                         <td>${customer.payment_method ? escapeHtml(customer.payment_method) : '-'}</td>
                         <td>${formatCurrency(customer.minimum_order_amount)}</td>
-                        <td>${customer.weight_tolerance_percentage != null ? formatNumber(customer.weight_tolerance_percentage) + '%' : '3%'}</td>
+                        <td>${escapeHtml(formatPercentage(customer.weight_tolerance_percentage))}</td>
                         <td>${customer.tax_id ? escapeHtml(customer.tax_id) : '-'}</td>
                         <td>${formatNotes(customer.notes)}</td>
                         <td>${formatDateTime(customer.created_at)}</td>

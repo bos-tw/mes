@@ -437,42 +437,49 @@ try {
                 $toolWeightKg = (float)($orderItemMetrics['total_tool_weight'] ?? 0);
                 $totalToolQuantity = (int)($orderItemMetrics['tool_quantity'] ?? 0);
 
-                $receiptType = $targetWorkOrderType === 'split' ? 'final' : 'standard';
+                $receiptType = 'standard';
                 $partialReceivedNetWeightKg = 0.0;
                 $partialReceivedUnits = 0.0;
-                if ($targetWorkOrderType === 'split') {
-                    $partialStmt = $pdo->prepare("
-                        SELECT
-                            COALESCE(SUM(net_weight_kg), 0) AS received_net_weight_kg,
-                            COALESCE(SUM(calculated_units), 0) AS received_units
-                        FROM work_order_partial_receipts
-                        WHERE work_order_id = :work_order_id
-                          AND receipt_status != 'reversed'
-                    ");
-                    $partialStmt->execute(['work_order_id' => $id]);
-                    $partialSummary = $partialStmt->fetch(PDO::FETCH_ASSOC) ?: [];
-                    $partialReceivedNetWeightKg = round((float)($partialSummary['received_net_weight_kg'] ?? 0), 2);
-                    $partialReceivedUnits = round((float)($partialSummary['received_units'] ?? 0), 2);
-
-                    if ($partialReceivedNetWeightKg - $totalWeightKg > 0.0001) {
-                        $pdo->rollBack();
-                        jsonResponse([
-                            'success' => false,
-                            'message' => "部分入庫淨重 {$partialReceivedNetWeightKg} kg 已超過主工單預期淨重 {$totalWeightKg} kg，無法完成工單。",
-                        ], 409);
-                        return;
-                    }
+                $partialStmt = $pdo->prepare("
+                    SELECT
+                        COALESCE(SUM(net_weight_kg), 0) AS received_net_weight_kg,
+                        COALESCE(SUM(calculated_units), 0) AS received_units
+                    FROM work_order_partial_receipts
+                    WHERE work_order_id = :work_order_id
+                      AND receipt_status != 'reversed'
+                ");
+                $partialStmt->execute(['work_order_id' => $id]);
+                $partialSummary = $partialStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+                $partialReceivedNetWeightKg = round((float)($partialSummary['received_net_weight_kg'] ?? 0), 2);
+                $partialReceivedUnits = round((float)($partialSummary['received_units'] ?? 0), 2);
+                if ($partialReceivedNetWeightKg > 0.0001) {
+                    $receiptType = 'final';
                 }
 
-                // 計算淨重（良品重量）。拆分工單最終入庫只補入尚未部分入庫的剩餘淨重。
+                // 計算完整良品淨重，再扣除先前部分入庫，避免一般與拆分工單重複計入庫存。
                 if ($targetWorkOrderType === 'split') {
-                    $netWeightKg = round(max(0, $totalWeightKg - $partialReceivedNetWeightKg), 2);
-                    $totalGoodUnits = $weightPerUnitG > 0 ? round($netWeightKg * 1000 / $weightPerUnitG, 2) : max(0, $totalGoodUnits - $partialReceivedUnits);
+                    $fullGoodNetWeightKg = round($totalWeightKg, 2);
                     $totalDefectsForInventory = 0.0;
                 } else {
-                    $netWeightKg = $weightPerUnitG > 0 ? round($totalGoodUnits * $weightPerUnitG / 1000, 2) : $totalWeightKg;
+                    $fullGoodNetWeightKg = $weightPerUnitG > 0
+                        ? round($totalGoodUnits * $weightPerUnitG / 1000, 2)
+                        : round($totalWeightKg, 2);
                     $totalDefectsForInventory = $totalDefects;
                 }
+
+                if ($partialReceivedNetWeightKg - $fullGoodNetWeightKg > 0.0001) {
+                    $pdo->rollBack();
+                    jsonResponse([
+                        'success' => false,
+                        'message' => "已部分入庫淨重 {$partialReceivedNetWeightKg} kg 超過本次完工良品淨重 {$fullGoodNetWeightKg} kg，無法完成工單。請先檢查生產紀錄或走部分入庫更正流程。",
+                    ], 409);
+                    return;
+                }
+
+                $netWeightKg = round(max(0, $fullGoodNetWeightKg - $partialReceivedNetWeightKg), 2);
+                $totalGoodUnits = $weightPerUnitG > 0
+                    ? round($netWeightKg * 1000 / $weightPerUnitG, 2)
+                    : max(0, $totalGoodUnits - $partialReceivedUnits);
                 $grossWeightKg = round($netWeightKg + $toolWeightKg, 2);
 
                 $currentEmployee = $_SESSION['employee'] ?? null;
@@ -552,14 +559,14 @@ try {
                         'ref_id' => $id,
                         'qty' => $totalGoodUnits,
                         'after_qty' => $totalGoodUnits,
-                        'notes' => $targetWorkOrderType === 'split'
-                            ? "拆分工單最終補入庫，剩餘淨重 {$netWeightKg} kg / {$totalGoodUnits} 支，已部分入庫 {$partialReceivedNetWeightKg} kg / {$partialReceivedUnits} 支"
+                        'notes' => $partialReceivedNetWeightKg > 0.0001
+                            ? "工單最終補入庫，剩餘淨重 {$netWeightKg} kg / {$totalGoodUnits} 支，已部分入庫 {$partialReceivedNetWeightKg} kg / {$partialReceivedUnits} 支"
                             : "工單完工自動入庫，良品 {$totalGoodUnits}，不良品 {$totalDefects}",
                         'created_by' => $currentUserId,
                     ]);
                 }
 
-                if ($targetWorkOrderType === 'split') {
+                if ($partialReceivedNetWeightKg > 0.0001) {
                     $settleStmt = $pdo->prepare("
                         UPDATE work_order_partial_receipts
                         SET receipt_status = 'settled',
@@ -572,7 +579,7 @@ try {
                         'employee_id' => $currentUserId,
                         'work_order_id' => $id,
                     ]);
-                    logAuditAction('Settled split work order partial receipts', 'work_orders', $id, [
+                    logAuditAction('Settled work order partial receipts', 'work_orders', $id, [
                         'settled_receipt_count' => $settleStmt->rowCount(),
                         'final_net_weight_kg' => $netWeightKg,
                         'partial_received_net_weight_kg' => $partialReceivedNetWeightKg,

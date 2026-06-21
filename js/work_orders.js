@@ -32,6 +32,8 @@
         // 編輯工單 Modal (不含頁籤)
         editModal: moduleRoot.querySelector('[data-work-orders-edit-modal]'),
         editModalForm: moduleRoot.querySelector('[data-work-orders-edit-form]'),
+        partialReceiptModal: moduleRoot.querySelector('[data-work-order-partial-receipt-modal]'),
+        partialReceiptForm: moduleRoot.querySelector('[data-partial-receipt-form]'),
         createButton: moduleRoot.querySelector('.content-header [data-action="create"]'),
         printButton: moduleRoot.querySelector('.content-header [data-action="print"]'),
         batchPrintButton: moduleRoot.querySelector('.content-header [data-action="batch-print"]'),
@@ -75,6 +77,8 @@
         editingStatusLookupId: null,
         editingHasInventory: false,
         editingInventoryItemId: null,
+        currentWorkOrder: null,
+        partialReceiptContext: null,
         orderItemDetails: null,
         firstPieceDimensions: null,
         images: [],
@@ -2307,6 +2311,15 @@
         if (elements.editImagesRows) {
             elements.editImagesRows.addEventListener('click', handleImageAction);
         }
+
+        if (elements.partialReceiptForm && elements.partialReceiptModal) {
+            elements.partialReceiptForm.addEventListener('submit', handlePartialReceiptSubmit);
+            elements.partialReceiptModal.addEventListener('click', (event) => {
+                if (event.target === elements.partialReceiptModal || event.target.closest('[data-action="close-partial-receipt-modal"]')) {
+                    closePartialReceiptModal();
+                }
+            });
+        }
         if (elements.editCompletionImagesRows) {
             elements.editCompletionImagesRows.addEventListener('click', handleImageAction);
         }
@@ -2837,7 +2850,11 @@
             const result = await response.json();
 
             if (!result.success) {
-                showModalAlert('error', result.message || '部分完工入庫失敗。', false, true);
+                if (elements.partialReceiptModal && !elements.partialReceiptModal.classList.contains('hidden')) {
+                    showPartialReceiptModalAlert(result.message || '部分完工入庫失敗。');
+                } else {
+                    showModalAlert('error', result.message || '部分完工入庫失敗。', false, true);
+                }
                 return;
             }
 
@@ -2854,10 +2871,98 @@
 
             await openModal(state.editingId);
             loadWorkOrders();
+            closePartialReceiptModal();
         } catch (error) {
             console.error('Create partial receipt error:', error);
-            showModalAlert('error', '部分完工入庫時發生錯誤，請檢查網路連線或主控台。', false, true);
+            if (elements.partialReceiptModal && !elements.partialReceiptModal.classList.contains('hidden')) {
+                showPartialReceiptModalAlert('部分完工入庫時發生錯誤，請稍後重試。');
+            } else {
+                showModalAlert('error', '部分完工入庫時發生錯誤，請稍後重試。', false, true);
+            }
         }
+    }
+
+    function showPartialReceiptModalAlert(message) {
+        const alertBox = elements.partialReceiptModal?.querySelector('[data-partial-receipt-modal-alert]');
+        if (!alertBox) {
+            return;
+        }
+        alertBox.textContent = message;
+        alertBox.className = 'modal-alert error';
+        alertBox.removeAttribute('hidden');
+    }
+
+    function closePartialReceiptModal() {
+        if (!elements.partialReceiptModal || !elements.partialReceiptForm) {
+            return;
+        }
+        elements.partialReceiptModal.classList.add('hidden');
+        elements.partialReceiptForm.reset();
+        state.partialReceiptContext = null;
+        const alertBox = elements.partialReceiptModal.querySelector('[data-partial-receipt-modal-alert]');
+        if (alertBox) {
+            alertBox.className = 'modal-alert hidden';
+            alertBox.setAttribute('hidden', '');
+            alertBox.textContent = '';
+        }
+    }
+
+    function openPartialReceiptModal({ machineRunId = null, sourceLabel, remainingNetWeightKg }) {
+        if (!elements.partialReceiptModal || !elements.partialReceiptForm) {
+            showModalAlert('error', '部分入庫視窗載入失敗。', false, true);
+            return;
+        }
+
+        const remaining = Math.max(0, Number(remainingNetWeightKg) || 0);
+        if (remaining <= 0.0001) {
+            showModalAlert('error', '目前已無可部分入庫的剩餘淨重。', false, true);
+            return;
+        }
+
+        state.partialReceiptContext = {
+            workOrderId: state.editingId,
+            machineRunId,
+            remainingNetWeightKg: remaining,
+        };
+        const sourceInput = elements.partialReceiptForm.querySelector('[name="source_label"]');
+        const remainingInput = elements.partialReceiptForm.querySelector('[name="remaining_net_weight_kg"]');
+        const weightInput = elements.partialReceiptForm.querySelector('[name="net_weight_kg"]');
+        if (!sourceInput || !remainingInput || !weightInput) {
+            showModalAlert('error', '部分入庫欄位載入失敗。', false, true);
+            return;
+        }
+        sourceInput.value = sourceLabel;
+        remainingInput.value = remaining.toFixed(2);
+        weightInput.value = '';
+        weightInput.max = remaining.toFixed(2);
+        elements.partialReceiptModal.classList.remove('hidden');
+        window.setTimeout(() => weightInput.focus(), 0);
+    }
+
+    async function handlePartialReceiptSubmit(event) {
+        event.preventDefault();
+        const context = state.partialReceiptContext;
+        if (!context || !elements.partialReceiptForm) {
+            return;
+        }
+
+        const formData = new FormData(elements.partialReceiptForm);
+        const netWeightKg = Number(formData.get('net_weight_kg'));
+        if (!Number.isFinite(netWeightKg) || netWeightKg <= 0) {
+            showPartialReceiptModalAlert('請填寫大於 0 的本次入庫淨重。');
+            return;
+        }
+        if (netWeightKg - context.remainingNetWeightKg > 0.0001) {
+            showPartialReceiptModalAlert(`本次入庫不可超過剩餘 ${context.remainingNetWeightKg.toFixed(2)} kg。`);
+            return;
+        }
+
+        await submitPartialReceipt({
+            work_order_id: context.workOrderId,
+            machine_run_id: context.machineRunId,
+            net_weight_kg: netWeightKg,
+            notes: String(formData.get('notes') || '').trim(),
+        });
     }
 
     async function createPartialReceiptForMachineRun(run) {
@@ -2874,14 +2979,10 @@
             return;
         }
 
-        const confirmed = confirm(`確定要將「${run.run_label || '機台'}」剩餘 ${remainingNetWeight.toFixed(2)} kg 建立為部分完工入庫嗎？\n\n主工單仍需所有機台完成後才可結案。`);
-        if (!confirmed) {
-            return;
-        }
-
-        await submitPartialReceipt({
-            work_order_id: state.editingId,
-            machine_run_id: run.id
+        openPartialReceiptModal({
+            machineRunId: run.id,
+            sourceLabel: `拆分機台：${run.run_label || run.machine_name || run.id}`,
+            remainingNetWeightKg: remainingNetWeight,
         });
     }
 
@@ -2909,13 +3010,17 @@
             return;
         }
 
-        const confirmed = confirm('確定要為此一般工單建立部分完工入庫嗎？\n\n系統會以工單剩餘可入庫淨重建立庫存。');
-        if (!confirmed) {
+        const currentWorkOrder = state.currentWorkOrder || {};
+        if (currentWorkOrder.lifecycle_locked == 1 || currentWorkOrder.completed_at || state.editingHasInventory) {
+            showModalAlert('error', '此工單已完成或已有正式庫存，不能再建立部分入庫。若需更正，請先退回工單並處理既有庫存。', false, true);
             return;
         }
 
-        await submitPartialReceipt({
-            work_order_id: state.editingId
+        const expectedNetWeight = Number(currentWorkOrder.total_weight_kg || elements.editModalForm.querySelector('[name="total_weight_kg"]')?.value || 0);
+        const receivedNetWeight = Number(currentWorkOrder.partial_receipt_net_weight_kg || 0);
+        openPartialReceiptModal({
+            sourceLabel: `一般工單：${currentWorkOrder.work_order_number || state.editingId}`,
+            remainingNetWeightKg: Math.max(0, expectedNetWeight - receivedNetWeight),
         });
     }
 
@@ -3821,9 +3926,22 @@
             const result = await response.json();
 
             if (result.success) {
+                state.currentWorkOrder = result.data;
                 state.editingStatusLookupId = result.data.status_lookup_id ?? null;
                 state.editingHasInventory = result.data.has_inventory == 1 || result.data.has_inventory === true;
                 state.editingInventoryItemId = result.data.inventory_item_id ? parseInt(result.data.inventory_item_id, 10) : null;
+                const partialReceiptButton = elements.editModalForm.querySelector('[data-action="create-work-order-partial-receipt"]');
+                if (partialReceiptButton) {
+                    const partialReceiptStatusAllowed = ['in_progress', 'paused'].includes(String(result.data.status_key || ''));
+                    const partialReceiptLocked = result.data.lifecycle_locked == 1
+                        || Boolean(result.data.completed_at)
+                        || state.editingHasInventory
+                        || !partialReceiptStatusAllowed;
+                    partialReceiptButton.disabled = partialReceiptLocked;
+                    partialReceiptButton.title = partialReceiptLocked
+                        ? '只有進行中或暫停中，且尚未建立正式庫存的工單可以部分入庫。'
+                        : '建立本次部分完工入庫';
+                }
                 populateForm(result.data, true);
                 state.images = result.data.images || [];
                 renderImages(true);
@@ -4908,7 +5026,7 @@
     }
 
     // Handle image row actions (preview, delete)
-    function handleImageAction(event) {
+    async function handleImageAction(event) {
         const target = event.target.closest('button');
         if (!target) return;
 
@@ -4918,16 +5036,45 @@
 
         const imageId = row.dataset.imageId;
         const filePath = row.dataset.filePath;
+        const tbody = row.parentElement;
 
         if (action === 'preview-image' && filePath) {
             window.open(filePath, '_blank');
         } else if (action === 'remove-image' && imageId) {
             const isEditMode = row.closest('[data-edit-images-rows]') !== null;
             const workOrderId = state.editingId;
-            if (confirm('確定要刪除此圖片嗎?')) {
-                handleDeleteImage(imageId, workOrderId, isEditMode);
-            }
+            await handleDeleteImage(imageId, workOrderId, isEditMode);
+        } else if (action === 'delete-execution-image' && imageId && tbody instanceof HTMLElement) {
+            await handleDeleteExecutionImage(imageId, tbody);
         }
+    }
+
+    function getExecutionImageTableConfig(tbody) {
+        if (tbody === elements.editCompletionImagesRows) {
+            return {
+                endpoint: 'work_order_completion_images',
+                label: '完工圖片',
+                emptyMessage: '尚未上傳完工圖片'
+            };
+        }
+
+        if (tbody === elements.editDefectImagesRows) {
+            return {
+                endpoint: 'work_order_defect_images',
+                label: '不良品圖片',
+                emptyMessage: '尚未上傳不良品圖片'
+            };
+        }
+
+        if (tbody === elements.editToolConditionImagesRows) {
+            return {
+                endpoint: 'work_order_tool_condition_images',
+                label: '載具狀況圖片',
+                emptyMessage: '尚未上傳載具狀況圖片'
+            };
+        }
+
+        return null;
     }
 
     function renderExecutionImageRows(tbody, images, emptyMessage) {
@@ -4938,7 +5085,7 @@
         if (!Array.isArray(images) || images.length === 0) {
             tbody.innerHTML = `
                 <tr class="empty-row">
-                    <td colspan="5" class="text-center">${escapeHtml(emptyMessage || '尚未上傳圖片')}</td>
+                    <td colspan="6" class="text-center">${escapeHtml(emptyMessage || '尚未上傳圖片')}</td>
                 </tr>
             `;
             return;
@@ -4980,19 +5127,33 @@
             uploadedByCell.textContent = uploadedBy;
 
             const actionCell = document.createElement('td');
+            actionCell.className = 'text-center';
             const previewButton = document.createElement('button');
             previewButton.type = 'button';
-            previewButton.className = 'btn ghost small';
+            previewButton.className = 'btn ghost icon-only';
             previewButton.dataset.action = 'preview-image';
             previewButton.title = '預覽';
+            previewButton.setAttribute('aria-label', '預覽圖片');
             previewButton.innerHTML = '<i class="fas fa-eye"></i>';
             actionCell.appendChild(previewButton);
+
+            const deleteCell = document.createElement('td');
+            deleteCell.className = 'text-center';
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'btn ghost icon-only';
+            deleteButton.dataset.action = 'delete-execution-image';
+            deleteButton.title = '刪除';
+            deleteButton.setAttribute('aria-label', '刪除此圖片');
+            deleteButton.innerHTML = '<i class="fas fa-trash"></i>';
+            deleteCell.appendChild(deleteButton);
 
             row.appendChild(previewCell);
             row.appendChild(descriptionCell);
             row.appendChild(uploadedAtCell);
             row.appendChild(uploadedByCell);
             row.appendChild(actionCell);
+            row.appendChild(deleteCell);
             fragment.appendChild(row);
         });
 
@@ -5094,6 +5255,54 @@
         } catch (error) {
             console.error('Delete error:', error);
             showModalAlert('danger', '刪除發生錯誤', false, isEditMode);
+        }
+    }
+
+    async function handleDeleteExecutionImage(imageId, tbody) {
+        const tableConfig = getExecutionImageTableConfig(tbody);
+        if (!tableConfig) {
+            return;
+        }
+
+        if (!confirm(`確定要刪除此${tableConfig.label}嗎?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`api/${tableConfig.endpoint}/delete.php`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: imageId })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const targetRow = Array.from(tbody.querySelectorAll('tr[data-image-id]'))
+                    .find((currentRow) => String(currentRow.dataset.imageId || '') === String(imageId));
+
+                if (targetRow) {
+                    targetRow.remove();
+                }
+
+                if (!tbody.querySelector('tr[data-image-id]')) {
+                    renderExecutionImageRows(tbody, [], tableConfig.emptyMessage);
+                }
+
+                if (typeof DataSync !== 'undefined') {
+                    DataSync.notifyWithDependencies(tableConfig.endpoint, DataSync.EVENT_TYPES.DELETED, {
+                        id: Number.parseInt(imageId, 10) || 0,
+                        work_order_id: state.editingId || 0
+                    });
+                }
+
+                showModalAlert('success', result.message || `${tableConfig.label}已刪除。`, true, true);
+            } else {
+                showModalAlert('danger', result.message || '刪除失敗', false, true);
+            }
+        } catch (error) {
+            console.error('Delete execution image error:', error);
+            showModalAlert('danger', '刪除發生錯誤', false, true);
         }
     }
 

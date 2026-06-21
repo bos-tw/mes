@@ -48,14 +48,17 @@ try {
             wo.work_order_type,
             wo.total_weight_kg AS expected_net_weight_kg,
             wo.weight_per_unit_g,
+            wo.completed_at,
             wo.order_item_id,
             oi.order_id,
             oi.screening_item_id,
             oi.customer_batch_number,
-            o.customer_id
+            o.customer_id,
+            lv.value_key AS status_key
         FROM work_orders wo
         JOIN order_items oi ON wo.order_item_id = oi.id
         JOIN orders o ON oi.order_id = o.id
+        LEFT JOIN lookup_values lv ON lv.id = wo.status_lookup_id
         WHERE wo.id = :work_order_id
           AND wo.deleted_at IS NULL
         FOR UPDATE
@@ -66,6 +69,40 @@ try {
     if (!$workOrder) {
         $pdo->rollBack();
         jsonResponse(['success' => false, 'message' => '找不到指定工單。'], 404);
+    }
+
+    if (!empty($workOrder['completed_at']) || (string)($workOrder['status_key'] ?? '') === 'completed') {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => '此工單已完成，不能再建立部分入庫。若需更正，請先依流程退回工單並處理既有庫存。',
+        ], 409);
+    }
+
+    if (!in_array((string)($workOrder['status_key'] ?? ''), ['in_progress', 'paused'], true)) {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => '只有進行中或暫停中的工單可以建立部分入庫。',
+        ], 409);
+    }
+
+    $finalInventoryStmt = $pdo->prepare("
+        SELECT inventory_number
+        FROM inventory_items
+        WHERE work_order_id = :work_order_id
+          AND deleted_at IS NULL
+          AND receipt_type IN ('standard', 'final')
+        LIMIT 1
+    ");
+    $finalInventoryStmt->execute(['work_order_id' => $workOrderId]);
+    $finalInventoryNumber = $finalInventoryStmt->fetchColumn();
+    if ($finalInventoryNumber !== false) {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => "此工單已有正式庫存 {$finalInventoryNumber}，不能再建立部分入庫。",
+        ], 409);
     }
 
     $isSplitWorkOrder = (string)($workOrder['work_order_type'] ?? 'normal') === 'split';
@@ -124,14 +161,15 @@ try {
 
     $receiptSummaryStmt = $pdo->prepare("
         SELECT
-            COALESCE(SUM(CASE WHEN :machine_run_id IS NOT NULL AND machine_run_id = :machine_run_id THEN net_weight_kg ELSE 0 END), 0) AS run_received_net_weight_kg,
+            COALESCE(SUM(CASE WHEN :scope_machine_run_id IS NOT NULL AND machine_run_id = :matched_machine_run_id THEN net_weight_kg ELSE 0 END), 0) AS run_received_net_weight_kg,
             COALESCE(SUM(net_weight_kg), 0) AS work_order_received_net_weight_kg
         FROM work_order_partial_receipts
         WHERE work_order_id = :work_order_id
           AND receipt_status != 'reversed'
     ");
     $receiptSummaryStmt->execute([
-        'machine_run_id' => $machineRunId,
+        'scope_machine_run_id' => $machineRunId,
+        'matched_machine_run_id' => $machineRunId,
         'work_order_id' => $workOrderId,
     ]);
     $receiptSummary = $receiptSummaryStmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -162,9 +200,11 @@ try {
     }
 
     $requestedNetWeight = $payload['net_weight_kg'] ?? null;
-    $receiptNetWeightKg = $requestedNetWeight === null || $requestedNetWeight === ''
-        ? $remainingScopeNetWeightKg
-        : round((float)$requestedNetWeight, 2);
+    if ($requestedNetWeight === null || $requestedNetWeight === '' || !is_numeric($requestedNetWeight)) {
+        $pdo->rollBack();
+        jsonResponse(['success' => false, 'message' => '請填寫本次部分入庫淨重。'], 400);
+    }
+    $receiptNetWeightKg = round((float)$requestedNetWeight, 2);
 
     if ($receiptNetWeightKg <= 0) {
         $pdo->rollBack();

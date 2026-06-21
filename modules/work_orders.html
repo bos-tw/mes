@@ -960,10 +960,11 @@
                                                     <th class="col-150">上傳時間</th>
                                                     <th class="col-120">上傳者</th>
                                                     <th class="col-80">預覽</th>
+                                                    <th class="col-80">操作</th>
                                                 </tr>
                                             </thead>
                                             <tbody data-edit-completion-images-rows>
-                                                <tr class="empty-row"><td colspan="5" class="text-center">尚未上傳完工圖片</td></tr>
+                                                <tr class="empty-row"><td colspan="6" class="text-center">尚未上傳完工圖片</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -982,10 +983,11 @@
                                                     <th class="col-150">上傳時間</th>
                                                     <th class="col-120">上傳者</th>
                                                     <th class="col-80">預覽</th>
+                                                    <th class="col-80">操作</th>
                                                 </tr>
                                             </thead>
                                             <tbody data-edit-defect-images-rows>
-                                                <tr class="empty-row"><td colspan="5" class="text-center">尚未上傳不良品圖片</td></tr>
+                                                <tr class="empty-row"><td colspan="6" class="text-center">尚未上傳不良品圖片</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -1005,10 +1007,11 @@
                                                 <th class="col-150">上傳時間</th>
                                                 <th class="col-120">上傳者</th>
                                                 <th class="col-80">預覽</th>
+                                                <th class="col-80">操作</th>
                                             </tr>
                                         </thead>
                                         <tbody data-edit-tool-condition-images-rows>
-                                            <tr class="empty-row"><td colspan="5" class="text-center">尚未上傳載具狀況圖片</td></tr>
+                                            <tr class="empty-row"><td colspan="6" class="text-center">尚未上傳載具狀況圖片</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -1196,6 +1199,41 @@
                         <button type="button" class="btn outline" data-action="cancel">取消</button>
                         <button type="submit" class="btn primary" data-action="submit-edit">儲存</button>
                     </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" data-work-order-partial-receipt-modal>
+        <div class="modal-window medium">
+            <button type="button" class="modal-close" data-action="close-partial-receipt-modal" aria-label="關閉">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3>工單部分入庫</h3>
+            <div class="modal-alert hidden" data-partial-receipt-modal-alert role="alert"></div>
+            <form data-partial-receipt-form novalidate>
+                <div class="form-grid">
+                    <label class="inline-label">
+                        <span>來源</span>
+                        <input type="text" name="source_label" readonly>
+                    </label>
+                    <label class="inline-label">
+                        <span>剩餘可入庫淨重 (kg)</span>
+                        <input type="text" name="remaining_net_weight_kg" readonly>
+                    </label>
+                    <label class="inline-label">
+                        <span>本次入庫淨重 (kg)</span>
+                        <input type="number" name="net_weight_kg" min="0.01" step="0.01" required>
+                    </label>
+                    <label class="inline-label full-width">
+                        <span>備註</span>
+                        <textarea name="notes" rows="3" placeholder="可填寫本次部分完工、交班或出貨需求說明"></textarea>
+                    </label>
+                </div>
+                <p class="form-hint">部分入庫只建立本次填寫的內容物淨重；工單不會因此自動結案。</p>
+                <div class="form-actions align-right">
+                    <button type="button" class="btn outline" data-action="close-partial-receipt-modal">取消</button>
+                    <button type="submit" class="btn primary">確認部分入庫</button>
                 </div>
             </form>
         </div>

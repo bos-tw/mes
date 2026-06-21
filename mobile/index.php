@@ -18,6 +18,8 @@ $bootstrapPayload = [
 $reason = trim((string)($_GET['reason'] ?? ''));
 $requestedWorkOrderId = isset($_GET['work_order_id']) ? max(0, (int)$_GET['work_order_id']) : 0;
 $requestedSection = trim((string)($_GET['section'] ?? 'work_orders'));
+$mobileCssVersion = (string)@filemtime(__DIR__ . '/mobile.css');
+$mobileJsVersion = (string)@filemtime(__DIR__ . '/mobile.js');
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -27,7 +29,7 @@ $requestedSection = trim((string)($_GET['section'] ?? 'work_orders'));
     <title>生產工單手機版 - 精密光學篩選管理系統</title>
     <link rel="stylesheet" href="../styles.css">
     <link rel="stylesheet" href="../login-fui.css">
-    <link rel="stylesheet" href="mobile.css">
+    <link rel="stylesheet" href="mobile.css?v=<?php echo escapeHtml($mobileCssVersion); ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body class="<?php echo $isAuthenticated ? 'mobile-app-page' : 'login-page mobile-login-page'; ?>" data-mobile-mode="<?php echo $isAuthenticated ? 'app' : 'guest'; ?>">
@@ -429,6 +431,6 @@ $requestedSection = trim((string)($_GET['section'] ?? 'work_orders'));
         </div>
     <?php endif; ?>
 
-    <script src="mobile.js"></script>
+    <script src="mobile.js?v=<?php echo escapeHtml($mobileJsVersion); ?>"></script>
 </body>
 </html>
