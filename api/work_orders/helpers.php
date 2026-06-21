@@ -74,6 +74,7 @@ function fetchWorkOrderToolDetails(PDO $pdo, int $orderItemId): array
         SELECT
             oit.id,
             oit.tool_id,
+            t.tool_number,
             t.name AS tool_name,
             oit.tool_type,
             oit.quantity,
@@ -95,6 +96,7 @@ function fetchWorkOrderToolDetails(PDO $pdo, int $orderItemId): array
         $result[] = [
             'id' => (int)($row['id'] ?? 0),
             'tool_id' => (int)($row['tool_id'] ?? 0),
+            'tool_number' => (string)($row['tool_number'] ?? ''),
             'tool_name' => (string)($row['tool_name'] ?: ($row['tool_type'] ?? '')),
             'tool_type' => (string)($row['tool_type'] ?? ''),
             'quantity' => $quantity,
@@ -104,6 +106,177 @@ function fetchWorkOrderToolDetails(PDO $pdo, int $orderItemId): array
     }
 
     return $result;
+}
+
+/**
+ * Validate and normalise partial-receipt shipping tools against order-item tools.
+ *
+ * @param mixed $payloadTools
+ * @param list<array<string,mixed>> $availableTools
+ * @return array{
+ *     items:list<array<string,mixed>>,
+ *     summary:string,
+ *     total_weight_kg:float
+ * }
+ */
+function normalisePartialReceiptShippingTools($payloadTools, array $availableTools): array
+{
+    if (!is_array($payloadTools)) {
+        throw new InvalidArgumentException('本次出貨載具資料格式不正確。');
+    }
+
+    $availableById = [];
+    foreach ($availableTools as $tool) {
+        $availableId = isset($tool['id']) ? (int)$tool['id'] : 0;
+        if ($availableId > 0) {
+            $availableById[$availableId] = $tool;
+        }
+    }
+
+    if ($availableById === []) {
+        throw new InvalidArgumentException('此工單尚未設定可用載具，請先到訂單品項維護載具資料。');
+    }
+
+    $aggregatedQuantities = [];
+    foreach ($payloadTools as $index => $toolRow) {
+        if (!is_array($toolRow)) {
+            throw new InvalidArgumentException('第 ' . ($index + 1) . ' 筆出貨載具資料格式不正確。');
+        }
+
+        $orderItemToolId = filter_var(
+            $toolRow['order_item_tool_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        if ($orderItemToolId === false || !isset($availableById[(int)$orderItemToolId])) {
+            throw new InvalidArgumentException('第 ' . ($index + 1) . ' 筆出貨載具不存在或已失效。');
+        }
+
+        $quantity = filter_var(
+            $toolRow['quantity'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        if ($quantity === false) {
+            throw new InvalidArgumentException('第 ' . ($index + 1) . ' 筆出貨載具數量必須為正整數。');
+        }
+
+        $normalizedToolId = (int)$orderItemToolId;
+        if (!isset($aggregatedQuantities[$normalizedToolId])) {
+            $aggregatedQuantities[$normalizedToolId] = 0;
+        }
+        $aggregatedQuantities[$normalizedToolId] += (int)$quantity;
+    }
+
+    if ($aggregatedQuantities === []) {
+        throw new InvalidArgumentException('請至少選擇一種本次出貨載具。');
+    }
+
+    $items = [];
+    $summaryParts = [];
+    $totalWeightKg = 0.0;
+
+    foreach ($aggregatedQuantities as $orderItemToolId => $quantity) {
+        $tool = $availableById[$orderItemToolId];
+        $toolName = trim((string)($tool['tool_name'] ?? ''));
+        $toolType = trim((string)($tool['tool_type'] ?? ''));
+        $toolLabel = $toolName !== '' ? $toolName : ($toolType !== '' ? $toolType : ('載具#' . $orderItemToolId));
+        if ($toolType !== '' && $toolType !== $toolLabel) {
+            $toolLabel .= ' / ' . $toolType;
+        }
+
+        $unitWeightKg = round((float)($tool['unit_weight_kg'] ?? 0), 3);
+        $lineWeightKg = round($unitWeightKg * (int)$quantity, 3);
+        $totalWeightKg += $lineWeightKg;
+
+        $items[] = [
+            'order_item_tool_id' => (int)$orderItemToolId,
+            'tool_id' => isset($tool['tool_id']) ? (int)$tool['tool_id'] : null,
+            'tool_number' => trim((string)($tool['tool_number'] ?? '')) ?: null,
+            'tool_name' => $toolName !== '' ? $toolName : $toolLabel,
+            'tool_type' => $toolType !== '' ? $toolType : null,
+            'unit_weight_kg' => $unitWeightKg,
+            'quantity' => (int)$quantity,
+            'total_weight_kg' => $lineWeightKg,
+        ];
+
+        $summaryParts[] = sprintf(
+            '%s x %d（%.3f kg/個，小計 %.3f kg）',
+            $toolLabel,
+            (int)$quantity,
+            $unitWeightKg,
+            $lineWeightKg
+        );
+    }
+
+    $totalWeightKg = round($totalWeightKg, 3);
+    $summary = implode('；', $summaryParts);
+    if ($summary !== '') {
+        $summary .= sprintf('；參考載具總重 %.3f kg', $totalWeightKg);
+    }
+
+    return [
+        'items' => $items,
+        'summary' => $summary,
+        'total_weight_kg' => $totalWeightKg,
+    ];
+}
+
+/**
+ * @param list<int> $partialReceiptIds
+ * @return array<int,list<array<string,mixed>>>
+ */
+function fetchPartialReceiptToolDetailsMap(PDO $pdo, array $partialReceiptIds): array
+{
+    $normalizedIds = array_values(array_filter(array_map('intval', $partialReceiptIds), static fn(int $id): bool => $id > 0));
+    if ($normalizedIds === []) {
+        return [];
+    }
+
+    $placeholders = implode(', ', array_fill(0, count($normalizedIds), '?'));
+    $stmt = $pdo->prepare("
+        SELECT
+            woprt.id,
+            woprt.partial_receipt_id,
+            woprt.order_item_tool_id,
+            woprt.tool_id,
+            woprt.tool_name,
+            woprt.tool_type,
+            woprt.unit_weight_kg,
+            woprt.quantity,
+            woprt.total_weight_kg
+        FROM work_order_partial_receipt_tools woprt
+        WHERE woprt.partial_receipt_id IN ({$placeholders})
+        ORDER BY woprt.partial_receipt_id ASC, woprt.id ASC
+    ");
+    $stmt->execute($normalizedIds);
+
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $grouped = [];
+    foreach ($rows as $row) {
+        $partialReceiptId = (int)($row['partial_receipt_id'] ?? 0);
+        if ($partialReceiptId <= 0) {
+            continue;
+        }
+
+        if (!isset($grouped[$partialReceiptId])) {
+            $grouped[$partialReceiptId] = [];
+        }
+
+        $grouped[$partialReceiptId][] = [
+            'id' => (int)($row['id'] ?? 0),
+            'partial_receipt_id' => $partialReceiptId,
+            'order_item_tool_id' => isset($row['order_item_tool_id']) ? (int)$row['order_item_tool_id'] : null,
+            'tool_id' => isset($row['tool_id']) ? (int)$row['tool_id'] : null,
+            'tool_name' => (string)($row['tool_name'] ?? ''),
+            'tool_type' => $row['tool_type'] !== null ? (string)$row['tool_type'] : null,
+            'unit_weight_kg' => round((float)($row['unit_weight_kg'] ?? 0), 3),
+            'quantity' => (int)round((float)($row['quantity'] ?? 0)),
+            'total_weight_kg' => round((float)($row['total_weight_kg'] ?? 0), 3),
+        ];
+    }
+
+    return $grouped;
 }
 
 /**
@@ -140,6 +313,378 @@ function fetchWorkOrderDrawings(PDO $pdo, int $orderItemId): array
             'uploaded_at' => $row['created_at'] ?? null,
         ];
     }, $rows);
+}
+
+function workOrderUnitsFromWeight(float $netWeightKg, float $weightPerUnitG): float
+{
+    if ($netWeightKg <= 0 || $weightPerUnitG <= 0) {
+        return 0.0;
+    }
+
+    $rawUnits = ($netWeightKg * 1000) / $weightPerUnitG;
+    return (float)max((int)floor($rawUnits + 0.000001), 0);
+}
+
+function workOrderWeightFromUnits(float $units, float $weightPerUnitG): float
+{
+    if ($units <= 0 || $weightPerUnitG <= 0) {
+        return 0.0;
+    }
+
+    return round(($units * $weightPerUnitG) / 1000, 2);
+}
+
+function workOrderDefectUnitsFromWeight(float $defectWeightKg, float $weightPerUnitG): float
+{
+    if ($defectWeightKg <= 0 || $weightPerUnitG <= 0) {
+        return 0.0;
+    }
+
+    return (float)max((int)round(($defectWeightKg * 1000) / $weightPerUnitG), 0);
+}
+
+/**
+ * @return array<string,mixed>
+ */
+function fetchWorkOrderProductionSummary(PDO $pdo, int $workOrderId, string $workOrderType, float $weightPerUnitG): array
+{
+    $toolWeightSql = workOrderTableHasColumn($pdo, 'production_records', 'tool_weight_kg')
+        ? 'COALESCE(SUM(COALESCE(tool_weight_kg, 0)), 0)'
+        : '0';
+
+    $recordStmt = $pdo->prepare("
+        SELECT
+            COUNT(*) AS record_count,
+            COALESCE(SUM(COALESCE(weight_kg, 0)), 0) AS total_weight_kg,
+            {$toolWeightSql} AS total_tool_weight_kg
+        FROM production_records
+        WHERE work_order_id = :work_order_id
+    ");
+    $recordStmt->execute(['work_order_id' => $workOrderId]);
+    $recordSummary = $recordStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $recordNetWeightKg = round(max(
+        0,
+        (float)($recordSummary['total_weight_kg'] ?? 0) - (float)($recordSummary['total_tool_weight_kg'] ?? 0)
+    ), 2);
+
+    $machineCompletedNetWeightKg = 0.0;
+    if ($workOrderType === 'split' && workOrderTableHasColumn($pdo, 'work_order_machine_runs', 'completed_net_weight_kg')) {
+        $machineStmt = $pdo->prepare("
+            SELECT COALESCE(SUM(COALESCE(completed_net_weight_kg, 0)), 0)
+            FROM work_order_machine_runs
+            WHERE work_order_id = :work_order_id
+              AND deleted_at IS NULL
+        ");
+        $machineStmt->execute(['work_order_id' => $workOrderId]);
+        $machineCompletedNetWeightKg = round((float)$machineStmt->fetchColumn(), 2);
+    }
+
+    $producedNetWeightKg = $workOrderType === 'split' && $machineCompletedNetWeightKg > 0.0001
+        ? $machineCompletedNetWeightKg
+        : $recordNetWeightKg;
+
+    return [
+        'record_count' => (int)($recordSummary['record_count'] ?? 0),
+        'record_net_weight_kg' => $recordNetWeightKg,
+        'machine_completed_net_weight_kg' => $machineCompletedNetWeightKg,
+        'produced_net_weight_kg' => $producedNetWeightKg,
+        'produced_units' => workOrderUnitsFromWeight($producedNetWeightKg, $weightPerUnitG),
+    ];
+}
+
+/**
+ * @return array<string,mixed>
+ */
+function fetchWorkOrderFinalInventorySummary(PDO $pdo, int $workOrderId, float $weightPerUnitG): array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            COALESCE(SUM(net_weight_kg), 0) AS final_received_net_weight_kg,
+            COALESCE(SUM(total_good_units), 0) AS final_received_units
+        FROM inventory_items
+        WHERE work_order_id = :work_order_id
+          AND deleted_at IS NULL
+          AND receipt_type IN ('standard', 'final')
+    ");
+    $stmt->execute(['work_order_id' => $workOrderId]);
+    $summary = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $finalNetWeightKg = round((float)($summary['final_received_net_weight_kg'] ?? 0), 2);
+    $finalUnits = (float)round((float)($summary['final_received_units'] ?? 0), 0);
+    if ($finalUnits <= 0 && $finalNetWeightKg > 0.0001) {
+        $finalUnits = workOrderUnitsFromWeight($finalNetWeightKg, $weightPerUnitG);
+    }
+
+    return [
+        'final_received_net_weight_kg' => $finalNetWeightKg,
+        'final_received_units' => $finalUnits,
+    ];
+}
+
+/**
+ * @return array{summary: array<string,mixed>, partial_receipts: array<int,array<string,mixed>>}
+ */
+function fetchWorkOrderPartialReceiptLedger(PDO $pdo, int $workOrderId): array
+{
+    $shippingSummarySql = "
+        SELECT
+            soi.inventory_item_id,
+            COALESCE(SUM(COALESCE(soi.shipped_quantity, 0)), 0) AS shipped_units,
+            COUNT(DISTINCT soi.shipping_order_id) AS shipping_order_count,
+            GROUP_CONCAT(
+                DISTINCT CONCAT(
+                    COALESCE(so.id, 0), '::',
+                    COALESCE(so.shipping_order_number, ''), '::',
+                    COALESCE(so.status, '')
+                )
+                ORDER BY so.shipping_date DESC, so.id DESC
+                SEPARATOR '||'
+            ) AS shipping_order_refs
+        FROM shipping_order_items soi
+        LEFT JOIN shipping_orders so ON so.id = soi.shipping_order_id
+        GROUP BY soi.inventory_item_id
+    ";
+
+    $stmt = $pdo->prepare("
+        SELECT
+            wopr.*,
+            ii.inventory_number,
+            COALESCE(ii.quantity_on_hand, 0) AS quantity_on_hand,
+            COALESCE(ii.quantity_allocated, 0) AS quantity_allocated,
+            COALESCE(ii.quantity_reserved, 0) AS quantity_reserved,
+            COALESCE(ii.quantity_shipped, 0) AS inventory_quantity_shipped,
+            womr.run_label,
+            womr.status AS machine_run_status,
+            m.name AS machine_name,
+            creator.name AS created_by_name,
+            settler.name AS settled_by_name,
+            reverser.name AS reversed_by_name,
+            COALESCE(shipping.shipped_units, 0) AS shipped_units,
+            COALESCE(shipping.shipping_order_count, 0) AS shipping_order_count,
+            shipping.shipping_order_refs
+        FROM work_order_partial_receipts wopr
+        LEFT JOIN inventory_items ii ON ii.id = wopr.inventory_item_id
+        LEFT JOIN work_order_machine_runs womr ON womr.id = wopr.machine_run_id
+        LEFT JOIN machines m ON m.id = womr.machine_id
+        LEFT JOIN employees creator ON creator.id = wopr.created_by_employee_id
+        LEFT JOIN employees settler ON settler.id = wopr.settled_by_employee_id
+        LEFT JOIN employees reverser ON reverser.id = wopr.reversed_by_employee_id
+        LEFT JOIN (
+            {$shippingSummarySql}
+        ) shipping ON shipping.inventory_item_id = wopr.inventory_item_id
+        WHERE wopr.work_order_id = :work_order_id
+        ORDER BY wopr.created_at DESC, wopr.id DESC
+    ");
+    $stmt->execute(['work_order_id' => $workOrderId]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $toolDetailsByReceiptId = fetchPartialReceiptToolDetailsMap(
+        $pdo,
+        array_map(static fn(array $row): int => (int)($row['id'] ?? 0), $rows)
+    );
+
+    $receipts = [];
+    $summary = [
+        'partial_receipt_count' => 0,
+        'partial_received_net_weight_kg' => 0.0,
+        'partial_received_units' => 0.0,
+        'partial_shipped_units' => 0.0,
+        'partial_in_stock_units' => 0.0,
+        'partial_allocated_units' => 0.0,
+        'partial_reserved_units' => 0.0,
+        'partial_available_to_ship_units' => 0.0,
+        'partial_unshipped_net_weight_kg' => 0.0,
+        'partial_allocated_net_weight_kg' => 0.0,
+        'partial_reserved_net_weight_kg' => 0.0,
+        'partial_available_to_ship_net_weight_kg' => 0.0,
+        'partial_shipped_net_weight_kg' => 0.0,
+    ];
+
+    foreach ($rows as $row) {
+        $receiptStatus = (string)($row['receipt_status'] ?? 'partial');
+        $netWeightKg = round((float)($row['net_weight_kg'] ?? 0), 2);
+        $weightPerUnitG = round((float)($row['weight_per_unit_g'] ?? 0), 3);
+        $calculatedUnits = (float)round((float)($row['calculated_units'] ?? 0), 0);
+        $quantityOnHand = (float)round((float)($row['quantity_on_hand'] ?? 0), 0);
+        $quantityAllocated = (float)round((float)($row['quantity_allocated'] ?? 0), 0);
+        $quantityReserved = (float)round((float)($row['quantity_reserved'] ?? 0), 0);
+        $quantityShipped = (float)round(max(
+            (float)($row['shipped_units'] ?? 0),
+            (float)($row['inventory_quantity_shipped'] ?? 0)
+        ), 0);
+        $quantityAvailableToShip = (float)round(max($quantityOnHand - $quantityAllocated, 0), 0);
+        $unshippedNetWeightKg = workOrderWeightFromUnits($quantityOnHand, $weightPerUnitG);
+        $allocatedNetWeightKg = workOrderWeightFromUnits($quantityAllocated, $weightPerUnitG);
+        $reservedNetWeightKg = workOrderWeightFromUnits($quantityReserved, $weightPerUnitG);
+        $availableToShipNetWeightKg = workOrderWeightFromUnits($quantityAvailableToShip, $weightPerUnitG);
+        $shippedNetWeightKg = workOrderWeightFromUnits($quantityShipped, $weightPerUnitG);
+
+        $shippingOrders = [];
+        $shippingRefs = trim((string)($row['shipping_order_refs'] ?? ''));
+        if ($shippingRefs !== '') {
+            foreach (explode('||', $shippingRefs) as $ref) {
+                [$shippingOrderId, $shippingOrderNumber, $shippingOrderStatus] = array_pad(explode('::', $ref), 3, '');
+                $shippingOrders[] = [
+                    'shipping_order_id' => (int)$shippingOrderId,
+                    'shipping_order_number' => $shippingOrderNumber !== '' ? $shippingOrderNumber : null,
+                    'shipping_order_status' => $shippingOrderStatus !== '' ? $shippingOrderStatus : null,
+                ];
+            }
+        }
+
+        if ($receiptStatus !== 'reversed') {
+            $summary['partial_receipt_count']++;
+            $summary['partial_received_net_weight_kg'] += $netWeightKg;
+            $summary['partial_received_units'] += $calculatedUnits;
+            $summary['partial_shipped_units'] += $quantityShipped;
+            $summary['partial_in_stock_units'] += $quantityOnHand;
+            $summary['partial_allocated_units'] += $quantityAllocated;
+            $summary['partial_reserved_units'] += $quantityReserved;
+            $summary['partial_available_to_ship_units'] += $quantityAvailableToShip;
+            $summary['partial_unshipped_net_weight_kg'] += $unshippedNetWeightKg;
+            $summary['partial_allocated_net_weight_kg'] += $allocatedNetWeightKg;
+            $summary['partial_reserved_net_weight_kg'] += $reservedNetWeightKg;
+            $summary['partial_available_to_ship_net_weight_kg'] += $availableToShipNetWeightKg;
+            $summary['partial_shipped_net_weight_kg'] += $shippedNetWeightKg;
+        }
+
+        $sourceLabel = $row['machine_run_id']
+            ? (trim((string)($row['run_label'] ?? '')) !== ''
+                ? (string)$row['run_label']
+                : (trim((string)($row['machine_name'] ?? '')) !== '' ? (string)$row['machine_name'] : '拆分機台'))
+            : '一般工單';
+        $receiptId = (int)($row['id'] ?? 0);
+        $shippingTools = $toolDetailsByReceiptId[$receiptId] ?? [];
+        $shippingToolTotalWeightKg = 0.0;
+        foreach ($shippingTools as $shippingTool) {
+            $shippingToolTotalWeightKg += (float)($shippingTool['total_weight_kg'] ?? 0);
+        }
+
+        $receipts[] = [
+            'id' => $receiptId,
+            'work_order_id' => (int)($row['work_order_id'] ?? 0),
+            'machine_run_id' => isset($row['machine_run_id']) ? (int)$row['machine_run_id'] : null,
+            'source_label' => $sourceLabel,
+            'inventory_item_id' => isset($row['inventory_item_id']) ? (int)$row['inventory_item_id'] : null,
+            'inventory_number' => $row['inventory_number'] ?? null,
+            'receipt_number' => $row['receipt_number'] ?? null,
+            'net_weight_kg' => $netWeightKg,
+            'weight_per_unit_g' => $weightPerUnitG,
+            'calculated_units' => $calculatedUnits,
+            'quantity_shipped' => $quantityShipped,
+            'quantity_allocated' => $quantityAllocated,
+            'quantity_reserved' => $quantityReserved,
+            'quantity_on_hand' => $quantityOnHand,
+            'quantity_available_to_ship' => $quantityAvailableToShip,
+            'unshipped_net_weight_kg' => $unshippedNetWeightKg,
+            'allocated_net_weight_kg' => $allocatedNetWeightKg,
+            'reserved_net_weight_kg' => $reservedNetWeightKg,
+            'available_to_ship_net_weight_kg' => $availableToShipNetWeightKg,
+            'shipped_net_weight_kg' => $shippedNetWeightKg,
+            'shipping_order_count' => (int)($row['shipping_order_count'] ?? 0),
+            'shipping_orders' => $shippingOrders,
+            'receipt_status' => $receiptStatus,
+            'notes' => $row['notes'] ?? null,
+            'shipping_tool_details' => $row['shipping_tool_details'] ?? null,
+            'shipping_tools' => $shippingTools,
+            'shipping_tool_total_weight_kg' => round($shippingToolTotalWeightKg, 3),
+            'created_by_name' => $row['created_by_name'] ?? null,
+            'created_at' => $row['created_at'] ?? null,
+            'settled_at' => $row['settled_at'] ?? null,
+            'settled_by_name' => $row['settled_by_name'] ?? null,
+            'reversed_at' => $row['reversed_at'] ?? null,
+            'reversed_by_name' => $row['reversed_by_name'] ?? null,
+            'reverse_reason' => $row['reverse_reason'] ?? null,
+        ];
+    }
+
+    foreach ($summary as $key => $value) {
+        if ($key === 'partial_receipt_count') {
+            continue;
+        }
+        if (str_ends_with((string)$key, '_net_weight_kg')) {
+            $summary[$key] = round((float)$value, 2);
+            continue;
+        }
+        $summary[$key] = (float)round((float)$value, 0);
+    }
+    $summary['partial_received_net_weight_kg'] = round((float)$summary['partial_received_net_weight_kg'], 2);
+
+    return [
+        'summary' => $summary,
+        'partial_receipts' => $receipts,
+    ];
+}
+
+/**
+ * @param array<string,mixed> $workOrder
+ * @param array<string,mixed> $productionSummary
+ * @param array<string,mixed> $partialReceiptSummary
+ * @param array<string,mixed> $finalInventorySummary
+ * @return array<string,mixed>
+ */
+function buildWorkOrderPartialReceiptSummary(
+    array $workOrder,
+    array $productionSummary,
+    array $partialReceiptSummary,
+    array $finalInventorySummary
+): array {
+    $weightPerUnitG = round((float)($workOrder['weight_per_unit_g'] ?? 0), 3);
+    $expectedNetWeightKg = round((float)($workOrder['total_weight_kg'] ?? 0), 2);
+    $expectedUnits = workOrderUnitsFromWeight($expectedNetWeightKg, $weightPerUnitG);
+    $producedNetWeightKg = round((float)($productionSummary['produced_net_weight_kg'] ?? 0), 2);
+    $producedUnits = (float)round((float)($productionSummary['produced_units'] ?? 0), 0);
+    $partialReceivedNetWeightKg = round((float)($partialReceiptSummary['partial_received_net_weight_kg'] ?? 0), 2);
+    $partialReceivedUnits = (float)round((float)($partialReceiptSummary['partial_received_units'] ?? 0), 0);
+    $partialShippedUnits = (float)round((float)($partialReceiptSummary['partial_shipped_units'] ?? 0), 0);
+    $partialInStockUnits = (float)round((float)($partialReceiptSummary['partial_in_stock_units'] ?? 0), 0);
+    $partialAllocatedUnits = (float)round((float)($partialReceiptSummary['partial_allocated_units'] ?? 0), 0);
+    $partialReservedUnits = (float)round((float)($partialReceiptSummary['partial_reserved_units'] ?? 0), 0);
+    $partialAvailableToShipUnits = (float)round((float)($partialReceiptSummary['partial_available_to_ship_units'] ?? 0), 0);
+    $partialUnshippedNetWeightKg = round((float)($partialReceiptSummary['partial_unshipped_net_weight_kg'] ?? 0), 2);
+    $partialAllocatedNetWeightKg = round((float)($partialReceiptSummary['partial_allocated_net_weight_kg'] ?? 0), 2);
+    $partialReservedNetWeightKg = round((float)($partialReceiptSummary['partial_reserved_net_weight_kg'] ?? 0), 2);
+    $partialAvailableToShipNetWeightKg = round((float)($partialReceiptSummary['partial_available_to_ship_net_weight_kg'] ?? 0), 2);
+    $partialShippedNetWeightKg = round((float)($partialReceiptSummary['partial_shipped_net_weight_kg'] ?? 0), 2);
+    $finalReceivedNetWeightKg = round((float)($finalInventorySummary['final_received_net_weight_kg'] ?? 0), 2);
+    $finalReceivedUnits = (float)round((float)($finalInventorySummary['final_received_units'] ?? 0), 0);
+    $shortageNetWeightKg = round((float)($workOrder['shortage_net_weight_kg'] ?? 0), 2);
+    $shortageUnits = (float)round((float)($workOrder['shortage_units'] ?? 0), 0);
+    if ($shortageUnits <= 0 && $shortageNetWeightKg > 0.0001) {
+        $shortageUnits = workOrderUnitsFromWeight($shortageNetWeightKg, $weightPerUnitG);
+    }
+
+    return [
+        'expected_net_weight_kg' => $expectedNetWeightKg,
+        'expected_units' => $expectedUnits,
+        'produced_net_weight_kg' => $producedNetWeightKg,
+        'produced_units' => $producedUnits,
+        'partial_receipt_count' => (int)($partialReceiptSummary['partial_receipt_count'] ?? 0),
+        'partial_received_net_weight_kg' => $partialReceivedNetWeightKg,
+        'partial_received_units' => $partialReceivedUnits,
+        'partial_shipped_units' => $partialShippedUnits,
+        'partial_in_stock_units' => $partialInStockUnits,
+        'partial_allocated_units' => $partialAllocatedUnits,
+        'partial_reserved_units' => $partialReservedUnits,
+        'partial_available_to_ship_units' => $partialAvailableToShipUnits,
+        'partial_unshipped_net_weight_kg' => $partialUnshippedNetWeightKg,
+        'partial_allocated_net_weight_kg' => $partialAllocatedNetWeightKg,
+        'partial_reserved_net_weight_kg' => $partialReservedNetWeightKg,
+        'partial_available_to_ship_net_weight_kg' => $partialAvailableToShipNetWeightKg,
+        'partial_shipped_net_weight_kg' => $partialShippedNetWeightKg,
+        'final_received_net_weight_kg' => $finalReceivedNetWeightKg,
+        'final_received_units' => $finalReceivedUnits,
+        'shortage_net_weight_kg' => $shortageNetWeightKg,
+        'shortage_units' => $shortageUnits,
+        'shortage_reason_code' => $workOrder['shortage_reason_code'] ?? null,
+        'shortage_notes' => $workOrder['shortage_notes'] ?? null,
+        'shortage_confirmed_by' => isset($workOrder['shortage_confirmed_by']) ? (int)$workOrder['shortage_confirmed_by'] : null,
+        'shortage_confirmed_at' => $workOrder['shortage_confirmed_at'] ?? null,
+        'balance_difference_net_weight_kg' => round(
+            $expectedNetWeightKg - $partialReceivedNetWeightKg - $finalReceivedNetWeightKg - $shortageNetWeightKg,
+            2
+        ),
+    ];
 }
 
 /**

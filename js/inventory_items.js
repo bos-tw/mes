@@ -558,6 +558,9 @@ function renderTable(items) {
             const receiptTypeBadge = receiptType === 'partial'
                 ? '<span class="inventory-receipt-badge partial">部分入庫</span>'
                 : (receiptType === 'final' ? '<span class="inventory-receipt-badge final">最終補入</span>' : '');
+            const partialReceiptTrace = receiptType === 'partial' && item.partial_receipt_number
+                ? `<div class="text-muted small">來源單號：${escapeHtml(item.partial_receipt_number)} / ${escapeHtml(item.partial_receipt_source_label || '一般工單')}</div>`
+                : '';
 
             // 客戶名稱處理（停用顯示）
             const customerIsActive = item.customer_is_active !== 0 && item.customer_is_active !== '0' && item.customer_is_active !== false;
@@ -586,7 +589,7 @@ function renderTable(items) {
 
             return `
             <tr data-id="${item.id}">
-                <td><strong>${escapeHtml(item.inventory_number) || '-'}</strong>${receiptTypeBadge}</td>
+                <td><strong>${escapeHtml(item.inventory_number) || '-'}</strong>${receiptTypeBadge}${partialReceiptTrace}</td>
                 <td>${escapeHtml(item.work_order_number) || '-'}</td>
                 <td>${customerDisplay}</td>
                 <td>${escapeHtml(item.customer_batch_number) || '-'}</td>
@@ -665,6 +668,8 @@ function renderTable(items) {
         if (!elements.detailContent) return;
 
         const { item, transactions, shipping_history: shippingHistory } = data;
+        const receiptTypeLabel = escapeHtml(item.receipt_type_label || '一般入庫');
+        const formatWeightUnits = (netWeightKg, units) => `${Number(netWeightKg || 0).toFixed(2)} kg / ${formatNumber(units || 0)} 支`;
 
         elements.detailContent.innerHTML = `
             <dl class="detail-list inventory-detail-list">
@@ -684,6 +689,10 @@ function renderTable(items) {
                     <dt>質量狀態</dt>
                     <dd><span class="status-badge ${getQualityStatusClass(item.quality_status)}">${getQualityStatusLabel(item.quality_status)}</span></dd>
                 </div>
+                <div>
+                    <dt>入庫類型</dt>
+                    <dd>${receiptTypeLabel}</dd>
+                </div>
             </dl>
 
             <div class="detail-section">
@@ -692,6 +701,22 @@ function renderTable(items) {
                     <div>
                         <dt>生產工單</dt>
                         <dd><strong>${escapeHtml(item.work_order_number) || '-'}</strong></dd>
+                    </div>
+                    <div>
+                        <dt>部分入庫單號</dt>
+                        <dd>${escapeHtml(item.partial_receipt_number) || '-'}</dd>
+                    </div>
+                    <div>
+                        <dt>部分入庫來源</dt>
+                        <dd>${escapeHtml(item.partial_receipt_source_label) || '-'}</dd>
+                    </div>
+                    <div>
+                        <dt>部分入庫狀態</dt>
+                        <dd>${escapeHtml(item.partial_receipt_status_label) || '-'}</dd>
+                    </div>
+                    <div>
+                        <dt>部分入庫建立時間</dt>
+                        <dd>${formatDateTime(item.partial_receipt_created_at)}</dd>
                     </div>
                     <div>
                         <dt>訂單號碼</dt>
@@ -713,8 +738,62 @@ function renderTable(items) {
                         <dt>內部批號</dt>
                         <dd>${escapeHtml(item.internal_lot_number) || '-'}</dd>
                     </div>
+                    <div>
+                        <dt>部分入庫載具</dt>
+                        <dd>${escapeHtml(item.partial_receipt_shipping_tool_details) || '-'}</dd>
+                    </div>
+                    <div>
+                        <dt>部分入庫參考載具總重</dt>
+                        <dd>${item.partial_receipt_tool_total_weight_kg !== null && item.partial_receipt_tool_total_weight_kg !== undefined ? `${Number(item.partial_receipt_tool_total_weight_kg).toFixed(3)} kg` : '-'}</dd>
+                    </div>
                 </dl>
             </div>
+
+            ${(item.receipt_type === 'partial' && item.partial_receipt_tool_breakdown) ? `
+            <div class="detail-section">
+                <h4>部分入庫載具明細</h4>
+                <div class="detail-note-stack">${escapeHtml(String(item.partial_receipt_tool_breakdown || '-')).replace(/\n/g, '<br>')}</div>
+            </div>
+            ` : ''}
+
+            ${item.receipt_type === 'partial' ? `
+            <div class="detail-section">
+                <h4>部分入庫出貨追蹤</h4>
+                <dl class="detail-list inventory-detail-list">
+                    <div>
+                        <dt>原始部分入庫</dt>
+                        <dd><strong>${escapeHtml(formatWeightUnits(item.partial_receipt_original_net_weight_kg, item.partial_receipt_original_units))}</strong></dd>
+                    </div>
+                    <div>
+                        <dt>目前未出貨</dt>
+                        <dd><strong>${escapeHtml(formatWeightUnits(item.partial_receipt_unshipped_net_weight_kg, item.partial_receipt_unshipped_units))}</strong></dd>
+                    </div>
+                    <div>
+                        <dt>可再出貨</dt>
+                        <dd>${escapeHtml(formatWeightUnits(item.partial_receipt_available_to_ship_net_weight_kg, item.partial_receipt_available_to_ship_units))}</dd>
+                    </div>
+                    <div>
+                        <dt>待出貨</dt>
+                        <dd>${escapeHtml(formatWeightUnits(item.partial_receipt_allocated_pending_ship_net_weight_kg, item.partial_receipt_allocated_pending_ship_units))}</dd>
+                    </div>
+                    <div>
+                        <dt>保留中</dt>
+                        <dd>${escapeHtml(formatWeightUnits(item.partial_receipt_reserved_net_weight_kg, item.partial_receipt_reserved_units))}</dd>
+                    </div>
+                    <div>
+                        <dt>累計已出貨</dt>
+                        <dd>${escapeHtml(formatWeightUnits(item.partial_receipt_shipped_net_weight_kg, item.partial_receipt_shipped_units))}</dd>
+                    </div>
+                </dl>
+            </div>
+            ` : ''}
+
+            ${(item.receipt_type === 'partial' && item.partial_receipt_notes) ? `
+            <div class="detail-section">
+                <h4>部分入庫備註</h4>
+                <div class="detail-note-stack">${escapeHtml(item.partial_receipt_notes).replace(/\n/g, '<br>')}</div>
+            </div>
+            ` : ''}
 
             <div class="detail-section">
                 <h4>數量資訊</h4>
@@ -1200,6 +1279,9 @@ function renderTable(items) {
             if (receiptLabel) {
                 elements.shippingModal.querySelector('[data-shipping-inventory-number]').textContent = `${item.inventory_number || '-'} ${receiptLabel}`;
             }
+            if (receiptType === 'partial' && item.partial_receipt_number) {
+                elements.shippingModal.querySelector('[data-shipping-product-name]').textContent = `${item.screening_item_name || '-'} / ${item.partial_receipt_number}`;
+            }
 
             const availableQty = parseInt(item.quantity_on_hand) - parseInt(item.quantity_allocated || 0);
             elements.shippingModal.querySelector('[data-shipping-available-qty]').textContent = formatNumber(availableQty);
@@ -1372,8 +1454,28 @@ function renderTable(items) {
         }
     }
 
+    function clearInventoryModalFormFields() {
+        if (!elements.modalForm) return;
+        const fields = elements.modalForm.querySelectorAll('[name]');
+        fields.forEach((field) => {
+            if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLTextAreaElement) && !(field instanceof HTMLSelectElement)) {
+                return;
+            }
+            if (field instanceof HTMLSelectElement) {
+                field.value = '';
+                return;
+            }
+            if (field.type === 'checkbox' || field.type === 'radio') {
+                field.checked = false;
+                return;
+            }
+            field.value = '';
+        });
+    }
+
     function populateForm(item) {
         if (!elements.modalForm) return;
+        clearInventoryModalFormFields();
 
         // Populate all form fields
         Object.keys(item).forEach(key => {
@@ -1807,6 +1909,7 @@ function renderTable(items) {
     function getRefTypeLabel(refType) {
         const labels = {
             'work_order': '生產工單',
+            'work_order_partial_receipt': '部分入庫',
             'shipping_order': '出貨單',
             'return_order': '退貨單',
             'adjustment': '庫存調整',

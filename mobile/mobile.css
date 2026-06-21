@@ -401,6 +401,55 @@ body.mobile-app-page {
     resize: vertical;
 }
 
+.mobile-partial-tools-empty {
+    padding: 12px;
+    border: 1px dashed #cbd5e1;
+    background: #f8fafc;
+    color: var(--color-text-muted);
+    font-size: var(--font-sm);
+}
+
+.mobile-partial-tools-list,
+.mobile-partial-tools-summary {
+    display: grid;
+    gap: 10px;
+}
+
+.mobile-partial-tool-row {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #d7e0ea;
+    background: #fbfdff;
+}
+
+.mobile-partial-tool-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #1f3556;
+    font-weight: 600;
+}
+
+.mobile-partial-tool-check input {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+}
+
+.mobile-partial-tool-meta {
+    color: var(--color-text-muted);
+    font-size: var(--font-sm);
+}
+
+.mobile-partial-tool-qty {
+    margin-top: 2px;
+}
+
+.mobile-text-danger {
+    color: #b42318 !important;
+}
+
 .mobile-filter-actions,
 .mobile-inline-actions,
 .mobile-card-actions,
@@ -663,6 +712,12 @@ body.mobile-app-page {
 .mobile-info-list {
     display: grid;
     gap: 10px;
+}
+
+.mobile-inline-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
 }
 
 .mobile-info-card strong,

@@ -1044,7 +1044,14 @@ function renderTable(items) {
 
                                         return `
                                     <tr class="${rowClass}">
-                                        <td>${escapeHtml(item.inventory_number) || '-'}</td>
+                                        <td>
+                                            <div>${escapeHtml(item.inventory_number) || '-'}</div>
+                                            ${
+                                                item.partial_receipt_number
+                                                    ? `<div class="text-muted small">來源：${escapeHtml(item.partial_receipt_number)} / ${escapeHtml(item.partial_receipt_source_label || '一般工單')}</div>`
+                                                    : ''
+                                            }
+                                        </td>
                                         <td>${escapeHtml(item.screening_item_name || item.product_name) || '-'}</td>
                                         <td>${formatNumber(item.shipped_quantity)}</td>
                                         <td>${totalReturned > 0 ? `<span class="text-danger">${formatNumber(totalReturned)}</span>` : '-'}</td>
@@ -1199,6 +1206,20 @@ function renderTable(items) {
                         <span class="detail-label">庫存編號</span>
                         <span class="detail-value">${escapeHtml(item.inventory_number) || '-'}</span>
                     </div>
+                    ${
+                        item.partial_receipt_number
+                            ? `
+                                <div class="detail-item">
+                                    <span class="detail-label">來源部分入庫</span>
+                                    <span class="detail-value">${escapeHtml(item.partial_receipt_number)} / ${escapeHtml(item.partial_receipt_source_label || '一般工單')}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">出貨載具</span>
+                                    <span class="detail-value">${escapeHtml(item.partial_receipt_shipping_tool_details || '-')}</span>
+                                </div>
+                            `
+                            : ''
+                    }
                     <div class="detail-item">
                         <span class="detail-label">入庫類型</span>
                         <span class="detail-value">${escapeHtml(receiptLabel)}</span>
@@ -1820,6 +1841,7 @@ function renderTable(items) {
                                        data-shipped-unit="${escapeHtml(item.shipped_unit || '支')}">
                             </td>
                             <td>${escapeHtml(item.inventory_number) || '-'}</td>
+                            <td>${item.partial_receipt_number ? `${escapeHtml(item.partial_receipt_number)} / ${escapeHtml(item.partial_receipt_source_label || '一般工單')}` : '-'}</td>
                             <td>${escapeHtml(item.screening_item_name) || '-'}</td>
                             <td>${formatNumber(item.shipped_quantity)}</td>
                             <td>${formatNumber(item.total_returned || 0)}</td>
@@ -1858,7 +1880,7 @@ function renderTable(items) {
                         });
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">沒有可退貨的品項</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">沒有可退貨的品項</td></tr>';
                 }
 
                 elems.createReturnModal.classList.remove('hidden');
@@ -2021,6 +2043,16 @@ function renderTable(items) {
                         <span class="detail-label">庫存編號</span>
                         <span class="detail-value">${escapeHtml(item.inventory_number) || '-'}</span>
                     </div>
+                    ${
+                        item.partial_receipt_number
+                            ? `
+                                <div class="detail-item">
+                                    <span class="detail-label">來源部分入庫</span>
+                                    <span class="detail-value">${escapeHtml(item.partial_receipt_number)} / ${escapeHtml(item.partial_receipt_source_label || '一般工單')}</span>
+                                </div>
+                            `
+                            : ''
+                    }
                     <div class="detail-item">
                         <span class="detail-label">產品名稱</span>
                         <span class="detail-value">${escapeHtml(item.screening_item_name) || '-'}</span>

@@ -34,6 +34,12 @@
         editModalForm: moduleRoot.querySelector('[data-work-orders-edit-form]'),
         partialReceiptModal: moduleRoot.querySelector('[data-work-order-partial-receipt-modal]'),
         partialReceiptForm: moduleRoot.querySelector('[data-partial-receipt-form]'),
+        partialReceiptRows: moduleRoot.querySelector('[data-work-order-partial-receipts-rows]'),
+        balanceAlert: moduleRoot.querySelector('[data-work-order-balance-alert]'),
+        completionModal: moduleRoot.querySelector('[data-work-order-completion-modal]'),
+        completionForm: moduleRoot.querySelector('[data-work-order-completion-form]'),
+        reversePartialModal: moduleRoot.querySelector('[data-work-order-reverse-partial-modal]'),
+        reversePartialForm: moduleRoot.querySelector('[data-work-order-reverse-partial-form]'),
         createButton: moduleRoot.querySelector('.content-header [data-action="create"]'),
         printButton: moduleRoot.querySelector('.content-header [data-action="print"]'),
         batchPrintButton: moduleRoot.querySelector('.content-header [data-action="batch-print"]'),
@@ -79,6 +85,8 @@
         editingInventoryItemId: null,
         currentWorkOrder: null,
         partialReceiptContext: null,
+        completionContext: null,
+        reversePartialContext: null,
         orderItemDetails: null,
         firstPieceDimensions: null,
         images: [],
@@ -406,6 +414,81 @@
         }
     }
 
+    function hasRelaxedWorkOrderPermission(permissionName) {
+        const permissions = Array.isArray(state.currentUser?.permissions) ? state.currentUser.permissions : [];
+        if (permissions.length === 0) {
+            return true;
+        }
+        if (typeof window.hasPermission === 'function') {
+            return window.hasPermission(permissionName);
+        }
+        return permissions.includes(permissionName);
+    }
+
+    function hasAnyRelaxedWorkOrderPermission(permissionNames) {
+        if (!Array.isArray(permissionNames) || permissionNames.length === 0) {
+            return true;
+        }
+        return permissionNames.some((permissionName) => hasRelaxedWorkOrderPermission(permissionName));
+    }
+
+    function getPartialReceiptLockMessage(workOrder = null) {
+        const currentWorkOrder = workOrder || state.currentWorkOrder || {};
+        if (!hasAnyRelaxedWorkOrderPermission(['work_orders.partial_receipt', 'manage_work_orders'])) {
+            return '目前帳號沒有工單部分入庫權限。';
+        }
+        if (currentWorkOrder.lifecycle_locked == 1 || currentWorkOrder.completed_at) {
+            return '此工單已完成，不能再建立部分入庫。若需更正，請先退回工單並處理既有庫存。';
+        }
+        if (currentWorkOrder.has_inventory == 1 || state.editingHasInventory) {
+            return '此工單已有正式庫存，不能再建立部分入庫。若需更正，請先退回工單並處理既有庫存。';
+        }
+        const statusKey = String(currentWorkOrder.status_key || '').trim();
+        if (!['in_progress', 'paused'].includes(statusKey)) {
+            return '只有進行中或暫停中的工單可以建立部分入庫。';
+        }
+        return '';
+    }
+
+    function roundWorkOrderWeight(value, digits = 2) {
+        const numeric = Number(value) || 0;
+        return Number(numeric.toFixed(digits));
+    }
+
+    function calculateWholeUnitsFromWeight(netWeightKg, weightPerUnitG) {
+        const netWeight = Number(netWeightKg) || 0;
+        const unitWeight = Number(weightPerUnitG) || 0;
+        if (netWeight <= 0 || unitWeight <= 0) {
+            return 0;
+        }
+        return Math.max(Math.floor(((netWeight * 1000) / unitWeight) + 0.000001), 0);
+    }
+
+    function formatWeightUnits(netWeightKg, units, digits = 2) {
+        return `${roundWorkOrderWeight(netWeightKg, digits).toFixed(digits)} kg / ${formatNumber(Math.round(Number(units) || 0))} 支`;
+    }
+
+    function getShortageReasonLabel(reasonCode) {
+        const labels = {
+            material_loss: '遺失 / 散落',
+            mixed_material: '混料 / 混批',
+            damaged: '破損 / 報廢',
+            count_error: '計數 / 重量誤差',
+            other: '其他',
+        };
+        return labels[String(reasonCode || '').trim()] || '';
+    }
+
+    function mergeWorkOrderOperationalNote(baseNote, label, extraNote) {
+        const baseText = String(baseNote || '').trim();
+        const nextText = String(extraNote || '').trim();
+        if (!nextText) {
+            return baseText || undefined;
+        }
+        const stampedNote = `[${label}] ${nextText}`;
+        return baseText ? `${baseText}\n${stampedNote}` : stampedNote;
+    }
+
     function toggleSectionBody(button, body) {
         if (!button || !body) {
             return;
@@ -620,7 +703,7 @@
             production_date: record.production_date || '',
             production_time: record.production_time || '',
             machine_id: record.machine_id || '',
-            machine_type: record.machine_type || '',
+            machine_type: getMachineCapabilityName(record.machine_id) || record.machine_type || '',
             operator_name: record.operator_name || record.employee_name || state.currentUser?.name || '',
             notes: record.notes || '',
             production_source_mode: record.production_source_mode || 'preset'
@@ -790,7 +873,7 @@
                 production_date: row.querySelector('[name="pr_date[]"]')?.value || '',
                 production_time: row.querySelector('[name="pr_time[]"]')?.value || '',
                 machine_id: machineSelect?.value || '',
-                machine_type: machineTypeInput?.value || '',
+            machine_type: machineTypeInput?.value || getMachineCapabilityName(machineSelect?.value || '') || '',
                 operator_name: operatorInput?.value || state.currentUser?.name || '',
                 notes: row.querySelector('[name="pr_notes[]"]')?.value || '',
                 production_source_mode: activeMode
@@ -858,7 +941,7 @@
                         ${getMachineOptionsHtml(record.machine_id)}
                     </select>
                 </td>
-                <td><input type="text" name="pr_machine_type[]" value="${escapeHtml(record.machine_type || '')}" readonly class="form-control-plaintext"></td>
+                <td><input type="text" name="pr_machine_type[]" value="${escapeHtml(getMachineCapabilityName(record.machine_id) || record.machine_type || '')}" readonly class="form-control-plaintext"></td>
                 <td>
                     <span class="current-user-name">${escapeHtml(record.operator_name || state.currentUser?.name || '')}</span>
                     <input type="hidden" name="pr_operator_name[]" value="${escapeHtml(record.operator_name || state.currentUser?.name || '')}">
@@ -943,7 +1026,7 @@
             production_date: '',
             production_time: '',
             machine_id: run.machine_id || '',
-            machine_type: getMachineDisplayName(run.machine_id || '') || '',
+            machine_type: getMachineCapabilityName(run.machine_id || '') || '',
             notes: ''
         };
     }
@@ -1016,13 +1099,26 @@
         state.machines.forEach(machine => {
             const id = String(machine.id);
             const selected = id === String(selectedValue || '') ? ' selected' : '';
+            const capability = machine.machine_capability_name || machine.capability_names || machine.machine_capability_code || '';
             const labelParts = [
                 machine.machine_number ? String(machine.machine_number) : '',
                 machine.name ? String(machine.name) : ''
             ].filter(Boolean);
-            options.push(`<option value="${escapeHtml(id)}"${selected}>${escapeHtml(labelParts.join(' - ') || id)}</option>`);
+            options.push(`<option value="${escapeHtml(id)}" data-capability="${escapeHtml(capability)}" data-type="${escapeHtml(capability)}"${selected}>${escapeHtml(labelParts.join(' - ') || id)}</option>`);
         });
         return options.join('');
+    }
+
+    function getMachineCapabilityName(machineId) {
+        const id = String(machineId || '');
+        if (!id) {
+            return '';
+        }
+        const machine = state.machines.find(item => String(item.id) === id);
+        if (!machine) {
+            return '';
+        }
+        return machine.machine_capability_name || machine.capability_names || machine.machine_capability_code || '';
     }
 
     function getMachineDisplayName(machineId) {
@@ -1035,6 +1131,30 @@
             return '';
         }
         return [machine.machine_number || '', machine.name || ''].filter(Boolean).join(' - ') || id;
+    }
+
+    function syncProductionRecordMachineCapability(select) {
+        if (!select) {
+            return;
+        }
+        const option = select.options[select.selectedIndex];
+        const selectedMachineId = select.value || '';
+        const capability = option?.getAttribute('data-capability')
+            || option?.getAttribute('data-type')
+            || getMachineCapabilityName(selectedMachineId)
+            || '';
+        const row = select.closest('tr');
+        const typeInput = row?.querySelector('[name="pr_machine_type[]"]');
+        if (typeInput) {
+            typeInput.value = capability;
+            return;
+        }
+
+        const form = select.closest('form');
+        const standaloneCapabilityInput = form?.querySelector('[data-field="pr-machine-type"], [name="machine_type"]');
+        if (standaloneCapabilityInput) {
+            standaloneCapabilityInput.value = capability;
+        }
     }
 
     function getEmployeeOptionsHtml(selectedValue = '') {
@@ -1575,7 +1695,7 @@
                 run.production_record_buffers[mode] = (run.production_record_buffers[mode] || []).map((record) => ({
                     ...record,
                     machine_id: selectedMachineId,
-                    machine_type: getMachineDisplayName(selectedMachineId) || ''
+                    machine_type: getMachineCapabilityName(selectedMachineId) || ''
                 }));
             });
             renderSplitMachineRuns(isEditMode);
@@ -1689,7 +1809,7 @@
             if (!targetRecords[recordIndex]) return;
             targetRecords[recordIndex][recordField.dataset.splitRecordField] = recordField.value;
             targetRecords[recordIndex].machine_id = run.machine_id || '';
-            targetRecords[recordIndex].machine_type = getMachineDisplayName(run.machine_id || '') || '';
+            targetRecords[recordIndex].machine_type = getMachineCapabilityName(run.machine_id || '') || '';
             if (recordField.dataset.splitRecordField === 'weight_kg' || recordField.dataset.splitRecordField === 'tool_weight_kg') {
                 updateMetricsPanel(isEditMode);
             }
@@ -2027,6 +2147,9 @@
             });
 
             elements.createModalForm.addEventListener('change', (e) => {
+                if (e.target.matches('[name="pr_machine_id[]"], [data-field="pr-machine"]')) {
+                    syncProductionRecordMachineCapability(e.target);
+                }
                 handleSplitMachineInput(e, false);
             });
 
@@ -2172,6 +2295,11 @@
                     toggleSectionBody(scheduleToggleButton, elements.editModalForm.querySelector('[data-edit-schedule-section]'));
                     return;
                 }
+                const partialHistoryToggleButton = e.target.closest('[data-action="toggle-partial-history-section"]');
+                if (partialHistoryToggleButton) {
+                    toggleSectionBody(partialHistoryToggleButton, elements.editModalForm.querySelector('[data-work-order-partial-history-section]'));
+                    return;
+                }
                 const inspectionToggleButton = e.target.closest('[data-action="toggle-inspection-section"]');
                 if (inspectionToggleButton) {
                     toggleSectionBody(inspectionToggleButton, elements.editModalForm.querySelector('[data-edit-inspection-section]'));
@@ -2255,10 +2383,34 @@
                     return;
                 }
                 if (e.target.closest('[data-action="create-work-order-partial-receipt"]')) {
+                    const partialReceiptButton = e.target.closest('[data-action="create-work-order-partial-receipt"]');
+                    const lockMessage = partialReceiptButton?.dataset.lockMessage || '';
+                    if (partialReceiptButton?.getAttribute('aria-disabled') === 'true' && lockMessage) {
+                        showModalAlert('error', lockMessage, false, true);
+                        return;
+                    }
                     await createPartialReceiptForWorkOrder();
                     return;
                 }
+                if (e.target.closest('[data-action="view-partial-receipt-inventory"]')) {
+                    openInventoryItemDetail(e.target.closest('[data-action="view-partial-receipt-inventory"]')?.dataset.inventoryId);
+                    return;
+                }
+                if (e.target.closest('[data-action="view-partial-receipt-shipping"]')) {
+                    openShippingOrderDetail(e.target.closest('[data-action="view-partial-receipt-shipping"]')?.dataset.shippingOrderId);
+                    return;
+                }
+                if (e.target.closest('[data-action="reverse-work-order-partial-receipt"]')) {
+                    await openReversePartialReceiptModal(e.target.closest('[data-action="reverse-work-order-partial-receipt"]')?.dataset.partialReceiptId);
+                    return;
+                }
                 await handleSplitMachineAction(e, true);
+            });
+
+            elements.editModalForm.addEventListener('change', (e) => {
+                if (e.target.matches('[name="pr_machine_id[]"], [data-field="pr-machine"]')) {
+                    syncProductionRecordMachineCapability(e.target);
+                }
             });
 
             // 排程日期星期顯示
@@ -2314,9 +2466,27 @@
 
         if (elements.partialReceiptForm && elements.partialReceiptModal) {
             elements.partialReceiptForm.addEventListener('submit', handlePartialReceiptSubmit);
+            elements.partialReceiptForm.addEventListener('change', handlePartialReceiptFormMutation);
+            elements.partialReceiptForm.addEventListener('input', handlePartialReceiptFormMutation);
             elements.partialReceiptModal.addEventListener('click', (event) => {
                 if (event.target === elements.partialReceiptModal || event.target.closest('[data-action="close-partial-receipt-modal"]')) {
                     closePartialReceiptModal();
+                }
+            });
+        }
+        if (elements.completionForm && elements.completionModal) {
+            elements.completionForm.addEventListener('submit', handleCompletionModalSubmit);
+            elements.completionModal.addEventListener('click', (event) => {
+                if (event.target === elements.completionModal || event.target.closest('[data-action="close-work-order-completion-modal"]')) {
+                    closeCompletionModal(null);
+                }
+            });
+        }
+        if (elements.reversePartialForm && elements.reversePartialModal) {
+            elements.reversePartialForm.addEventListener('submit', handleReversePartialReceiptSubmit);
+            elements.reversePartialModal.addEventListener('click', (event) => {
+                if (event.target === elements.reversePartialModal || event.target.closest('[data-action="close-work-order-reverse-partial-modal"]')) {
+                    closeReversePartialModal();
                 }
             });
         }
@@ -2382,6 +2552,12 @@
                 handleSelectAll(e.target.checked);
             });
         }
+
+        moduleRoot.addEventListener('change', (event) => {
+            if (event.target.matches('[data-field="pr-machine"]')) {
+                syncProductionRecordMachineCapability(event.target);
+            }
+        });
 
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') {
@@ -2521,6 +2697,7 @@
                 state.machines = result.data;
                 populateSelect('[name="machine_id"]', result.data, 'id', 'name');
                 populateSelect('[data-field="pr-machine"]', result.data, 'id', 'name');
+                moduleRoot.querySelectorAll('[name="pr_machine_id[]"], [data-field="pr-machine"]').forEach(syncProductionRecordMachineCapability);
                 updateFilterSummary();
             }
         } catch (error) {
@@ -2840,6 +3017,342 @@
         });
     }
 
+    function openInventoryItemDetail(inventoryItemId) {
+        const normalizedId = Number.parseInt(inventoryItemId, 10) || 0;
+        if (normalizedId <= 0) {
+            showModalAlert('error', '找不到對應的庫存項目。', false, true);
+            return;
+        }
+        if (typeof window.openTab !== 'function') {
+            showModalAlert('error', '無法切換到庫存項目模組，請檢查系統設定。', false, true);
+            return;
+        }
+        window.openTab('inventory_items', '庫存項目', 'modules/inventory_items.html', {
+            context: {
+                inventoryItemId: normalizedId
+            }
+        });
+    }
+
+    function openShippingOrderDetail(shippingOrderId) {
+        const normalizedId = Number.parseInt(shippingOrderId, 10) || 0;
+        if (normalizedId <= 0) {
+            showModalAlert('error', '找不到對應的出貨單。', false, true);
+            return;
+        }
+        if (typeof window.openTab !== 'function') {
+            showModalAlert('error', '無法切換到出貨單模組，請檢查系統設定。', false, true);
+            return;
+        }
+        window.openTab('shipping_orders', '出貨管理', 'modules/shipping_orders.html', {
+            context: {
+                shippingOrderId: normalizedId
+            }
+        });
+    }
+
+    function calculateCurrentProducedNetWeightKg() {
+        if (!elements.editModalForm) {
+            return 0;
+        }
+
+        const workOrderType = elements.editModalForm.querySelector('[name="work_order_type"]')?.value || 'normal';
+        if (workOrderType === 'split') {
+            return roundWorkOrderWeight(getSplitRuns(true).reduce((sum, run) => {
+                return sum + (parseFloat(run.completed_net_weight_kg) || 0);
+            }, 0));
+        }
+
+        syncProductionRecordBufferFromForm(true);
+        const activeMode = getProductionRecordMode(true);
+        const activeRecords = getProductionRecordBuffers(true)[activeMode] || [];
+        const totalProductionWeight = activeRecords.reduce((sum, record) => sum + (parseFloat(record.weight_kg) || 0), 0);
+        const totalToolWeight = activeRecords.reduce((sum, record) => sum + (parseFloat(record.tool_weight_kg) || 0), 0);
+        return roundWorkOrderWeight(Math.max(totalProductionWeight - totalToolWeight, 0));
+    }
+
+    function buildCompletionPreview() {
+        const workOrder = state.currentWorkOrder || {};
+        const summary = workOrder.partial_receipt_summary || {};
+        const expectedNetWeightKg = roundWorkOrderWeight(summary.expected_net_weight_kg ?? workOrder.total_weight_kg ?? 0);
+        const weightPerUnitG = Number(workOrder.weight_per_unit_g || state.orderItemDetails?.weight_per_unit_g || 0);
+        const producedNetWeightKg = calculateCurrentProducedNetWeightKg();
+        const producedUnits = calculateWholeUnitsFromWeight(producedNetWeightKg, weightPerUnitG);
+        const partialReceivedNetWeightKg = roundWorkOrderWeight(summary.partial_received_net_weight_kg || 0);
+        const partialReceivedUnits = Math.round(Number(summary.partial_received_units) || 0);
+        const partialShippedUnits = Math.round(Number(summary.partial_shipped_units) || 0);
+        const partialAllocatedUnits = Math.round(Number(summary.partial_allocated_units) || 0);
+        const partialAvailableToShipUnits = Math.round(Number(summary.partial_available_to_ship_units) || 0);
+        const partialInStockUnits = Math.round(Number(summary.partial_in_stock_units) || 0);
+        const finalReceivedNetWeightKg = roundWorkOrderWeight(Math.max(producedNetWeightKg - partialReceivedNetWeightKg, 0));
+        const finalReceivedUnits = calculateWholeUnitsFromWeight(finalReceivedNetWeightKg, weightPerUnitG);
+        const shortageNetWeightKg = roundWorkOrderWeight(Math.max(expectedNetWeightKg - producedNetWeightKg, 0));
+        const shortageUnits = calculateWholeUnitsFromWeight(shortageNetWeightKg, weightPerUnitG);
+        const balanceDifferenceNetWeightKg = roundWorkOrderWeight(
+            expectedNetWeightKg - partialReceivedNetWeightKg - finalReceivedNetWeightKg - shortageNetWeightKg
+        );
+
+        const warnings = [];
+        const blockingErrors = [];
+        if (producedNetWeightKg - expectedNetWeightKg > 0.0001) {
+            blockingErrors.push(`現場已生產 ${producedNetWeightKg.toFixed(2)} kg，已超過工單預計 ${expectedNetWeightKg.toFixed(2)} kg。`);
+        }
+        if (partialReceivedNetWeightKg - producedNetWeightKg > 0.0001) {
+            blockingErrors.push(`累計部分入庫 ${partialReceivedNetWeightKg.toFixed(2)} kg 已超過現場已生產 ${producedNetWeightKg.toFixed(2)} kg。`);
+        }
+        if (partialShippedUnits > partialReceivedUnits) {
+            blockingErrors.push(`部分入庫已出貨 ${formatNumber(partialShippedUnits)} 支，已超過有效部分入庫 ${formatNumber(partialReceivedUnits)} 支。`);
+        }
+        if (partialInStockUnits + partialShippedUnits > partialReceivedUnits) {
+            warnings.push(`部分入庫已出貨 ${formatNumber(partialShippedUnits)} 支 + 尚在庫 ${formatNumber(partialInStockUnits)} 支，已高於有效部分入庫 ${formatNumber(partialReceivedUnits)} 支，請確認庫存帳。`);
+        }
+        if (Math.abs(balanceDifferenceNetWeightKg) > 0.0001) {
+            warnings.push(`平衡差異為 ${balanceDifferenceNetWeightKg.toFixed(2)} kg，請確認部分入庫、最終補入與短缺是否一致。`);
+        }
+
+        return {
+            expected_net_weight_kg: expectedNetWeightKg,
+            expected_units: calculateWholeUnitsFromWeight(expectedNetWeightKg, weightPerUnitG),
+            produced_net_weight_kg: producedNetWeightKg,
+            produced_units: producedUnits,
+            partial_received_net_weight_kg: partialReceivedNetWeightKg,
+            partial_received_units: partialReceivedUnits,
+            partial_shipped_units: partialShippedUnits,
+            partial_allocated_units: partialAllocatedUnits,
+            partial_available_to_ship_units: partialAvailableToShipUnits,
+            partial_in_stock_units: partialInStockUnits,
+            final_received_net_weight_kg: finalReceivedNetWeightKg,
+            final_received_units: finalReceivedUnits,
+            shortage_net_weight_kg: shortageNetWeightKg,
+            shortage_units: shortageUnits,
+            balance_difference_net_weight_kg: balanceDifferenceNetWeightKg,
+            warnings,
+            blockingErrors,
+        };
+    }
+
+    function setBalanceMetricValue(metricName, value, isDanger = false) {
+        const element = moduleRoot.querySelector(`[data-balance-metric="${metricName}"]`);
+        if (!element) {
+            return;
+        }
+        element.textContent = value;
+        element.classList.toggle('text-danger', !!isDanger);
+    }
+
+    function renderWorkOrderBalanceSummary(summary) {
+        const data = summary || {};
+        setBalanceMetricValue('expected', formatWeightUnits(data.expected_net_weight_kg || 0, data.expected_units || 0));
+        setBalanceMetricValue('produced', formatWeightUnits(data.produced_net_weight_kg || 0, data.produced_units || 0));
+        setBalanceMetricValue('partial_received', formatWeightUnits(data.partial_received_net_weight_kg || 0, data.partial_received_units || 0));
+        setBalanceMetricValue('partial_shipped', formatWeightUnits(data.partial_shipped_net_weight_kg || 0, data.partial_shipped_units || 0));
+        setBalanceMetricValue('partial_allocated', formatWeightUnits(data.partial_allocated_net_weight_kg || 0, data.partial_allocated_units || 0));
+        setBalanceMetricValue('partial_available_to_ship', formatWeightUnits(data.partial_available_to_ship_net_weight_kg || 0, data.partial_available_to_ship_units || 0));
+        setBalanceMetricValue('partial_in_stock', formatWeightUnits(data.partial_unshipped_net_weight_kg || 0, data.partial_in_stock_units || 0));
+        setBalanceMetricValue('final_received', formatWeightUnits(data.final_received_net_weight_kg || 0, data.final_received_units || 0));
+        setBalanceMetricValue('shortage', formatWeightUnits(data.shortage_net_weight_kg || 0, data.shortage_units || 0));
+        setBalanceMetricValue(
+            'balance_difference',
+            `${roundWorkOrderWeight(data.balance_difference_net_weight_kg || 0).toFixed(2)} kg`,
+            Math.abs(Number(data.balance_difference_net_weight_kg) || 0) > 0.0001
+        );
+    }
+
+    function renderWorkOrderBalanceAlert(messages, type = 'warning') {
+        if (!elements.balanceAlert) {
+            return;
+        }
+        const list = Array.isArray(messages) ? messages.filter(Boolean) : [];
+        if (list.length === 0) {
+            elements.balanceAlert.className = 'work-order-balance-alert hidden';
+            elements.balanceAlert.textContent = '';
+            return;
+        }
+        elements.balanceAlert.className = `work-order-balance-alert ${type === 'error' ? 'error' : 'warning'}`;
+        elements.balanceAlert.innerHTML = list.map((message) => `<div>${escapeHtml(message)}</div>`).join('');
+    }
+
+    function renderPartialReceiptHistory(receipts) {
+        if (!elements.partialReceiptRows) {
+            return;
+        }
+
+        const rows = Array.isArray(receipts) ? receipts : [];
+        if (rows.length === 0) {
+            elements.partialReceiptRows.innerHTML = '<tr class="empty-row"><td colspan="10" class="text-center">尚無部分入庫紀錄</td></tr>';
+            return;
+        }
+
+        const canReversePartialReceipt = hasAnyRelaxedWorkOrderPermission(['work_orders.reverse_partial_receipt', 'manage_work_orders']);
+        const fragment = document.createDocumentFragment();
+
+        const createCell = (text, tagName = 'td', className = '') => {
+            const cell = document.createElement(tagName);
+            if (className) {
+                cell.className = className;
+            }
+            cell.textContent = text;
+            return cell;
+        };
+        const appendSummaryLine = (container, label, value, className = '') => {
+            const line = document.createElement('div');
+            if (className) {
+                line.className = className;
+            }
+            line.textContent = `${label}：${value}`;
+            container.appendChild(line);
+        };
+        const formatShippingToolSummary = (receipt) => {
+            const tools = Array.isArray(receipt.shipping_tools) ? receipt.shipping_tools : [];
+            if (tools.length > 0) {
+                const totalWeight = Number(receipt.shipping_tool_total_weight_kg || 0);
+                return `${formatNumber(tools.length)} 種載具 / ${totalWeight.toFixed(3)} kg`;
+            }
+            return receipt.shipping_tool_details ? '已記錄' : '-';
+        };
+
+        rows.forEach((receipt) => {
+            const shippingLinks = Array.isArray(receipt.shipping_orders) ? receipt.shipping_orders.filter((item) => Number(item.shipping_order_id || 0) > 0) : [];
+            const receiptStatus = String(receipt.receipt_status || 'partial');
+            const receiptStatusLabel = receiptStatus === 'settled'
+                ? '已結清'
+                : (receiptStatus === 'reversed' ? '已沖銷' : '有效');
+            const row = document.createElement('tr');
+            row.dataset.partialReceiptId = String(receipt.id || '');
+
+            const receiptNumberCell = document.createElement('td');
+            const strong = document.createElement('strong');
+            strong.textContent = receipt.receipt_number || `PR-${receipt.id}`;
+            receiptNumberCell.appendChild(strong);
+            row.appendChild(receiptNumberCell);
+            row.appendChild(createCell(formatDateTime(receipt.created_at)));
+            row.appendChild(createCell(receipt.created_by_name || '-'));
+            row.appendChild(createCell(receipt.source_label || '一般工單'));
+            row.appendChild(createCell(formatWeightUnits(receipt.net_weight_kg || 0, receipt.calculated_units || 0)));
+            const shippingToolCell = createCell(formatShippingToolSummary(receipt), 'td', 'partial-receipt-tools-cell');
+            shippingToolCell.title = receipt.shipping_tool_details || '';
+            row.appendChild(shippingToolCell);
+
+            const inventoryCell = document.createElement('td');
+            if (Number(receipt.inventory_item_id || 0) > 0) {
+                const inventoryButton = document.createElement('button');
+                inventoryButton.type = 'button';
+                inventoryButton.className = 'btn ghost small';
+                inventoryButton.dataset.action = 'view-partial-receipt-inventory';
+                inventoryButton.dataset.inventoryId = String(receipt.inventory_item_id);
+                inventoryButton.textContent = '檢視庫存';
+                inventoryCell.appendChild(inventoryButton);
+            } else {
+                const emptyInventory = document.createElement('span');
+                emptyInventory.className = 'text-muted small';
+                emptyInventory.textContent = '無庫存';
+                inventoryCell.appendChild(emptyInventory);
+            }
+            row.appendChild(inventoryCell);
+
+            const shippingCell = document.createElement('td');
+            const shippingSummary = document.createElement('div');
+            appendSummaryLine(
+                shippingSummary,
+                '已出貨',
+                formatWeightUnits(receipt.shipped_net_weight_kg || 0, receipt.quantity_shipped || 0)
+            );
+            appendSummaryLine(
+                shippingSummary,
+                '待出貨',
+                formatWeightUnits(receipt.allocated_net_weight_kg || 0, receipt.quantity_allocated || 0)
+            );
+            appendSummaryLine(
+                shippingSummary,
+                '可再出貨',
+                formatWeightUnits(receipt.available_to_ship_net_weight_kg || 0, receipt.quantity_available_to_ship || 0)
+            );
+            appendSummaryLine(
+                shippingSummary,
+                '未出貨',
+                formatWeightUnits(receipt.unshipped_net_weight_kg || 0, receipt.quantity_on_hand || 0)
+            );
+            shippingCell.appendChild(shippingSummary);
+            const shippingActions = document.createElement('div');
+            shippingActions.className = 'text-muted small';
+            if (shippingLinks.length > 0) {
+                shippingLinks.forEach((shippingOrder) => {
+                    const shippingButton = document.createElement('button');
+                    shippingButton.type = 'button';
+                    shippingButton.className = 'btn ghost small';
+                    shippingButton.dataset.action = 'view-partial-receipt-shipping';
+                    shippingButton.dataset.shippingOrderId = String(shippingOrder.shipping_order_id);
+                    shippingButton.textContent = shippingOrder.shipping_order_number || `出貨單 #${shippingOrder.shipping_order_id}`;
+                    shippingActions.appendChild(shippingButton);
+                });
+            } else {
+                shippingActions.textContent = '尚未出貨';
+            }
+            shippingCell.appendChild(shippingActions);
+            row.appendChild(shippingCell);
+
+            const statusCell = document.createElement('td');
+            const statusWrap = document.createElement('div');
+            const badge = document.createElement('span');
+            badge.className = `status-badge ${receiptStatus === 'reversed' ? 'cancelled' : (receiptStatus === 'settled' ? 'completed' : 'in-progress')}`;
+            badge.textContent = receiptStatusLabel;
+            statusWrap.appendChild(badge);
+            statusCell.appendChild(statusWrap);
+            if (receiptStatus === 'reversed' || receiptStatus === 'settled') {
+                const meta = document.createElement('div');
+                meta.className = 'text-muted small';
+                meta.textContent = receiptStatus === 'reversed'
+                    ? `${formatDateTime(receipt.reversed_at)} / ${receipt.reversed_by_name || '-'}`
+                    : `${formatDateTime(receipt.settled_at)} / ${receipt.settled_by_name || '-'}`;
+                statusCell.appendChild(meta);
+            }
+            row.appendChild(statusCell);
+
+            const actionCell = document.createElement('td');
+            const actionWrap = document.createElement('div');
+            actionWrap.className = 'inline-actions-wrap';
+            if (receiptStatus !== 'reversed' && canReversePartialReceipt) {
+                const reverseButton = document.createElement('button');
+                reverseButton.type = 'button';
+                reverseButton.className = 'btn ghost small danger';
+                reverseButton.dataset.action = 'reverse-work-order-partial-receipt';
+                reverseButton.dataset.partialReceiptId = String(receipt.id || '');
+                reverseButton.textContent = '沖銷';
+                actionWrap.appendChild(reverseButton);
+            } else {
+                const actionNote = document.createElement('span');
+                actionNote.className = 'text-muted small';
+                actionNote.textContent = receiptStatus !== 'reversed' ? '無沖銷權限' : '-';
+                actionWrap.appendChild(actionNote);
+            }
+            actionCell.appendChild(actionWrap);
+            row.appendChild(actionCell);
+            fragment.appendChild(row);
+        });
+
+        elements.partialReceiptRows.replaceChildren(fragment);
+    }
+
+    function refreshWorkOrderBalancePresentation(workOrder) {
+        const currentWorkOrder = workOrder || state.currentWorkOrder || {};
+        const summary = currentWorkOrder.partial_receipt_summary || {};
+        renderWorkOrderBalanceSummary(summary);
+
+        const messages = [];
+        const balanceDiff = Number(summary.balance_difference_net_weight_kg || 0);
+        if (Math.abs(balanceDiff) > 0.0001) {
+            messages.push(`平衡差異 ${balanceDiff.toFixed(2)} kg，請確認部分入庫、最終補入與短缺是否一致。`);
+        }
+        if ((Number(summary.partial_received_net_weight_kg) || 0) - (Number(summary.produced_net_weight_kg) || 0) > 0.0001) {
+            messages.push('有效部分入庫已超過現場已生產重量，結案前必須先處理。');
+        }
+        if ((Number(summary.partial_shipped_units) || 0) > (Number(summary.partial_received_units) || 0)) {
+            messages.push('部分入庫已出貨支數高於有效部分入庫支數，請先檢查出貨帳。');
+        }
+        renderWorkOrderBalanceAlert(messages, messages.length > 0 ? 'error' : 'warning');
+        renderPartialReceiptHistory(currentWorkOrder.partial_receipts || []);
+    }
+
     async function submitPartialReceipt(payload) {
         try {
             const response = await fetch('api/work_orders/partial_receipt.php', {
@@ -2851,14 +3364,15 @@
 
             if (!result.success) {
                 if (elements.partialReceiptModal && !elements.partialReceiptModal.classList.contains('hidden')) {
-                    showPartialReceiptModalAlert(result.message || '部分完工入庫失敗。');
+                    showPartialReceiptModalAlert(result.message || '部分入庫失敗。');
                 } else {
-                    showModalAlert('error', result.message || '部分完工入庫失敗。', false, true);
+                    showModalAlert('error', result.message || '部分入庫失敗。', false, true);
                 }
                 return;
             }
 
-            showModalAlert('success', result.message || '部分完工入庫完成。', true, true);
+            const successMessage = `${result.message || '部分入庫完成。'} 單號：${result.data?.receipt_number || '-'}，工單剩餘可入庫 ${roundWorkOrderWeight(result.data?.remaining_work_order_net_weight_kg || 0).toFixed(2)} kg。`;
+            showModalAlert('success', successMessage, true, true);
             if (typeof DataSync !== 'undefined') {
                 DataSync.notifyWithDependencies('inventory_items', DataSync.EVENT_TYPES.CREATED, {
                     id: result.data?.inventory_item_id,
@@ -2875,9 +3389,9 @@
         } catch (error) {
             console.error('Create partial receipt error:', error);
             if (elements.partialReceiptModal && !elements.partialReceiptModal.classList.contains('hidden')) {
-                showPartialReceiptModalAlert('部分完工入庫時發生錯誤，請稍後重試。');
+                showPartialReceiptModalAlert('部分入庫時發生錯誤，請稍後重試。');
             } else {
-                showModalAlert('error', '部分完工入庫時發生錯誤，請稍後重試。', false, true);
+                showModalAlert('error', '部分入庫時發生錯誤，請稍後重試。', false, true);
             }
         }
     }
@@ -2892,12 +3406,257 @@
         alertBox.removeAttribute('hidden');
     }
 
+    function getPartialReceiptAvailableTools() {
+        const sourceTools = Array.isArray(state.currentWorkOrder?.tool_details)
+            ? state.currentWorkOrder.tool_details
+            : (Array.isArray(state.orderItemDetails?.tool_details) ? state.orderItemDetails.tool_details : []);
+        return sourceTools
+            .map((tool) => ({
+                id: Number.parseInt(tool?.id, 10) || 0,
+                tool_id: Number.parseInt(tool?.tool_id, 10) || 0,
+                tool_number: String(tool?.tool_number || '').trim(),
+                tool_name: String(tool?.tool_name || '').trim(),
+                tool_type: String(tool?.tool_type || '').trim(),
+                quantity: Math.max(0, Number(tool?.quantity) || 0),
+                unit_weight_kg: Math.max(0, Number(tool?.unit_weight_kg) || 0),
+                total_weight_kg: Math.max(0, Number(tool?.total_weight_kg) || 0),
+            }))
+            .filter((tool) => tool.id > 0);
+    }
+
+    function formatPartialReceiptToolLabel(tool) {
+        const name = String(tool?.tool_name || '').trim();
+        const type = String(tool?.tool_type || '').trim();
+        const fallback = name || type || `載具#${Number.parseInt(tool?.id, 10) || 0}`;
+        return type && type !== fallback ? `${fallback} / ${type}` : fallback;
+    }
+
+    function updatePartialReceiptToolSummaryDisplay(summaryText, totalWeightKg, isError = false) {
+        if (!elements.partialReceiptForm) {
+            return;
+        }
+
+        const hiddenInput = elements.partialReceiptForm.querySelector('[name="shipping_tool_details"]');
+        const totalWeightTarget = elements.partialReceiptForm.querySelector('[data-partial-receipt-tool-total-weight]');
+        const summaryTarget = elements.partialReceiptForm.querySelector('[data-partial-receipt-tool-summary]');
+
+        if (hiddenInput) {
+            hiddenInput.value = isError ? '' : summaryText;
+        }
+        if (totalWeightTarget) {
+            totalWeightTarget.textContent = `${roundWorkOrderWeight(totalWeightKg || 0, 3).toFixed(3)} kg`;
+        }
+        if (summaryTarget) {
+            summaryTarget.textContent = summaryText || '尚未選擇本次出貨載具。';
+            summaryTarget.classList.toggle('text-danger', isError);
+        }
+    }
+
+    function collectPartialReceiptShippingTools() {
+        if (!elements.partialReceiptForm) {
+            return {
+                items: [],
+                summary: '',
+                totalWeightKg: 0,
+                error: '部分入庫視窗尚未載入完成。',
+            };
+        }
+
+        const rows = Array.from(elements.partialReceiptForm.querySelectorAll('[data-partial-receipt-tool-row]'));
+        const selectedItems = [];
+        const summaryParts = [];
+        let totalWeightKg = 0;
+
+        for (const row of rows) {
+            const toggle = row.querySelector('[data-partial-receipt-tool-toggle]');
+            const quantityInput = row.querySelector('[data-partial-receipt-tool-quantity]');
+            if (!(toggle instanceof HTMLInputElement) || !(quantityInput instanceof HTMLInputElement) || !toggle.checked) {
+                continue;
+            }
+
+            const orderItemToolId = Number.parseInt(toggle.value, 10) || 0;
+            const quantityRaw = quantityInput.value.trim();
+            const quantityNumber = Number(quantityRaw);
+            if (orderItemToolId <= 0 || !/^[1-9]\d*$/.test(quantityRaw) || !Number.isInteger(quantityNumber) || quantityNumber <= 0) {
+                return {
+                    items: [],
+                    summary: '',
+                    totalWeightKg: 0,
+                    error: '請為每筆已勾選載具填寫正整數數量。',
+                };
+            }
+
+            const unitWeightKg = Number(row.dataset.unitWeightKg || 0) || 0;
+            const lineWeightKg = roundWorkOrderWeight(unitWeightKg * quantityNumber, 3);
+            totalWeightKg += lineWeightKg;
+
+            selectedItems.push({
+                order_item_tool_id: orderItemToolId,
+                quantity: quantityNumber,
+            });
+
+            summaryParts.push(
+                `${row.dataset.toolLabel || `載具#${orderItemToolId}`} x ${quantityNumber}（${roundWorkOrderWeight(unitWeightKg, 3).toFixed(3)} kg/個，小計 ${lineWeightKg.toFixed(3)} kg）`
+            );
+        }
+
+        totalWeightKg = roundWorkOrderWeight(totalWeightKg, 3);
+        const summary = summaryParts.length > 0
+            ? `${summaryParts.join('；')}；參考載具總重 ${totalWeightKg.toFixed(3)} kg`
+            : '';
+
+        return {
+            items: selectedItems,
+            summary,
+            totalWeightKg,
+            error: '',
+        };
+    }
+
+    function syncPartialReceiptToolSummary() {
+        const selection = collectPartialReceiptShippingTools();
+        if (selection.error) {
+            updatePartialReceiptToolSummaryDisplay(selection.error, 0, true);
+            return selection;
+        }
+
+        updatePartialReceiptToolSummaryDisplay(selection.summary, selection.totalWeightKg, false);
+        return selection;
+    }
+
+    function togglePartialReceiptToolRowState(toggleInput) {
+        if (!(toggleInput instanceof HTMLInputElement)) {
+            return;
+        }
+
+        const row = toggleInput.closest('[data-partial-receipt-tool-row]');
+        if (!(row instanceof HTMLElement)) {
+            return;
+        }
+
+        const quantityInput = row.querySelector('[data-partial-receipt-tool-quantity]');
+        if (!(quantityInput instanceof HTMLInputElement)) {
+            return;
+        }
+
+        row.classList.toggle('is-selected', toggleInput.checked);
+        quantityInput.disabled = !toggleInput.checked;
+        if (toggleInput.checked) {
+            if (!quantityInput.value.trim() || Number(quantityInput.value) <= 0) {
+                quantityInput.value = '1';
+            }
+        } else {
+            quantityInput.value = '';
+        }
+    }
+
+    function renderPartialReceiptToolSelector() {
+        if (!elements.partialReceiptForm) {
+            return 0;
+        }
+
+        const list = elements.partialReceiptForm.querySelector('[data-partial-receipt-tools-list]');
+        const emptyState = elements.partialReceiptForm.querySelector('[data-partial-receipt-tools-empty]');
+        if (!(list instanceof HTMLElement) || !(emptyState instanceof HTMLElement)) {
+            return 0;
+        }
+
+        list.innerHTML = '';
+        const tools = getPartialReceiptAvailableTools();
+        if (tools.length === 0) {
+            emptyState.classList.remove('hidden');
+            updatePartialReceiptToolSummaryDisplay('此工單尚未設定可帶入的載具資料。', 0, true);
+            return 0;
+        }
+
+        emptyState.classList.add('hidden');
+        const fragment = document.createDocumentFragment();
+
+        tools.forEach((tool) => {
+            const row = document.createElement('div');
+            row.className = 'work-order-partial-tool-row';
+            row.dataset.partialReceiptToolRow = 'true';
+            row.dataset.unitWeightKg = String(tool.unit_weight_kg || 0);
+            row.dataset.toolLabel = formatPartialReceiptToolLabel(tool);
+
+            const toggleWrap = document.createElement('div');
+            toggleWrap.className = 'work-order-partial-tool-toggle';
+            const toggle = document.createElement('input');
+            toggle.type = 'checkbox';
+            toggle.value = String(tool.id);
+            toggle.dataset.partialReceiptToolToggle = 'true';
+            toggle.setAttribute('aria-label', `選擇 ${formatPartialReceiptToolLabel(tool)}`);
+            toggleWrap.appendChild(toggle);
+
+            const meta = document.createElement('div');
+            meta.className = 'work-order-partial-tool-meta';
+            const title = document.createElement('strong');
+            title.textContent = formatPartialReceiptToolLabel(tool);
+            meta.appendChild(title);
+            const detail = document.createElement('span');
+            const detailParts = [];
+            if (tool.tool_number) {
+                detailParts.push(`編號 ${tool.tool_number}`);
+            }
+            detailParts.push(`單重 ${roundWorkOrderWeight(tool.unit_weight_kg || 0, 3).toFixed(3)} kg`);
+            if (tool.quantity > 0) {
+                detailParts.push(`原設定 ${formatNumber(Math.round(tool.quantity))} 個`);
+            }
+            detail.textContent = detailParts.join(' ｜ ');
+            meta.appendChild(detail);
+
+            const qtyWrap = document.createElement('label');
+            qtyWrap.className = 'work-order-partial-tool-qty';
+            const qtyLabel = document.createElement('span');
+            qtyLabel.textContent = '本次數量';
+            const qtyInput = document.createElement('input');
+            qtyInput.type = 'number';
+            qtyInput.min = '1';
+            qtyInput.step = '1';
+            qtyInput.placeholder = '請輸入';
+            qtyInput.disabled = true;
+            qtyInput.dataset.partialReceiptToolQuantity = 'true';
+            qtyWrap.appendChild(qtyLabel);
+            qtyWrap.appendChild(qtyInput);
+
+            row.appendChild(toggleWrap);
+            row.appendChild(meta);
+            row.appendChild(qtyWrap);
+            fragment.appendChild(row);
+        });
+
+        list.appendChild(fragment);
+        updatePartialReceiptToolSummaryDisplay('', 0, false);
+        return tools.length;
+    }
+
+    function handlePartialReceiptFormMutation(event) {
+        const target = event.target;
+        if (!(target instanceof HTMLElement) || !elements.partialReceiptForm?.contains(target)) {
+            return;
+        }
+
+        if (target instanceof HTMLInputElement && target.dataset.partialReceiptToolToggle === 'true') {
+            togglePartialReceiptToolRowState(target);
+        }
+        syncPartialReceiptToolSummary();
+    }
+
     function closePartialReceiptModal() {
         if (!elements.partialReceiptModal || !elements.partialReceiptForm) {
             return;
         }
         elements.partialReceiptModal.classList.add('hidden');
         elements.partialReceiptForm.reset();
+        const list = elements.partialReceiptForm.querySelector('[data-partial-receipt-tools-list]');
+        const emptyState = elements.partialReceiptForm.querySelector('[data-partial-receipt-tools-empty]');
+        if (list instanceof HTMLElement) {
+            list.innerHTML = '';
+        }
+        if (emptyState instanceof HTMLElement) {
+            emptyState.classList.add('hidden');
+        }
+        updatePartialReceiptToolSummaryDisplay('', 0, false);
         state.partialReceiptContext = null;
         const alertBox = elements.partialReceiptModal.querySelector('[data-partial-receipt-modal-alert]');
         if (alertBox) {
@@ -2907,9 +3666,299 @@
         }
     }
 
-    function openPartialReceiptModal({ machineRunId = null, sourceLabel, remainingNetWeightKg }) {
+    function showCompletionModalAlert(message) {
+        const alertBox = elements.completionModal?.querySelector('[data-work-order-completion-modal-alert]');
+        if (!alertBox) {
+            return;
+        }
+        if (!message) {
+            alertBox.className = 'modal-alert hidden';
+            alertBox.setAttribute('hidden', '');
+            alertBox.textContent = '';
+            return;
+        }
+        alertBox.textContent = message;
+        alertBox.className = 'modal-alert error';
+        alertBox.removeAttribute('hidden');
+    }
+
+    function closeCompletionModal(resolveValue = null) {
+        if (elements.completionModal) {
+            elements.completionModal.classList.add('hidden');
+        }
+        if (elements.completionForm) {
+            elements.completionForm.reset();
+        }
+        showCompletionModalAlert('');
+        const resolver = state.completionContext?.resolve;
+        state.completionContext = null;
+        if (typeof resolver === 'function') {
+            resolver(resolveValue);
+        }
+    }
+
+    function renderCompletionModalSummary(summary) {
+        const targets = elements.completionModal?.querySelectorAll('[data-completion-summary]') || [];
+        const mapping = {
+            expected: formatWeightUnits(summary.expected_net_weight_kg || 0, summary.expected_units || 0),
+            produced: formatWeightUnits(summary.produced_net_weight_kg || 0, summary.produced_units || 0),
+            partial_received: formatWeightUnits(summary.partial_received_net_weight_kg || 0, summary.partial_received_units || 0),
+            final_received: formatWeightUnits(summary.final_received_net_weight_kg || 0, summary.final_received_units || 0),
+            shortage: formatWeightUnits(summary.shortage_net_weight_kg || 0, summary.shortage_units || 0),
+            balance_difference: `${roundWorkOrderWeight(summary.balance_difference_net_weight_kg || 0).toFixed(2)} kg`,
+        };
+        targets.forEach((target) => {
+            const key = target.dataset.completionSummary || '';
+            target.textContent = mapping[key] || '--';
+            target.classList.toggle('text-danger', key === 'balance_difference' && Math.abs(Number(summary.balance_difference_net_weight_kg) || 0) > 0.0001);
+        });
+    }
+
+    function requestCompletionConfirmation(basePayload) {
+        if (!elements.completionModal || !elements.completionForm) {
+            return Promise.resolve(null);
+        }
+
+        const preview = buildCompletionPreview();
+        state.completionContext = {
+            basePayload: { ...basePayload },
+            preview,
+            resolve: null,
+        };
+        renderCompletionModalSummary(preview);
+
+        const autoCreateInventoryField = elements.completionForm.querySelector('[name="auto_create_inventory"]');
+        const shortageReasonField = elements.completionForm.querySelector('[name="shortage_reason_code"]');
+        const shortageNotesField = elements.completionForm.querySelector('[name="shortage_notes"]');
+        const completionNotesField = elements.completionForm.querySelector('[name="completion_notes"]');
+        if (autoCreateInventoryField) {
+            autoCreateInventoryField.value = preview.final_received_net_weight_kg > 0.0001 ? '1' : '0';
+        }
+        if (shortageReasonField) {
+            shortageReasonField.value = String(state.currentWorkOrder?.shortage_reason_code || '');
+        }
+        if (shortageNotesField) {
+            shortageNotesField.value = String(state.currentWorkOrder?.shortage_notes || '');
+        }
+        if (completionNotesField) {
+            completionNotesField.value = '';
+        }
+
+        const initialMessage = preview.blockingErrors[0] || preview.warnings[0] || '';
+        showCompletionModalAlert(initialMessage);
+        elements.completionModal.classList.remove('hidden');
+
+        return new Promise((resolve) => {
+            if (state.completionContext) {
+                state.completionContext.resolve = resolve;
+            } else {
+                resolve(null);
+            }
+        });
+    }
+
+    async function handleCompletionModalSubmit(event) {
+        event.preventDefault();
+        if (!state.completionContext || !elements.completionForm) {
+            return;
+        }
+
+        const preview = buildCompletionPreview();
+        state.completionContext.preview = preview;
+        renderCompletionModalSummary(preview);
+
+        const formData = new FormData(elements.completionForm);
+        const autoCreateInventory = String(formData.get('auto_create_inventory') || '1') !== '0';
+        const shortageReasonCode = String(formData.get('shortage_reason_code') || '').trim();
+        const shortageNotes = String(formData.get('shortage_notes') || '').trim();
+        const completionNotes = String(formData.get('completion_notes') || '').trim();
+        const errors = [...preview.blockingErrors];
+
+        if (preview.final_received_net_weight_kg > 0.0001 && !autoCreateInventory) {
+            errors.push('尚有最終補入庫重量時，不能只更新工單狀態。');
+        }
+        if (preview.shortage_net_weight_kg > 0.0001 && shortageReasonCode === '') {
+            errors.push('有真實短缺時，必須填寫短缺原因。');
+        }
+        if (preview.shortage_net_weight_kg > 0.0001 && shortageReasonCode === 'other' && shortageNotes === '') {
+            errors.push('短缺原因選擇「其他」時，必須補充短缺說明。');
+        }
+
+        if (errors.length > 0) {
+            showCompletionModalAlert(errors[0]);
+            return;
+        }
+
+        const payload = {
+            auto_create_inventory: autoCreateInventory,
+            shortage_reason_code: preview.shortage_net_weight_kg > 0.0001 ? shortageReasonCode : '',
+            shortage_notes: preview.shortage_net_weight_kg > 0.0001 ? shortageNotes : '',
+            other_notes: mergeWorkOrderOperationalNote(
+                state.completionContext.basePayload.other_notes,
+                '結案備註',
+                completionNotes
+            ),
+        };
+        closeCompletionModal(payload);
+    }
+
+    function showReversePartialModalAlert(message, type = 'error') {
+        const alertBox = elements.reversePartialModal?.querySelector('[data-work-order-reverse-partial-modal-alert]');
+        if (!alertBox) {
+            return;
+        }
+        if (!message) {
+            alertBox.className = 'modal-alert hidden';
+            alertBox.setAttribute('hidden', '');
+            alertBox.textContent = '';
+            return;
+        }
+        alertBox.textContent = message;
+        alertBox.className = `modal-alert ${type}`;
+        alertBox.removeAttribute('hidden');
+    }
+
+    function closeReversePartialModal() {
+        if (elements.reversePartialModal) {
+            elements.reversePartialModal.classList.add('hidden');
+        }
+        if (elements.reversePartialForm) {
+            elements.reversePartialForm.reset();
+            const submitButton = elements.reversePartialForm.querySelector('[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = false;
+            }
+        }
+        showReversePartialModalAlert('');
+        if (elements.reversePartialModal) {
+            const impactList = elements.reversePartialModal.querySelector('[data-work-order-reverse-impact-list]');
+            if (impactList) {
+                impactList.innerHTML = '';
+            }
+        }
+        state.reversePartialContext = null;
+    }
+
+    async function openReversePartialReceiptModal(partialReceiptId) {
+        const receiptId = Number.parseInt(partialReceiptId, 10) || 0;
+        const receipts = Array.isArray(state.currentWorkOrder?.partial_receipts) ? state.currentWorkOrder.partial_receipts : [];
+        const receipt = receipts.find((item) => Number(item.id || 0) === receiptId);
+        if (!receipt || !elements.reversePartialModal || !elements.reversePartialForm) {
+            showModalAlert('error', '找不到要沖銷的部分入庫紀錄。', false, true);
+            return;
+        }
+
+        try {
+            const response = await fetch(`api/workflow_guard/check.php?module=work_order_partial_receipts&action=reverse&id=${receiptId}`, {
+                credentials: 'include'
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || '部分入庫流程檢查失敗。');
+            }
+
+            const assessment = result.data || {};
+            state.reversePartialContext = { receipt, assessment };
+            const summaryTargets = elements.reversePartialModal.querySelectorAll('[data-reverse-summary]');
+            const summaryMapping = {
+                receipt_number: receipt.receipt_number || `PR-${receipt.id}`,
+                source_label: receipt.source_label || '一般工單',
+                receipt_quantity: formatWeightUnits(receipt.net_weight_kg || 0, receipt.calculated_units || 0),
+                impact_title: assessment.message || (assessment.allowed ? '可沖銷' : '目前不可沖銷'),
+            };
+            summaryTargets.forEach((target) => {
+                const key = target.dataset.reverseSummary || '';
+                target.textContent = summaryMapping[key] || '--';
+            });
+
+            const impactList = elements.reversePartialModal.querySelector('[data-work-order-reverse-impact-list]');
+            if (impactList) {
+                const impacts = Array.isArray(assessment.impacts) ? assessment.impacts : [];
+                impactList.innerHTML = impacts.length > 0
+                    ? impacts.map((impact) => `<div class="work-order-reverse-impact-item">${escapeHtml(impact)}</div>`).join('')
+                    : '<div class="work-order-reverse-impact-item">無額外流程影響。</div>';
+            }
+
+            const submitButton = elements.reversePartialForm.querySelector('[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = !assessment.allowed;
+            }
+
+            showReversePartialModalAlert(
+                assessment.allowed
+                    ? '沖銷後會作廢原部分入庫與關聯庫存，並保留完整庫存異動紀錄。'
+                    : (assessment.message || '此部分入庫目前不可沖銷。'),
+                assessment.allowed ? 'info' : 'error'
+            );
+            elements.reversePartialModal.classList.remove('hidden');
+        } catch (error) {
+            console.error('Open reverse partial receipt modal error:', error);
+            showModalAlert('error', error.message || '載入部分入庫沖銷資訊失敗。', false, true);
+        }
+    }
+
+    async function handleReversePartialReceiptSubmit(event) {
+        event.preventDefault();
+        if (!state.reversePartialContext || !elements.reversePartialForm) {
+            return;
+        }
+
+        const reverseReason = String(new FormData(elements.reversePartialForm).get('reverse_reason') || '').trim();
+        if (!reverseReason) {
+            showReversePartialModalAlert('請填寫沖銷原因。');
+            return;
+        }
+        if (!state.reversePartialContext.assessment?.allowed) {
+            showReversePartialModalAlert(state.reversePartialContext.assessment?.message || '此部分入庫目前不可沖銷。');
+            return;
+        }
+
+        try {
+            const response = await fetch('api/work_orders/reverse_partial_receipt.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    partial_receipt_id: state.reversePartialContext.receipt.id,
+                    reverse_reason: reverseReason,
+                })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                showReversePartialModalAlert(result.message || '部分入庫沖銷失敗。');
+                return;
+            }
+
+            if (typeof DataSync !== 'undefined') {
+                if (state.reversePartialContext.receipt.inventory_item_id) {
+                    DataSync.notifyWithDependencies('inventory_items', DataSync.EVENT_TYPES.DELETED, {
+                        id: state.reversePartialContext.receipt.inventory_item_id,
+                        work_order_id: state.editingId
+                    });
+                }
+                DataSync.notifyWithDependencies('work_orders', DataSync.EVENT_TYPES.UPDATED, {
+                    id: state.editingId
+                });
+            }
+
+            closeReversePartialModal();
+            showModalAlert('success', result.message || '部分入庫已沖銷。', true, true);
+            await openModal(state.editingId);
+            loadWorkOrders();
+        } catch (error) {
+            console.error('Reverse partial receipt error:', error);
+            showReversePartialModalAlert('部分入庫沖銷時發生錯誤，請稍後重試。');
+        }
+    }
+
+    function openPartialReceiptModal({ machineRunId = null, sourceLabel, remainingNetWeightKg, receivedNetWeightKg = 0 }) {
         if (!elements.partialReceiptModal || !elements.partialReceiptForm) {
             showModalAlert('error', '部分入庫視窗載入失敗。', false, true);
+            return;
+        }
+
+        if (getPartialReceiptAvailableTools().length === 0) {
+            showModalAlert('error', '此工單尚未設定可帶入的載具資料，請先到訂單品項維護載具設定。', false, true);
             return;
         }
 
@@ -2926,6 +3975,7 @@
         };
         const sourceInput = elements.partialReceiptForm.querySelector('[name="source_label"]');
         const remainingInput = elements.partialReceiptForm.querySelector('[name="remaining_net_weight_kg"]');
+        const receivedInput = elements.partialReceiptForm.querySelector('[name="received_net_weight_kg"]');
         const weightInput = elements.partialReceiptForm.querySelector('[name="net_weight_kg"]');
         if (!sourceInput || !remainingInput || !weightInput) {
             showModalAlert('error', '部分入庫欄位載入失敗。', false, true);
@@ -2933,8 +3983,12 @@
         }
         sourceInput.value = sourceLabel;
         remainingInput.value = remaining.toFixed(2);
+        if (receivedInput) {
+            receivedInput.value = roundWorkOrderWeight(receivedNetWeightKg || 0).toFixed(2);
+        }
         weightInput.value = '';
         weightInput.max = remaining.toFixed(2);
+        renderPartialReceiptToolSelector();
         elements.partialReceiptModal.classList.remove('hidden');
         window.setTimeout(() => weightInput.focus(), 0);
     }
@@ -2956,18 +4010,30 @@
             showPartialReceiptModalAlert(`本次入庫不可超過剩餘 ${context.remainingNetWeightKg.toFixed(2)} kg。`);
             return;
         }
+        const shippingToolSelection = syncPartialReceiptToolSummary();
+        const shippingToolDetails = String(shippingToolSelection.summary || '').trim();
+        if (shippingToolSelection.error) {
+            showPartialReceiptModalAlert(shippingToolSelection.error);
+            return;
+        }
+        if (shippingToolSelection.items.length === 0 || !shippingToolDetails) {
+            showPartialReceiptModalAlert('請至少選擇一種本次出貨載具並填寫數量。');
+            return;
+        }
 
         await submitPartialReceipt({
             work_order_id: context.workOrderId,
             machine_run_id: context.machineRunId,
             net_weight_kg: netWeightKg,
+            shipping_tool_details: shippingToolDetails,
+            shipping_tools: shippingToolSelection.items,
             notes: String(formData.get('notes') || '').trim(),
         });
     }
 
     async function createPartialReceiptForMachineRun(run) {
         if (!state.editingId || !run || !run.id) {
-            showModalAlert('error', '請先儲存拆分機台明細後，再執行部分完工入庫。', false, true);
+            showModalAlert('error', '請先儲存拆分機台明細後，再執行部分入庫。', false, true);
             return;
         }
 
@@ -2983,6 +4049,7 @@
             machineRunId: run.id,
             sourceLabel: `拆分機台：${run.run_label || run.machine_name || run.id}`,
             remainingNetWeightKg: remainingNetWeight,
+            receivedNetWeightKg: receivedNetWeight,
         });
     }
 
@@ -3021,6 +4088,7 @@
         openPartialReceiptModal({
             sourceLabel: `一般工單：${currentWorkOrder.work_order_number || state.editingId}`,
             remainingNetWeightKg: Math.max(0, expectedNetWeight - receivedNetWeight),
+            receivedNetWeightKg: receivedNetWeight,
         });
     }
 
@@ -3186,6 +4254,7 @@
                     production_date: record.production_date || null,
                     production_time: record.production_time || null,
                     machine_id: record.machine_id || null,
+                    machine_type: getMachineCapabilityName(record.machine_id) || record.machine_type || null,
                     operator_name: record.operator_name || (state.currentUser?.name || ''),
                     notes: record.notes || null,
                     production_source_mode: activeMode
@@ -3206,6 +4275,7 @@
                 const dateInput = row.querySelector('[name="pr_date[]"]');
                 const timeInput = row.querySelector('[name="pr_time[]"]');
                 const machineSelect = row.querySelector('[name="pr_machine_id[]"]');
+                const machineTypeInput = row.querySelector('[name="pr_machine_type[]"]');
                 const operatorInput = row.querySelector('[name="pr_operator_name[]"]');
                 const notesInput = row.querySelector('[name="pr_notes[]"]');
 
@@ -3218,6 +4288,7 @@
                         production_date: dateInput ? dateInput.value : null,
                         production_time: timeInput ? timeInput.value : null,
                         machine_id: machineSelect ? machineSelect.value : null,
+                        machine_type: machineTypeInput ? machineTypeInput.value : getMachineCapabilityName(machineSelect?.value || '') || null,
                         operator_name: operatorInput ? operatorInput.value : (state.currentUser?.name || ''),
                         notes: notesInput ? notesInput.value : null,
                         production_source_mode: 'preset'
@@ -3270,11 +4341,11 @@
             const newStatusId = data.status_lookup_id ? parseInt(data.status_lookup_id, 10) : null;
             const oldStatusId = state.editingStatusLookupId ? parseInt(state.editingStatusLookupId, 10) : null;
             if (newStatusId === 28 && oldStatusId !== 28) {
-                const inventoryChoice = await askCompletionInventoryChoice();
-                if (inventoryChoice === 'cancel') {
+                const completionPayload = await requestCompletionConfirmation(data);
+                if (!completionPayload) {
                     return;
                 }
-                data.auto_create_inventory = inventoryChoice === 'convert';
+                Object.assign(data, completionPayload);
             } else if (oldStatusId === 28 && newStatusId !== 28 && state.editingHasInventory) {
                 const inventoryChoice = await askReopenCompletedWorkOrderChoice();
                 if (inventoryChoice === 'cancel') {
@@ -3860,6 +4931,9 @@
         state.productionRecordModes.edit = 'preset';
         state.productionRecordBuffers.edit = { preset: [], manual: [] };
         renderOrderDrawings([]);
+        renderWorkOrderBalanceSummary({});
+        renderWorkOrderBalanceAlert([]);
+        renderPartialReceiptHistory([]);
 
         await loadWorkOrderData(id);
         setWorkOrderType(elements.editModalForm, 'normal');
@@ -3897,6 +4971,9 @@
         elements.editModal.classList.add('hidden');
         hideModalAlert(true);
         elements.editModalForm.reset();
+        closePartialReceiptModal();
+        closeCompletionModal(null);
+        closeReversePartialModal();
         stopLiveTimeTicker();
         state.editingId = null;
         state.editingStatusLookupId = null;
@@ -3909,6 +4986,9 @@
         renderOrderDrawings([]);
         resetMobileQuickEntry();
         setSplitRuns(true, []);
+        renderWorkOrderBalanceSummary({});
+        renderWorkOrderBalanceAlert([]);
+        renderPartialReceiptHistory([]);
         state.formSnapshots.edit = null;
     }
 
@@ -3932,17 +5012,17 @@
                 state.editingInventoryItemId = result.data.inventory_item_id ? parseInt(result.data.inventory_item_id, 10) : null;
                 const partialReceiptButton = elements.editModalForm.querySelector('[data-action="create-work-order-partial-receipt"]');
                 if (partialReceiptButton) {
-                    const partialReceiptStatusAllowed = ['in_progress', 'paused'].includes(String(result.data.status_key || ''));
-                    const partialReceiptLocked = result.data.lifecycle_locked == 1
-                        || Boolean(result.data.completed_at)
-                        || state.editingHasInventory
-                        || !partialReceiptStatusAllowed;
-                    partialReceiptButton.disabled = partialReceiptLocked;
+                    const partialReceiptLockMessage = getPartialReceiptLockMessage(result.data);
+                    const partialReceiptLocked = partialReceiptLockMessage !== '';
+                    partialReceiptButton.disabled = false;
+                    partialReceiptButton.setAttribute('aria-disabled', partialReceiptLocked ? 'true' : 'false');
+                    partialReceiptButton.dataset.lockMessage = partialReceiptLockMessage;
                     partialReceiptButton.title = partialReceiptLocked
-                        ? '只有進行中或暫停中，且尚未建立正式庫存的工單可以部分入庫。'
-                        : '建立本次部分完工入庫';
+                        ? partialReceiptLockMessage
+                        : '建立本次部分入庫';
                 }
                 populateForm(result.data, true);
+                refreshWorkOrderBalancePresentation(result.data);
                 state.images = result.data.images || [];
                 renderImages(true);
                 renderOrderDrawings(result.data.drawings || []);
@@ -4285,7 +5365,7 @@
                     </select>
                 </td>
                 <td>
-                    <input type="text" name="pr_machine_type[]" value="${escapeHtml(record.machine_type || '')}" readonly class="form-control-plaintext" style="width: 100px;">
+                    <input type="text" name="pr_machine_type[]" value="${escapeHtml(getMachineCapabilityName(record.machine_id) || record.machine_type || '')}" readonly class="form-control-plaintext" style="width: 100px;">
                 </td>
                 <td>
                     <span class="current-user-name">${escapeHtml(record.employee_name || state.currentUser?.name || '')}</span>
@@ -4370,7 +5450,7 @@
                     </select>
                 </td>
                 <td>
-                    <input type="text" name="pr_machine_type[]" value="${escapeHtml(existingRecord.machine_type || '')}" readonly class="form-control-plaintext" style="width: 100px;">
+                    <input type="text" name="pr_machine_type[]" value="${escapeHtml(getMachineCapabilityName(existingRecord.machine_id) || existingRecord.machine_type || '')}" readonly class="form-control-plaintext" style="width: 100px;">
                 </td>
                 <td>
                     <span class="current-user-name">${escapeHtml(existingRecord.employee_name || state.currentUser?.name || '當前用戶')}</span>
@@ -4411,11 +5491,7 @@
 
     // 全局函式供行內 onchange 使用
     window.updateMachineType = function(select) {
-        const option = select.options[select.selectedIndex];
-        const type = option.getAttribute('data-type') || '';
-        const row = select.closest('tr');
-        const typeInput = row.querySelector('[name="pr_machine_type[]"]');
-        if (typeInput) typeInput.value = type;
+        syncProductionRecordMachineCapability(select);
     };
 
     /**
@@ -4642,6 +5718,13 @@
         const defectMetric = document.querySelector(`[data-metric="${prefix}defect-units"]`);
         if (defectMetric) {
             defectMetric.title = `分布合計：${formatNumber(totalDefectsDistribution)} 支`;
+        }
+
+        if (isEditMode && state.currentWorkOrder) {
+            const preview = buildCompletionPreview();
+            renderWorkOrderBalanceSummary(preview);
+            const messages = preview.blockingErrors.length > 0 ? preview.blockingErrors : preview.warnings;
+            renderWorkOrderBalanceAlert(messages, preview.blockingErrors.length > 0 ? 'error' : 'warning');
         }
     }
 

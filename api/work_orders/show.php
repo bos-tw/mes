@@ -239,25 +239,6 @@ try {
     $productionRecords = $prStmt->fetchAll(PDO::FETCH_ASSOC);
     $workOrder['production_records'] = $productionRecords;
 
-    $partialReceiptSummaryStmt = $pdo->prepare("
-        SELECT
-            COUNT(*) AS partial_receipt_count,
-            COALESCE(SUM(net_weight_kg), 0) AS partial_receipt_net_weight_kg,
-            COALESCE(SUM(calculated_units), 0) AS partial_receipt_units
-        FROM work_order_partial_receipts
-        WHERE work_order_id = :work_order_id
-          AND receipt_status <> 'reversed'
-    ");
-    $partialReceiptSummaryStmt->execute(['work_order_id' => $id]);
-    $partialReceiptSummary = $partialReceiptSummaryStmt->fetch(PDO::FETCH_ASSOC) ?: [];
-    $workOrder['partial_receipt_count'] = (int)($partialReceiptSummary['partial_receipt_count'] ?? 0);
-    $workOrder['partial_receipt_net_weight_kg'] = round((float)($partialReceiptSummary['partial_receipt_net_weight_kg'] ?? 0), 2);
-    $workOrder['partial_receipt_units'] = round((float)($partialReceiptSummary['partial_receipt_units'] ?? 0), 2);
-    $workOrder['partial_receipt_remaining_net_weight_kg'] = round(max(
-        0,
-        (float)($workOrder['total_weight_kg'] ?? 0) - $workOrder['partial_receipt_net_weight_kg']
-    ), 2);
-
     // Get screening service defects
     $defectsStmt = $pdo->prepare("
         SELECT
@@ -386,6 +367,33 @@ try {
     }
 
     $workOrder['machine_runs'] = $machineRuns;
+    $productionSummary = fetchWorkOrderProductionSummary(
+        $pdo,
+        $id,
+        (string)($workOrder['work_order_type'] ?? 'normal'),
+        (float)($workOrder['weight_per_unit_g'] ?? 0)
+    );
+    $partialReceiptLedger = fetchWorkOrderPartialReceiptLedger($pdo, $id);
+    $finalInventorySummary = fetchWorkOrderFinalInventorySummary(
+        $pdo,
+        $id,
+        (float)($workOrder['weight_per_unit_g'] ?? 0)
+    );
+    $workOrder['partial_receipt_summary'] = buildWorkOrderPartialReceiptSummary(
+        $workOrder,
+        $productionSummary,
+        $partialReceiptLedger['summary'],
+        $finalInventorySummary
+    );
+    $workOrder['partial_receipts'] = $partialReceiptLedger['partial_receipts'];
+    $workOrder['partial_receipt_count'] = (int)($workOrder['partial_receipt_summary']['partial_receipt_count'] ?? 0);
+    $workOrder['partial_receipt_net_weight_kg'] = round((float)($workOrder['partial_receipt_summary']['partial_received_net_weight_kg'] ?? 0), 2);
+    $workOrder['partial_receipt_units'] = (float)round((float)($workOrder['partial_receipt_summary']['partial_received_units'] ?? 0), 0);
+    $workOrder['partial_receipt_remaining_net_weight_kg'] = round(max(
+        0,
+        (float)($workOrder['partial_receipt_summary']['expected_net_weight_kg'] ?? 0)
+        - (float)($workOrder['partial_receipt_summary']['partial_received_net_weight_kg'] ?? 0)
+    ), 2);
 
     jsonResponse([
         'success' => true,

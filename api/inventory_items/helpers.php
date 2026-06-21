@@ -29,6 +29,55 @@ require_once __DIR__ . '/../number_sequences/helpers.php';
  */
 
 /**
+ * @return list<array<string,mixed>>
+ */
+function fetchInventoryPartialReceiptToolDetails(PDO $pdo, int $partialReceiptId): array
+{
+    if ($partialReceiptId <= 0) {
+        return [];
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            order_item_tool_id,
+            tool_id,
+            tool_name,
+            tool_type,
+            unit_weight_kg,
+            quantity,
+            total_weight_kg
+        FROM work_order_partial_receipt_tools
+        WHERE partial_receipt_id = :partial_receipt_id
+        ORDER BY id ASC
+    ");
+    $stmt->execute(['partial_receipt_id' => $partialReceiptId]);
+
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    return array_map(static function (array $row): array {
+        return [
+            'id' => (int)($row['id'] ?? 0),
+            'order_item_tool_id' => isset($row['order_item_tool_id']) ? (int)$row['order_item_tool_id'] : null,
+            'tool_id' => isset($row['tool_id']) ? (int)$row['tool_id'] : null,
+            'tool_name' => (string)($row['tool_name'] ?? ''),
+            'tool_type' => $row['tool_type'] !== null ? (string)$row['tool_type'] : null,
+            'unit_weight_kg' => round((float)($row['unit_weight_kg'] ?? 0), 3),
+            'quantity' => (int)round((float)($row['quantity'] ?? 0)),
+            'total_weight_kg' => round((float)($row['total_weight_kg'] ?? 0), 3),
+        ];
+    }, $rows);
+}
+
+function inventoryUnitsToWeightKg(float $units, float $weightPerUnitG): float
+{
+    if ($units <= 0 || $weightPerUnitG <= 0) {
+        return 0.0;
+    }
+
+    return round(($units * $weightPerUnitG) / 1000, 2);
+}
+
+/**
  * Generate unique inventory number
  * Format: INV-YYYYMMDD-XXXX
  */
@@ -114,7 +163,20 @@ function getInventoryItemDetails(PDO $pdo, int $id): ?array
             o.customer_po_number,
             c.name AS customer_name,
             inspector.name AS inspector_name,
-            creator.name AS creator_name
+            creator.name AS creator_name,
+            wopr.id AS partial_receipt_id,
+            wopr.receipt_number AS partial_receipt_number,
+            wopr.receipt_status AS partial_receipt_status,
+            wopr.shipping_tool_details AS partial_receipt_shipping_tool_details,
+            wopr.notes AS partial_receipt_notes,
+            wopr.created_at AS partial_receipt_created_at,
+            CASE
+                WHEN wopr.id IS NULL THEN NULL
+                WHEN wopr.machine_run_id IS NULL THEN '一般工單'
+                WHEN COALESCE(wopr_run.run_label, '') <> '' THEN wopr_run.run_label
+                WHEN COALESCE(wopr_machine.name, '') <> '' THEN wopr_machine.name
+                ELSE '拆分機台'
+            END AS partial_receipt_source_label
         FROM inventory_items ii
         LEFT JOIN screening_items si ON ii.screening_item_id = si.id
         LEFT JOIN work_orders wo ON ii.work_order_id = wo.id
@@ -123,11 +185,76 @@ function getInventoryItemDetails(PDO $pdo, int $id): ?array
         LEFT JOIN customers c ON ii.customer_id = c.id
         LEFT JOIN employees inspector ON ii.inspector_employee_id = inspector.id
         LEFT JOIN employees creator ON ii.created_by_employee_id = creator.id
+        LEFT JOIN work_order_partial_receipts wopr ON wopr.inventory_item_id = ii.id
+        LEFT JOIN work_order_machine_runs wopr_run ON wopr_run.id = wopr.machine_run_id
+        LEFT JOIN machines wopr_machine ON wopr_machine.id = wopr_run.machine_id
         WHERE ii.id = :id AND ii.deleted_at IS NULL
     ");
 
     $stmt->execute(['id' => $id]);
     $item = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($item) {
+        $receiptType = (string)($item['receipt_type'] ?? 'standard');
+        $item['receipt_type_label'] = match ($receiptType) {
+            'partial' => '部分入庫',
+            'final' => '最終補入',
+            default => '一般入庫',
+        };
+
+        $partialReceiptStatus = (string)($item['partial_receipt_status'] ?? '');
+        $item['partial_receipt_status_label'] = match ($partialReceiptStatus) {
+            'partial' => '有效',
+            'settled' => '已結清',
+            'reversed' => '已沖銷',
+            default => '',
+        };
+
+        $partialReceiptId = (int)($item['partial_receipt_id'] ?? 0);
+        $partialReceiptTools = fetchInventoryPartialReceiptToolDetails($pdo, $partialReceiptId);
+        $partialReceiptToolTotalWeightKg = 0.0;
+        $partialReceiptToolBreakdown = [];
+        foreach ($partialReceiptTools as $tool) {
+            $partialReceiptToolTotalWeightKg += (float)($tool['total_weight_kg'] ?? 0);
+            $toolLabel = trim((string)($tool['tool_name'] ?? ''));
+            $toolType = trim((string)($tool['tool_type'] ?? ''));
+            if ($toolType !== '' && $toolType !== $toolLabel) {
+                $toolLabel .= ' / ' . $toolType;
+            }
+            $partialReceiptToolBreakdown[] = sprintf(
+                '%s x %d（%.3f kg/個，小計 %.3f kg）',
+                $toolLabel !== '' ? $toolLabel : ('載具#' . (int)($tool['id'] ?? 0)),
+                (int)($tool['quantity'] ?? 0),
+                round((float)($tool['unit_weight_kg'] ?? 0), 3),
+                round((float)($tool['total_weight_kg'] ?? 0), 3)
+            );
+        }
+
+        $item['partial_receipt_tool_details'] = $partialReceiptTools;
+        $item['partial_receipt_tool_total_weight_kg'] = round($partialReceiptToolTotalWeightKg, 3);
+        $item['partial_receipt_tool_breakdown'] = implode("\n", $partialReceiptToolBreakdown);
+
+        $weightPerUnitG = round((float)($item['weight_per_unit_g'] ?? 0), 3);
+        $originalUnits = round((float)($item['total_good_units'] ?? 0), 0);
+        $unshippedUnits = round((float)($item['quantity_on_hand'] ?? 0), 0);
+        $allocatedUnits = round((float)($item['quantity_allocated'] ?? 0), 0);
+        $reservedUnits = round((float)($item['quantity_reserved'] ?? 0), 0);
+        $shippedUnits = round((float)($item['quantity_shipped'] ?? 0), 0);
+        $availableToShipUnits = round(max($unshippedUnits - $allocatedUnits, 0), 0);
+
+        $item['partial_receipt_original_units'] = $originalUnits;
+        $item['partial_receipt_original_net_weight_kg'] = round((float)($item['net_weight_kg'] ?? 0), 2);
+        $item['partial_receipt_unshipped_units'] = $unshippedUnits;
+        $item['partial_receipt_unshipped_net_weight_kg'] = inventoryUnitsToWeightKg($unshippedUnits, $weightPerUnitG);
+        $item['partial_receipt_allocated_pending_ship_units'] = $allocatedUnits;
+        $item['partial_receipt_allocated_pending_ship_net_weight_kg'] = inventoryUnitsToWeightKg($allocatedUnits, $weightPerUnitG);
+        $item['partial_receipt_reserved_units'] = $reservedUnits;
+        $item['partial_receipt_reserved_net_weight_kg'] = inventoryUnitsToWeightKg($reservedUnits, $weightPerUnitG);
+        $item['partial_receipt_available_to_ship_units'] = $availableToShipUnits;
+        $item['partial_receipt_available_to_ship_net_weight_kg'] = inventoryUnitsToWeightKg($availableToShipUnits, $weightPerUnitG);
+        $item['partial_receipt_shipped_units'] = $shippedUnits;
+        $item['partial_receipt_shipped_net_weight_kg'] = inventoryUnitsToWeightKg($shippedUnits, $weightPerUnitG);
+    }
 
     return $item ?: null;
 }

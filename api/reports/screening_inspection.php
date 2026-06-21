@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../work_orders/helpers.php';
 
 requireAuth();
 
@@ -31,10 +32,17 @@ try {
             wo.total_weight_kg,
             wo.weight_per_unit_g,
             wo.total_units,
+            wo.work_order_type,
             wo.tool_statistics,
             wo.screening_speed,
             wo.customer_instructions,
             wo.other_notes,
+            wo.shortage_net_weight_kg,
+            wo.shortage_units,
+            wo.shortage_reason_code,
+            wo.shortage_notes,
+            wo.shortage_confirmed_by,
+            wo.shortage_confirmed_at,
             wo.status,
             wo.actual_start_date,
             wo.actual_end_date,
@@ -295,6 +303,31 @@ try {
         unset($machineRun);
     }
 
+    $productionSummary = fetchWorkOrderProductionSummary(
+        $pdo,
+        $workOrderId,
+        (string)($workOrder['work_order_type'] ?? 'normal'),
+        $weightPerUnitG
+    );
+    $partialReceiptLedger = fetchWorkOrderPartialReceiptLedger($pdo, $workOrderId);
+    $finalInventorySummary = fetchWorkOrderFinalInventorySummary($pdo, $workOrderId, $weightPerUnitG);
+    $workOrder['partial_receipt_summary'] = buildWorkOrderPartialReceiptSummary(
+        [
+            'total_weight_kg' => $orderTotalWeight,
+            'weight_per_unit_g' => $weightPerUnitG,
+            'shortage_net_weight_kg' => $workOrder['shortage_net_weight_kg'] ?? null,
+            'shortage_units' => $workOrder['shortage_units'] ?? null,
+            'shortage_reason_code' => $workOrder['shortage_reason_code'] ?? null,
+            'shortage_notes' => $workOrder['shortage_notes'] ?? null,
+            'shortage_confirmed_by' => $workOrder['shortage_confirmed_by'] ?? null,
+            'shortage_confirmed_at' => $workOrder['shortage_confirmed_at'] ?? null,
+        ],
+        $productionSummary,
+        $partialReceiptLedger['summary'],
+        $finalInventorySummary
+    );
+    $workOrder['partial_receipts'] = $partialReceiptLedger['partial_receipts'];
+
     // 8. 準備圓餅圖數據（只包含有不良品的項目）
     $chartLabels = [];
     $chartLabelsEn = [];
@@ -422,8 +455,10 @@ try {
                 'total_tool_weight_kg' => round($totalToolWeight, 3),
                 'total_tool_quantity' => $totalToolQuantity,
                 'defect_rate_percent' => round($defectRate, 4),
-                'defect_rate_ppm' => round($defectRatePpm, 2)
+                'defect_rate_ppm' => round($defectRatePpm, 2),
+                'partial_receipt_summary' => $workOrder['partial_receipt_summary'],
             ],
+            'partial_receipts' => $workOrder['partial_receipts'],
             // 圓餅圖數據
             'chart_data' => [
                 'labels' => $chartLabels,

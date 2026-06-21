@@ -90,6 +90,27 @@ $machineRunsPayload = $payload['machine_runs'] ?? [];
 unset($payload['machine_runs']);
 $machineRunsPayload = is_array($machineRunsPayload) ? $machineRunsPayload : [];
 
+$shortagePayload = [];
+if (isset($payload['completion_shortage']) && is_array($payload['completion_shortage'])) {
+    $shortagePayload = $payload['completion_shortage'];
+}
+foreach ([
+    'completion_shortage',
+    'shortage_reason_code',
+    'shortage_notes',
+    'shortage_net_weight_kg',
+    'shortage_units',
+    'shortage_confirmed_by',
+    'shortage_confirmed_at',
+] as $shortageField) {
+    if (array_key_exists($shortageField, $payload)) {
+        if ($shortageField !== 'completion_shortage') {
+            $shortagePayload[$shortageField] = $payload[$shortageField];
+        }
+        unset($payload[$shortageField]);
+    }
+}
+
 $validation = validateWorkOrderData($payload, true);
 
 if (!empty($validation['errors'])) {
@@ -139,6 +160,9 @@ try {
     if ($newIsCompleted && !$hasCompletedAt) {
         $data['completed_at'] = date('Y-m-d H:i:s');
         $hasCompletedAt = true;
+    } elseif (!$newIsCompleted && $hasCompletedAt) {
+        $data['completed_at'] = null;
+        $hasCompletedAt = false;
     }
 
     $targetWorkOrderType = (string)($data['work_order_type'] ?? $existingWorkOrder['work_order_type'] ?? 'normal');
@@ -342,6 +366,7 @@ try {
 
     $createdInventoryItemId = null;
     $deletedInventoryItemId = null;
+    $completionSummary = null;
 
     // ===== 工單完工 → 依使用者選擇建立庫存品項 =====
     $isCompletingNow = ($newIsCompleted && !$oldIsCompleted);
@@ -376,217 +401,302 @@ try {
             $deleteInventoryStmt->execute(['id' => $inventoryItemId]);
             $deletedInventoryItemId = $inventoryItemId;
         }
+        $reopenReceiptStmt = $pdo->prepare("
+            UPDATE work_order_partial_receipts
+            SET
+                receipt_status = 'partial',
+                settled_at = NULL,
+                settled_by_employee_id = NULL
+            WHERE work_order_id = :work_order_id
+              AND receipt_status = 'settled'
+        ");
+        $reopenReceiptStmt->execute(['work_order_id' => $id]);
+
+        $clearShortageStmt = $pdo->prepare("
+            UPDATE work_orders
+            SET
+                shortage_net_weight_kg = NULL,
+                shortage_units = NULL,
+                shortage_reason_code = NULL,
+                shortage_notes = NULL,
+                shortage_confirmed_by = NULL,
+                shortage_confirmed_at = NULL
+            WHERE id = :id
+        ");
+        $clearShortageStmt->execute(['id' => $id]);
     }
 
-    if ($isCompletingNow && $autoCreateInventory) {
-        // 檢查是否已為此工單建立過庫存（避免重複）
-        $checkInvSql = $targetWorkOrderType === 'split'
-            ? "SELECT id FROM inventory_items WHERE work_order_id = :woid AND deleted_at IS NULL AND receipt_type IN ('standard', 'final') LIMIT 1"
-            : "SELECT id FROM inventory_items WHERE work_order_id = :woid AND deleted_at IS NULL LIMIT 1";
-        $checkInvStmt = $pdo->prepare($checkInvSql);
-        $checkInvStmt->execute(['woid' => $id]);
-        $existingInv = $checkInvStmt->fetchColumn();
+    if ($isCompletingNow) {
+        $orderItemStmt = $pdo->prepare("
+            SELECT oi.id AS order_item_id, oi.order_id, oi.screening_item_id,
+                   oi.customer_batch_number, o.customer_id
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.id
+            WHERE oi.id = :oiid
+        ");
+        $orderItemStmt->execute(['oiid' => $existingWorkOrder['order_item_id']]);
+        $orderItemInfo = $orderItemStmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$existingInv) {
-            // 取得訂單項目和客戶資訊
-            $orderItemStmt = $pdo->prepare("
-                SELECT oi.id AS order_item_id, oi.order_id, oi.screening_item_id,
-                       oi.customer_batch_number, o.customer_id
-                FROM order_items oi
-                JOIN orders o ON oi.order_id = o.id
-                WHERE oi.id = :oiid
-            ");
-            $orderItemStmt->execute(['oiid' => $existingWorkOrder['order_item_id']]);
-            $orderItemInfo = $orderItemStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$orderItemInfo) {
+            $pdo->rollBack();
+            jsonResponse(['success' => false, 'message' => '找不到工單對應的訂單品項，無法完成工單。'], 409);
+            return;
+        }
 
-            if ($orderItemInfo) {
-                $orderItemMetrics = fetchOrderItemDetailsForWorkOrder($pdo, (int)$existingWorkOrder['order_item_id']) ?? [];
+        $orderItemMetrics = fetchOrderItemDetailsForWorkOrder($pdo, (int)$existingWorkOrder['order_item_id']) ?? [];
+        $expectedNetWeightKg = round((float)(
+            $data['total_weight_kg']
+            ?? $existingWorkOrder['total_weight_kg']
+            ?? $orderItemMetrics['net_weight']
+            ?? 0
+        ), 2);
+        $weightPerUnitG = round((float)(
+            $data['weight_per_unit_g']
+            ?? $existingWorkOrder['weight_per_unit_g']
+            ?? $orderItemMetrics['weight_per_unit_g']
+            ?? 0
+        ), 3);
+        if ($expectedNetWeightKg <= 0 || $weightPerUnitG <= 0) {
+            $pdo->rollBack();
+            jsonResponse(['success' => false, 'message' => '工單缺少預期淨重或單支重，無法完成工單。'], 400);
+            return;
+        }
 
-                // 計算良品/不良品數量
-                $defectStmt = $pdo->prepare("
-                    SELECT COALESCE(SUM(defect_quantity), 0) FROM work_order_screening_defects WHERE work_order_id = :woid
-                ");
-                $defectStmt->execute(['woid' => $id]);
-                $totalDefects = (float)$defectStmt->fetchColumn();
+        $productionSummary = fetchWorkOrderProductionSummary($pdo, $id, $targetWorkOrderType, $weightPerUnitG);
+        $partialReceiptLedger = fetchWorkOrderPartialReceiptLedger($pdo, $id);
+        $partialSummary = $partialReceiptLedger['summary'];
+        $partialReceivedNetWeightKg = round((float)($partialSummary['partial_received_net_weight_kg'] ?? 0), 2);
+        $partialReceivedUnits = (float)round((float)($partialSummary['partial_received_units'] ?? 0), 0);
+        $producedNetWeightKg = round((float)($productionSummary['produced_net_weight_kg'] ?? 0), 2);
 
-                $totalUnits = (float)(
-                    $data['total_units']
-                    ?? $existingWorkOrder['total_units']
-                    ?? $orderItemMetrics['total_units']
-                    ?? 0
-                );
-                $totalGoodUnits = max(0, $totalUnits - $totalDefects);
+        if ($producedNetWeightKg - $expectedNetWeightKg > 0.0001) {
+            $pdo->rollBack();
+            jsonResponse([
+                'success' => false,
+                'message' => "本次完工良品淨重 {$producedNetWeightKg} kg 超過工單預期淨重 {$expectedNetWeightKg} kg。請先檢查生產紀錄或機台完成重量。",
+            ], 409);
+            return;
+        }
 
-                // 取得重量資料（可能從最新的 data 或既有欄位）
-                $totalWeightKg = (float)(
-                    $data['total_weight_kg']
-                    ?? $existingWorkOrder['total_weight_kg']
-                    ?? $orderItemMetrics['net_weight']
-                    ?? 0
-                );
-                $weightPerUnitG = (float)(
-                    $data['weight_per_unit_g']
-                    ?? $existingWorkOrder['weight_per_unit_g']
-                    ?? $orderItemMetrics['weight_per_unit_g']
-                    ?? 0
-                );
+        if ($partialReceivedNetWeightKg - $producedNetWeightKg > 0.0001) {
+            $pdo->rollBack();
+            jsonResponse([
+                'success' => false,
+                'message' => "已部分入庫淨重 {$partialReceivedNetWeightKg} kg 超過本次完工良品淨重 {$producedNetWeightKg} kg，無法完成工單。請先檢查生產紀錄或走部分入庫更正流程。",
+            ], 409);
+            return;
+        }
+
+        $shortageNetWeightKg = round(max($expectedNetWeightKg - $producedNetWeightKg, 0), 2);
+        $shortageUnits = workOrderUnitsFromWeight($shortageNetWeightKg, $weightPerUnitG);
+        $shortageReasonCode = trim((string)($shortagePayload['shortage_reason_code'] ?? ''));
+        $shortageNotes = trim((string)($shortagePayload['shortage_notes'] ?? ''));
+        $allowedShortageReasonCodes = ['material_loss', 'mixed_material', 'damaged', 'count_error', 'other'];
+
+        if ($shortageNetWeightKg > 0.0001) {
+            if ($employeePermissions !== [] && !hasAnyPermission(['work_orders.confirm_shortage', 'manage_work_orders'])) {
+                $pdo->rollBack();
+                jsonResponse(['success' => false, 'message' => '您沒有確認工單短缺的權限。'], 403);
+                return;
+            }
+            if ($shortageReasonCode === '' || !in_array($shortageReasonCode, $allowedShortageReasonCodes, true)) {
+                $pdo->rollBack();
+                jsonResponse(['success' => false, 'message' => '真實短缺必須選擇有效原因。'], 400);
+                return;
+            }
+            if ($shortageReasonCode === 'other' && $shortageNotes === '') {
+                $pdo->rollBack();
+                jsonResponse(['success' => false, 'message' => '短缺原因選擇其他時，請補充說明。'], 400);
+                return;
+            }
+        } else {
+            $shortageReasonCode = '';
+            $shortageNotes = '';
+        }
+
+        $finalNetWeightKg = round(max($producedNetWeightKg - $partialReceivedNetWeightKg, 0), 2);
+        $finalUnits = workOrderUnitsFromWeight($finalNetWeightKg, $weightPerUnitG);
+
+        if (!$autoCreateInventory && $finalNetWeightKg > 0.0001) {
+            $pdo->rollBack();
+            jsonResponse([
+                'success' => false,
+                'message' => "此工單尚有 {$finalNetWeightKg} kg / {$finalUnits} 支需建立最終入庫，不可只更新工單狀態。請改用自動入庫完成結案。",
+            ], 409);
+            return;
+        }
+
+        if ($autoCreateInventory) {
+            $checkInvSql = $targetWorkOrderType === 'split'
+                ? "SELECT id FROM inventory_items WHERE work_order_id = :woid AND deleted_at IS NULL AND receipt_type IN ('standard', 'final') LIMIT 1"
+                : "SELECT id FROM inventory_items WHERE work_order_id = :woid AND deleted_at IS NULL AND receipt_type IN ('standard', 'final') LIMIT 1";
+            $checkInvStmt = $pdo->prepare($checkInvSql);
+            $checkInvStmt->execute(['woid' => $id]);
+            $existingInv = $checkInvStmt->fetchColumn();
+
+            if (!$existingInv && $finalNetWeightKg > 0.0001 && $finalUnits > 0) {
+                require_once __DIR__ . '/../inventory_items/helpers.php';
+                $inventoryNumber = generateInventoryNumber($pdo);
                 $toolStatistics = $data['tool_statistics']
                     ?? $existingWorkOrder['tool_statistics']
                     ?? $orderItemMetrics['tool_statistics']
                     ?? null;
                 $toolWeightKg = (float)($orderItemMetrics['total_tool_weight'] ?? 0);
                 $totalToolQuantity = (int)($orderItemMetrics['tool_quantity'] ?? 0);
+                $receiptType = $partialReceivedNetWeightKg > 0.0001 ? 'final' : 'standard';
+                $inventoryToolWeightKg = $receiptType === 'standard' && $targetWorkOrderType !== 'split'
+                    ? $toolWeightKg
+                    : 0.0;
+                $inventoryToolStatistics = $receiptType === 'standard' ? $toolStatistics : null;
+                $inventoryToolQuantity = $receiptType === 'standard' ? $totalToolQuantity : 0;
+                $grossWeightKg = round($finalNetWeightKg + $inventoryToolWeightKg, 2);
 
-                $receiptType = 'standard';
-                $partialReceivedNetWeightKg = 0.0;
-                $partialReceivedUnits = 0.0;
-                $partialStmt = $pdo->prepare("
-                    SELECT
-                        COALESCE(SUM(net_weight_kg), 0) AS received_net_weight_kg,
-                        COALESCE(SUM(calculated_units), 0) AS received_units
-                    FROM work_order_partial_receipts
-                    WHERE work_order_id = :work_order_id
-                      AND receipt_status != 'reversed'
-                ");
-                $partialStmt->execute(['work_order_id' => $id]);
-                $partialSummary = $partialStmt->fetch(PDO::FETCH_ASSOC) ?: [];
-                $partialReceivedNetWeightKg = round((float)($partialSummary['received_net_weight_kg'] ?? 0), 2);
-                $partialReceivedUnits = round((float)($partialSummary['received_units'] ?? 0), 2);
-                if ($partialReceivedNetWeightKg > 0.0001) {
-                    $receiptType = 'final';
-                }
+                $insertInvSql = "
+                    INSERT INTO inventory_items (
+                        screening_item_id, inventory_number, receipt_type, work_order_id,
+                        order_item_id, order_id, customer_id, customer_batch_number,
+                        total_good_units, total_defect_units,
+                        quantity_on_hand, quantity_allocated, quantity_reserved, quantity_shipped,
+                        net_weight_kg, gross_weight_kg, tool_weight_kg, weight_per_unit_g,
+                        tool_statistics, total_tool_quantity,
+                        quality_status, status, received_at, created_by_employee_id
+                    ) VALUES (
+                        :screening_item_id, :inventory_number, :receipt_type, :work_order_id,
+                        :order_item_id, :order_id, :customer_id, :customer_batch_number,
+                        :total_good_units, 0,
+                        :quantity_on_hand, 0, 0, 0,
+                        :net_weight_kg, :gross_weight_kg, :tool_weight_kg, :weight_per_unit_g,
+                        :tool_statistics, :total_tool_quantity,
+                        'pending', 'in_stock', NOW(), :created_by
+                    )
+                ";
+                $insertInvStmt = $pdo->prepare($insertInvSql);
+                $insertInvStmt->execute([
+                    'screening_item_id' => (int)$orderItemInfo['screening_item_id'],
+                    'inventory_number' => $inventoryNumber,
+                    'receipt_type' => $receiptType,
+                    'work_order_id' => $id,
+                    'order_item_id' => (int)$orderItemInfo['order_item_id'],
+                    'order_id' => (int)$orderItemInfo['order_id'],
+                    'customer_id' => (int)$orderItemInfo['customer_id'],
+                    'customer_batch_number' => $orderItemInfo['customer_batch_number'],
+                    'total_good_units' => $finalUnits,
+                    'quantity_on_hand' => $finalUnits,
+                    'net_weight_kg' => $finalNetWeightKg,
+                    'gross_weight_kg' => $grossWeightKg,
+                    'tool_weight_kg' => $inventoryToolWeightKg,
+                    'weight_per_unit_g' => $weightPerUnitG,
+                    'tool_statistics' => $inventoryToolStatistics,
+                    'total_tool_quantity' => $inventoryToolQuantity,
+                    'created_by' => $_SESSION['employee']['id'] ?? null,
+                ]);
 
-                // 計算完整良品淨重，再扣除先前部分入庫，避免一般與拆分工單重複計入庫存。
-                if ($targetWorkOrderType === 'split') {
-                    $fullGoodNetWeightKg = round($totalWeightKg, 2);
-                    $totalDefectsForInventory = 0.0;
-                } else {
-                    $fullGoodNetWeightKg = $weightPerUnitG > 0
-                        ? round($totalGoodUnits * $weightPerUnitG / 1000, 2)
-                        : round($totalWeightKg, 2);
-                    $totalDefectsForInventory = $totalDefects;
-                }
+                $invId = (int)$pdo->lastInsertId();
+                $createdInventoryItemId = $invId;
 
-                if ($partialReceivedNetWeightKg - $fullGoodNetWeightKg > 0.0001) {
-                    $pdo->rollBack();
-                    jsonResponse([
-                        'success' => false,
-                        'message' => "已部分入庫淨重 {$partialReceivedNetWeightKg} kg 超過本次完工良品淨重 {$fullGoodNetWeightKg} kg，無法完成工單。請先檢查生產紀錄或走部分入庫更正流程。",
-                    ], 409);
-                    return;
-                }
-
-                $netWeightKg = round(max(0, $fullGoodNetWeightKg - $partialReceivedNetWeightKg), 2);
-                $totalGoodUnits = $weightPerUnitG > 0
-                    ? round($netWeightKg * 1000 / $weightPerUnitG, 2)
-                    : max(0, $totalGoodUnits - $partialReceivedUnits);
-                $grossWeightKg = round($netWeightKg + $toolWeightKg, 2);
-
-                $currentEmployee = $_SESSION['employee'] ?? null;
-                $currentUserId = $currentEmployee ? (int)$currentEmployee['id'] : null;
-
-                if ($netWeightKg > 0.0001 && $totalGoodUnits > 0.0001) {
-                    // 產生庫存編號
-                    require_once __DIR__ . '/../inventory_items/helpers.php';
-                    $inventoryNumber = generateInventoryNumber($pdo);
-
-                    // 建立庫存品項
-                    $insertInvSql = "
-                        INSERT INTO inventory_items (
-                            screening_item_id, inventory_number, receipt_type, work_order_id,
-                            order_item_id, order_id, customer_id, customer_batch_number,
-                            total_good_units, total_defect_units,
-                            quantity_on_hand, quantity_allocated, quantity_reserved, quantity_shipped,
-                            net_weight_kg, gross_weight_kg, tool_weight_kg, weight_per_unit_g,
-                            tool_statistics, total_tool_quantity,
-                            quality_status, status, received_at, created_by_employee_id
-                        ) VALUES (
-                            :screening_item_id, :inventory_number, :receipt_type, :work_order_id,
-                            :order_item_id, :order_id, :customer_id, :customer_batch_number,
-                            :total_good_units, :total_defect_units,
-                            :quantity_on_hand, 0, 0, 0,
-                            :net_weight_kg, :gross_weight_kg, :tool_weight_kg, :weight_per_unit_g,
-                            :tool_statistics, :total_tool_quantity,
-                            'pending', 'in_stock', NOW(), :created_by
-                        )
-                    ";
-                    $insertInvStmt = $pdo->prepare($insertInvSql);
-                    $insertInvStmt->execute([
-                        'screening_item_id' => (int)$orderItemInfo['screening_item_id'],
-                        'inventory_number' => $inventoryNumber,
-                        'receipt_type' => $receiptType,
-                        'work_order_id' => $id,
-                        'order_item_id' => (int)$orderItemInfo['order_item_id'],
-                        'order_id' => (int)$orderItemInfo['order_id'],
-                        'customer_id' => (int)$orderItemInfo['customer_id'],
-                        'customer_batch_number' => $orderItemInfo['customer_batch_number'],
-                        'total_good_units' => $totalGoodUnits,
-                        'total_defect_units' => $totalDefectsForInventory,
-                        'quantity_on_hand' => $totalGoodUnits,
-                        'net_weight_kg' => $netWeightKg,
-                        'gross_weight_kg' => $grossWeightKg,
-                        'tool_weight_kg' => $targetWorkOrderType === 'split' ? 0 : $toolWeightKg,
-                        'weight_per_unit_g' => $weightPerUnitG,
-                        'tool_statistics' => $toolStatistics,
-                        'total_tool_quantity' => $targetWorkOrderType === 'split' ? 0 : $totalToolQuantity,
-                        'created_by' => $currentUserId,
-                    ]);
-
-                    $invId = (int)$pdo->lastInsertId();
-                    $createdInventoryItemId = $invId;
-
-                    // 建立入庫交易記錄
-                    $txnId = getNextInventoryTransactionId($pdo);
-                    $txnSql = "
-                        INSERT INTO inventory_transactions (
-                            id, inventory_item_id, order_id, order_item_id, work_order_id,
-                            ref_type, ref_id, direction, quantity, after_quantity,
-                            notes, created_by_employee_id
-                        ) VALUES (
-                            :id, :inv_id, :order_id, :order_item_id, :work_order_id,
-                            :ref_type, :ref_id, 'inbound', :qty, :after_qty,
-                            :notes, :created_by
-                        )
-                    ";
-                    $txnStmt = $pdo->prepare($txnSql);
-                    $txnStmt->execute([
-                        'id' => $txnId,
-                        'inv_id' => $invId,
-                        'order_id' => (int)$orderItemInfo['order_id'],
-                        'order_item_id' => (int)$orderItemInfo['order_item_id'],
-                        'work_order_id' => $id,
-                        'ref_type' => $targetWorkOrderType === 'split' ? 'work_order_final_receipt' : 'work_order',
-                        'ref_id' => $id,
-                        'qty' => $totalGoodUnits,
-                        'after_qty' => $totalGoodUnits,
-                        'notes' => $partialReceivedNetWeightKg > 0.0001
-                            ? "工單最終補入庫，剩餘淨重 {$netWeightKg} kg / {$totalGoodUnits} 支，已部分入庫 {$partialReceivedNetWeightKg} kg / {$partialReceivedUnits} 支"
-                            : "工單完工自動入庫，良品 {$totalGoodUnits}，不良品 {$totalDefects}",
-                        'created_by' => $currentUserId,
-                    ]);
-                }
-
-                if ($partialReceivedNetWeightKg > 0.0001) {
-                    $settleStmt = $pdo->prepare("
-                        UPDATE work_order_partial_receipts
-                        SET receipt_status = 'settled',
-                            settled_at = COALESCE(settled_at, NOW()),
-                            settled_by_employee_id = COALESCE(settled_by_employee_id, :employee_id)
-                        WHERE work_order_id = :work_order_id
-                          AND receipt_status = 'partial'
-                    ");
-                    $settleStmt->execute([
-                        'employee_id' => $currentUserId,
-                        'work_order_id' => $id,
-                    ]);
-                    logAuditAction('Settled work order partial receipts', 'work_orders', $id, [
-                        'settled_receipt_count' => $settleStmt->rowCount(),
-                        'final_net_weight_kg' => $netWeightKg,
-                        'partial_received_net_weight_kg' => $partialReceivedNetWeightKg,
-                    ]);
-                }
+                $txnId = getNextInventoryTransactionId($pdo);
+                $txnSql = "
+                    INSERT INTO inventory_transactions (
+                        id, inventory_item_id, order_id, order_item_id, work_order_id,
+                        ref_type, ref_id, direction, quantity, after_quantity,
+                        notes, created_by_employee_id
+                    ) VALUES (
+                        :id, :inv_id, :order_id, :order_item_id, :work_order_id,
+                        :ref_type, :ref_id, 'inbound', :qty, :after_qty,
+                        :notes, :created_by
+                    )
+                ";
+                $txnStmt = $pdo->prepare($txnSql);
+                $txnStmt->execute([
+                    'id' => $txnId,
+                    'inv_id' => $invId,
+                    'order_id' => (int)$orderItemInfo['order_id'],
+                    'order_item_id' => (int)$orderItemInfo['order_item_id'],
+                    'work_order_id' => $id,
+                    'ref_type' => $targetWorkOrderType === 'split' ? 'work_order_final_receipt' : 'work_order',
+                    'ref_id' => $id,
+                    'qty' => $finalUnits,
+                    'after_qty' => $finalUnits,
+                    'notes' => $partialReceivedNetWeightKg > 0.0001
+                        ? "工單最終補入庫，剩餘淨重 {$finalNetWeightKg} kg / {$finalUnits} 支，已部分入庫 {$partialReceivedNetWeightKg} kg / {$partialReceivedUnits} 支"
+                        : "工單完工自動入庫，良品 {$finalUnits} 支 / {$finalNetWeightKg} kg",
+                    'created_by' => $_SESSION['employee']['id'] ?? null,
+                ]);
             }
         }
+
+        if ($partialReceivedNetWeightKg > 0.0001) {
+            $settleStmt = $pdo->prepare("
+                UPDATE work_order_partial_receipts
+                SET receipt_status = 'settled',
+                    settled_at = COALESCE(settled_at, NOW()),
+                    settled_by_employee_id = COALESCE(settled_by_employee_id, :employee_id)
+                WHERE work_order_id = :work_order_id
+                  AND receipt_status = 'partial'
+            ");
+            $settleStmt->execute([
+                'employee_id' => $_SESSION['employee']['id'] ?? null,
+                'work_order_id' => $id,
+            ]);
+            logAuditAction('Settled work order partial receipts', 'work_orders', $id, [
+                'settled_receipt_count' => $settleStmt->rowCount(),
+                'final_net_weight_kg' => $finalNetWeightKg,
+                'partial_received_net_weight_kg' => $partialReceivedNetWeightKg,
+            ]);
+        }
+
+        $shortageUpdateStmt = $pdo->prepare("
+            UPDATE work_orders
+            SET
+                shortage_net_weight_kg = :shortage_net_weight_kg,
+                shortage_units = :shortage_units,
+                shortage_reason_code = :shortage_reason_code,
+                shortage_notes = :shortage_notes,
+                shortage_confirmed_by = :shortage_confirmed_by,
+                shortage_confirmed_at = :shortage_confirmed_at
+            WHERE id = :id
+        ");
+        $shortageUpdateStmt->execute([
+            'shortage_net_weight_kg' => $shortageNetWeightKg > 0.0001 ? $shortageNetWeightKg : null,
+            'shortage_units' => $shortageNetWeightKg > 0.0001 ? $shortageUnits : null,
+            'shortage_reason_code' => $shortageReasonCode !== '' ? $shortageReasonCode : null,
+            'shortage_notes' => $shortageNotes !== '' ? $shortageNotes : null,
+            'shortage_confirmed_by' => $shortageNetWeightKg > 0.0001 ? ($_SESSION['employee']['id'] ?? null) : null,
+            'shortage_confirmed_at' => $shortageNetWeightKg > 0.0001 ? date('Y-m-d H:i:s') : null,
+            'id' => $id,
+        ]);
+
+        if ($shortageNetWeightKg > 0.0001) {
+            appendWorkOrderOperationLog($pdo, $id, 'confirm_shortage', '確認工單短缺', [
+                'notes' => $shortageNotes !== '' ? $shortageNotes : null,
+                'payload' => [
+                    'shortage_net_weight_kg' => $shortageNetWeightKg,
+                    'shortage_units' => $shortageUnits,
+                    'shortage_reason_code' => $shortageReasonCode,
+                ],
+            ]);
+            logAuditAction('Confirmed work order shortage', 'work_orders', $id, [
+                'shortage_net_weight_kg' => $shortageNetWeightKg,
+                'shortage_units' => $shortageUnits,
+                'shortage_reason_code' => $shortageReasonCode,
+            ]);
+        }
+
+        $completionSummary = [
+            'expected_net_weight_kg' => $expectedNetWeightKg,
+            'produced_net_weight_kg' => $producedNetWeightKg,
+            'partial_received_net_weight_kg' => $partialReceivedNetWeightKg,
+            'final_received_net_weight_kg' => $finalNetWeightKg,
+            'final_received_units' => $finalUnits,
+            'shortage_net_weight_kg' => $shortageNetWeightKg,
+            'shortage_units' => $shortageUnits,
+            'shortage_reason_code' => $shortageReasonCode !== '' ? $shortageReasonCode : null,
+            'shortage_notes' => $shortageNotes !== '' ? $shortageNotes : null,
+            'balance_difference_net_weight_kg' => round(
+                $expectedNetWeightKg - $partialReceivedNetWeightKg - $finalNetWeightKg - $shortageNetWeightKg,
+                2
+            ),
+        ];
     }
 
     if ($newStatusLookupId !== $oldStatusLookupId) {
@@ -657,6 +767,7 @@ try {
             'inventory_item_id' => $currentInventoryItemId ? (int)$currentInventoryItemId : null,
             'deleted_inventory_item_id' => $deletedInventoryItemId,
             'has_inventory' => $currentInventoryItemId ? 1 : 0,
+            'completion_summary' => $completionSummary,
         ],
     ]);
 

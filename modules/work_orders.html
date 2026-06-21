@@ -662,7 +662,7 @@
                                         <th>日期</th>
                                         <th>時間</th>
                                         <th>機台編號</th>
-                                        <th>機台種類</th>
+                                        <th>機台能力</th>
                                         <th>登錄者</th>
                                         <th>備註</th>
                                         <th>操作</th>
@@ -878,6 +878,37 @@
                         </div>
                     </section>
 
+                    <section class="form-section work-order-partial-history-section" data-collapsible-section>
+                        <header class="subsection-header">
+                            <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-partial-history-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                            <h4>部分入庫歷程 / 結清追蹤</h4>
+                        </header>
+                        <div class="subsection-body" data-work-order-partial-history-section>
+                            <div class="work-order-balance-alert hidden" data-work-order-balance-alert></div>
+                            <div class="table-responsive">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th>入庫單號</th>
+                                            <th>建立時間</th>
+                                            <th>操作人</th>
+                                            <th>來源</th>
+                                            <th>原始入庫</th>
+                                            <th>出貨載具</th>
+                                            <th>庫存編號</th>
+                                            <th>出貨追蹤</th>
+                                            <th>狀態</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody data-work-order-partial-receipts-rows>
+                                        <tr class="empty-row"><td colspan="10" class="text-center">尚無部分入庫紀錄</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
                     <section class="form-section work-order-edit-inspection-section" data-split-mode-hidden data-collapsible-section>
                         <header class="subsection-header">
                             <div class="subsection-actions">
@@ -1051,7 +1082,7 @@
                                                 <th>日期</th>
                                                 <th>時間</th>
                                                 <th>機台編號</th>
-                                                <th>機台種類</th>
+                                                <th>機台能力</th>
                                                 <th>登錄者</th>
                                                 <th>備註</th>
                                             </tr>
@@ -1085,7 +1116,7 @@
                                                 <th>日期</th>
                                                 <th>時間</th>
                                                 <th>機台編號</th>
-                                                <th>機台種類</th>
+                                                <th>機台能力</th>
                                                 <th>登錄者</th>
                                                 <th>備註</th>
                                                 <th>操作</th>
@@ -1170,6 +1201,52 @@
                             </div>
                     </div>
 
+                    <section class="work-order-balance-card">
+                        <div class="metrics-sidebar-header">工單數量平衡 <span class="text-muted small">(預計 = 先行入庫 + 最終補入 + 真實短缺)</span></div>
+                        <div class="work-order-balance-grid">
+                            <div class="metric">
+                                <span class="metric-label">工單預計淨重 / 支數</span>
+                                <strong data-balance-metric="expected">--</strong>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">現場已生產淨重 / 支數</span>
+                                <strong data-balance-metric="produced">--</strong>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">累計部分入庫</span>
+                                <strong data-balance-metric="partial_received">--</strong>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">部分入庫已出貨</span>
+                                <strong data-balance-metric="partial_shipped">--</strong>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">部分入庫待出貨</span>
+                                <strong data-balance-metric="partial_allocated">--</strong>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">部分入庫可再出貨</span>
+                                <strong data-balance-metric="partial_available_to_ship">--</strong>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">部分入庫未出貨</span>
+                                <strong data-balance-metric="partial_in_stock">--</strong>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">最終補入庫</span>
+                                <strong data-balance-metric="final_received">--</strong>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">真實短缺</span>
+                                <strong data-balance-metric="shortage">--</strong>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">平衡差異</span>
+                                <strong data-balance-metric="balance_difference">--</strong>
+                            </div>
+                        </div>
+                    </section>
+
                     <section class="work-order-mobile-quick-entry-card">
                         <div class="metrics-sidebar-header">手機快速入口 / QR Code</div>
                         <div class="work-order-mobile-quick-entry-body">
@@ -1222,18 +1299,152 @@
                         <input type="text" name="remaining_net_weight_kg" readonly>
                     </label>
                     <label class="inline-label">
+                        <span>累計已部分入庫 (kg)</span>
+                        <input type="text" name="received_net_weight_kg" readonly>
+                    </label>
+                    <label class="inline-label">
                         <span>本次入庫淨重 (kg)</span>
                         <input type="number" name="net_weight_kg" min="0.01" step="0.01" required>
                     </label>
+                    <div class="inline-label full-width work-order-partial-tools-field">
+                        <span>本次出貨載具</span>
+                        <input type="hidden" name="shipping_tool_details" value="">
+                        <div class="work-order-partial-tools-empty hidden" data-partial-receipt-tools-empty>
+                            此工單尚未設定可帶入的載具資料，請先到訂單品項維護載具設定。
+                        </div>
+                        <div class="work-order-partial-tools-list" data-partial-receipt-tools-list></div>
+                        <div class="work-order-partial-tools-summary">
+                            <div class="work-order-partial-tools-metric">
+                                <span>參考載具總重</span>
+                                <strong data-partial-receipt-tool-total-weight>0.000 kg</strong>
+                            </div>
+                            <div class="work-order-partial-tools-metric is-summary">
+                                <span>系統摘要</span>
+                                <p data-partial-receipt-tool-summary>尚未選擇本次出貨載具。</p>
+                            </div>
+                        </div>
+                    </div>
                     <label class="inline-label full-width">
                         <span>備註</span>
-                        <textarea name="notes" rows="3" placeholder="可填寫本次部分完工、交班或出貨需求說明"></textarea>
+                        <textarea name="notes" rows="3" placeholder="可填寫本次部分入庫、交班或出貨需求說明"></textarea>
                     </label>
                 </div>
-                <p class="form-hint">部分入庫只建立本次填寫的內容物淨重；工單不會因此自動結案。</p>
+                <p class="form-hint">部分入庫只建立本次填寫的內容物淨重；載具重量只供現場參考與追溯，不會併入工單產品淨重。</p>
                 <div class="form-actions align-right">
                     <button type="button" class="btn outline" data-action="close-partial-receipt-modal">取消</button>
                     <button type="submit" class="btn primary">確認部分入庫</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" data-work-order-completion-modal>
+        <div class="modal-window medium">
+            <button type="button" class="modal-close" data-action="close-work-order-completion-modal" aria-label="關閉">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3>工單結案確認</h3>
+            <div class="modal-alert hidden" data-work-order-completion-modal-alert role="alert"></div>
+            <form data-work-order-completion-form novalidate>
+                <div class="work-order-completion-summary">
+                    <div class="work-order-completion-summary-row">
+                        <span>工單預計</span>
+                        <strong data-completion-summary="expected">--</strong>
+                    </div>
+                    <div class="work-order-completion-summary-row">
+                        <span>現場已生產</span>
+                        <strong data-completion-summary="produced">--</strong>
+                    </div>
+                    <div class="work-order-completion-summary-row">
+                        <span>已部分入庫</span>
+                        <strong data-completion-summary="partial_received">--</strong>
+                    </div>
+                    <div class="work-order-completion-summary-row">
+                        <span>本次最終補入</span>
+                        <strong data-completion-summary="final_received">--</strong>
+                    </div>
+                    <div class="work-order-completion-summary-row">
+                        <span>真實短缺</span>
+                        <strong data-completion-summary="shortage">--</strong>
+                    </div>
+                    <div class="work-order-completion-summary-row">
+                        <span>平衡差異</span>
+                        <strong data-completion-summary="balance_difference">--</strong>
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <label class="inline-label">
+                        <span>入庫設定</span>
+                        <select name="auto_create_inventory">
+                            <option value="1">依平衡結果自動建立最終入庫</option>
+                            <option value="0">只更新工單狀態</option>
+                        </select>
+                    </label>
+                    <label class="inline-label">
+                        <span>短缺原因</span>
+                        <select name="shortage_reason_code">
+                            <option value="">-- 無短缺可留空 --</option>
+                            <option value="material_loss">遺失 / 散落</option>
+                            <option value="mixed_material">混料 / 混批</option>
+                            <option value="damaged">破損 / 報廢</option>
+                            <option value="count_error">計數 / 重量誤差</option>
+                            <option value="other">其他</option>
+                        </select>
+                    </label>
+                    <label class="inline-label full-width">
+                        <span>短缺說明</span>
+                        <textarea name="shortage_notes" rows="3" placeholder="若有真實短缺，請補充原因與現場說明"></textarea>
+                    </label>
+                    <label class="inline-label full-width">
+                        <span>結案備註</span>
+                        <textarea name="completion_notes" rows="3" placeholder="可補充完工、交接、庫存或短缺說明"></textarea>
+                    </label>
+                </div>
+                <p class="form-hint">若尚有剩餘良品需建立最終入庫，不能選擇「只更新工單狀態」。</p>
+                <div class="form-actions align-right">
+                    <button type="button" class="btn outline" data-action="close-work-order-completion-modal">取消</button>
+                    <button type="submit" class="btn primary">確認結案</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" data-work-order-reverse-partial-modal>
+        <div class="modal-window medium">
+            <button type="button" class="modal-close" data-action="close-work-order-reverse-partial-modal" aria-label="關閉">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3>沖銷部分入庫</h3>
+            <div class="modal-alert hidden" data-work-order-reverse-partial-modal-alert role="alert"></div>
+            <form data-work-order-reverse-partial-form novalidate>
+                <div class="work-order-completion-summary">
+                    <div class="work-order-completion-summary-row">
+                        <span>部分入庫單號</span>
+                        <strong data-reverse-summary="receipt_number">--</strong>
+                    </div>
+                    <div class="work-order-completion-summary-row">
+                        <span>來源</span>
+                        <strong data-reverse-summary="source_label">--</strong>
+                    </div>
+                    <div class="work-order-completion-summary-row">
+                        <span>淨重 / 支數</span>
+                        <strong data-reverse-summary="receipt_quantity">--</strong>
+                    </div>
+                    <div class="work-order-completion-summary-row">
+                        <span>流程影響</span>
+                        <strong data-reverse-summary="impact_title">--</strong>
+                    </div>
+                </div>
+                <div class="work-order-reverse-impact-list" data-work-order-reverse-impact-list></div>
+                <div class="form-grid">
+                    <label class="inline-label full-width">
+                        <span>沖銷原因</span>
+                        <textarea name="reverse_reason" rows="3" placeholder="請說明此次沖銷原因與後續處理方式" required></textarea>
+                    </label>
+                </div>
+                <div class="form-actions align-right">
+                    <button type="button" class="btn outline" data-action="close-work-order-reverse-partial-modal">取消</button>
+                    <button type="submit" class="btn danger">確認沖銷</button>
                 </div>
             </form>
         </div>
@@ -1275,7 +1486,7 @@
                         </select>
                     </label>
                     <label class="inline-label">
-                        <span>機台種類</span>
+                        <span>機台能力</span>
                         <input type="text" name="machine_type" readonly disabled data-field="pr-machine-type" placeholder="選擇機台後自動帶入">
                     </label>
                     <label class="inline-label full-width">

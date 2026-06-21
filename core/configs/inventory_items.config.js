@@ -139,7 +139,27 @@ ModuleConfig.register('inventory_items', {
                         ]
                     },
                     {
-                        title: '載具資訊',
+                        title: '部分入庫追溯',
+                        fields: [
+                            { name: 'receipt_type_label', label: '入庫類型', type: 'text', readonly: true },
+                            { name: 'partial_receipt_number', label: '部分入庫單號', type: 'text', readonly: true },
+                            { name: 'partial_receipt_source_label', label: '部分入庫來源', type: 'text', readonly: true },
+                            { name: 'partial_receipt_status_label', label: '部分入庫狀態', type: 'text', readonly: true },
+                            { name: 'partial_receipt_created_at', label: '部分入庫建立時間', type: 'datetime-local', readonly: true },
+                            { name: 'partial_receipt_tool_total_weight_kg', label: '部分入庫參考載具總重 (kg)', type: 'number', step: '0.001', readonly: true },
+                            { name: 'partial_receipt_original_units', label: '原始部分入庫支數', type: 'number', step: '1', readonly: true },
+                            { name: 'partial_receipt_original_net_weight_kg', label: '原始部分入庫淨重 (kg)', type: 'number', step: '0.01', readonly: true },
+                            { name: 'partial_receipt_unshipped_units', label: '目前未出貨支數', type: 'number', step: '1', readonly: true },
+                            { name: 'partial_receipt_available_to_ship_units', label: '可再出貨支數', type: 'number', step: '1', readonly: true },
+                            { name: 'partial_receipt_allocated_pending_ship_units', label: '待出貨支數', type: 'number', step: '1', readonly: true },
+                            { name: 'partial_receipt_shipped_units', label: '累計已出貨支數', type: 'number', step: '1', readonly: true },
+                            { name: 'partial_receipt_shipping_tool_details', label: '部分入庫載具摘要', type: 'textarea', rows: 2, fullWidth: true, readonly: true },
+                            { name: 'partial_receipt_tool_breakdown', label: '部分入庫載具明細', type: 'textarea', rows: 4, fullWidth: true, readonly: true },
+                            { name: 'partial_receipt_notes', label: '部分入庫備註', type: 'textarea', rows: 2, fullWidth: true, readonly: true }
+                        ]
+                    },
+                    {
+                        title: '工單載具資訊',
                         fields: [
                             { name: 'tool_statistics', label: '載具統計', type: 'text', placeholder: '例: 10kg標準桶 2個、52kg標準船 1個' },
                             { name: 'total_tool_quantity', label: '載具總數量', type: 'number' }

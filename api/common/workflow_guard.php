@@ -95,6 +95,18 @@ function getWorkflowDeleteAssessment(PDO $pdo, string $module, int $id): array
     };
 }
 
+function getWorkflowActionAssessment(PDO $pdo, string $module, string $action, int $id): array
+{
+    if ($action === 'delete') {
+        return getWorkflowDeleteAssessment($pdo, $module, $id);
+    }
+
+    return match ($module . ':' . $action) {
+        'work_order_partial_receipts:reverse' => assessWorkOrderPartialReceiptReverse($pdo, $id),
+        default => workflowBlocked('此流程動作尚未支援守門檢查。'),
+    };
+}
+
 function assessOrderDelete(PDO $pdo, int $id): array
 {
     $stmt = $pdo->prepare('SELECT id, order_number FROM orders WHERE id = :id AND deleted_at IS NULL');
@@ -433,4 +445,155 @@ function assessReturnOrderDelete(PDO $pdo, int $id): array
         $impacts[] = "將同步移除退貨流程關聯品項：{$itemCount} 筆";
     }
     return workflowAllowed('此退貨單尚未完成且未產生庫存異動，可以刪除。', $impacts, 'delete');
+}
+
+function assessWorkOrderPartialReceiptReverse(PDO $pdo, int $id): array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            wopr.id,
+            wopr.receipt_number,
+            wopr.receipt_status,
+            wopr.inventory_item_id,
+            wopr.machine_run_id,
+            wopr.net_weight_kg,
+            wopr.calculated_units,
+            ii.inventory_number,
+            ii.deleted_at AS inventory_deleted_at,
+            COALESCE(ii.quantity_on_hand, 0) AS quantity_on_hand,
+            COALESCE(ii.quantity_allocated, 0) AS quantity_allocated,
+            COALESCE(ii.quantity_shipped, 0) AS quantity_shipped,
+            wo.id AS work_order_id,
+            wo.work_order_number,
+            wo.completed_at,
+            womr.run_label
+        FROM work_order_partial_receipts wopr
+        JOIN work_orders wo ON wo.id = wopr.work_order_id
+        LEFT JOIN inventory_items ii ON ii.id = wopr.inventory_item_id
+        LEFT JOIN work_order_machine_runs womr ON womr.id = wopr.machine_run_id
+        WHERE wopr.id = :id
+        LIMIT 1
+    ");
+    $stmt->execute(['id' => $id]);
+    $receipt = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$receipt) {
+        return workflowBlocked('找不到指定的部分入庫紀錄。');
+    }
+
+    $receiptLabel = trim((string)($receipt['receipt_number'] ?? '')) ?: ('部分入庫 #' . (int)$receipt['id']);
+    $impacts = [
+        '部分入庫單號：' . $receiptLabel,
+        '來源工單：' . (trim((string)($receipt['work_order_number'] ?? '')) ?: ('#' . (int)($receipt['work_order_id'] ?? 0))),
+        '入庫淨重：' . round((float)($receipt['net_weight_kg'] ?? 0), 2) . ' kg',
+        '入庫支數：' . (float)round((float)($receipt['calculated_units'] ?? 0), 0) . ' 支',
+    ];
+
+    if (!empty($receipt['run_label'])) {
+        $impacts[] = '來源機台：' . (string)$receipt['run_label'];
+    }
+
+    $status = strtolower(trim((string)($receipt['receipt_status'] ?? 'partial')));
+    if ($status === 'reversed') {
+        return workflowBlocked('此部分入庫已沖銷，不可重複操作。', $impacts, 'review');
+    }
+
+    if ($status === 'settled' || !empty($receipt['completed_at'])) {
+        return workflowBlocked(
+            '此部分入庫已參與工單結清，請先將工單退回並處理最終入庫，再重新調整部分入庫。',
+            $impacts,
+            'reopen_work_order'
+        );
+    }
+
+    $inventoryItemId = (int)($receipt['inventory_item_id'] ?? 0);
+    if ($inventoryItemId <= 0 || !empty($receipt['inventory_deleted_at'])) {
+        return workflowBlocked(
+            '此部分入庫的關聯庫存不存在或已作廢，請先確認追溯資料。',
+            $impacts,
+            'review'
+        );
+    }
+
+    $shippingStmt = $pdo->prepare("
+        SELECT
+            so.id,
+            so.shipping_order_number,
+            so.status,
+            soi.shipped_quantity
+        FROM shipping_order_items soi
+        LEFT JOIN shipping_orders so ON so.id = soi.shipping_order_id
+        WHERE soi.inventory_item_id = :inventory_item_id
+        ORDER BY so.shipping_date DESC, so.id DESC
+    ");
+    $shippingStmt->execute(['inventory_item_id' => $inventoryItemId]);
+    $shippingItems = $shippingStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $hasShipped = (float)($receipt['quantity_shipped'] ?? 0) > 0.0001;
+    $hasAllocated = (float)($receipt['quantity_allocated'] ?? 0) > 0.0001;
+    $shippingRefs = [];
+    foreach ($shippingItems as $item) {
+        $shippingNumber = trim((string)($item['shipping_order_number'] ?? '')) ?: ('#' . (int)($item['id'] ?? 0));
+        $shippingStatus = trim((string)($item['status'] ?? 'draft'));
+        $shippingRefs[] = $shippingNumber . ($shippingStatus !== '' ? "（{$shippingStatus}）" : '');
+        if (in_array(strtolower($shippingStatus), ['shipped', 'delivered'], true)) {
+            $hasShipped = true;
+        } else {
+            $hasAllocated = true;
+        }
+    }
+
+    if ($shippingRefs !== []) {
+        $impacts[] = '出貨關聯：' . implode('、', array_values(array_unique($shippingRefs)));
+    }
+
+    if ($hasShipped) {
+        $impacts[] = '已出貨數量：' . (float)round((float)($receipt['quantity_shipped'] ?? 0), 0) . ' 支';
+        return workflowBlocked(
+            '此部分入庫已有出貨記錄，不能直接沖銷；請先建立退貨／出貨沖銷流程。',
+            $impacts,
+            'create_return_or_shipping_void'
+        );
+    }
+
+    if ($hasAllocated) {
+        $impacts[] = '已配貨數量：' . (float)round((float)($receipt['quantity_allocated'] ?? 0), 0) . ' 支';
+        return workflowBlocked(
+            '此部分入庫已被出貨單配貨，請先從出貨單移除配貨後再沖銷。',
+            $impacts,
+            'remove_shipping_allocation'
+        );
+    }
+
+    $transactionStmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM inventory_transactions
+        WHERE inventory_item_id = :inventory_item_id
+          AND NOT (
+              ref_type = 'work_order_partial_receipt'
+              AND direction = 'inbound'
+              AND ref_id = :partial_receipt_id
+          )
+    ");
+    $transactionStmt->execute([
+        'inventory_item_id' => $inventoryItemId,
+        'partial_receipt_id' => $id,
+    ]);
+    $nonInboundTransactionCount = (int)$transactionStmt->fetchColumn();
+    if ($nonInboundTransactionCount > 0) {
+        $impacts[] = '其他庫存異動：' . $nonInboundTransactionCount . ' 筆';
+        return workflowBlocked(
+            '此部分入庫已有其他庫存異動，請先確認追溯與作廢流程。',
+            $impacts,
+            'review_inventory_transactions'
+        );
+    }
+
+    $impacts[] = '將作廢庫存項目：' . (trim((string)($receipt['inventory_number'] ?? '')) ?: ('#' . $inventoryItemId));
+    $impacts[] = '目前在庫：' . (float)round((float)($receipt['quantity_on_hand'] ?? 0), 0) . ' 支';
+
+    return workflowAllowed(
+        '此部分入庫尚未配貨/出貨，可以沖銷；系統會保留追溯並作廢本次庫存。',
+        $impacts,
+        'reverse_partial_receipt'
+    );
 }

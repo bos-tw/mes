@@ -42,7 +42,7 @@
         work_orders: {
             title: '生產工單',
             kicker: 'WORK ORDERS',
-            subtitle: '現場工單清單、開工、部分完工、完工、異常與拍照回報。',
+            subtitle: '現場工單清單、開工、部分入庫、完工、異常與拍照回報。',
             emptyTitle: '手機版生產工單已可使用',
             emptyText: '此頁面已完成第一版手機操作流程，供現場人員直接使用。',
         },
@@ -278,6 +278,7 @@
 
         actionForm?.addEventListener('submit', handleActionSubmit);
         actionForm?.addEventListener('change', handleActionFormChange);
+        actionForm?.addEventListener('input', handleActionFormChange);
 
         document.getElementById('mobile-work-order-list')?.addEventListener('click', handleListActionClick);
         document.getElementById('mobile-detail-content')?.addEventListener('click', handleDetailActionClick);
@@ -568,12 +569,12 @@
         }
         if (statusKey === 'in_progress') {
             buttons.push(renderActionButton('pause', item.id, 'fa-pause', '暫停', 'mobile-secondary-button'));
-            buttons.push(renderActionButton('partial', item.id, 'fa-box-open', '部分完工', 'mobile-ghost-button'));
+            buttons.push(renderActionButton('partial', item.id, 'fa-box-open', '部分入庫', 'mobile-ghost-button'));
             buttons.push(renderActionButton('complete', item.id, 'fa-flag-checkered', '完工', 'mobile-primary-button'));
         }
         if (statusKey === 'paused') {
             buttons.push(renderActionButton('resume', item.id, 'fa-play', '恢復', 'mobile-primary-button'));
-            buttons.push(renderActionButton('partial', item.id, 'fa-box-open', '部分完工', 'mobile-ghost-button'));
+            buttons.push(renderActionButton('partial', item.id, 'fa-box-open', '部分入庫', 'mobile-ghost-button'));
         }
         if (statusKey === 'completed') {
             buttons.push(renderActionButton('upload', item.id, 'fa-camera', '補傳照片', 'mobile-secondary-button'));
@@ -638,6 +639,8 @@
         const toolConditionImages = Array.isArray(workOrder.tool_condition_images) ? workOrder.tool_condition_images : [];
         const operationLogs = Array.isArray(workOrder.operation_logs) ? workOrder.operation_logs : [];
         const machineRuns = Array.isArray(workOrder.machine_runs) ? workOrder.machine_runs : [];
+        const partialReceipts = Array.isArray(workOrder.partial_receipts) ? workOrder.partial_receipts : [];
+        const balanceSummary = buildWorkOrderCompletionPreview(workOrder);
         const infoSectionContent = `
             <div class="mobile-info-list">
                 ${renderInfoCard('訂單號', workOrder.order_number)}
@@ -700,6 +703,45 @@
                 </div>
             </section>
 
+            <section class="mobile-detail-section">
+                <div class="mobile-detail-section-header">
+                    <h3>部分入庫 / 數量平衡</h3>
+                </div>
+                <div class="mobile-info-list">
+                    ${renderInfoCard('工單預計', formatWeightUnits(balanceSummary.expected_net_weight_kg, balanceSummary.expected_units))}
+                    ${renderInfoCard('現場已生產', formatWeightUnits(balanceSummary.produced_net_weight_kg, balanceSummary.produced_units))}
+                    ${renderInfoCard('累計部分入庫', formatWeightUnits(balanceSummary.partial_received_net_weight_kg, balanceSummary.partial_received_units))}
+                    ${renderInfoCard('部分入庫已出貨', formatWeightUnits(balanceSummary.partial_shipped_net_weight_kg, balanceSummary.partial_shipped_units))}
+                    ${renderInfoCard('部分入庫待出貨', formatWeightUnits(balanceSummary.partial_allocated_net_weight_kg, balanceSummary.partial_allocated_units))}
+                    ${renderInfoCard('部分入庫可再出貨', formatWeightUnits(balanceSummary.partial_available_to_ship_net_weight_kg, balanceSummary.partial_available_to_ship_units))}
+                    ${renderInfoCard('部分入庫未出貨', formatWeightUnits(balanceSummary.partial_unshipped_net_weight_kg, balanceSummary.partial_in_stock_units))}
+                    ${renderInfoCard('最終補入庫', formatWeightUnits(balanceSummary.final_received_net_weight_kg, balanceSummary.final_received_units))}
+                    ${renderInfoCard('真實短缺', formatWeightUnits(balanceSummary.shortage_net_weight_kg, balanceSummary.shortage_units))}
+                    ${renderInfoCard('剩餘可部分入庫', formatWeight(Math.max(Number(workOrder.partial_receipt_remaining_net_weight_kg || 0), 0)))}
+                </div>
+                ${
+                    partialReceipts.length
+                        ? `<div class="mobile-inline-list">
+                            ${partialReceipts.map((receipt) => `
+                                <article class="mobile-record-card">
+                                    <strong>${escapeHtml(receipt.receipt_number || `PR-${receipt.id}`)}</strong>
+                                    <div class="mobile-card-meta">
+                                        <span>來源：${escapeHtml(receipt.source_label || '一般工單')}</span>
+                                        <span>原始入庫：${escapeHtml(formatWeightUnits(receipt.net_weight_kg, receipt.calculated_units))}</span>
+                                        <span>已出貨：${escapeHtml(formatWeightUnits(receipt.shipped_net_weight_kg, receipt.quantity_shipped))}</span>
+                                        <span>待出貨：${escapeHtml(formatWeightUnits(receipt.allocated_net_weight_kg, receipt.quantity_allocated))}</span>
+                                        <span>可再出貨：${escapeHtml(formatWeightUnits(receipt.available_to_ship_net_weight_kg, receipt.quantity_available_to_ship))}</span>
+                                        <span>未出貨：${escapeHtml(formatWeightUnits(receipt.unshipped_net_weight_kg, receipt.quantity_on_hand))}</span>
+                                        <span>出貨載具：${escapeHtml(receipt.shipping_tool_details || '-')}</span>
+                                        <span>狀態：${escapeHtml(receipt.receipt_status === 'settled' ? '已結清' : (receipt.receipt_status === 'reversed' ? '已沖銷' : '有效'))}</span>
+                                    </div>
+                                </article>
+                            `).join('')}
+                        </div>`
+                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">尚無部分入庫紀錄。</p></div>'
+                }
+            </section>
+
             ${renderCollapsibleDetailSection('work_order_info', '工單資訊', infoSectionContent)}
             ${renderCollapsibleDetailSection('screening_services', '篩分服務', screeningServicesContent)}
             ${renderCollapsibleDetailSection('production_records', '生產紀錄', productionRecordsContent, productionRecordActions)}
@@ -729,16 +771,17 @@
                                     <span>狀態：${escapeHtml(run.status || '-')}</span>
                                     <span>完成淨重：${escapeHtml(formatWeight(run.completed_net_weight_kg))}</span>
                                     <span>已部分入庫：${escapeHtml(formatWeight(run.partial_receipt_net_weight_kg))}</span>
+                                    <span>剩餘可入庫：${escapeHtml(formatWeight(Math.max((Number(run.completed_net_weight_kg) || 0) - (Number(run.partial_receipt_net_weight_kg) || 0), 0)))}</span>
                                 </div>
                                 <div class="mobile-run-actions">
                                     <button type="button" class="mobile-ghost-button" data-action="partial-run" data-id="${workOrder.id}" data-run-id="${run.id}">
                                         <i class="fas fa-box-open"></i>
-                                        此機台部分完工
+                                        此機台部分入庫
                                     </button>
                                 </div>
                             </article>
                         `).join('')
-                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">目前沒有拆分機台資料；一般工單可直接使用「部分完工」功能。</p></div>'
+                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">目前沒有拆分機台資料；一般工單可直接使用「部分入庫」功能。</p></div>'
                 }
             </section>
 
@@ -1204,11 +1247,11 @@
         }
         if (statusKey === 'in_progress') {
             buttons.unshift(renderActionButton('complete', workOrder.id, 'fa-flag-checkered', '完工', 'mobile-primary-button'));
-            buttons.unshift(renderActionButton('partial', workOrder.id, 'fa-box-open', '部分完工', 'mobile-ghost-button'));
+            buttons.unshift(renderActionButton('partial', workOrder.id, 'fa-box-open', '部分入庫', 'mobile-ghost-button'));
             buttons.unshift(renderActionButton('pause', workOrder.id, 'fa-pause', '暫停', 'mobile-secondary-button'));
         }
         if (statusKey === 'paused') {
-            buttons.unshift(renderActionButton('partial', workOrder.id, 'fa-box-open', '部分完工', 'mobile-ghost-button'));
+            buttons.unshift(renderActionButton('partial', workOrder.id, 'fa-box-open', '部分入庫', 'mobile-ghost-button'));
             buttons.unshift(renderActionButton('resume', workOrder.id, 'fa-play', '恢復', 'mobile-primary-button'));
         }
 
@@ -1406,7 +1449,15 @@
         openInspectionModal('edit', inspection);
     }
 
-    function handleActionClick(button) {
+    async function loadWorkOrderActionContext(workOrderId) {
+        if (state.currentWorkOrder && Number(state.currentWorkOrder.id || 0) === Number(workOrderId || 0)) {
+            return state.currentWorkOrder;
+        }
+        const result = await fetchJson(`${API_BASE}/work_orders/show.php?id=${workOrderId}`);
+        return result.data || null;
+    }
+
+    async function handleActionClick(button) {
         const action = button.dataset.action || '';
         const id = Number(button.dataset.id || 0);
         const runId = Number(button.dataset.runId || 0);
@@ -1452,28 +1503,117 @@
         }
 
         if (action === 'partial') {
-            openActionModal({
-                type: 'partial',
-                workOrderId: id,
-                machineRunId: null,
-            });
+            try {
+                const workOrder = await loadWorkOrderActionContext(id);
+                if (!workOrder) {
+                    window.alert('找不到工單資料。');
+                    return;
+                }
+                if (!hasRelaxedPermission(['work_orders.partial_receipt', 'manage_work_orders'])) {
+                    window.alert('目前帳號沒有部分入庫權限。');
+                    return;
+                }
+                if (String(workOrder.work_order_type || 'normal') === 'split') {
+                    window.alert('拆分工單請從下方來源機台執行部分入庫，不能直接以整張工單建立。');
+                    if (state.currentWorkOrder?.id !== workOrder.id) {
+                        await openWorkOrderDetail(id);
+                    }
+                    return;
+                }
+                if (workOrder.lifecycle_locked == 1 || workOrder.completed_at || workOrder.has_inventory == 1) {
+                    window.alert('此工單已完成或已有正式庫存，不能再建立部分入庫。');
+                    return;
+                }
+                const summary = workOrder.partial_receipt_summary || {};
+                const remainingNetWeightKg = Math.max(
+                    Number(workOrder.partial_receipt_remaining_net_weight_kg || 0),
+                    Number(summary.expected_net_weight_kg || 0) - Number(summary.partial_received_net_weight_kg || 0),
+                    0
+                );
+                if (remainingNetWeightKg <= 0.0001) {
+                    window.alert('此工單目前沒有可再部分入庫的剩餘淨重。');
+                    return;
+                }
+                if (getPartialReceiptAvailableTools(workOrder).length === 0) {
+                    window.alert('此工單尚未設定可帶入的載具資料，請先到訂單品項維護載具設定。');
+                    return;
+                }
+                openActionModal({
+                    type: 'partial',
+                    workOrderId: id,
+                    machineRunId: null,
+                    workOrder,
+                    remainingNetWeightKg,
+                    sourceLabel: `一般工單：${workOrder.work_order_number || id}`,
+                });
+            } catch (error) {
+                window.alert(error.message || '載入工單部分入庫資訊失敗。');
+            }
             return;
         }
 
         if (action === 'partial-run') {
-            openActionModal({
-                type: 'partial',
-                workOrderId: id,
-                machineRunId: runId || null,
-            });
+            try {
+                const workOrder = await loadWorkOrderActionContext(id);
+                if (!workOrder) {
+                    window.alert('找不到工單資料。');
+                    return;
+                }
+                if (!hasRelaxedPermission(['work_orders.partial_receipt', 'manage_work_orders'])) {
+                    window.alert('目前帳號沒有部分入庫權限。');
+                    return;
+                }
+                const runs = Array.isArray(workOrder.machine_runs) ? workOrder.machine_runs : [];
+                const run = runs.find((item) => Number(item.id || 0) === runId);
+                if (!run) {
+                    window.alert('找不到來源機台資料。');
+                    return;
+                }
+                const remainingNetWeightKg = Math.max((Number(run.completed_net_weight_kg) || 0) - (Number(run.partial_receipt_net_weight_kg) || 0), 0);
+                if (String(run.status || '') !== 'completed' || remainingNetWeightKg <= 0.0001) {
+                    window.alert('只有已完成且仍有剩餘淨重的來源機台可以部分入庫。');
+                    return;
+                }
+                if (getPartialReceiptAvailableTools(workOrder).length === 0) {
+                    window.alert('此工單尚未設定可帶入的載具資料，請先到訂單品項維護載具設定。');
+                    return;
+                }
+                openActionModal({
+                    type: 'partial',
+                    workOrderId: id,
+                    machineRunId: runId || null,
+                    workOrder,
+                    remainingNetWeightKg,
+                    sourceLabel: `拆分機台：${run.run_label || run.machine_name || run.id}`,
+                    machineRun: run,
+                });
+            } catch (error) {
+                window.alert(error.message || '載入來源機台部分入庫資訊失敗。');
+            }
             return;
         }
 
         if (action === 'complete') {
-            openActionModal({
-                type: 'complete',
-                workOrderId: id,
-            });
+            try {
+                const workOrder = await loadWorkOrderActionContext(id);
+                if (!workOrder) {
+                    window.alert('找不到工單資料。');
+                    return;
+                }
+                const preview = buildWorkOrderCompletionPreview(workOrder);
+                if (!hasRelaxedPermission(['work_orders.confirm_shortage', 'manage_work_orders']) && preview.shortage_net_weight_kg > 0.0001) {
+                    window.alert('此工單有真實短缺，但目前帳號沒有短缺確認權限。');
+                    return;
+                }
+                openActionModal({
+                    type: 'complete',
+                    workOrderId: id,
+                    workOrder,
+                    completionPreview: preview,
+                });
+            } catch (error) {
+                window.alert(error.message || '載入工單結案資訊失敗。');
+            }
             return;
         }
 
@@ -1546,6 +1686,157 @@
         });
     }
 
+    function getPartialReceiptAvailableTools(workOrder) {
+        const sourceTools = Array.isArray(workOrder?.tool_details) ? workOrder.tool_details : [];
+        return sourceTools
+            .map((tool) => ({
+                id: Number.parseInt(tool?.id, 10) || 0,
+                tool_id: Number.parseInt(tool?.tool_id, 10) || 0,
+                tool_number: String(tool?.tool_number || '').trim(),
+                tool_name: String(tool?.tool_name || '').trim(),
+                tool_type: String(tool?.tool_type || '').trim(),
+                quantity: Math.max(0, Number(tool?.quantity) || 0),
+                unit_weight_kg: Math.max(0, Number(tool?.unit_weight_kg) || 0),
+                total_weight_kg: Math.max(0, Number(tool?.total_weight_kg) || 0),
+            }))
+            .filter((tool) => tool.id > 0);
+    }
+
+    function formatPartialReceiptToolLabel(tool) {
+        const name = String(tool?.tool_name || '').trim();
+        const type = String(tool?.tool_type || '').trim();
+        const fallback = name || type || `載具#${Number.parseInt(tool?.id, 10) || 0}`;
+        return type && type !== fallback ? `${fallback} / ${type}` : fallback;
+    }
+
+    function renderPartialReceiptToolSelector(workOrder) {
+        const tools = getPartialReceiptAvailableTools(workOrder);
+        if (tools.length === 0) {
+            return `
+                <div class="mobile-partial-tools-empty">
+                    此工單尚未設定可帶入的載具資料，請先到訂單品項維護載具設定。
+                </div>
+            `;
+        }
+
+        return `
+            <div class="mobile-partial-tools-list">
+                ${tools.map((tool) => {
+                    const detailParts = [];
+                    if (tool.tool_number) {
+                        detailParts.push(`編號 ${tool.tool_number}`);
+                    }
+                    detailParts.push(`單重 ${Number(tool.unit_weight_kg || 0).toFixed(3)} kg`);
+                    if (tool.quantity > 0) {
+                        detailParts.push(`原設定 ${formatNumber(Math.round(tool.quantity))} 個`);
+                    }
+
+                    return `
+                        <div class="mobile-partial-tool-row" data-partial-tool-row data-unit-weight-kg="${escapeAttribute(String(tool.unit_weight_kg || 0))}" data-tool-label="${escapeAttribute(formatPartialReceiptToolLabel(tool))}">
+                            <label class="mobile-partial-tool-check">
+                                <input type="checkbox" value="${escapeAttribute(String(tool.id))}" data-partial-tool-toggle>
+                                <span>${escapeHtml(formatPartialReceiptToolLabel(tool))}</span>
+                            </label>
+                            <span class="mobile-partial-tool-meta">${escapeHtml(detailParts.join(' ｜ '))}</span>
+                            <label class="mobile-field mobile-partial-tool-qty">
+                                <span>本次數量</span>
+                                <input type="number" min="1" step="1" placeholder="請輸入" data-partial-tool-quantity disabled>
+                            </label>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            <div class="mobile-partial-tools-summary">
+                <div class="mobile-info-card">
+                    <strong>參考載具總重</strong>
+                    <p class="mobile-detail-note" data-partial-tool-total-weight>0.000 kg</p>
+                </div>
+                <div class="mobile-info-card">
+                    <strong>系統摘要</strong>
+                    <p class="mobile-detail-note" data-partial-tool-summary>尚未選擇本次出貨載具。</p>
+                </div>
+            </div>
+        `;
+    }
+
+    function updateMobilePartialReceiptToolSummary(form, summaryText, totalWeightKg, isError = false) {
+        const summaryInput = form.querySelector('[name="shipping_tool_details"]');
+        const summaryTarget = form.querySelector('[data-partial-tool-summary]');
+        const totalWeightTarget = form.querySelector('[data-partial-tool-total-weight]');
+
+        if (summaryInput instanceof HTMLInputElement) {
+            summaryInput.value = isError ? '' : summaryText;
+        }
+        if (summaryTarget instanceof HTMLElement) {
+            summaryTarget.textContent = summaryText || '尚未選擇本次出貨載具。';
+            summaryTarget.classList.toggle('mobile-text-danger', isError);
+        }
+        if (totalWeightTarget instanceof HTMLElement) {
+            totalWeightTarget.textContent = `${Number(totalWeightKg || 0).toFixed(3)} kg`;
+        }
+    }
+
+    function collectMobilePartialReceiptShippingTools(form) {
+        const rows = Array.from(form.querySelectorAll('[data-partial-tool-row]'));
+        const items = [];
+        const summaryParts = [];
+        let totalWeightKg = 0;
+
+        for (const row of rows) {
+            const toggle = row.querySelector('[data-partial-tool-toggle]');
+            const quantityInput = row.querySelector('[data-partial-tool-quantity]');
+            if (!(toggle instanceof HTMLInputElement) || !(quantityInput instanceof HTMLInputElement) || !toggle.checked) {
+                continue;
+            }
+
+            const orderItemToolId = Number.parseInt(toggle.value, 10) || 0;
+            const quantityRaw = quantityInput.value.trim();
+            const quantityNumber = Number(quantityRaw);
+            if (orderItemToolId <= 0 || !/^[1-9]\d*$/.test(quantityRaw) || !Number.isInteger(quantityNumber) || quantityNumber <= 0) {
+                return {
+                    items: [],
+                    summary: '',
+                    totalWeightKg: 0,
+                    error: '請為每筆已勾選載具填寫正整數數量。',
+                };
+            }
+
+            const unitWeightKg = Number(row.dataset.unitWeightKg || 0) || 0;
+            const lineWeightKg = Number((unitWeightKg * quantityNumber).toFixed(3));
+            totalWeightKg += lineWeightKg;
+            items.push({
+                order_item_tool_id: orderItemToolId,
+                quantity: quantityNumber,
+            });
+            summaryParts.push(
+                `${row.dataset.toolLabel || `載具#${orderItemToolId}`} x ${quantityNumber}（${unitWeightKg.toFixed(3)} kg/個，小計 ${lineWeightKg.toFixed(3)} kg）`
+            );
+        }
+
+        totalWeightKg = Number(totalWeightKg.toFixed(3));
+        const summary = summaryParts.length > 0
+            ? `${summaryParts.join('；')}；參考載具總重 ${totalWeightKg.toFixed(3)} kg`
+            : '';
+
+        return {
+            items,
+            summary,
+            totalWeightKg,
+            error: '',
+        };
+    }
+
+    function syncMobilePartialReceiptToolSummary(form) {
+        const selection = collectMobilePartialReceiptShippingTools(form);
+        if (selection.error) {
+            updateMobilePartialReceiptToolSummary(form, selection.error, 0, true);
+            return selection;
+        }
+
+        updateMobilePartialReceiptToolSummary(form, selection.summary, selection.totalWeightKg, false);
+        return selection;
+    }
+
     function openActionModal(config) {
         state.modalAction = config;
         const modal = document.getElementById('mobile-action-modal');
@@ -1563,46 +1854,101 @@
         feedback.textContent = '';
 
         if (config.type === 'partial') {
-            title.textContent = '部分完工回報';
+            const workOrder = config.workOrder || null;
+            const summary = workOrder?.partial_receipt_summary || {};
+            const remainingNetWeightKg = Number(config.remainingNetWeightKg || workOrder?.partial_receipt_remaining_net_weight_kg || 0);
+            title.textContent = '部分入庫';
             kicker.textContent = 'PARTIAL RECEIPT';
-            submit.textContent = '送出部分完工';
+            submit.textContent = '確認部分入庫';
             body.innerHTML = `
                 <div class="mobile-action-grid">
+                    <div class="mobile-info-card">
+                        <strong>${escapeHtml(config.sourceLabel || (config.machineRun ? `拆分機台：${config.machineRun.run_label || config.machineRun.machine_name || config.machineRun.id}` : '一般工單'))}</strong>
+                        <p class="mobile-detail-note">工單：${escapeHtml(workOrder?.work_order_number || String(config.workOrderId || ''))}</p>
+                    </div>
+                    <div class="mobile-info-card">
+                        <strong>工單預計</strong>
+                        <p class="mobile-detail-note">${escapeHtml(formatWeightUnits(summary.expected_net_weight_kg || 0, summary.expected_units || 0))}</p>
+                    </div>
+                    <div class="mobile-info-card">
+                        <strong>累計已部分入庫</strong>
+                        <p class="mobile-detail-note">${escapeHtml(formatWeightUnits(summary.partial_received_net_weight_kg || 0, summary.partial_received_units || 0))}</p>
+                    </div>
+                    <div class="mobile-info-card">
+                        <strong>剩餘可入庫</strong>
+                        <p class="mobile-detail-note">${escapeHtml(formatWeight(remainingNetWeightKg))}</p>
+                    </div>
                     <label class="mobile-field">
-                        <span>本次完成淨重 (kg)</span>
+                        <span>本次入庫淨重 (kg)</span>
                         <input type="number" name="net_weight_kg" min="0.01" step="0.01" placeholder="例如 25.50" required>
                     </label>
-                    ${
-                        config.machineRunId
-                            ? `<div class="mobile-info-card"><strong>來源機台頁籤</strong><p class="mobile-detail-note">機台明細 ID：${escapeHtml(String(config.machineRunId))}</p></div>`
-                            : ''
-                    }
+                    <input type="hidden" name="shipping_tool_details" value="">
+                    <div class="mobile-field">
+                        <span>本次出貨載具</span>
+                        ${renderPartialReceiptToolSelector(workOrder)}
+                    </div>
                     <label class="mobile-field">
                         <span>備註</span>
-                        <textarea name="notes" placeholder="可填寫本次部分完工說明、交班資訊或異常狀況"></textarea>
+                        <textarea name="notes" placeholder="可填寫本次部分入庫、交班、急單交付或異常狀況"></textarea>
                     </label>
                 </div>
             `;
         } else if (config.type === 'complete') {
+            const preview = config.completionPreview || buildWorkOrderCompletionPreview(config.workOrder || state.currentWorkOrder);
             title.textContent = '完工回報';
             kicker.textContent = 'COMPLETE';
             submit.textContent = '確認完工';
             body.innerHTML = `
                 <div class="mobile-action-grid">
                     <div class="mobile-info-card">
-                        <strong>完工說明</strong>
-                        <p class="mobile-detail-note">送出後會把工單狀態更新為「已完成」，並依既有工單流程自動處理最終入庫。</p>
+                        <strong>工單預計</strong>
+                        <p class="mobile-detail-note">${escapeHtml(formatWeightUnits(preview.expected_net_weight_kg, preview.expected_units))}</p>
                     </div>
-                    <label class="mobile-field">
-                        <span>完工備註</span>
-                        <textarea name="notes" placeholder="可補充完工狀況、交接資訊或照片說明"></textarea>
-                    </label>
+                    <div class="mobile-info-card">
+                        <strong>現場已生產</strong>
+                        <p class="mobile-detail-note">${escapeHtml(formatWeightUnits(preview.produced_net_weight_kg, preview.produced_units))}</p>
+                    </div>
+                    <div class="mobile-info-card">
+                        <strong>已部分入庫</strong>
+                        <p class="mobile-detail-note">${escapeHtml(formatWeightUnits(preview.partial_received_net_weight_kg, preview.partial_received_units))}</p>
+                    </div>
+                    <div class="mobile-info-card">
+                        <strong>本次最終補入</strong>
+                        <p class="mobile-detail-note">${escapeHtml(formatWeightUnits(preview.final_received_net_weight_kg, preview.final_received_units))}</p>
+                    </div>
+                    <div class="mobile-info-card">
+                        <strong>真實短缺</strong>
+                        <p class="mobile-detail-note">${escapeHtml(formatWeightUnits(preview.shortage_net_weight_kg, preview.shortage_units))}</p>
+                    </div>
+                    <div class="mobile-info-card">
+                        <strong>平衡差異</strong>
+                        <p class="mobile-detail-note">${escapeHtml(`${Number(preview.balance_difference_net_weight_kg || 0).toFixed(2)} kg`)}</p>
+                    </div>
                     <label class="mobile-field">
                         <span>入庫設定</span>
                         <select name="auto_create_inventory">
-                            <option value="1">完工後依既有邏輯自動入庫</option>
-                            <option value="0">只更新工單狀態，不自動入庫</option>
+                            <option value="1"${preview.final_received_net_weight_kg > 0.0001 ? ' selected' : ''}>依平衡結果自動建立最終入庫</option>
+                            <option value="0"${preview.final_received_net_weight_kg <= 0.0001 ? ' selected' : ''}>只更新工單狀態</option>
                         </select>
+                    </label>
+                    <label class="mobile-field">
+                        <span>短缺原因</span>
+                        <select name="shortage_reason_code">
+                            <option value="">-- 無短缺可留空 --</option>
+                            <option value="material_loss"${String(config.workOrder?.shortage_reason_code || '') === 'material_loss' ? ' selected' : ''}>遺失 / 散落</option>
+                            <option value="mixed_material"${String(config.workOrder?.shortage_reason_code || '') === 'mixed_material' ? ' selected' : ''}>混料 / 混批</option>
+                            <option value="damaged"${String(config.workOrder?.shortage_reason_code || '') === 'damaged' ? ' selected' : ''}>破損 / 報廢</option>
+                            <option value="count_error"${String(config.workOrder?.shortage_reason_code || '') === 'count_error' ? ' selected' : ''}>計數 / 重量誤差</option>
+                            <option value="other"${String(config.workOrder?.shortage_reason_code || '') === 'other' ? ' selected' : ''}>其他</option>
+                        </select>
+                    </label>
+                    <label class="mobile-field">
+                        <span>短缺說明</span>
+                        <textarea name="shortage_notes" placeholder="若有真實短缺，請補充原因與現場說明">${escapeHtml(String(config.workOrder?.shortage_notes || ''))}</textarea>
+                    </label>
+                    <label class="mobile-field">
+                        <span>結案備註</span>
+                        <textarea name="notes" placeholder="可補充完工狀況、交接資訊、庫存或短缺說明"></textarea>
                     </label>
                 </div>
             `;
@@ -1798,6 +2144,11 @@
             `;
         }
 
+        const actionForm = document.getElementById('mobile-action-form');
+        if (config.type === 'partial' && actionForm instanceof HTMLFormElement) {
+            updateMobilePartialReceiptToolSummary(actionForm, '', 0, false);
+        }
+
         modal.classList.remove('hidden');
         modal.setAttribute('aria-hidden', 'false');
     }
@@ -1959,6 +2310,29 @@
             return;
         }
 
+        if (state.modalAction.type === 'partial') {
+            if (target instanceof HTMLInputElement && target.dataset.partialToolToggle !== undefined) {
+                const row = target.closest('[data-partial-tool-row]');
+                const quantityInput = row?.querySelector('[data-partial-tool-quantity]');
+                if (quantityInput instanceof HTMLInputElement) {
+                    quantityInput.disabled = !target.checked;
+                    if (target.checked) {
+                        if (!quantityInput.value.trim() || Number(quantityInput.value) <= 0) {
+                            quantityInput.value = '1';
+                        }
+                    } else {
+                        quantityInput.value = '';
+                    }
+                }
+            }
+
+            const form = target.closest('form');
+            if (form instanceof HTMLFormElement) {
+                syncMobilePartialReceiptToolSummary(form);
+            }
+            return;
+        }
+
         if (state.modalAction.type === 'production_records' && target instanceof HTMLSelectElement && target.name === 'pr_machine_id[]') {
             const row = target.closest('[data-production-row]');
             if (row instanceof HTMLElement) {
@@ -2080,16 +2454,29 @@
     }
 
     async function submitPartialReceipt(form, action) {
-        const weightValue = String(new FormData(form).get('net_weight_kg') || '').trim();
+        const formData = new FormData(form);
+        const weightValue = String(formData.get('net_weight_kg') || '').trim();
         if (!weightValue) {
-            showActionFeedback('error', '請填寫本次完成淨重。');
+            showActionFeedback('error', '請填寫本次入庫淨重。');
+            return;
+        }
+        const shippingToolSelection = syncMobilePartialReceiptToolSummary(form);
+        const shippingToolDetails = String(shippingToolSelection.summary || '').trim();
+        if (shippingToolSelection.error) {
+            showActionFeedback('error', shippingToolSelection.error);
+            return;
+        }
+        if (!shippingToolDetails || shippingToolSelection.items.length === 0) {
+            showActionFeedback('error', '請至少選擇一種本次出貨載具並填寫數量。');
             return;
         }
 
-        const notes = String(new FormData(form).get('notes') || '').trim();
+        const notes = String(formData.get('notes') || '').trim();
         const payload = {
             work_order_id: action.workOrderId,
             net_weight_kg: parseFloat(weightValue),
+            shipping_tool_details: shippingToolDetails,
+            shipping_tools: shippingToolSelection.items,
             notes,
         };
 
@@ -2103,9 +2490,11 @@
                 body: payload,
                 withCsrf: true,
             });
-            await refreshAfterMutation(action.workOrderId, result.message || '部分完工回報成功。', true);
+            const receiptNumber = result.data?.receipt_number ? `單號 ${result.data.receipt_number}` : '部分入庫單';
+            const remainingWeight = Number(result.data?.remaining_work_order_net_weight_kg || 0).toFixed(2);
+            await refreshAfterMutation(action.workOrderId, `${result.message || '部分入庫完成。'} ${receiptNumber}，工單剩餘可入庫 ${remainingWeight} kg。`, true);
         } catch (error) {
-            showActionFeedback('error', error.message || '部分完工回報失敗。');
+            showActionFeedback('error', error.message || '部分入庫失敗。');
         }
     }
 
@@ -2160,12 +2549,27 @@
         const formData = new FormData(form);
         const notes = String(formData.get('notes') || '').trim();
         const autoCreateInventory = String(formData.get('auto_create_inventory') || '1') !== '0';
-        const existingNotes = state.currentWorkOrder?.other_notes || '';
+        const shortageReasonCode = String(formData.get('shortage_reason_code') || '').trim();
+        const shortageNotes = String(formData.get('shortage_notes') || '').trim();
+        const preview = action.completionPreview || buildWorkOrderCompletionPreview(action.workOrder || state.currentWorkOrder);
+        const existingNotes = action.workOrder?.other_notes || state.currentWorkOrder?.other_notes || '';
         const mergedNotes = mergeOperationalNote(existingNotes, '完工回報', notes);
         const status = state.statusByKey.completed;
 
         if (!status || !status.id) {
             showActionFeedback('error', '找不到已完成狀態設定。');
+            return;
+        }
+        if (preview.final_received_net_weight_kg > 0.0001 && !autoCreateInventory) {
+            showActionFeedback('error', '尚有最終補入庫重量時，不能只更新工單狀態。');
+            return;
+        }
+        if (preview.shortage_net_weight_kg > 0.0001 && !shortageReasonCode) {
+            showActionFeedback('error', '有真實短缺時，必須填寫短缺原因。');
+            return;
+        }
+        if (preview.shortage_net_weight_kg > 0.0001 && shortageReasonCode === 'other' && !shortageNotes) {
+            showActionFeedback('error', '短缺原因選擇其他時，必須填寫短缺說明。');
             return;
         }
 
@@ -2176,6 +2580,8 @@
                     status_lookup_id: status.id,
                     actual_end_date: getCurrentDateTimeString(),
                     auto_create_inventory: autoCreateInventory,
+                    shortage_reason_code: preview.shortage_net_weight_kg > 0.0001 ? shortageReasonCode : '',
+                    shortage_notes: preview.shortage_net_weight_kg > 0.0001 ? shortageNotes : '',
                     other_notes: mergedNotes || undefined,
                 },
                 withCsrf: true,
@@ -2719,6 +3125,73 @@
         const stamp = formatDateTime(getCurrentDateTimeString()) || getCurrentDateTimeString();
         const appended = `[${stamp}] ${label}${operatorName}\n${trimmedNote}`;
         return [String(existingNotes || '').trim(), appended].filter(Boolean).join('\n\n');
+    }
+
+    function hasRelaxedPermission(permissionNames) {
+        const permissions = Array.isArray(state.currentUser?.permissions) ? state.currentUser.permissions : [];
+        if (permissions.length === 0) {
+            return true;
+        }
+        const names = Array.isArray(permissionNames) ? permissionNames : [permissionNames];
+        return names.some((permissionName) => permissions.includes(permissionName));
+    }
+
+    function calculateWholeUnitsFromWeight(netWeightKg, weightPerUnitG) {
+        const weight = Number(netWeightKg) || 0;
+        const unitWeight = Number(weightPerUnitG) || 0;
+        if (weight <= 0 || unitWeight <= 0) {
+            return 0;
+        }
+        return Math.max(Math.floor(((weight * 1000) / unitWeight) + 0.000001), 0);
+    }
+
+    function formatWeightUnits(netWeightKg, units) {
+        return `${formatWeight(netWeightKg)} / ${formatNumber(Math.round(Number(units) || 0))} 支`;
+    }
+
+    function getShortageReasonLabel(reasonCode) {
+        const labels = {
+            material_loss: '遺失 / 散落',
+            mixed_material: '混料 / 混批',
+            damaged: '破損 / 報廢',
+            count_error: '計數 / 重量誤差',
+            other: '其他',
+        };
+        return labels[String(reasonCode || '').trim()] || '';
+    }
+
+    function buildWorkOrderCompletionPreview(workOrder) {
+        const summary = workOrder?.partial_receipt_summary || {};
+        const expectedNetWeightKg = Number(summary.expected_net_weight_kg || workOrder?.total_weight_kg || 0);
+        const producedNetWeightKg = Number(summary.produced_net_weight_kg || 0);
+        const weightPerUnitG = Number(workOrder?.weight_per_unit_g || 0);
+        const partialReceivedNetWeightKg = Number(summary.partial_received_net_weight_kg || 0);
+        const partialReceivedUnits = Math.round(Number(summary.partial_received_units || 0));
+        const finalReceivedNetWeightKg = Number(summary.final_received_net_weight_kg || Math.max(producedNetWeightKg - partialReceivedNetWeightKg, 0));
+        const finalReceivedUnits = Math.round(Number(summary.final_received_units || calculateWholeUnitsFromWeight(finalReceivedNetWeightKg, weightPerUnitG)));
+        const shortageNetWeightKg = Number(summary.shortage_net_weight_kg || Math.max(expectedNetWeightKg - producedNetWeightKg, 0));
+        const shortageUnits = Math.round(Number(summary.shortage_units || calculateWholeUnitsFromWeight(shortageNetWeightKg, weightPerUnitG)));
+        return {
+            expected_net_weight_kg: expectedNetWeightKg,
+            expected_units: Math.round(Number(summary.expected_units || calculateWholeUnitsFromWeight(expectedNetWeightKg, weightPerUnitG))),
+            produced_net_weight_kg: producedNetWeightKg,
+            produced_units: Math.round(Number(summary.produced_units || calculateWholeUnitsFromWeight(producedNetWeightKg, weightPerUnitG))),
+            partial_received_net_weight_kg: partialReceivedNetWeightKg,
+            partial_received_units: partialReceivedUnits,
+            partial_shipped_net_weight_kg: Number(summary.partial_shipped_net_weight_kg || 0),
+            partial_shipped_units: Math.round(Number(summary.partial_shipped_units || 0)),
+            partial_allocated_net_weight_kg: Number(summary.partial_allocated_net_weight_kg || 0),
+            partial_allocated_units: Math.round(Number(summary.partial_allocated_units || 0)),
+            partial_available_to_ship_net_weight_kg: Number(summary.partial_available_to_ship_net_weight_kg || 0),
+            partial_available_to_ship_units: Math.round(Number(summary.partial_available_to_ship_units || 0)),
+            partial_unshipped_net_weight_kg: Number(summary.partial_unshipped_net_weight_kg || 0),
+            partial_in_stock_units: Math.round(Number(summary.partial_in_stock_units || 0)),
+            final_received_net_weight_kg: finalReceivedNetWeightKg,
+            final_received_units: finalReceivedUnits,
+            shortage_net_weight_kg: shortageNetWeightKg,
+            shortage_units: shortageUnits,
+            balance_difference_net_weight_kg: Number(summary.balance_difference_net_weight_kg || 0),
+        };
     }
 
     function renderStatusBadge(statusKey, statusLabel) {

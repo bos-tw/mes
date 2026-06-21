@@ -160,6 +160,16 @@ function handleGetInventoryItems(PDO $pdo): void
             ii.customer_id,
             c.name AS customer_name,
             c.is_active AS customer_is_active,
+            wopr.receipt_number AS partial_receipt_number,
+            wopr.receipt_status AS partial_receipt_status,
+            wopr.shipping_tool_details AS partial_receipt_shipping_tool_details,
+            CASE
+                WHEN wopr.id IS NULL THEN NULL
+                WHEN wopr.machine_run_id IS NULL THEN '一般工單'
+                WHEN COALESCE(wopr_run.run_label, '') <> '' THEN wopr_run.run_label
+                WHEN COALESCE(wopr_machine.name, '') <> '' THEN wopr_machine.name
+                ELSE '拆分機台'
+            END AS partial_receipt_source_label,
             ii.customer_batch_number,
             ii.internal_lot_number,
             ii.total_good_units,
@@ -187,6 +197,9 @@ function handleGetInventoryItems(PDO $pdo): void
         LEFT JOIN work_orders wo ON ii.work_order_id = wo.id
         LEFT JOIN orders o ON ii.order_id = o.id
         LEFT JOIN order_items oi ON ii.order_item_id = oi.id
+        LEFT JOIN work_order_partial_receipts wopr ON wopr.inventory_item_id = ii.id
+        LEFT JOIN work_order_machine_runs wopr_run ON wopr_run.id = wopr.machine_run_id
+        LEFT JOIN machines wopr_machine ON wopr_machine.id = wopr_run.machine_id
         WHERE {$whereClause}
         ORDER BY {$orderByColumn} {$sortOrder}
         LIMIT :limit OFFSET :offset

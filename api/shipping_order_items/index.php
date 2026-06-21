@@ -160,12 +160,25 @@ $sql = "
         c.name AS customer_name,
         c.customer_number,
         ii.inventory_number,
+        ii.receipt_type,
         ii.net_weight_kg,
+        wopr.receipt_number AS partial_receipt_number,
+        wopr.shipping_tool_details AS partial_receipt_shipping_tool_details,
+        CASE
+            WHEN wopr.id IS NULL THEN NULL
+            WHEN wopr.machine_run_id IS NULL THEN '一般工單'
+            WHEN COALESCE(wopr_run.run_label, '') <> '' THEN wopr_run.run_label
+            WHEN COALESCE(wopr_machine.name, '') <> '' THEN wopr_machine.name
+            ELSE '拆分機台'
+        END AS partial_receipt_source_label,
         si.name AS screening_item_name,
         si.item_number AS product_number
     FROM shipping_order_items soi
     JOIN shipping_orders so ON soi.shipping_order_id = so.id
     LEFT JOIN inventory_items ii ON soi.inventory_item_id = ii.id
+    LEFT JOIN work_order_partial_receipts wopr ON wopr.inventory_item_id = ii.id
+    LEFT JOIN work_order_machine_runs wopr_run ON wopr_run.id = wopr.machine_run_id
+    LEFT JOIN machines wopr_machine ON wopr_machine.id = wopr_run.machine_id
     LEFT JOIN screening_items si ON ii.screening_item_id = si.id
     LEFT JOIN customers c ON so.customer_id = c.id
     WHERE {$whereClause}

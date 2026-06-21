@@ -15,11 +15,7 @@ if ($module === '' || $id <= 0) {
     jsonResponse(['success' => false, 'message' => '缺少流程檢查參數。'], 400);
 }
 
-if ($action !== 'delete') {
-    jsonResponse(['success' => false, 'message' => '目前僅支援刪除流程檢查。'], 400);
-}
-
-$assessment = getWorkflowDeleteAssessment(db(), $module, $id);
+$assessment = getWorkflowActionAssessment(db(), $module, $action, $id);
 
 jsonResponse([
     'success' => true,

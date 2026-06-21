@@ -1470,6 +1470,15 @@ body.login-page {
     transform: none;
 }
 
+.btn:not(.text)[aria-disabled="true"] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn:not(.text)[aria-disabled="true"]:hover {
+    transform: none;
+}
+
 .btn.text[data-action="view"],
 .btn.text[data-action="view-detail"],
 .btn.text[data-action="view-details"],
@@ -3978,6 +3987,18 @@ td.actions-col {
     line-height: 1.6;
 }
 
+.detail-note-stack {
+    padding: 12px 15px;
+    background-color: var(--color-bg-light);
+    border-radius: 8px;
+    color: var(--color-text-body);
+    line-height: 1.7;
+}
+
+.detail-note-stack > div + div {
+    margin-top: 6px;
+}
+
 .detail-section .table-responsive {
     margin-top: 10px;
 }
@@ -5479,7 +5500,8 @@ td.actions-col {
 
 [data-work-orders-edit-modal] .work-order-edit-schedule-section > .subsection-header,
 [data-work-orders-edit-modal] .work-order-edit-inspection-section > .subsection-header,
-[data-work-orders-edit-modal] .work-order-edit-production-records > .subsection-header {
+[data-work-orders-edit-modal] .work-order-edit-production-records > .subsection-header,
+[data-work-orders-edit-modal] .work-order-partial-history-section > .subsection-header {
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -5489,7 +5511,8 @@ td.actions-col {
 
 [data-work-orders-edit-modal] .work-order-edit-schedule-section > .subsection-header h4,
 [data-work-orders-edit-modal] .work-order-edit-inspection-section > .subsection-header h4,
-[data-work-orders-edit-modal] .work-order-edit-production-records > .subsection-header h4 {
+[data-work-orders-edit-modal] .work-order-edit-production-records > .subsection-header h4,
+[data-work-orders-edit-modal] .work-order-partial-history-section > .subsection-header h4 {
     margin: 0;
     flex: 0 1 auto;
 }
@@ -5498,6 +5521,7 @@ td.actions-col {
 [data-work-orders-edit-modal] .work-order-edit-schedule-section .subsection-actions,
 [data-work-orders-edit-modal] .work-order-edit-inspection-section .subsection-actions,
 [data-work-orders-edit-modal] .work-order-edit-production-records .subsection-actions,
+[data-work-orders-edit-modal] .work-order-partial-history-section .subsection-actions,
 [data-work-orders-edit-modal] .work-order-edit-first-piece-card .subsection-actions,
 [data-work-orders-edit-modal] .work-order-edit-service-section .subsection-actions {
     margin-bottom: 0;
@@ -5528,7 +5552,8 @@ td.actions-col {
 [data-work-orders-edit-modal] .work-order-edit-detail-section > .subsection-body,
 [data-work-orders-edit-modal] .work-order-edit-schedule-section > .subsection-body,
 [data-work-orders-edit-modal] .work-order-edit-inspection-section > .subsection-body,
-[data-work-orders-edit-modal] .work-order-edit-production-records > .subsection-body {
+[data-work-orders-edit-modal] .work-order-edit-production-records > .subsection-body,
+[data-work-orders-edit-modal] .work-order-partial-history-section > .subsection-body {
     padding-left: 2px;
     padding-right: 2px;
 }
@@ -5692,6 +5717,33 @@ td.actions-col {
     padding: 8px 10px;
 }
 
+[data-work-orders-edit-modal] .work-order-partial-history-section {
+    grid-column: 1 / -1;
+    order: 45;
+    margin: 0;
+    padding: 8px 10px;
+}
+
+[data-work-orders-edit-modal] .work-order-partial-history-section .subsection-header {
+    margin: 0 0 8px;
+    padding: 0 0 6px;
+    border-bottom: 1px solid #dfe5ec;
+}
+
+[data-work-orders-edit-modal] .work-order-partial-history-section .table-responsive {
+    min-height: 0;
+}
+
+[data-work-orders-edit-modal] .work-order-partial-history-section table {
+    font-size: 10px;
+}
+
+[data-work-orders-edit-modal] .work-order-partial-history-section th,
+[data-work-orders-edit-modal] .work-order-partial-history-section td {
+    padding: 4px 6px;
+    vertical-align: top;
+}
+
 [data-work-orders-edit-modal] .work-order-edit-schedule-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
@@ -5700,7 +5752,7 @@ td.actions-col {
 
 [data-work-orders-edit-modal] .work-order-edit-schedule-grid label.inline-label {
     display: grid;
-    grid-template-columns: 86px minmax(0, 1fr);
+    grid-template-columns: 86px minmax(0, 1fr) auto;
     align-items: center;
     gap: 0;
     margin: 0;
@@ -5717,6 +5769,22 @@ td.actions-col {
     min-height: 29px;
     padding: 3px 6px;
     font-size: 10px;
+    min-width: 0;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-schedule-grid input + .weekday-badge {
+    display: inline-flex;
+    align-self: stretch;
+    height: 29px;
+    min-width: 48px;
+    padding: 0 10px;
+    border-left: none;
+    border-radius: 0 6px 6px 0;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-schedule-grid input:where([type="datetime-local"]) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
 }
 
 [data-work-orders-edit-modal] .work-order-edit-middle-row {
@@ -6009,6 +6077,67 @@ td.actions-col {
     font-size: var(--font-md);
 }
 
+[data-work-orders-edit-modal] .work-order-edit-schedule-grid label.inline-label {
+    grid-template-columns: minmax(118px, auto) minmax(0, 1fr) auto;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-schedule-grid label.inline-label > .weekday-badge {
+    grid-column: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    width: auto;
+    min-width: 48px;
+    max-width: none;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 10px;
+    margin: 0;
+    border: 1px solid #ced4da;
+    border-left: 0;
+    border-radius: 0 6px 6px 0;
+    background-color: var(--color-primary-light);
+    color: var(--color-primary);
+    font-size: var(--font-sm);
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-schedule-grid input[type="datetime-local"] {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-schedule-grid label.inline-label {
+    align-items: stretch;
+    min-height: 34px;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-schedule-grid label.inline-label > span:first-child {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 34px;
+    min-height: 34px;
+    padding: 4px 8px;
+    line-height: 1.2;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-schedule-grid input,
+[data-work-orders-edit-modal] .work-order-edit-schedule-grid select {
+    height: 34px;
+    min-height: 34px;
+    padding: 4px 8px;
+    line-height: 1.2;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-schedule-grid label.inline-label > .weekday-badge {
+    height: 34px;
+    min-height: 34px;
+}
+
 [data-work-orders-edit-modal] .work-order-edit-detail-section .work-order-edit-drawing-card {
     margin: 12px 0 0;
     padding: 10px 12px;
@@ -6055,6 +6184,104 @@ td.actions-col {
 [data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.full-width {
     display: grid;
     grid-column: 1 / -1;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-inspection-section .work-order-edit-middle-row {
+    align-items: start;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-service-section,
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card {
+    min-height: 0;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-service-section .table-responsive {
+    max-height: 210px;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-service-section table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-service-section th,
+[data-work-orders-edit-modal] .work-order-edit-service-section td {
+    height: 34px;
+    padding: 4px 6px;
+    vertical-align: middle;
+}
+
+[data-work-orders-edit-modal] .screening-service-defect-input,
+[data-work-orders-edit-modal] .screening-service-notes-input {
+    width: 100%;
+    height: 28px;
+    min-height: 28px;
+    padding: 4px 6px;
+    font-size: var(--font-base);
+}
+
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid {
+    gap: 6px 10px;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.inline-label {
+    grid-template-columns: 74px minmax(0, 1fr);
+    align-items: stretch;
+    min-height: 32px;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.inline-label > span:first-child {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 32px;
+    min-height: 32px;
+    padding: 4px 8px;
+    border: 1px solid #ced4da;
+    border-right: 0;
+    border-radius: 0;
+    background-color: var(--color-bg-disabled);
+    font-size: var(--font-base);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid input,
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid select,
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid textarea {
+    height: 32px;
+    min-height: 32px;
+    padding: 4px 7px;
+    font-size: var(--font-base);
+}
+
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.full-width {
+    grid-template-columns: 74px minmax(0, 1fr);
+}
+
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.full-width textarea {
+    height: 38px;
+    min-height: 38px;
+    resize: vertical;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.full-width > span:first-child,
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.full-width textarea {
+    height: 34px;
+    min-height: 34px;
+}
+
+[data-work-orders-edit-modal] .work-order-partial-history-section th:nth-child(6),
+[data-work-orders-edit-modal] .work-order-partial-history-section td:nth-child(6) {
+    width: 150px;
+    max-width: 150px;
+}
+
+[data-work-orders-edit-modal] .work-order-partial-history-section .partial-receipt-tools-cell {
+    color: #64748b;
+    font-size: 11px;
+    line-height: 1.35;
+    white-space: normal;
 }
 
 [data-work-orders-edit-modal] .split-work-order-panel {
@@ -6518,6 +6745,208 @@ td.actions-col {
 .split-partial-receipt-box span {
     color: #15803d;
     font-size: 13px;
+}
+
+.work-order-balance-card {
+    margin-top: 18px;
+    padding: 16px;
+    border: 1px solid #d6dde6;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #fbfdff 0%, #f3f7fb 100%);
+}
+
+.work-order-balance-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.work-order-balance-card .metric {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #e1e8ef;
+    background: #fff;
+}
+
+.work-order-balance-alert {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #f2c48d;
+    background: #fff8ef;
+    color: #8a4b08;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.work-order-balance-alert.is-danger {
+    border-color: #f0b1b1;
+    background: #fff3f3;
+    color: #a42424;
+}
+
+.work-order-balance-alert.is-success {
+    border-color: #b7e1bf;
+    background: #f3fbf4;
+    color: #1e6a35;
+}
+
+[data-balance-metric="balance_difference"].is-danger {
+    color: #b42318;
+}
+
+[data-balance-metric="balance_difference"].is-success {
+    color: #0f7a2b;
+}
+
+.work-order-partial-tools-field {
+    display: grid;
+    gap: 10px;
+}
+
+.work-order-partial-tools-empty {
+    padding: 10px 12px;
+    border: 1px dashed #d0d8e2;
+    background: #f8fafc;
+    color: #52606d;
+    font-size: 0.92rem;
+}
+
+.work-order-partial-tools-list {
+    display: grid;
+    gap: 10px;
+}
+
+.work-order-partial-tool-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) 132px;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid #d9e2ec;
+    background: #fbfdff;
+}
+
+.work-order-partial-tool-row.is-selected {
+    border-color: #90c2a3;
+    background: #f3fbf4;
+}
+
+.work-order-partial-tool-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.work-order-partial-tool-toggle input {
+    width: 18px;
+    height: 18px;
+}
+
+.work-order-partial-tool-meta {
+    display: grid;
+    gap: 4px;
+}
+
+.work-order-partial-tool-meta strong {
+    color: #102a43;
+    font-size: 0.96rem;
+}
+
+.work-order-partial-tool-meta span {
+    color: #52606d;
+    font-size: 0.88rem;
+}
+
+.work-order-partial-tool-qty {
+    display: grid;
+    gap: 6px;
+}
+
+.work-order-partial-tool-qty span {
+    color: #1f3556;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.work-order-partial-tool-qty input {
+    width: 100%;
+}
+
+.work-order-partial-tools-summary {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #d9e2ec;
+    background: #f8fafc;
+}
+
+.work-order-partial-tools-metric {
+    display: grid;
+    gap: 4px;
+}
+
+.work-order-partial-tools-metric span {
+    color: #52606d;
+    font-size: 0.84rem;
+}
+
+.work-order-partial-tools-metric strong {
+    color: #102a43;
+    font-size: 1rem;
+}
+
+.work-order-partial-tools-metric p {
+    margin: 0;
+    color: #102a43;
+    line-height: 1.5;
+}
+
+.work-order-partial-tools-metric.is-summary p {
+    white-space: pre-wrap;
+}
+
+.work-order-completion-summary {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.work-order-completion-summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #f6f8fb;
+    border: 1px solid #e1e8ef;
+}
+
+.work-order-completion-summary-row span {
+    color: #52606d;
+    font-size: 0.92rem;
+}
+
+.work-order-completion-summary-row strong {
+    color: #102a43;
+    font-size: 0.98rem;
+    text-align: right;
+}
+
+.work-order-reverse-impact-list {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.work-order-reverse-impact-item {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #fff8ef;
+    border: 1px solid #f0dcc0;
+    color: #7c4b16;
+    font-size: 0.92rem;
 }
 
 .inventory-receipt-badge {

@@ -15,6 +15,11 @@ require_once __DIR__ . '/../work_order_operation_logs_helper.php';
 requireAuth();
 requireMethod(['POST']);
 
+$employeePermissions = (array)(($_SESSION['employee']['permissions'] ?? []));
+if ($employeePermissions !== [] && !hasAnyPermission(['work_orders.partial_receipt', 'manage_work_orders'])) {
+    jsonResponse(['success' => false, 'message' => '您沒有建立工單部分入庫的權限。'], 403);
+}
+
 $payload = getJsonInput();
 $workOrderId = filter_var($payload['work_order_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 $machineRunIdRaw = $payload['machine_run_id'] ?? null;
@@ -70,6 +75,8 @@ try {
         $pdo->rollBack();
         jsonResponse(['success' => false, 'message' => '找不到指定工單。'], 404);
     }
+
+    $availableShippingTools = fetchWorkOrderToolDetails($pdo, (int)$workOrder['order_item_id']);
 
     if (!empty($workOrder['completed_at']) || (string)($workOrder['status_key'] ?? '') === 'completed') {
         $pdo->rollBack();
@@ -229,12 +236,36 @@ try {
         ], 409);
     }
 
-    $calculatedUnits = round($receiptNetWeightKg * 1000 / $unitWeightG, 2);
+    $calculatedUnits = workOrderUnitsFromWeight($receiptNetWeightKg, $unitWeightG);
     $inventoryNumber = generateInventoryNumber($pdo);
     $receiptNumber = generatePartialReceiptNumber($pdo);
     $currentEmployee = $_SESSION['employee'] ?? null;
     $currentUserId = $currentEmployee ? (int)$currentEmployee['id'] : null;
     $notes = trim((string)($payload['notes'] ?? ''));
+    $shippingToolsPayload = $payload['shipping_tools'] ?? null;
+    try {
+        $shippingTools = normalisePartialReceiptShippingTools($shippingToolsPayload, $availableShippingTools);
+    } catch (InvalidArgumentException $exception) {
+        $pdo->rollBack();
+        jsonResponse(['success' => false, 'message' => $exception->getMessage()], 400);
+    }
+    $shippingToolDetails = trim((string)($shippingTools['summary'] ?? ''));
+    if ($shippingToolDetails === '') {
+        $pdo->rollBack();
+        jsonResponse(['success' => false, 'message' => '請至少選擇一種本次出貨載具。'], 400);
+    }
+    $shippingToolTotalWeightKg = round((float)($shippingTools['total_weight_kg'] ?? 0), 3);
+    $shippingToolItems = $shippingTools['items'] ?? [];
+    $inventoryNotes = $notes === ''
+        ? (
+            $run
+                ? "拆分工單 {$workOrder['work_order_number']} / {$run['run_label']} 部分入庫，出貨載具：{$shippingToolDetails}"
+                : "一般工單 {$workOrder['work_order_number']} 部分入庫，出貨載具：{$shippingToolDetails}"
+        )
+        : $notes;
+    $inventoryNotes = mb_substr($inventoryNotes, 0, 65535);
+    $transactionNotes = ($run ? '拆分工單' : '一般工單') . "部分入庫 {$receiptNumber}，淨重 {$receiptNetWeightKg} kg / {$calculatedUnits} 支，出貨載具：{$shippingToolDetails}";
+    $transactionNotes = mb_substr($transactionNotes, 0, 65535);
 
     $inventoryStmt = $pdo->prepare("
         INSERT INTO inventory_items (
@@ -266,11 +297,7 @@ try {
         'net_weight_kg' => $receiptNetWeightKg,
         'gross_weight_kg' => $receiptNetWeightKg,
         'weight_per_unit_g' => $unitWeightG,
-        'notes' => $notes === '' ? (
-            $run
-                ? "拆分工單 {$workOrder['work_order_number']} / {$run['run_label']} 部分完工入庫"
-                : "一般工單 {$workOrder['work_order_number']} 部分完工入庫"
-        ) : $notes,
+        'notes' => $inventoryNotes,
         'created_by_employee_id' => $currentUserId,
     ]);
     $inventoryItemId = (int)$pdo->lastInsertId();
@@ -279,11 +306,11 @@ try {
         INSERT INTO work_order_partial_receipts (
             work_order_id, machine_run_id, inventory_item_id, receipt_number,
             net_weight_kg, weight_per_unit_g, calculated_units,
-            receipt_status, notes, created_by_employee_id
+            receipt_status, notes, shipping_tool_details, created_by_employee_id
         ) VALUES (
             :work_order_id, :machine_run_id, :inventory_item_id, :receipt_number,
             :net_weight_kg, :weight_per_unit_g, :calculated_units,
-            'partial', :notes, :created_by_employee_id
+            'partial', :notes, :shipping_tool_details, :created_by_employee_id
         )
     ");
     $partialReceiptStmt->execute([
@@ -295,9 +322,32 @@ try {
         'weight_per_unit_g' => $unitWeightG,
         'calculated_units' => $calculatedUnits,
         'notes' => $notes === '' ? null : $notes,
+        'shipping_tool_details' => $shippingToolDetails,
         'created_by_employee_id' => $currentUserId,
     ]);
     $partialReceiptId = (int)$pdo->lastInsertId();
+
+    $partialReceiptToolStmt = $pdo->prepare("
+        INSERT INTO work_order_partial_receipt_tools (
+            partial_receipt_id, order_item_tool_id, tool_id, tool_name, tool_type,
+            unit_weight_kg, quantity, total_weight_kg
+        ) VALUES (
+            :partial_receipt_id, :order_item_tool_id, :tool_id, :tool_name, :tool_type,
+            :unit_weight_kg, :quantity, :total_weight_kg
+        )
+    ");
+    foreach ($shippingToolItems as $shippingToolItem) {
+        $partialReceiptToolStmt->execute([
+            'partial_receipt_id' => $partialReceiptId,
+            'order_item_tool_id' => isset($shippingToolItem['order_item_tool_id']) ? (int)$shippingToolItem['order_item_tool_id'] : null,
+            'tool_id' => isset($shippingToolItem['tool_id']) ? (int)$shippingToolItem['tool_id'] : null,
+            'tool_name' => (string)($shippingToolItem['tool_name'] ?? ''),
+            'tool_type' => $shippingToolItem['tool_type'] !== null ? (string)$shippingToolItem['tool_type'] : null,
+            'unit_weight_kg' => round((float)($shippingToolItem['unit_weight_kg'] ?? 0), 3),
+            'quantity' => (int)($shippingToolItem['quantity'] ?? 0),
+            'total_weight_kg' => round((float)($shippingToolItem['total_weight_kg'] ?? 0), 3),
+        ]);
+    }
 
     $transactionId = getNextInventoryTransactionId($pdo);
     $transactionStmt = $pdo->prepare("
@@ -320,7 +370,7 @@ try {
         'ref_id' => $partialReceiptId,
         'quantity' => $calculatedUnits,
         'after_quantity' => $calculatedUnits,
-        'notes' => ($run ? '拆分工單' : '一般工單') . "部分完工入庫 {$receiptNumber}，淨重 {$receiptNetWeightKg} kg / {$calculatedUnits} 支",
+        'notes' => $transactionNotes,
         'created_by_employee_id' => $currentUserId,
     ]);
 
@@ -330,6 +380,9 @@ try {
         'inventory_item_id' => $inventoryItemId,
         'net_weight_kg' => $receiptNetWeightKg,
         'calculated_units' => $calculatedUnits,
+        'shipping_tool_details' => $shippingToolDetails,
+        'shipping_tool_total_weight_kg' => $shippingToolTotalWeightKg,
+        'shipping_tools' => $shippingToolItems,
     ]);
 
     appendWorkOrderOperationLog($pdo, $workOrderId, 'partial_receipt', '工單部分完工', [
@@ -343,6 +396,9 @@ try {
             'receipt_number' => $receiptNumber,
             'net_weight_kg' => $receiptNetWeightKg,
             'calculated_units' => $calculatedUnits,
+            'shipping_tool_details' => $shippingToolDetails,
+            'shipping_tool_total_weight_kg' => $shippingToolTotalWeightKg,
+            'shipping_tools' => $shippingToolItems,
         ],
     ]);
 
@@ -360,6 +416,11 @@ try {
             'machine_run_id' => $machineRunId,
             'net_weight_kg' => $receiptNetWeightKg,
             'calculated_units' => $calculatedUnits,
+            'shipping_tool_details' => $shippingToolDetails,
+            'shipping_tool_total_weight_kg' => $shippingToolTotalWeightKg,
+            'shipping_tools' => $shippingToolItems,
+            'remaining_scope_net_weight_kg' => round(max(0, $remainingScopeNetWeightKg - $receiptNetWeightKg), 2),
+            'remaining_work_order_net_weight_kg' => round(max(0, $expectedNetWeightKg - $workOrderReceivedNetWeightKg - $receiptNetWeightKg), 2),
         ],
     ]);
 } catch (Exception $e) {
