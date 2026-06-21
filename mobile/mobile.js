@@ -19,6 +19,11 @@
         pendingUploadWorkOrderId: null,
         uploadDraft: [],
         currentSection: bootstrap.requestedSection || 'work_orders',
+        detailSectionState: {
+            work_order_info: false,
+            screening_services: false,
+            production_records: true,
+        },
         inspections: [],
         inspectionsPagination: null,
         inspectionsMeta: {
@@ -240,10 +245,11 @@
         });
 
         actionModal?.addEventListener('click', (event) => {
-            const target = event.target;
+            const target = event.target instanceof HTMLElement ? event.target.closest('button[data-action]') : null;
             if (!(target instanceof HTMLElement)) {
                 return;
             }
+
             if (target.dataset.action === 'close-modal') {
                 closeActionModal();
                 return;
@@ -251,6 +257,21 @@
             if (target.dataset.action === 'remove-upload-file') {
                 event.preventDefault();
                 removeUploadDraftFile(target.dataset.uploadDraftId || '');
+                return;
+            }
+            if (target.dataset.action === 'toggle-production-mode') {
+                event.preventDefault();
+                handleProductionRecordModeToggle(String(target.dataset.mode || 'preset'));
+                return;
+            }
+            if (target.dataset.action === 'add-production-row') {
+                event.preventDefault();
+                addProductionRecordDraftRow();
+                return;
+            }
+            if (target.dataset.action === 'remove-production-row') {
+                event.preventDefault();
+                removeProductionRecordDraftRow(Number(target.dataset.rowIndex || -1));
             }
         });
 
@@ -615,6 +636,40 @@
         const operationLogs = Array.isArray(workOrder.operation_logs) ? workOrder.operation_logs : [];
         const productionRecords = Array.isArray(workOrder.production_records) ? workOrder.production_records : [];
         const machineRuns = Array.isArray(workOrder.machine_runs) ? workOrder.machine_runs : [];
+        const infoSectionContent = `
+            <div class="mobile-info-list">
+                ${renderInfoCard('訂單號', workOrder.order_number)}
+                ${renderInfoCard('客戶批號', workOrder.customer_batch_number)}
+                ${renderInfoCard('圖號', workOrder.drawing_number)}
+                ${renderInfoCard('客戶', workOrder.customer_name)}
+                ${renderInfoCard('產品 / 規格', workOrder.screening_item_name)}
+                ${renderInfoCard('機台能力', workOrder.machine_capability_name)}
+                ${renderInfoCard('單重 (g)', formatNumber(workOrder.weight_per_unit_g))}
+                ${renderInfoCard('載具統計', workOrder.tool_statistics || '-')}
+                ${renderInfoCard('實際開始', formatDateTime(workOrder.actual_start_date))}
+                ${renderInfoCard('實際完成', formatDateTime(workOrder.actual_end_date))}
+                ${renderInfoCard('備註', workOrder.other_notes || '-')}
+            </div>
+        `;
+        const screeningServicesContent = screeningServices.length
+            ? screeningServices.map((service) => `
+                <article class="mobile-record-card">
+                    <strong>${escapeHtml(service.custom_service_name || service.screening_service_name || '未命名服務')}</strong>
+                    <div class="mobile-card-meta">
+                        <span>+公差：${escapeHtml(service.tolerance_plus_value || '-')}</span>
+                        <span>-公差：${escapeHtml(service.tolerance_minus_value || '-')}</span>
+                        <span>PPM：${escapeHtml(service.ppm_standard || '-')}</span>
+                    </div>
+                </article>
+            `).join('')
+            : '<div class="mobile-empty-state"><p class="mobile-empty-text">此工單目前沒有篩分服務明細。</p></div>';
+        const productionRecordsContent = renderProductionRecordList(productionRecords, workOrder);
+        const productionRecordActions = Number(workOrder.lifecycle_locked || 0) === 0
+            ? `<button type="button" class="mobile-secondary-button" data-action="production-records" data-id="${workOrder.id}">
+                <i class="fas fa-pen-to-square"></i>
+                編輯生產紀錄
+            </button>`
+            : '';
 
         content.innerHTML = `
             <section class="mobile-detail-section">
@@ -648,66 +703,9 @@
                 </div>
             </section>
 
-            <section class="mobile-detail-section">
-                <div class="mobile-detail-section-header">
-                    <h3>工單資訊</h3>
-                </div>
-                <div class="mobile-info-list">
-                    ${renderInfoCard('訂單號', workOrder.order_number)}
-                    ${renderInfoCard('客戶批號', workOrder.customer_batch_number)}
-                    ${renderInfoCard('圖號', workOrder.drawing_number)}
-                    ${renderInfoCard('客戶', workOrder.customer_name)}
-                    ${renderInfoCard('產品 / 規格', workOrder.screening_item_name)}
-                    ${renderInfoCard('機台能力', workOrder.machine_capability_name)}
-                    ${renderInfoCard('單重 (g)', formatNumber(workOrder.weight_per_unit_g))}
-                    ${renderInfoCard('載具統計', workOrder.tool_statistics || '-')}
-                    ${renderInfoCard('實際開始', formatDateTime(workOrder.actual_start_date))}
-                    ${renderInfoCard('實際完成', formatDateTime(workOrder.actual_end_date))}
-                    ${renderInfoCard('備註', workOrder.other_notes || '-')}
-                </div>
-            </section>
-
-            <section class="mobile-detail-section">
-                <div class="mobile-detail-section-header">
-                    <h3>篩分服務</h3>
-                </div>
-                ${
-                    screeningServices.length
-                        ? screeningServices.map((service) => `
-                            <article class="mobile-record-card">
-                                <strong>${escapeHtml(service.custom_service_name || service.screening_service_name || '未命名服務')}</strong>
-                                <div class="mobile-card-meta">
-                                    <span>+公差：${escapeHtml(service.tolerance_plus_value || '-')}</span>
-                                    <span>-公差：${escapeHtml(service.tolerance_minus_value || '-')}</span>
-                                    <span>PPM：${escapeHtml(service.ppm_standard || '-')}</span>
-                                </div>
-                            </article>
-                        `).join('')
-                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">此工單目前沒有篩分服務明細。</p></div>'
-                }
-            </section>
-
-            <section class="mobile-detail-section">
-                <div class="mobile-detail-section-header">
-                    <h3>生產紀錄</h3>
-                </div>
-                ${
-                    productionRecords.length
-                        ? productionRecords.map((record) => `
-                            <article class="mobile-record-card">
-                                <strong>${escapeHtml(record.machine_name || workOrder.machine_name || '未指定機台')}</strong>
-                                <div class="mobile-card-meta">
-                                    <span>日期：${escapeHtml(record.production_date || '-')}</span>
-                                    <span>時間：${escapeHtml(record.production_time || '-')}</span>
-                                    <span>重量：${escapeHtml(formatWeight(record.weight_kg))}</span>
-                                    <span>操作人：${escapeHtml(record.employee_name || record.operator_name || '-')}</span>
-                                </div>
-                                <p class="mobile-detail-note">${escapeHtml(record.notes || '無備註')}</p>
-                            </article>
-                        `).join('')
-                        : '<div class="mobile-empty-state"><p class="mobile-empty-text">尚未建立生產紀錄。</p></div>'
-                }
-            </section>
+            ${renderCollapsibleDetailSection('work_order_info', '工單資訊', infoSectionContent)}
+            ${renderCollapsibleDetailSection('screening_services', '篩分服務', screeningServicesContent)}
+            ${renderCollapsibleDetailSection('production_records', '生產紀錄', productionRecordsContent, productionRecordActions)}
 
             <section class="mobile-detail-section">
                 <div class="mobile-detail-section-header">
@@ -857,12 +855,273 @@
         `).join('');
     }
 
+    function renderProductionRecordList(records, workOrder) {
+        if (!records.length) {
+            return '<div class="mobile-empty-state"><p class="mobile-empty-text">尚未建立生產紀錄。</p></div>';
+        }
+
+        const filledWeightCount = records.filter((record) => hasSubmittedValue(record.weight_kg)).length;
+        const assignedMachineCount = records.filter((record) => hasSubmittedValue(record.machine_id)).length;
+
+        return `
+            <div class="mobile-info-card mobile-production-summary-card">
+                <strong>生產紀錄摘要</strong>
+                <div class="mobile-card-meta">
+                    <span>載具筆數：${escapeHtml(String(records.length))}</span>
+                    <span>已填重量：${escapeHtml(String(filledWeightCount))}</span>
+                    <span>已指定機台：${escapeHtml(String(assignedMachineCount))}</span>
+                    <span>工單載具統計：${escapeHtml(workOrder.tool_statistics || '-')}</span>
+                </div>
+                <p class="mobile-detail-note">此區會沿用桌面版的生產紀錄資料；預設模式會先帶入卡號、載具類型與載具重量，現場再逐筆補實際裝載重量。</p>
+            </div>
+            <div class="mobile-production-records-block">
+                <div class="mobile-production-records-header">
+                    <span class="mobile-chip mobile-production-records-chip">逐筆載具明細</span>
+                    <p class="mobile-empty-text">以下每筆卡號都是獨立載具；摘要只看整體狀態，明細才是逐筆作業資料。</p>
+                </div>
+                <div class="mobile-production-records-list">
+                    ${records.map((record, index) => renderProductionRecordCard(record, workOrder, index)).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderCollapsibleDetailSection(sectionKey, title, contentHtml, actionsHtml = '') {
+        const isExpanded = state.detailSectionState[sectionKey] !== false;
+        return `
+            <section class="mobile-detail-section mobile-collapsible-section${isExpanded ? ' is-expanded' : ' is-collapsed'}" data-detail-section="${escapeAttribute(sectionKey)}">
+                <div class="mobile-detail-section-header mobile-collapsible-header">
+                    <button
+                        type="button"
+                        class="mobile-detail-section-toggle"
+                        data-action="toggle-detail-section"
+                        data-section="${escapeAttribute(sectionKey)}"
+                        aria-expanded="${isExpanded ? 'true' : 'false'}"
+                    >
+                        <span>${escapeHtml(title)}</span>
+                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                    </button>
+                    ${actionsHtml ? `<div class="mobile-detail-section-actions">${actionsHtml}</div>` : ''}
+                </div>
+                <div class="mobile-detail-section-body${isExpanded ? '' : ' hidden'}" data-detail-section-body="${escapeAttribute(sectionKey)}">
+                    ${contentHtml}
+                </div>
+            </section>
+        `;
+    }
+
+    function renderProductionRecordCard(record, workOrder, index) {
+        const weightFilled = hasSubmittedValue(record.weight_kg);
+        const statusClass = weightFilled ? 'mobile-status-completed' : 'mobile-status-pending';
+        const statusLabel = weightFilled ? '已填實際重量' : '待填實際重量';
+        const sourceMode = String(record.production_source_mode || 'preset') === 'manual' ? '自行輸入' : '預設';
+
+        return `
+            <article class="mobile-record-card mobile-production-record-card">
+                <div class="mobile-record-card-header">
+                    <strong>${escapeHtml(record.card_number ? `卡號 ${record.card_number}` : `生產紀錄 ${index + 1}`)}</strong>
+                    <span class="mobile-status-badge ${statusClass}">${escapeHtml(statusLabel)}</span>
+                </div>
+                <div class="mobile-card-meta">
+                    <span>來源：${escapeHtml(sourceMode)}</span>
+                    <span>載具類型：${escapeHtml(record.tool_name || '未設定')}</span>
+                    <span>載具重量：${escapeHtml(formatWeight(record.tool_weight_kg))}</span>
+                    <span>實際裝載重量：${escapeHtml(weightFilled ? formatWeight(record.weight_kg) : '待填寫')}</span>
+                    <span>機台：${escapeHtml(record.machine_name || workOrder.machine_name || '尚未指定機台')}</span>
+                    <span>日期：${escapeHtml(record.production_date || '-')}</span>
+                    <span>時間：${escapeHtml(formatTimeValue(record.production_time) || '-')}</span>
+                    <span>操作人：${escapeHtml(record.employee_name || record.operator_name || '-')}</span>
+                </div>
+                <p class="mobile-detail-note">${escapeHtml(record.notes || '無備註')}</p>
+            </article>
+        `;
+    }
+
+    function initializeProductionRecordModalState(config) {
+        if (config.productionRecordBuffers) {
+            return;
+        }
+
+        const records = Array.isArray(config.records) ? config.records : [];
+        const presetRecords = records
+            .filter((record) => String(record.production_source_mode || 'preset') !== 'manual')
+            .map((record) => normalizeProductionRecordDraft(record, 'preset'));
+        const manualRecords = records
+            .filter((record) => String(record.production_source_mode || 'preset') === 'manual')
+            .map((record) => normalizeProductionRecordDraft(record, 'manual'));
+
+        config.productionRecordBuffers = {
+            preset: presetRecords,
+            manual: manualRecords.length
+                ? manualRecords
+                : (presetRecords.length
+                    ? presetRecords.map((record) => ({ ...record, production_source_mode: 'manual' }))
+                    : [createEmptyProductionRecordDraft('manual')]),
+        };
+
+        if (!config.productionRecordBuffers.preset.length && records.length) {
+            config.productionRecordBuffers.preset = records.map((record) => normalizeProductionRecordDraft(record, 'preset'));
+        }
+
+        config.productionRecordMode = config.productionRecordMode
+            || (manualRecords.length > 0 && presetRecords.length === 0 ? 'manual' : 'preset');
+    }
+
+    function normalizeProductionRecordDraft(record, fallbackMode) {
+        return {
+            card_number: String(record.card_number || '').trim(),
+            tool_name: String(record.tool_name || '').trim(),
+            tool_weight_kg: hasSubmittedValue(record.tool_weight_kg) ? String(record.tool_weight_kg).trim() : '',
+            weight_kg: hasSubmittedValue(record.weight_kg) ? String(record.weight_kg).trim() : '',
+            production_date: String(record.production_date || '').trim(),
+            production_time: normalizeTimeInputValue(record.production_time),
+            machine_id: hasSubmittedValue(record.machine_id) ? String(record.machine_id).trim() : '',
+            notes: String(record.notes || '').trim(),
+            production_source_mode: fallbackMode,
+        };
+    }
+
+    function createEmptyProductionRecordDraft(mode) {
+        return {
+            card_number: '',
+            tool_name: '',
+            tool_weight_kg: '',
+            weight_kg: '',
+            production_date: '',
+            production_time: '',
+            machine_id: '',
+            notes: '',
+            production_source_mode: mode,
+        };
+    }
+
+    function renderProductionRecordEditor(config) {
+        initializeProductionRecordModalState(config);
+
+        const mode = String(config.productionRecordMode || 'preset') === 'manual' ? 'manual' : 'preset';
+        const records = mode === 'manual'
+            ? (config.productionRecordBuffers.manual || [])
+            : (config.productionRecordBuffers.preset || []);
+        const filledWeightCount = records.filter((record) => hasSubmittedValue(record.weight_kg)).length;
+
+        return `
+            <div class="mobile-action-grid">
+                <div class="mobile-info-card mobile-production-summary-card">
+                    <strong>生產紀錄操作說明</strong>
+                    <div class="mobile-card-meta">
+                        <span>目前模式：${escapeHtml(mode === 'manual' ? '自行輸入' : '預設')}</span>
+                        <span>載具筆數：${escapeHtml(String(records.length))}</span>
+                        <span>已填重量：${escapeHtml(String(filledWeightCount))}</span>
+                    </div>
+                    <p class="mobile-detail-note">
+                        ${mode === 'manual'
+                            ? '自行輸入模式可增減載具筆數，並自行調整卡號、載具類型與載具重量。'
+                            : '預設模式會沿用桌面版依客戶批號帶入的卡號、載具類型與載具重量，現場只需補每筆實際裝載重量。'}
+                    </p>
+                </div>
+
+                <div class="mobile-production-mode-switch" role="tablist" aria-label="生產紀錄模式">
+                    <button type="button" class="mobile-production-mode-button${mode === 'preset' ? ' active' : ''}" data-action="toggle-production-mode" data-mode="preset">
+                        預設
+                    </button>
+                    <button type="button" class="mobile-production-mode-button${mode === 'manual' ? ' active' : ''}" data-action="toggle-production-mode" data-mode="manual">
+                        自行輸入
+                    </button>
+                </div>
+
+                <div class="mobile-production-toolbar">
+                    <span class="mobile-empty-text">卡號會依總支數與載具數量帶入；實際作業時請逐筆填寫重量。</span>
+                    ${mode === 'manual'
+                        ? `<button type="button" class="mobile-secondary-button" data-action="add-production-row">
+                            <i class="fas fa-plus"></i>
+                            新增載具
+                        </button>`
+                        : ''}
+                </div>
+
+                <div class="mobile-production-editor-list">
+                    ${records.map((record, index) => renderProductionRecordEditorRow(record, index, mode)).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderProductionRecordEditorRow(record, index, mode) {
+        const isManual = mode === 'manual';
+        const machineOptions = getProductionRecordMachineOptions(record.machine_id);
+        return `
+            <article class="mobile-record-card mobile-production-editor-card" data-production-row="${index}">
+                <div class="mobile-record-card-header">
+                    <strong>${escapeHtml(record.card_number ? `卡號 ${record.card_number}` : `載具 ${index + 1}`)}</strong>
+                    ${isManual
+                        ? `<button type="button" class="mobile-icon-button" data-action="remove-production-row" data-row-index="${index}" aria-label="刪除此載具">
+                            <i class="fas fa-trash"></i>
+                        </button>`
+                        : `<span class="mobile-chip">預設載具</span>`}
+                </div>
+                <div class="mobile-production-editor-grid">
+                    <label class="mobile-field">
+                        <span>卡號</span>
+                        <input type="text" name="pr_card_number[]" value="${escapeAttribute(record.card_number)}"${isManual ? '' : ' readonly'}>
+                    </label>
+                    <label class="mobile-field">
+                        <span>載具類型</span>
+                        <input type="text" name="pr_tool_name[]" value="${escapeAttribute(record.tool_name)}"${isManual ? '' : ' readonly'}>
+                    </label>
+                    <label class="mobile-field">
+                        <span>載具重量 (kg)</span>
+                        <input type="number" name="pr_tool_weight_kg[]" value="${escapeAttribute(record.tool_weight_kg)}" step="0.001" min="0"${isManual ? '' : ' readonly'}>
+                    </label>
+                    <label class="mobile-field">
+                        <span>實際裝載重量 (kg)</span>
+                        <input type="number" name="pr_weight_kg[]" value="${escapeAttribute(record.weight_kg)}" step="0.01" min="0" placeholder="請填實際重量">
+                    </label>
+                    <label class="mobile-field">
+                        <span>日期</span>
+                        <input type="date" name="pr_date[]" value="${escapeAttribute(record.production_date)}">
+                    </label>
+                    <label class="mobile-field">
+                        <span>時間</span>
+                        <input type="time" name="pr_time[]" value="${escapeAttribute(record.production_time)}">
+                    </label>
+                    <label class="mobile-field">
+                        <span>機台</span>
+                        <select name="pr_machine_id[]">
+                            ${machineOptions}
+                        </select>
+                    </label>
+                    <label class="mobile-field mobile-field-full">
+                        <span>備註</span>
+                        <textarea name="pr_notes[]" placeholder="補充裝載狀況、臨時換載具或其他說明">${escapeHtml(record.notes)}</textarea>
+                    </label>
+                </div>
+            </article>
+        `;
+    }
+
+    function getProductionRecordMachineOptions(selectedId) {
+        const selected = String(selectedId || '').trim();
+        return ['<option value="">未指定機台</option>']
+            .concat(state.machines.map((machine) => {
+                const id = String(machine.id || '');
+                const label = machine.machine_number
+                    ? `${String(machine.machine_number)} / ${String(machine.name || '未命名機台')}`
+                    : String(machine.name || '未命名機台');
+                return `<option value="${escapeAttribute(id)}"${id === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+            }))
+            .join('');
+    }
+
     function buildDetailActionButtons(workOrder) {
         const buttons = [
             renderActionButton('view', workOrder.id, 'fa-rotate-right', '重新載入', 'mobile-secondary-button'),
             renderActionButton('upload', workOrder.id, 'fa-camera', '拍照 / 上傳', 'mobile-secondary-button'),
             renderActionButton('issue', workOrder.id, 'fa-triangle-exclamation', '異常回報', 'mobile-secondary-button'),
         ];
+
+        if (Number(workOrder.lifecycle_locked || 0) === 0) {
+            buttons.splice(1, 0, renderActionButton('production-records', workOrder.id, 'fa-list-check', '生產紀錄', 'mobile-ghost-button'));
+        }
 
         const statusKey = String(workOrder.status_key || '');
         if (statusKey === 'pending') {
@@ -903,7 +1162,43 @@
         if (!button) {
             return;
         }
+
+        if (button.dataset.action === 'toggle-detail-section') {
+            event.preventDefault();
+            toggleDetailSection(String(button.dataset.section || ''));
+            return;
+        }
+
         handleActionClick(button);
+    }
+
+    function toggleDetailSection(sectionKey) {
+        if (!sectionKey) {
+            return;
+        }
+
+        const currentValue = state.detailSectionState[sectionKey] !== false;
+        state.detailSectionState[sectionKey] = !currentValue;
+
+        const root = document.querySelector(`[data-detail-section="${sectionKey}"]`);
+        if (!(root instanceof HTMLElement)) {
+            return;
+        }
+
+        const body = root.querySelector(`[data-detail-section-body="${sectionKey}"]`);
+        const toggle = root.querySelector(`[data-action="toggle-detail-section"][data-section="${sectionKey}"]`);
+        const isExpanded = state.detailSectionState[sectionKey] !== false;
+
+        root.classList.toggle('is-expanded', isExpanded);
+        root.classList.toggle('is-collapsed', !isExpanded);
+
+        if (body instanceof HTMLElement) {
+            body.classList.toggle('hidden', !isExpanded);
+        }
+
+        if (toggle instanceof HTMLElement) {
+            toggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        }
     }
 
     function handleInspectionListClick(event) {
@@ -980,6 +1275,16 @@
             openActionModal({
                 type: 'complete',
                 workOrderId: id,
+            });
+            return;
+        }
+
+        if (action === 'production-records') {
+            openActionModal({
+                type: 'production_records',
+                workOrderId: id,
+                workOrder: state.currentWorkOrder,
+                records: Array.isArray(state.currentWorkOrder?.production_records) ? state.currentWorkOrder.production_records : [],
             });
             return;
         }
@@ -1103,6 +1408,11 @@
                     </label>
                 </div>
             `;
+        } else if (config.type === 'production_records') {
+            title.textContent = '編輯生產紀錄';
+            kicker.textContent = 'PRODUCTION RECORDS';
+            submit.textContent = '儲存生產紀錄';
+            body.innerHTML = renderProductionRecordEditor(config);
         } else if (config.type === 'upload') {
             const uploadTarget = String(config.uploadTarget || 'completion');
             const uploadConfig = getExecutionImageUploadConfig(uploadTarget);
@@ -1313,6 +1623,97 @@
         state.modalAction = null;
     }
 
+    function handleProductionRecordModeToggle(mode) {
+        if (!state.modalAction || state.modalAction.type !== 'production_records') {
+            return;
+        }
+
+        const form = document.getElementById('mobile-action-form');
+        if (form instanceof HTMLFormElement) {
+            syncProductionRecordDraftFromForm(form);
+        }
+
+        state.modalAction.productionRecordMode = mode === 'manual' ? 'manual' : 'preset';
+        rerenderProductionRecordModal();
+    }
+
+    function addProductionRecordDraftRow() {
+        if (!state.modalAction || state.modalAction.type !== 'production_records') {
+            return;
+        }
+
+        const form = document.getElementById('mobile-action-form');
+        if (form instanceof HTMLFormElement) {
+            syncProductionRecordDraftFromForm(form);
+        }
+
+        const mode = String(state.modalAction.productionRecordMode || 'preset') === 'manual' ? 'manual' : 'preset';
+        if (mode !== 'manual') {
+            return;
+        }
+
+        state.modalAction.productionRecordBuffers.manual.push(createEmptyProductionRecordDraft('manual'));
+        rerenderProductionRecordModal();
+    }
+
+    function removeProductionRecordDraftRow(index) {
+        if (!state.modalAction || state.modalAction.type !== 'production_records') {
+            return;
+        }
+
+        const form = document.getElementById('mobile-action-form');
+        if (form instanceof HTMLFormElement) {
+            syncProductionRecordDraftFromForm(form);
+        }
+
+        const records = state.modalAction.productionRecordBuffers.manual || [];
+        if (index < 0 || index >= records.length) {
+            return;
+        }
+
+        records.splice(index, 1);
+        if (!records.length) {
+            records.push(createEmptyProductionRecordDraft('manual'));
+        }
+        rerenderProductionRecordModal();
+    }
+
+    function rerenderProductionRecordModal() {
+        if (!state.modalAction || state.modalAction.type !== 'production_records') {
+            return;
+        }
+
+        const body = document.getElementById('mobile-action-body');
+        if (!(body instanceof HTMLElement)) {
+            return;
+        }
+
+        body.innerHTML = renderProductionRecordEditor(state.modalAction);
+    }
+
+    function syncProductionRecordDraftFromForm(form) {
+        if (!state.modalAction || state.modalAction.type !== 'production_records') {
+            return;
+        }
+
+        const mode = String(state.modalAction.productionRecordMode || 'preset') === 'manual' ? 'manual' : 'preset';
+        const rows = Array.from(form.querySelectorAll('[data-production-row]'));
+        state.modalAction.productionRecordBuffers[mode] = rows.map((row) => {
+            const scope = row instanceof HTMLElement ? row : null;
+            return {
+                card_number: String(scope?.querySelector('[name="pr_card_number[]"]')?.value || '').trim(),
+                tool_name: String(scope?.querySelector('[name="pr_tool_name[]"]')?.value || '').trim(),
+                tool_weight_kg: String(scope?.querySelector('[name="pr_tool_weight_kg[]"]')?.value || '').trim(),
+                weight_kg: String(scope?.querySelector('[name="pr_weight_kg[]"]')?.value || '').trim(),
+                production_date: String(scope?.querySelector('[name="pr_date[]"]')?.value || '').trim(),
+                production_time: String(scope?.querySelector('[name="pr_time[]"]')?.value || '').trim(),
+                machine_id: String(scope?.querySelector('[name="pr_machine_id[]"]')?.value || '').trim(),
+                notes: String(scope?.querySelector('[name="pr_notes[]"]')?.value || '').trim(),
+                production_source_mode: mode,
+            };
+        });
+    }
+
     function closeDetailSheet() {
         const sheet = document.getElementById('mobile-detail-sheet');
         if (sheet) {
@@ -1344,6 +1745,10 @@
             }
             if (state.modalAction.type === 'inspection_create' || state.modalAction.type === 'inspection_edit') {
                 await submitInspectionAction(form, state.modalAction);
+                return;
+            }
+            if (state.modalAction.type === 'production_records') {
+                await submitProductionRecords(form, state.modalAction);
                 return;
             }
             if (state.modalAction.type === 'complete') {
@@ -1504,6 +1909,44 @@
             await refreshAfterMutation(action.workOrderId, result.message || '部分完工回報成功。', true);
         } catch (error) {
             showActionFeedback('error', error.message || '部分完工回報失敗。');
+        }
+    }
+
+    async function submitProductionRecords(form, action) {
+        syncProductionRecordDraftFromForm(form);
+
+        const mode = String(action.productionRecordMode || 'preset') === 'manual' ? 'manual' : 'preset';
+        const records = Array.isArray(action.productionRecordBuffers?.[mode]) ? action.productionRecordBuffers[mode] : [];
+        const normalizedRecords = records
+            .map((record) => ({
+                card_number: String(record.card_number || '').trim(),
+                tool_name: String(record.tool_name || '').trim(),
+                tool_weight_kg: hasSubmittedValue(record.tool_weight_kg) ? String(record.tool_weight_kg).trim() : null,
+                weight_kg: hasSubmittedValue(record.weight_kg) ? String(record.weight_kg).trim() : null,
+                production_date: String(record.production_date || '').trim() || null,
+                production_time: String(record.production_time || '').trim() || null,
+                machine_id: String(record.machine_id || '').trim() || null,
+                notes: String(record.notes || '').trim() || null,
+                production_source_mode: mode,
+            }))
+            .filter((record) => hasSubmittedValue(record.card_number) && isMeaningfulProductionRecord(record));
+
+        if (!normalizedRecords.length) {
+            showActionFeedback('error', '請至少保留一筆有卡號，且已填載具或生產資訊的生產紀錄。');
+            return;
+        }
+
+        try {
+            const result = await fetchJson(`${API_BASE}/work_orders/update.php?id=${action.workOrderId}`, {
+                method: 'PUT',
+                body: {
+                    production_records: normalizedRecords,
+                },
+                withCsrf: true,
+            });
+            await refreshAfterMutation(action.workOrderId, result.message || '生產紀錄已更新。', true);
+        } catch (error) {
+            showActionFeedback('error', error.message || '生產紀錄更新失敗。');
         }
     }
 
@@ -2088,6 +2531,30 @@
             return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
         }
         return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    }
+
+    function hasSubmittedValue(value) {
+        return value !== null && value !== undefined && String(value).trim() !== '';
+    }
+
+    function isMeaningfulProductionRecord(record) {
+        return ['weight_kg', 'production_date', 'production_time', 'machine_id', 'tool_name', 'tool_weight_kg', 'notes']
+            .some((field) => hasSubmittedValue(record[field]));
+    }
+
+    function normalizeTimeInputValue(value) {
+        if (!value) {
+            return '';
+        }
+        const text = String(value).trim();
+        if (!text) {
+            return '';
+        }
+        return text.length >= 5 ? text.slice(0, 5) : text;
+    }
+
+    function formatTimeValue(value) {
+        return normalizeTimeInputValue(value);
     }
 
     function getCurrentDateTimeString() {

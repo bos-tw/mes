@@ -223,7 +223,7 @@ span {
     color: white;
     font-size: var(--font-xs);
     padding: 2px 6px;
-    border-radius: 50%;
+    border-radius: 6px;
     margin-left: 5px;
     line-height: 1;
 }
@@ -352,7 +352,7 @@ span {
 
 .dropdown-item .badge {
     margin-left: auto;
-    border-radius: 10px;
+    border-radius: 6px;
 }
 
 .dropdown-item .notification-badge {
@@ -1662,7 +1662,7 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     color: #fff;
     font-size: var(--font-xs);
     padding: 2px 6px;
-    border-radius: 10px;
+    border-radius: 6px;
     margin-left: 4px;
 }
 
@@ -1895,7 +1895,7 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     padding: 0 5px;
     color: #fff;
     background: var(--color-primary);
-    border-radius: 999px;
+    border-radius: 6px;
     font-size: var(--font-xs);
     font-weight: 700;
     line-height: 1;
@@ -6525,7 +6525,7 @@ td.actions-col {
     align-items: center;
     margin-left: 6px;
     padding: 2px 6px;
-    border-radius: 999px;
+    border-radius: 6px;
     font-size: 11px;
     font-weight: 700;
     vertical-align: middle;
@@ -7126,7 +7126,7 @@ td.actions-col {
 .priority-badge {
     display: inline-block;
     padding: 2px 8px;
-    border-radius: 10px;
+    border-radius: 6px;
     font-size: var(--font-xs);
     font-weight: 500;
 }
@@ -7294,7 +7294,7 @@ td.actions-col {
     font-weight: 600;
     min-width: 20px;
     height: 20px;
-    border-radius: 10px;
+    border-radius: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -7742,7 +7742,7 @@ select option:disabled {
 .event-popup-type-badge {
     display: inline-block;
     padding: 4px 10px;
-    border-radius: 20px;
+    border-radius: 6px;
     font-size: var(--font-sm);
     font-weight: 600;
     color: #fff;
@@ -9830,7 +9830,7 @@ select option:disabled {
     align-items: center;
     margin-left: 6px;
     padding: 2px 6px;
-    border-radius: 999px;
+    border-radius: 6px;
     background: #0891b2;
     color: #fff;
     font-size: 12px;
@@ -9843,7 +9843,7 @@ select option:disabled {
     align-items: center;
     padding: 3px 8px;
     border: 1px solid transparent;
-    border-radius: 999px;
+    border-radius: 6px;
     font-size: 12px;
     font-weight: 700;
     line-height: 1.4;
@@ -9883,7 +9883,7 @@ select option:disabled {
     align-items: center;
     padding: 3px 8px;
     border: 1px solid #d6e9df;
-    border-radius: 999px;
+    border-radius: 6px;
     background: #edf9f1;
     color: #0f766e;
     font-size: var(--font-xs);

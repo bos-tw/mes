@@ -330,12 +330,12 @@
         // 取得狀態徽章
         function getStatusBadge(status) {
             const statusMap = {
-                'pending': '<span class="badge bg-warning">待處理</span>',
-                'processing': '<span class="badge bg-info">處理中</span>',
-                'completed': '<span class="badge bg-success">已完成</span>',
-                'cancelled': '<span class="badge bg-secondary">已取消</span>',
+                'pending': '<span class="status-badge pending">待處理</span>',
+                'processing': '<span class="status-badge in-progress">處理中</span>',
+                'completed': '<span class="status-badge completed">已完成</span>',
+                'cancelled': '<span class="status-badge cancelled">已取消</span>',
             };
-            return statusMap[status] || `<span class="badge bg-secondary">${escapeHtml(status || '未知')}</span>`;
+            return statusMap[status] || `<span class="status-badge secondary">${escapeHtml(status || '未知')}</span>`;
         }
 
         // 渲染分頁
