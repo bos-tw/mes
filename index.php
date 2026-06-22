@@ -177,6 +177,7 @@ $ver = $cacheVersion['version'];
                             </a>
                             <ul class="submenu">
                                 <li><a href="#" data-page="production_quality_records" data-title="生產品質檢驗"><i class="fas fa-microscope"></i> 生產品質檢驗</a></li>
+                                <li><a href="#" data-page="defect_history_records" data-title="不良品歷史紀錄"><i class="fas fa-history"></i> 不良品歷史紀錄</a></li>
                                 <li><a href="#" data-page="shipping_quality_inspections" data-title="出貨品質檢驗"><i class="fas fa-search"></i> 出貨品質檢驗</a></li>
                                 <li><a href="#" data-page="quality_issue_reports" data-title="品質異常報告"><i class="fas fa-exclamation-triangle"></i> 品質異常報告</a></li>
                             </ul>
@@ -453,6 +454,7 @@ $ver = $cacheVersion['version'];
     <script defer src="core/configs/quality_issue_reports.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/shipping_quality_inspections.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/production_quality_records.config.js?v=<?= $ver ?>"></script>
+    <script defer src="core/configs/defect_history_records.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/machine_maintenance_tasks.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/daily_machine_inspections.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/daily_machine_inspection_items.config.js?v=<?= $ver ?>"></script>
@@ -501,6 +503,7 @@ $ver = $cacheVersion['version'];
     <script defer src="js/shipping_order_items.js?v=<?= $ver ?>"></script>
     <script defer src="js/return_orders.js?v=<?= $ver ?>"></script>
     <script defer src="js/production_quality_records.js?v=<?= $ver ?>"></script>
+    <script defer src="js/defect_history_records.js?v=<?= $ver ?>"></script>
     <script defer src="js/dashboard.js?v=<?= $ver ?>"></script>
     <!-- 新增模組 -->
     <script defer src="js/roles.js?v=<?= $ver ?>"></script>

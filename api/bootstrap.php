@@ -904,6 +904,7 @@ function autoEnforcePermission(array $employee): void
         'return_order_items'            => 'manage_return_orders',
         'production_records'            => 'manage_production_records',
         'production_quality_records'    => 'manage_production_quality',
+        'defect_history_records'        => 'manage_production_quality',
         'quality_issue_reports'         => 'manage_quality_issues',
         'roles'                         => 'manage_roles',
         'permissions'                   => 'manage_permissions',

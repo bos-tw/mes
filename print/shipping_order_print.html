@@ -252,17 +252,88 @@
             line-height: 1.4;
         }
 
+        .supplement-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .supplement-card {
+            border: 1px solid #ccc;
+            background-color: #fafafa;
+            padding: 4px 6px;
+            font-size: 7pt;
+        }
+
+        .supplement-card .card-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 3px;
+        }
+
+        .supplement-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            margin-bottom: 3px;
+        }
+
+        .supplement-metric {
+            border: 1px solid #ddd;
+            background-color: #fff;
+            padding: 3px 4px;
+        }
+
+        .supplement-metric .label {
+            font-size: 6.5pt;
+            color: #666;
+            display: block;
+        }
+
+        .supplement-metric .value {
+            font-size: 8pt;
+            font-weight: bold;
+            display: block;
+            margin-top: 1px;
+        }
+
+        .supplement-note {
+            color: #555;
+            min-height: 18px;
+            white-space: pre-line;
+        }
+
+        .tool-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .tool-summary-table th,
+        .tool-summary-table td {
+            border: 1px solid #ddd;
+            padding: 2px 3px;
+            font-size: 7pt;
+        }
+
+        .tool-summary-table th {
+            background-color: #f0f0f0;
+            text-align: center;
+            font-weight: bold;
+        }
+
         /* 合計區 */
         .summary-section {
             display: flex;
+            flex-wrap: wrap;
             justify-content: flex-end;
+            gap: 8px 16px;
             padding: 4px 0;
             border-top: 2px solid #000;
             margin-top: auto;
         }
 
         .summary-item {
-            margin-left: 20px;
             text-align: right;
         }
 
@@ -407,27 +478,40 @@
             // 從 URL 取得參數
             const urlParams = new URLSearchParams(window.location.search);
             const shippingOrderId = urlParams.get('id');
+            const isPreviewMode = urlParams.get('preview') === '1';
 
-            if (!shippingOrderId) {
+            if (!shippingOrderId && !isPreviewMode) {
                 showError('缺少出貨單 ID 參數');
                 return;
             }
+
+            document.title = isPreviewMode ? '出貨單 - 空白預覽' : '出貨單 - 列印';
 
             // 載入所有資料
             loadAllData(shippingOrderId);
 
             async function loadAllData(id) {
                 try {
-                    // 並行載入所有資料
-                    const [orderResult, companyInfo, companyLogo, reportDesc] = await Promise.all([
-                        loadShippingOrder(id),
+                    const loadTasks = [
                         loadCompanyInfo(1),
                         loadCompanyLogo(1),
                         loadReportDescription('shipping_order')
+                    ];
+
+                    if (isPreviewMode) {
+                        const [companyInfo, companyLogo, reportDesc] = await Promise.all(loadTasks);
+                        const previewOrder = buildPreviewShippingOrder();
+                        renderShippingOrder(previewOrder, [], null, [], companyInfo, companyLogo, reportDesc);
+                        return;
+                    }
+
+                    const [orderResult, companyInfo, companyLogo, reportDesc] = await Promise.all([
+                        loadShippingOrder(id),
+                        ...loadTasks
                     ]);
 
                     if (orderResult) {
-                        renderShippingOrder(orderResult.order, orderResult.items, companyInfo, companyLogo, reportDesc);
+                        renderShippingOrder(orderResult.order, orderResult.items, orderResult.defectSummary, orderResult.toolSummaries, companyInfo, companyLogo, reportDesc);
                     }
                 } catch (error) {
                     console.error('載入資料失敗:', error);
@@ -444,7 +528,12 @@
                     return null;
                 }
 
-                return { order: result.order, items: result.items || [] };
+                return {
+                    order: result.order,
+                    items: result.items || [],
+                    defectSummary: result.defect_summary || result.order?.defect_summary || null,
+                    toolSummaries: result.tool_summaries || result.order?.tool_summaries || []
+                };
             }
 
             async function loadCompanyInfo(companyId = 1) {
@@ -492,14 +581,45 @@
                 return reportDescriptionCache;
             }
 
-            function renderShippingOrder(order, items, companyInfo, companyLogo, reportDesc) {
+            function buildPreviewShippingOrder() {
+                return {
+                    shipping_order_number: '',
+                    shipping_date: '',
+                    customer_name: '',
+                    order_number: '',
+                    shipment_purpose: 'normal',
+                    customer: {
+                        minimum_order_amount: 0
+                    },
+                    order: {
+                        total_amount: 0
+                    }
+                };
+            }
+
+            function renderShippingOrder(order, items, defectSummary, toolSummaries, companyInfo, companyLogo, reportDesc) {
                 const company = companyInfo || {};
                 const logoPath = companyLogo || '';
                 const reportNotes = reportDesc?.description || '';
+                const shippingPurposeLabels = {
+                    normal: '一般出貨',
+                    defect_return: '不良回送',
+                    tool_return: '載具歸還',
+                    mixed: '混合出貨'
+                };
+                const normalizedDefectSummary = defectSummary || {
+                    defect_quantity: 0,
+                    weight_per_unit_g: 0,
+                    total_weight_kg: 0,
+                    notes: ''
+                };
+                const normalizedToolSummaries = Array.isArray(toolSummaries) ? toolSummaries : [];
                 // 計算合計
                 let totalQuantity = 0;
                 let totalGoodWeight = 0;
                 let totalDefectWeight = 0;
+                let totalToolQuantity = 0;
+                let totalToolWeight = 0;
                 const processedItems = items.map(item => {
                     totalQuantity += parseFloat(item.shipped_quantity || 0);
                     const defectWeight = (parseFloat(item.total_defect_units || 0) * parseFloat(item.weight_per_unit_g || 0)) / 1000;
@@ -507,6 +627,10 @@
                     totalGoodWeight += goodWeight;
                     totalDefectWeight += defectWeight;
                     return { ...item, calcGoodWeight: goodWeight, calcDefectWeight: defectWeight };
+                });
+                normalizedToolSummaries.forEach((summary) => {
+                    totalToolQuantity += parseFloat(summary.quantity || 0);
+                    totalToolWeight += parseFloat(summary.total_weight_kg || 0);
                 });
 
                 // 最低委託額度警示
@@ -547,8 +671,8 @@
                                     <div class="value">${escapeHtml(order.customer_name || '-')}</div>
                                 </div>
                                 <div class="order-reference">
-                                    <div class="label">關聯訂單</div>
-                                    <div class="value">${escapeHtml(order.order_number || '-')}</div>
+                                    <div class="label">出貨性質</div>
+                                    <div class="value">${escapeHtml(shippingPurposeLabels[order.shipment_purpose || 'normal'] || '一般出貨')}</div>
                                 </div>
                             </div>
 
@@ -594,10 +718,60 @@
                                 </tbody>
                             </table>
 
+                            <div class="supplement-grid">
+                                <div class="supplement-card">
+                                    <div class="card-title">不良品摘要</div>
+                                    <div class="supplement-metrics">
+                                        <div class="supplement-metric">
+                                            <span class="label">總數量</span>
+                                            <span class="value">${formatNumber(normalizedDefectSummary.defect_quantity || 0, 2)}</span>
+                                        </div>
+                                        <div class="supplement-metric">
+                                            <span class="label">單重(g)</span>
+                                            <span class="value">${formatNumber(normalizedDefectSummary.weight_per_unit_g || 0, 2)}</span>
+                                        </div>
+                                        <div class="supplement-metric">
+                                            <span class="label">總重量(kg)</span>
+                                            <span class="value">${formatNumber(normalizedDefectSummary.total_weight_kg || 0, 2)}</span>
+                                        </div>
+                                    </div>
+                                    <div class="supplement-note">${escapeHtml(normalizedDefectSummary.notes || '-')}</div>
+                                </div>
+                                <div class="supplement-card">
+                                    <div class="card-title">客戶載具摘要</div>
+                                    <table class="tool-summary-table">
+                                        <thead>
+                                            <tr>
+                                                <th>名稱</th>
+                                                <th>類型</th>
+                                                <th>數量</th>
+                                                <th>單重</th>
+                                                <th>總重</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${normalizedToolSummaries.length > 0 ? normalizedToolSummaries.map((summary) => `
+                                                <tr>
+                                                    <td>${escapeHtml(summary.tool_name || '-')}</td>
+                                                    <td>${escapeHtml(summary.tool_type || '-')}</td>
+                                                    <td class="text-right">${formatNumber(summary.quantity || 0, 0)}</td>
+                                                    <td class="text-right">${formatNumber(summary.unit_weight_kg || 0, 2)}</td>
+                                                    <td class="text-right">${formatNumber(summary.total_weight_kg || 0, 2)}</td>
+                                                </tr>
+                                            `).join('') : `
+                                                <tr>
+                                                    <td colspan="5" class="text-center">無載具摘要</td>
+                                                </tr>
+                                            `}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
                             <!-- 備註區 -->
                             ${reportNotes ? `
                             <div class="notes-section">
-                                <div class="notes-title">備註說明</div>
+                                <div class="notes-title">備註</div>
                                 <div class="notes-content">${escapeHtml(reportNotes)}</div>
                             </div>
                             ` : ''}
@@ -619,6 +793,14 @@
                                 <div class="summary-item">
                                     <div class="label">不良品總重量</div>
                                     <div class="value">${formatNumber(totalDefectWeight, 2)} kg</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="label">摘要不良重量</div>
+                                    <div class="value">${formatNumber(normalizedDefectSummary.total_weight_kg || 0, 2)} kg</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="label">載具總數量 / 重量</div>
+                                    <div class="value">${formatNumber(totalToolQuantity, 0)} / ${formatNumber(totalToolWeight, 2)} kg</div>
                                 </div>
                             </div>
 

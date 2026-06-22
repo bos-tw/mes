@@ -56,7 +56,7 @@ if (!$id) {
 }
 
 // 取得請求資料
-$input = json_decode(file_get_contents('php://input'), true);
+$input = readShippingOrderPayload();
 
 try {
     $pdo = db();
@@ -70,21 +70,51 @@ try {
         jsonResponse(['success' => false, 'message' => '找不到該出貨單。'], 404);
     }
 
+    $validation = validateShippingOrderData($input, true);
+    if (!empty($validation['errors'])) {
+        jsonResponse([
+            'success' => false,
+            'message' => implode('；', array_values($validation['errors'])),
+            'errors' => $validation['errors'],
+        ], 400);
+    }
+
+    $defectSummaryResult = normalizeShippingOrderDefectSummary($input);
+    $toolSummaryResult = normalizeShippingOrderToolSummaries($input['tool_summaries'] ?? []);
+    $nextShipmentPurpose = (string)($validation['data']['shipment_purpose'] ?? $order['shipment_purpose'] ?? 'normal');
+    $businessRuleErrors = validateShippingPhase1BusinessRules($nextShipmentPurpose, $defectSummaryResult['summary']);
+    $allErrors = $defectSummaryResult['errors'] + $toolSummaryResult['errors'] + $businessRuleErrors;
+    if (!empty($allErrors)) {
+        jsonResponse([
+            'success' => false,
+            'message' => implode('；', array_values($allErrors)),
+            'errors' => $allErrors,
+        ], 400);
+    }
+
     // 準備更新欄位
     $updateFields = [];
     $params = [];
     $oldStatus = $order['status'];
     $newStatus = $input['status'] ?? $oldStatus;
+    $hasDefectSummaryInput = array_key_exists('defect_quantity', $input)
+        || array_key_exists('defect_weight_per_unit_g', $input)
+        || array_key_exists('defect_total_weight_kg', $input)
+        || array_key_exists('defect_notes', $input)
+        || array_key_exists('defect_source_shipping_order_id', $input)
+        || array_key_exists('defect_source_work_order_id', $input)
+        || array_key_exists('defect_source_inventory_item_id', $input);
+    $hasToolSummariesInput = array_key_exists('tool_summaries', $input);
 
     $allowedFields = [
         'shipping_order_number', 'order_id', 'customer_id', 'shipping_date',
         'delivery_method', 'consignee_name', 'consignee_address',
-        'carrier', 'tracking_number', 'status', 'notes'
+        'carrier', 'shipment_purpose', 'tracking_number', 'status', 'notes'
     ];
 
     foreach ($allowedFields as $field) {
-        if (array_key_exists($field, $input)) {
-            $value = $input[$field];
+        if (array_key_exists($field, $validation['data'])) {
+            $value = $validation['data'][$field];
             // 空字串轉為 NULL
             if ($value === '') {
                 $value = null;
@@ -94,7 +124,7 @@ try {
         }
     }
 
-    if (empty($updateFields)) {
+    if (empty($updateFields) && !$hasDefectSummaryInput && !$hasToolSummariesInput) {
         jsonResponse(['success' => false, 'message' => '沒有要更新的欄位。'], 400);
     }
 
@@ -256,20 +286,34 @@ try {
         $params[] = $id;
 
         $sql = "UPDATE shipping_orders SET " . implode(', ', $updateFields) . " WHERE id = ?";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+        if (!empty($updateFields)) {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+        }
+
+        if ($hasDefectSummaryInput) {
+            saveShippingOrderDefectSummary($pdo, $id, $defectSummaryResult['summary']);
+        }
+
+        if ($hasToolSummariesInput) {
+            replaceShippingOrderToolSummaries($pdo, $id, $toolSummaryResult['summaries']);
+        }
 
         $pdo->commit();
 
         // 回傳更新後的資料
-        $stmt = $pdo->prepare("SELECT * FROM shipping_orders WHERE id = ?");
-        $stmt->execute([$id]);
-        $updatedOrder = $stmt->fetch(PDO::FETCH_ASSOC);
+        $updatedOrder = findShippingOrder($pdo, $id);
+        $responseOrder = $updatedOrder ? transformShippingOrder($updatedOrder) : null;
+        if ($responseOrder) {
+            $responseOrder['defect_summary'] = fetchShippingOrderDefectSummary($pdo, $id);
+            $responseOrder['tool_summaries'] = fetchShippingOrderToolSummaries($pdo, $id);
+        }
 
         jsonResponse([
             'success' => true,
             'message' => '出貨單已更新。',
-            'order' => $updatedOrder
+            'order' => $responseOrder,
+            'data' => $responseOrder,
         ]);
 
     } catch (Exception $e) {

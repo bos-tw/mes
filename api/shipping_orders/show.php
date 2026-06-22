@@ -41,6 +41,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/helpers.php';
 requireAuth();
 
 requireMethod('GET');
@@ -174,11 +175,31 @@ try {
     $returnOrdersStmt->execute(['shipping_order_id' => $id]);
     $returnOrders = $returnOrdersStmt->fetchAll(PDO::FETCH_ASSOC);
     $order['return_orders'] = $returnOrders;
+    $defectSummary = fetchShippingOrderDefectSummary($pdo, (int)$id);
+    $toolSummaries = fetchShippingOrderToolSummaries($pdo, (int)$id);
+    $summarySuggestions = fetchShippingOrderSummarySuggestions($pdo, (int)$id);
+    $effectiveDefectSummary = $defectSummary ?: ($summarySuggestions['defect_summary'] ?? null);
+    $effectiveToolSummaries = $toolSummaries !== [] ? $toolSummaries : ($summarySuggestions['tool_summaries'] ?? []);
+
+    $order['shipment_purpose'] = $order['shipment_purpose'] ?? 'normal';
+    $order['defect_summary'] = $effectiveDefectSummary;
+    $order['tool_summaries'] = $effectiveToolSummaries;
+    $order['defect_quantity'] = $effectiveDefectSummary['defect_quantity'] ?? null;
+    $order['defect_weight_per_unit_g'] = $effectiveDefectSummary['weight_per_unit_g'] ?? null;
+    $order['defect_total_weight_kg'] = $effectiveDefectSummary['total_weight_kg'] ?? null;
+    $order['defect_notes'] = $effectiveDefectSummary['notes'] ?? null;
+    $order['defect_source_shipping_order_id'] = $effectiveDefectSummary['source_shipping_order_id'] ?? null;
+    $order['defect_source_work_order_id'] = $effectiveDefectSummary['source_work_order_id'] ?? null;
+    $order['defect_source_inventory_item_id'] = $effectiveDefectSummary['source_inventory_item_id'] ?? null;
 
     jsonResponse([
         'success' => true,
         'order' => $order,
         'items' => $items,
+        'defect_summary' => $effectiveDefectSummary,
+        'tool_summaries' => $effectiveToolSummaries,
+        'suggested_defect_summary' => $summarySuggestions['defect_summary'],
+        'suggested_tool_summaries' => $summarySuggestions['tool_summaries'],
     ]);
 
 } catch (Exception $e) {

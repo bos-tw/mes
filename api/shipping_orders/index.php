@@ -53,6 +53,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/../number_sequences/helpers.php';
+require_once __DIR__ . '/helpers.php';
 requireAuth();
 
 $method = requireMethod(['GET', 'POST']);
@@ -203,24 +204,48 @@ function handleList(): void
 function handleCreate(): void
 {
     $pdo = db();
-    $data = json_decode(file_get_contents('php://input'), true);
+    $payload = readShippingOrderPayload();
 
-    if (!$data) {
+    if (!$payload) {
         jsonResponse(['success' => false, 'message' => '無效的請求資料。'], 400);
     }
 
-    // Validation
-    $customerId = $data['customer_id'] ?? null;
-    $shippingDate = $data['shipping_date'] ?? date('Y-m-d');
-    $deliveryMethod = trim($data['delivery_method'] ?? '');
-    $consigneeName = trim($data['consignee_name'] ?? '');
-    $consigneeAddress = trim($data['consignee_address'] ?? '');
-    $notes = trim($data['notes'] ?? '');
-    $status = $data['status'] ?? 'draft';
-
-    if (!$customerId) {
-        jsonResponse(['success' => false, 'message' => '請選擇客戶。'], 400);
+    $validation = validateShippingOrderData($payload, false);
+    if (!empty($validation['errors'])) {
+        jsonResponse([
+            'success' => false,
+            'message' => implode('；', array_values($validation['errors'])),
+            'errors' => $validation['errors'],
+        ], 400);
     }
+
+    $defectSummaryResult = normalizeShippingOrderDefectSummary($payload);
+    $toolSummaryResult = normalizeShippingOrderToolSummaries($payload['tool_summaries'] ?? []);
+    $businessRuleErrors = validateShippingPhase1BusinessRules(
+        (string)($validation['data']['shipment_purpose'] ?? 'normal'),
+        $defectSummaryResult['summary']
+    );
+    $allErrors = $defectSummaryResult['errors'] + $toolSummaryResult['errors'] + $businessRuleErrors;
+    if (!empty($allErrors)) {
+        jsonResponse([
+            'success' => false,
+            'message' => implode('；', array_values($allErrors)),
+            'errors' => $allErrors,
+        ], 400);
+    }
+
+    $data = $validation['data'];
+    $customerId = (int)$data['customer_id'];
+    $shippingDate = (string)($data['shipping_date'] ?? date('Y-m-d'));
+    $deliveryMethod = $data['delivery_method'] ?? null;
+    $consigneeName = $data['consignee_name'] ?? null;
+    $consigneeAddress = $data['consignee_address'] ?? null;
+    $carrier = $data['carrier'] ?? null;
+    $trackingNumber = $data['tracking_number'] ?? null;
+    $status = (string)($data['status'] ?? 'draft');
+    $notes = $data['notes'] ?? null;
+    $orderId = $data['order_id'] ?? null;
+    $shipmentPurpose = (string)($data['shipment_purpose'] ?? 'normal');
 
     try {
         $pdo->beginTransaction();
@@ -231,11 +256,13 @@ function handleCreate(): void
         // Insert shipping order
         $sql = "
             INSERT INTO shipping_orders (
-                id, shipping_order_number, customer_id, shipping_date,
-                delivery_method, consignee_name, consignee_address, status, notes
+                id, shipping_order_number, customer_id, order_id, shipping_date,
+                delivery_method, consignee_name, consignee_address, carrier,
+                tracking_number, shipment_purpose, status, notes
             ) VALUES (
-                :id, :shipping_order_number, :customer_id, :shipping_date,
-                :delivery_method, :consignee_name, :consignee_address, :status, :notes
+                :id, :shipping_order_number, :customer_id, :order_id, :shipping_date,
+                :delivery_method, :consignee_name, :consignee_address, :carrier,
+                :tracking_number, :shipment_purpose, :status, :notes
             )
         ";
 
@@ -245,26 +272,30 @@ function handleCreate(): void
             'id' => $id,
             'shipping_order_number' => $shippingOrderNumber,
             'customer_id' => $customerId,
+            'order_id' => $orderId,
             'shipping_date' => $shippingDate,
-            'delivery_method' => $deliveryMethod ?: null,
-            'consignee_name' => $consigneeName ?: null,
-            'consignee_address' => $consigneeAddress ?: null,
+            'delivery_method' => $deliveryMethod,
+            'consignee_name' => $consigneeName,
+            'consignee_address' => $consigneeAddress,
+            'carrier' => $carrier,
+            'tracking_number' => $trackingNumber,
+            'shipment_purpose' => $shipmentPurpose,
             'status' => $status,
-            'notes' => $notes ?: null,
+            'notes' => $notes,
         ]);
+
+        saveShippingOrderDefectSummary($pdo, $id, $defectSummaryResult['summary']);
+        replaceShippingOrderToolSummaries($pdo, $id, $toolSummaryResult['summaries']);
 
         $pdo->commit();
 
         // Fetch the created record
-        $fetchSql = "
-            SELECT so.*, c.name AS customer_name
-            FROM shipping_orders so
-            LEFT JOIN customers c ON so.customer_id = c.id
-            WHERE so.id = :id
-        ";
-        $fetchStmt = $pdo->prepare($fetchSql);
-        $fetchStmt->execute(['id' => $id]);
-        $record = $fetchStmt->fetch(PDO::FETCH_ASSOC);
+        $record = findShippingOrder($pdo, $id);
+        if ($record) {
+            $record = transformShippingOrder($record);
+            $record['defect_summary'] = fetchShippingOrderDefectSummary($pdo, $id);
+            $record['tool_summaries'] = fetchShippingOrderToolSummaries($pdo, $id);
+        }
 
         jsonResponse([
             'success' => true,

@@ -405,6 +405,31 @@ span {
     font-weight: 600;
 }
 
+.record-link-button {
+    display: inline;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #0f766e;
+    font: inherit;
+    font-weight: 600;
+    line-height: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.record-link-button:hover,
+.record-link-button:focus-visible {
+    color: #115e59;
+    text-decoration: none;
+}
+
+.record-link-button:focus-visible {
+    outline: 2px solid rgba(15, 118, 110, 0.25);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
 /* 工單狀態徽章 */
 .status-badge {
     display: inline-block;
@@ -4894,7 +4919,7 @@ td.actions-col {
     top: 48px;
     right: 16px;
     z-index: 2;
-    width: 292px;
+    width: 360px;
     min-height: 36px;
     margin: 0;
     padding: 8px 12px;
@@ -5426,7 +5451,7 @@ td.actions-col {
 }
 
 [data-work-orders-edit-modal] .work-orders-modal-main {
-    gap: 12px;
+    gap: 10px;
 }
 
 [data-work-orders-edit-modal] .work-order-edit-service-section .subsection-header,
@@ -5590,7 +5615,7 @@ td.actions-col {
 
 [data-work-orders-edit-modal] .work-orders-modal-body {
     display: block;
-    padding-right: 8px;
+    padding-right: 6px;
 }
 
 [data-work-orders-edit-modal] .work-order-type-top-section {
@@ -5601,11 +5626,11 @@ td.actions-col {
 [data-work-orders-edit-modal] .work-order-live-time-row {
     top: 48px;
     right: 18px;
-    width: 300px;
+    width: 368px;
 }
 
 [data-work-orders-edit-modal] .work-orders-metrics-sidebar {
-    width: 300px;
+    width: 368px;
     padding: 50px 12px 10px;
 }
 
@@ -5858,6 +5883,10 @@ td.actions-col {
         width: 270px;
     }
 
+    [data-work-orders-edit-modal] .work-order-live-time-row {
+        width: 270px;
+    }
+
     [data-work-orders-edit-modal] .work-order-edit-detail-section .form-grid,
     [data-work-orders-edit-modal] .work-order-edit-schedule-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -6103,6 +6132,11 @@ td.actions-col {
     font-weight: 600;
     line-height: 1;
     white-space: nowrap;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-schedule-grid label.inline-label > .weekday-badge.is-placeholder {
+    background-color: #f8fafc;
+    color: #94a3b8;
 }
 
 [data-work-orders-edit-modal] .work-order-edit-schedule-grid input[type="datetime-local"] {

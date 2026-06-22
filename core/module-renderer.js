@@ -682,6 +682,7 @@ ${fields}
             const submitLabel = addItemModal.submitLabel || '儲存';
             const submitIcon = addItemModal.submitIcon ? `<i class="fas ${addItemModal.submitIcon}"></i> ` : '';
             const submitStyle = addItemModal.submitStyle || 'primary';
+            const submitDataAction = addItemModal.submitDataAction ? ` data-action="${addItemModal.submitDataAction}"` : '';
 
             return `<div class="modal-overlay hidden" data-add-item-modal>
     <div class="modal-window${sizeClass}">
@@ -699,7 +700,7 @@ ${sectionsHtml}
 
             <div class="form-actions">
                 <button type="button" class="outline" data-action="close-add-item-modal">取消</button>
-                <button type="submit" class="${submitStyle}">${submitIcon}${submitLabel}</button>
+                <button type="submit" class="${submitStyle}"${submitDataAction}>${submitIcon}${submitLabel}</button>
             </div>
         </form>
     </div>

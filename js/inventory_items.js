@@ -143,6 +143,11 @@
                 }
 
                 switch (actionButton.dataset.action) {
+                    case 'open-customer': {
+                        const customerId = Number.parseInt(actionButton.dataset.customerId || '', 10);
+                        if (Number.isInteger(customerId) && typeof window.openTab === 'function') window.openTab('customers', '客戶基本資料', 'modules/customers.html', { context: { customerId } });
+                        break;
+                    }
                     case 'delete-blocked':
                         showDeleteBlocked(id);
                         break;
@@ -540,14 +545,7 @@ function renderTable(items) {
         state.deleteBlockReasons.clear();
 
         if (items.length === 0) {
-            elements.tbody.innerHTML = `
-                <tr class="empty-row">
-                    <td colspan="12" style="text-align: center; padding: 2rem;">
-                        <i class="fas fa-box-open" style="font-size: 3rem; color: #ccc;"></i>
-                        <p style="color: #999; margin-top: 1rem;">暫無庫存資料</p>
-                    </td>
-                </tr>
-            `;
+            elements.tbody.innerHTML = '<tr class="empty-row"><td colspan="12" style="text-align: center; padding: 2rem;"><i class="fas fa-box-open" style="font-size: 3rem; color: #ccc;"></i><p style="color: #999; margin-top: 1rem;">暫無庫存資料</p></td></tr>';
             return;
         }
 
@@ -555,43 +553,25 @@ function renderTable(items) {
             const statusClass = item.status ? item.status.toLowerCase().replace(/_/g, '-') : 'in-stock';
             const qualityClass = item.quality_status ? item.quality_status.toLowerCase().replace(/_/g, '-') : 'qualified';
             const receiptType = String(item.receipt_type || 'standard').toLowerCase();
-            const receiptTypeBadge = receiptType === 'partial'
-                ? '<span class="inventory-receipt-badge partial">部分入庫</span>'
-                : (receiptType === 'final' ? '<span class="inventory-receipt-badge final">最終補入</span>' : '');
-            const partialReceiptTrace = receiptType === 'partial' && item.partial_receipt_number
-                ? `<div class="text-muted small">來源單號：${escapeHtml(item.partial_receipt_number)} / ${escapeHtml(item.partial_receipt_source_label || '一般工單')}</div>`
-                : '';
-
-            // 客戶名稱處理（停用顯示）
+            const receiptTypeBadge = receiptType === 'partial' ? '<span class="inventory-receipt-badge partial">部分入庫</span>' : (receiptType === 'final' ? '<span class="inventory-receipt-badge final">最終補入</span>' : '');
+            const partialReceiptTrace = receiptType === 'partial' && item.partial_receipt_number ? `<div class="text-muted small">來源單號：${escapeHtml(item.partial_receipt_number)} / ${escapeHtml(item.partial_receipt_source_label || '一般工單')}</div>` : '';
             const customerIsActive = item.customer_is_active !== 0 && item.customer_is_active !== '0' && item.customer_is_active !== false;
-            const customerDisplay = item.customer_name
-                ? (customerIsActive ? escapeHtml(item.customer_name) : `${escapeHtml(item.customer_name)} <span class="text-muted">(已停用)</span>`)
-                : '-';
-
-            // 判斷是否可以加入出貨單 (在庫 + 合格)
-            const canShip = item.status === 'in_stock'
-                && (item.quality_status === 'qualified' || receiptType === 'partial')
-                && item.quantity_on_hand > 0;
-            // 判斷是否已有分配數量（已加入出貨單）
+            const normalizedCustomerId = Number.parseInt(item.customer_id, 10);
+            const customerOpenLabel = escapeHtml(`查看客戶基本資料：${item.customer_name || ''}`);
+            const canShip = item.status === 'in_stock' && (item.quality_status === 'qualified' || receiptType === 'partial') && item.quantity_on_hand > 0;
             const hasAllocated = parseFloat(item.quantity_allocated || 0) > 0;
             const shippingBtnTitle = hasAllocated ? '已加入出貨單（已分配數量：' + item.quantity_allocated + '）' : '加入出貨單';
             const deleteBlockReason = getInventoryDeleteBlockReason(item);
-            if (deleteBlockReason) {
-                state.deleteBlockReasons.set(Number(item.id), deleteBlockReason.alert);
-            }
+            if (deleteBlockReason) state.deleteBlockReasons.set(Number(item.id), deleteBlockReason.alert);
             const deleteButton = deleteBlockReason
-                ? `<button type="button" class="btn text op-action-btn op-role-blocked" data-action="delete-blocked" title="${escapeHtml(deleteBlockReason.tooltip)}" aria-label="${escapeHtml(deleteBlockReason.tooltip)}">
-                        <i class="fas fa-trash"></i>
-                    </button>`
-                : `<button type="button" class="btn text danger op-action-btn op-role-delete" data-action="delete" title="刪除" aria-label="刪除">
-                        <i class="fas fa-trash"></i>
-                    </button>`;
+                ? `<button type="button" class="btn text op-action-btn op-role-blocked" data-action="delete-blocked" title="${escapeHtml(deleteBlockReason.tooltip)}" aria-label="${escapeHtml(deleteBlockReason.tooltip)}"><i class="fas fa-trash"></i></button>`
+                : '<button type="button" class="btn text danger op-action-btn op-role-delete" data-action="delete" title="刪除" aria-label="刪除"><i class="fas fa-trash"></i></button>';
 
             return `
             <tr data-id="${item.id}">
                 <td><strong>${escapeHtml(item.inventory_number) || '-'}</strong>${receiptTypeBadge}${partialReceiptTrace}</td>
                 <td>${escapeHtml(item.work_order_number) || '-'}</td>
-                <td>${customerDisplay}</td>
+                <td>${Number.isInteger(normalizedCustomerId) && normalizedCustomerId > 0 && item.customer_name ? `<button type="button" class="record-link-button" data-action="open-customer" data-customer-id="${normalizedCustomerId}" title="${customerOpenLabel}" aria-label="${customerOpenLabel}">${escapeHtml(item.customer_name)}</button>` : escapeHtml(item.customer_name || '-')}${item.customer_name && !customerIsActive ? ' <span class="text-muted">(已停用)</span>' : ''}</td>
                 <td>${escapeHtml(item.customer_batch_number) || '-'}</td>
                 <td>${escapeHtml(item.screening_item_name) || '-'}</td>
                 <td>${formatNumber(item.quantity_on_hand)}</td>
@@ -600,17 +580,9 @@ function renderTable(items) {
                 <td><span class="status-badge ${getStatusClass(item.status)}">${getStatusLabel(item.status)}</span></td>
                 <td>${formatDateTime(item.received_at)}</td>
                 <td class="table-actions">
-                    ${canShip ? `
-                    <button type="button" class="btn text op-action-btn op-role-shipping" data-action="add-to-shipping" title="${escapeHtml(shippingBtnTitle)}">
-                        <i class="fas fa-shipping-fast"></i>
-                    </button>
-                    ` : ''}
-                    <button type="button" class="btn text op-action-btn op-role-view" data-action="view" title="檢視" aria-label="檢視">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button type="button" class="btn text op-action-btn op-role-edit" data-action="edit" title="編輯" aria-label="編輯">
-                        <i class="fas fa-edit"></i>
-                    </button>
+                    ${canShip ? `<button type="button" class="btn text op-action-btn op-role-shipping" data-action="add-to-shipping" title="${escapeHtml(shippingBtnTitle)}"><i class="fas fa-shipping-fast"></i></button>` : ''}
+                    <button type="button" class="btn text op-action-btn op-role-view" data-action="view" title="檢視" aria-label="檢視"><i class="fas fa-eye"></i></button>
+                    <button type="button" class="btn text op-action-btn op-role-edit" data-action="edit" title="編輯" aria-label="編輯"><i class="fas fa-edit"></i></button>
                     ${deleteButton}
                 </td>
             </tr>

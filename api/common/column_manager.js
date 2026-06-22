@@ -333,6 +333,7 @@
                 'shipping_order_items': 'shippingOrderItemColumnManager',
                 'inventory_transactions': 'inventoryTransactionColumnManager',
                 'production_quality_records': 'productionQualityRecordsColumnManager',
+                'defect_history_records': 'defectHistoryRecordColumnManager',
                 'return_orders': 'returnOrderColumnManager',
                 'roles': 'roleColumnManager',
                 'permissions': 'permissionColumnManager',

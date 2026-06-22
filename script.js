@@ -663,6 +663,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         return shouldTrackUnsavedField(event.target);
     }
 
+    function shouldPreventNativeTabFormSubmit(form) {
+        if (!(form instanceof HTMLFormElement)) {
+            return false;
+        }
+
+        if (!form.closest('.tab-content[data-tab-id]')) {
+            return false;
+        }
+
+        if (form.hasAttribute('data-allow-native-submit')) {
+            return false;
+        }
+
+        return true;
+    }
+
     function ensureUnsavedChangesEntry(tabId) {
         if (!unsavedChangesState.has(tabId)) {
             unsavedChangesState.set(tabId, {
@@ -1295,6 +1311,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return_order_items: 'manage_return_orders',
         production_records: 'manage_production_records',
         production_quality_records: 'manage_production_quality',
+        defect_history_records: 'manage_production_quality',
         quality_issue_reports: 'manage_quality_issues',
         roles: 'manage_roles',
         permissions: 'manage_permissions',
@@ -2337,6 +2354,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     registerModuleInitializer('shipping_order_items', window.initializeShippingOrderItemsModule);
     registerModuleInitializer('return_orders', window.initializeReturnOrdersModule);
     registerModuleInitializer('production_quality_records', window.initializeProductionQualityRecordsModule);
+    registerModuleInitializer('defect_history_records', window.initializeDefectHistoryRecordsModule);
     registerModuleInitializer('dashboard', window.initializeDashboardModule);
     // 新增模組初始化器
     registerModuleInitializer('roles', window.initializeRolesModule);
@@ -2420,6 +2438,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         markTabUserInteracted(tabId);
         evaluateTabUnsavedChanges(tabId);
     });
+
+    // SPA 分頁內的表單一律交由模組腳本處理，避免漏攔截時觸發原生導頁。
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (!shouldPreventNativeTabFormSubmit(form)) {
+            return;
+        }
+
+        event.preventDefault();
+    }, true);
 
     window.addEventListener('beforeunload', (event) => {
         const hasUnsavedTabs = openTabs.some((tab) => hasTrackedUnsavedChanges(tab.id));

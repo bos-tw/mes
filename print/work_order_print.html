@@ -457,6 +457,7 @@
     let companyInfoCache = null;
     let companyLogoUrl = '';
     let reportDescriptionCache = null;
+    const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === '1';
 
     function escapeHtml(value) {
         if (value === null || value === undefined) return '';
@@ -691,9 +692,9 @@
         const notes = [
             context.run?.notes ? `【拆分機台備註】${context.run.notes}` : '',
             wo.customer_instructions ? `【客戶交辦】${wo.customer_instructions}` : '',
-            wo.other_notes ? `【其他說明】${wo.other_notes}` : '',
-            reportDesc?.description || ''
+            wo.other_notes ? `【其他說明】${wo.other_notes}` : ''
         ].filter(Boolean).join('\n');
+        const reportNotes = String(reportDesc?.description || '').trim();
 
         const splitMarker = context.isSplit
             ? `<div class="split-marker">主工單：${escapeHtml(wo.work_order_number)}<strong>拆分工單 第 ${context.splitIndex + 1} 份／共 ${context.splitTotal} 份</strong></div>`
@@ -860,6 +861,13 @@
             <div class="section-heading">交辦事項與備註</div>
             <div class="notes-box">${escapeHtml(notes)}</div>
         </section>
+
+        ${reportNotes ? `
+        <section class="section">
+            <div class="section-heading">備註</div>
+            <div class="notes-box">${escapeHtml(reportNotes)}</div>
+        </section>
+        ` : ''}
     </div>
 
     <footer class="document-footer">
@@ -910,6 +918,38 @@
         const batchIds = params.get('ids');
         if (singleId) return [singleId];
         return batchIds ? batchIds.split(',').map((id) => id.trim()).filter(Boolean) : [];
+    }
+
+    function buildPreviewWorkOrder() {
+        return {
+            id: 0,
+            work_order_type: 'normal',
+            work_order_number: '',
+            created_at: '',
+            expected_delivery_date: '',
+            customer_name: '',
+            customer_po_number: '',
+            order_number: '',
+            customer_batch_number: '',
+            sub_item_number: '',
+            part_number: '',
+            screening_item_name: '',
+            drawing_number: '',
+            customer_sample_status: '',
+            customer_sample_status_label: '',
+            total_weight_kg: 0,
+            total_tool_weight: 0,
+            net_weight: 0,
+            weight_per_unit_g: 0,
+            total_units: 0,
+            tool_quantity: '',
+            tool_statistics: '',
+            customer_instructions: '',
+            other_notes: '',
+            screening_services_details: [],
+            first_piece_dimensions: [],
+            machine_runs: []
+        };
     }
 
     async function fetchWorkOrder(id) {
@@ -1003,13 +1043,27 @@
     async function loadWorkOrders() {
         const ids = getRequestedIds();
         const content = document.getElementById('content');
-        if (ids.length === 0) {
+        if (ids.length === 0 && !isPreviewMode) {
             content.innerHTML = '<div class="error-message">未指定工單 ID</div>';
             return;
         }
 
         try {
             await Promise.all([loadCompanyInfo(), loadCompanyLogo(), loadReportDescription()]);
+
+            if (isPreviewMode) {
+                const previewWorkOrder = buildPreviewWorkOrder();
+                content.innerHTML = generateWorkOrderHtml(
+                    previewWorkOrder,
+                    createPrintContext(previewWorkOrder, null, 0, 1),
+                    companyInfoCache,
+                    reportDescriptionCache
+                );
+                renderPrintedQrCodes();
+                document.title = '生產命令單 - 空白預覽';
+                return;
+            }
+
             const workOrders = [];
             for (const id of ids) {
                 workOrders.push(await fetchWorkOrder(id));

@@ -275,15 +275,15 @@ const DataSync = (function() {
         // 機台能力變更
         'machine_capabilities': ['machines', 'work_orders', 'production_work_order_schedule'],
         // 工具變更
-        'tools': ['work_orders', 'order_items'],
+        'tools': ['work_orders', 'order_items', 'defect_history_records'],
         // 訂單變更
         'orders': ['order_items', 'work_orders', 'dashboard'],
         // 訂單項目變更
-        'order_items': ['orders', 'work_orders', 'inventory_items'],
+        'order_items': ['orders', 'work_orders', 'inventory_items', 'defect_history_records'],
         // 工單變更
-        'work_orders': ['order_items', 'orders', 'work_order_images', 'work_order_first_piece_dimensions', 'inventory_items', 'inventory_transactions', 'dashboard', 'production_records', 'production_work_order_schedule'],
+        'work_orders': ['order_items', 'orders', 'work_order_images', 'work_order_first_piece_dimensions', 'inventory_items', 'inventory_transactions', 'dashboard', 'production_records', 'production_work_order_schedule', 'defect_history_records'],
         // 出貨單變更
-        'shipping_orders': ['shipping_order_items', 'inventory_items', 'order_items', 'inventory_transactions', 'return_orders', 'dashboard', 'shipping_quality_inspections'],
+        'shipping_orders': ['shipping_order_items', 'inventory_items', 'order_items', 'inventory_transactions', 'return_orders', 'dashboard', 'shipping_quality_inspections', 'defect_history_records'],
         // 出貨單項目變更（會影響出貨單狀態、客戶批號出貨狀態與庫存紀錄）
         'shipping_order_items': ['shipping_orders', 'order_items', 'inventory_items', 'inventory_transactions', 'return_orders'],
         // 退貨單變更（會影響出貨單/出貨明細退貨狀態、庫存與異動紀錄）
@@ -318,6 +318,8 @@ const DataSync = (function() {
         'calendar_event_reminders': ['dashboard_calendar_events'],
         // 生產品質記錄變更 → 工單需刷新
         'production_quality_records': ['work_orders'],
+        // 生產紀錄變更、工單/出貨相關變更 → 不良品歷史需同步刷新
+        'production_records': ['defect_history_records'],
         // 品質異常報告變更 → 儀表板需刷新
         'quality_issue_reports': ['dashboard'],
         // Lookup values 變更（影響所有使用下拉選單的模組）

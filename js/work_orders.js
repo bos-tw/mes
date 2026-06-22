@@ -373,8 +373,9 @@
         const badge = form.closest('.modal-overlay')?.querySelector(`[data-weekday-for="${prefix}_${fieldName}"]`);
         if (!badge) return;
         const text = input ? getWeekdayText(input.value) : '';
-        badge.textContent = text;
-        badge.style.display = text ? '' : 'none';
+        badge.textContent = text || '週別';
+        badge.style.display = '';
+        badge.classList.toggle('is-placeholder', !text);
     }
 
     function updateAllScheduleWeekdays(form, prefix) {
@@ -4104,6 +4105,7 @@
 
     function handleTableAction(e) {
         const selectCheckbox = e.target.closest('[data-action="select-row"]');
+        const customerButton = e.target.closest('[data-action="open-customer"]');
         const printButton = e.target.closest('[data-action="print-work-order"]');
         const printScreeningReportButton = e.target.closest('[data-action="print-screening-report"]');
         const editButton = e.target.closest('[data-action="edit-work-order"]');
@@ -4113,6 +4115,13 @@
         if (selectCheckbox) {
             const row = selectCheckbox.closest('tr');
             handleRowSelect(selectCheckbox, row);
+        } else if (customerButton) {
+            const customerId = Number.parseInt(customerButton.dataset.customerId || '', 10);
+            if (Number.isInteger(customerId) && typeof window.openTab === 'function') {
+                window.openTab('customers', '客戶基本資料', 'modules/customers.html', {
+                    context: { customerId }
+                });
+            }
         } else if (printButton) {
             const row = printButton.closest('tr');
             const id = row.dataset.id;
@@ -4721,6 +4730,23 @@
             return;
         }
 
+        function renderCustomerRecordLink(customerId, customerName, isActive = true) {
+            const normalizedCustomerId = Number.parseInt(customerId, 10);
+            const trimmedCustomerName = (customerName || '').toString().trim();
+            if (!trimmedCustomerName) {
+                return '-';
+            }
+
+            const escapedCustomerName = escapeHtml(trimmedCustomerName);
+            const inactiveSuffix = !isActive ? ' <span class="text-muted">(已停用)</span>' : '';
+            if (!Number.isInteger(normalizedCustomerId) || normalizedCustomerId <= 0) {
+                return `${escapedCustomerName}${inactiveSuffix}`;
+            }
+
+            const openLabel = escapeHtml(`查看客戶基本資料：${trimmedCustomerName}`);
+            return `<button type="button" class="record-link-button" data-action="open-customer" data-customer-id="${normalizedCustomerId}" title="${openLabel}" aria-label="${openLabel}">${escapedCustomerName}</button>${inactiveSuffix}`;
+        }
+
         const html = data.map(item => {
             // 儲存到快取
             workOrdersCache.set(item.id, item);
@@ -4749,8 +4775,8 @@
             // 客戶名稱處理（停用顯示）
             const customerIsActive = item.customer_is_active !== 0 && item.customer_is_active !== '0' && item.customer_is_active !== false;
             const customerDisplay = item.customer_name
-                ? (customerIsActive ? escapeHtml(item.customer_name) : `${escapeHtml(item.customer_name)} <span class="text-muted">(已停用)</span>`)
-                : '';
+                ? renderCustomerRecordLink(item.customer_id, item.customer_name, customerIsActive)
+                : '-';
 
             // checkbox 狀態
             const isChecked = selectedWorkOrders.has(item.id) ? 'checked' : '';

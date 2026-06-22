@@ -1,15 +1,15 @@
 # DataSync 稽核報告
 
-產生時間：2026-06-21T14:14:54.346Z
+產生時間：2026-06-22T07:26:39.107Z
 
 ## 摘要
 
 - P0: 0
 - P1: 0
 - P2: 10
-- 通過：36
-- 相依來源數：37
-- 狀態型介面刷新檢查數：34
+- 通過：37
+- 相依來源數：38
+- 狀態型介面刷新檢查數：35
 
 ## 模組矩陣
 
@@ -31,6 +31,7 @@
 | OK | daily_machine_inspection_items | daily_machine_inspection_items | DELETE | (helper) | daily_machine_inspections | daily_machine_inspections, employees | - |
 | OK | daily_machine_inspections | daily_machine_inspections | DELETE | (helper) | daily_machine_inspection_items | daily_machine_inspection_items, employees, machines | - |
 | OK | dashboard_calendar_events | dashboard_calendar_events | DELETE | (helper) | calendar_event_participants, calendar_event_reminders, dashboard | calendar_event_reminders | - |
+| OK | defect_history_records | defect_history_records | - | - | - | order_items, production_records, shipping_orders, tools, work_orders | - |
 | OK | departments | departments | POST, PUT, DELETE | (helper) | employees, notifications, quality_issue_reports | - | - |
 | OK | employee_roles | employee_roles | POST, DELETE | (helper) | employees, roles | employees, roles | - |
 | OK | employees | employees | DELETE | (helper) | work_orders, orders, calendar_event_participants, calendar_event_reminders, work_order_first_piece_dimensions, messages, notifications, employee_roles, daily_machine_inspections, daily_machine_inspection_items, machine_maintenance_tasks, production_records, quality_issue_reports, shipping_quality_inspections | companies, departments, employee_roles, lookup_values | - |
@@ -42,11 +43,11 @@
 | OK | machine_maintenance_tasks | machine_maintenance_tasks | DELETE | (helper) | machines | employees, machines | - |
 | OK | machines | machines | POST, PUT, DELETE | machines | work_orders, machine_maintenance_tasks, daily_machine_inspections, production_records, production_work_order_schedule | machine_capabilities, machine_maintenance_tasks | - |
 | OK | notifications | notifications | POST, DELETE | (helper) | dashboard | departments, employees, roles | - |
-| OK | order_items | order_items | POST, DELETE | order_items | orders, work_orders, inventory_items | orders, screening_items, screening_services, shipping_order_items, shipping_orders, tools, work_orders | - |
+| OK | order_items | order_items | POST, DELETE | order_items | orders, work_orders, inventory_items, defect_history_records | orders, screening_items, screening_services, shipping_order_items, shipping_orders, tools, work_orders | - |
 | OK | orders | orders | POST, DELETE | (helper), order_items | order_items, work_orders, dashboard | customers, employees, lookup_values, order_items, screening_services, suppliers, work_orders | - |
 | OK | permissions | permissions | DELETE | (helper) | role_permissions | role_permissions | - |
 | OK | production_quality_records | production_quality_records | POST, DELETE | production_quality_records | work_orders | - | - |
-| OK | production_records | production_records | - | - | - | employees, machines, work_orders | - |
+| OK | production_records | production_records | - | - | defect_history_records | employees, machines, work_orders | - |
 | OK | quality_issue_reports | quality_issue_reports | DELETE | (helper) | dashboard | departments, employees | - |
 | OK | return_orders | return_orders | DELETE | (helper) | inventory_items, inventory_transactions, shipping_orders, shipping_order_items | customers, shipping_order_items, shipping_orders | - |
 | OK | role_permissions | role_permissions | PUT | (helper) | roles, permissions | permissions, roles | - |
@@ -54,13 +55,13 @@
 | OK | screening_items | screening_items | DELETE | screening_items | order_items, screening_services, inventory_items | lookup_values | - |
 | OK | screening_services | screening_services | POST, DELETE | screening_services | orders, order_items | customers, screening_items | - |
 | OK | shipping_order_items | shipping_order_items | - | - | shipping_orders, order_items, inventory_items, inventory_transactions, return_orders | inventory_items, return_orders, shipping_orders | - |
-| OK | shipping_orders | shipping_orders | POST, PUT, DELETE | return_orders, shipping_orders | shipping_order_items, inventory_items, order_items, inventory_transactions, return_orders, dashboard, shipping_quality_inspections | inventory_items, return_orders, shipping_order_items, shipping_quality_inspections | - |
+| OK | shipping_orders | shipping_orders | POST, PUT, DELETE | return_orders, shipping_orders | shipping_order_items, inventory_items, order_items, inventory_transactions, return_orders, dashboard, shipping_quality_inspections, defect_history_records | inventory_items, return_orders, shipping_order_items, shipping_quality_inspections | - |
 | OK | shipping_quality_inspections | shipping_quality_inspections | POST, PUT, DELETE | (helper) | shipping_orders | employees, shipping_orders | - |
 | OK | suppliers | suppliers | POST, DELETE | suppliers | orders, inventory_items | companies, lookup_values | - |
-| OK | tools | tools | DELETE | tools | work_orders, order_items | - | - |
+| OK | tools | tools | DELETE | tools | work_orders, order_items, defect_history_records | - | - |
 | OK | work_order_first_piece_dimensions | work_order_first_piece_dimensions | POST, DELETE | (helper) | work_orders | employees, work_orders | - |
 | OK | work_order_images | work_order_images | - | - | work_orders | work_orders | - |
-| OK | work_orders | work_orders | POST, DELETE | inventory_items, work_orders | order_items, orders, work_order_images, work_order_first_piece_dimensions, inventory_items, inventory_transactions, dashboard, production_records, production_work_order_schedule | employees, inventory_items, lookup_values, machine_capabilities, machines, order_items, orders, production_quality_records, tools, work_order_completion_images, work_order_defect_images, work_order_first_piece_dimensions, work_order_images, work_order_tool_condition_images | - |
+| OK | work_orders | work_orders | POST, DELETE | inventory_items, work_orders | order_items, orders, work_order_images, work_order_first_piece_dimensions, inventory_items, inventory_transactions, dashboard, production_records, production_work_order_schedule, defect_history_records | employees, inventory_items, lookup_values, machine_capabilities, machines, order_items, orders, production_quality_records, tools, work_order_completion_images, work_order_defect_images, work_order_first_piece_dimensions, work_order_images, work_order_tool_condition_images | - |
 
 ## 建議處理順序
 
@@ -88,6 +89,7 @@
 | daily_machine_inspections | 編輯視窗, 按鈕狀態 | daily_machine_inspection_items, employees, machines | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | dashboard | 編輯視窗, 按鈕狀態 | dashboard_calendar_events, notifications, orders, quality_issue_reports, shipping_orders, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | dashboard_calendar_events | 編輯視窗, 按鈕狀態 | calendar_event_reminders | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
+| defect_history_records | 明細視窗, 編輯視窗, 按鈕狀態 | order_items, production_records, shipping_orders, tools, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | employee_roles | 編輯視窗, 按鈕狀態 | employees, roles | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | employees | 快取, 編輯視窗, 按鈕狀態 | companies, departments, employee_roles, lookup_values | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | inventory_items | 明細視窗, 編輯視窗, 按鈕狀態 | order_items, return_orders, screening_items, shipping_order_items, shipping_orders, suppliers, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |

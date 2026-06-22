@@ -96,6 +96,23 @@ function validateShippingOrderData(array $payload, bool $isUpdate = false): arra
         $data['delivery_method'] = $deliveryMethod !== '' ? mb_substr($deliveryMethod, 0, 50) : null;
     }
 
+    // 出貨性質
+    if (array_key_exists('shipment_purpose', $payload)) {
+        $shipmentPurpose = trim((string)($payload['shipment_purpose'] ?? ''));
+        $allowedPurposes = ['normal', 'defect_return', 'tool_return', 'mixed'];
+        if ($shipmentPurpose !== '' && !in_array($shipmentPurpose, $allowedPurposes, true)) {
+            $errors['shipment_purpose'] = '出貨性質值無效。';
+        } else {
+            $data['shipment_purpose'] = $shipmentPurpose !== '' ? $shipmentPurpose : 'normal';
+        }
+    }
+
+    // 物流公司
+    if (array_key_exists('carrier', $payload)) {
+        $carrier = trim((string)($payload['carrier'] ?? ''));
+        $data['carrier'] = $carrier !== '' ? mb_substr($carrier, 0, 100) : null;
+    }
+
     // 物流追蹤編號
     if (array_key_exists('tracking_number', $payload)) {
         $trackingNumber = trim((string)($payload['tracking_number'] ?? ''));
@@ -135,6 +152,821 @@ function validateShippingOrderData(array $payload, bool $isUpdate = false): arra
 }
 
 /**
+ * 標準化不良品摘要
+ *
+ * @param array<string,mixed> $payload
+ * @return array{summary: array<string,mixed>|null, errors: array<string,string>}
+ */
+function normalizeShippingOrderDefectSummary(array $payload): array
+{
+    $errors = [];
+    $rawQuantity = trim((string)($payload['defect_quantity'] ?? ''));
+    $rawUnitWeight = trim((string)($payload['defect_weight_per_unit_g'] ?? ''));
+    $rawTotalWeight = trim((string)($payload['defect_total_weight_kg'] ?? ''));
+    $rawNotes = trim((string)($payload['defect_notes'] ?? ''));
+    $rawSourceShippingOrderId = trim((string)($payload['defect_source_shipping_order_id'] ?? ''));
+    $rawSourceWorkOrderId = trim((string)($payload['defect_source_work_order_id'] ?? ''));
+    $rawSourceInventoryItemId = trim((string)($payload['defect_source_inventory_item_id'] ?? ''));
+
+    $hasAnyValue = $rawQuantity !== ''
+        || $rawUnitWeight !== ''
+        || $rawTotalWeight !== ''
+        || $rawNotes !== ''
+        || $rawSourceShippingOrderId !== ''
+        || $rawSourceWorkOrderId !== ''
+        || $rawSourceInventoryItemId !== '';
+
+    if (!$hasAnyValue) {
+        return ['summary' => null, 'errors' => []];
+    }
+
+    $quantity = 0.0;
+    if ($rawQuantity !== '') {
+        if (!is_numeric($rawQuantity) || (float)$rawQuantity < 0) {
+            $errors['defect_quantity'] = '不良品總數量必須為 0 或正數。';
+        } else {
+            $quantity = round((float)$rawQuantity, 2);
+        }
+    }
+
+    $unitWeight = 0.0;
+    if ($rawUnitWeight !== '') {
+        if (!is_numeric($rawUnitWeight) || (float)$rawUnitWeight < 0) {
+            $errors['defect_weight_per_unit_g'] = '不良品單重必須為 0 或正數。';
+        } else {
+            $unitWeight = round((float)$rawUnitWeight, 3);
+        }
+    }
+
+    $totalWeight = 0.0;
+    if ($rawTotalWeight !== '') {
+        if (!is_numeric($rawTotalWeight) || (float)$rawTotalWeight < 0) {
+            $errors['defect_total_weight_kg'] = '不良品總重量必須為 0 或正數。';
+        } else {
+            $totalWeight = round((float)$rawTotalWeight, 3);
+        }
+    }
+
+    if ($quantity > 0 && $unitWeight > 0) {
+        $totalWeight = round(($quantity * $unitWeight) / 1000, 3);
+    }
+
+    $sourceShippingOrderId = null;
+    if ($rawSourceShippingOrderId !== '') {
+        $sourceShippingOrderId = filter_var($rawSourceShippingOrderId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($sourceShippingOrderId === false) {
+            $errors['defect_source_shipping_order_id'] = '來源出貨單 ID 格式無效。';
+            $sourceShippingOrderId = null;
+        }
+    }
+
+    $sourceWorkOrderId = null;
+    if ($rawSourceWorkOrderId !== '') {
+        $sourceWorkOrderId = filter_var($rawSourceWorkOrderId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($sourceWorkOrderId === false) {
+            $errors['defect_source_work_order_id'] = '來源工單 ID 格式無效。';
+            $sourceWorkOrderId = null;
+        }
+    }
+
+    $sourceInventoryItemId = null;
+    if ($rawSourceInventoryItemId !== '') {
+        $sourceInventoryItemId = filter_var($rawSourceInventoryItemId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($sourceInventoryItemId === false) {
+            $errors['defect_source_inventory_item_id'] = '來源庫存項目 ID 格式無效。';
+            $sourceInventoryItemId = null;
+        }
+    }
+
+    return [
+        'summary' => [
+            'defect_quantity' => $quantity,
+            'weight_per_unit_g' => $unitWeight,
+            'total_weight_kg' => $totalWeight,
+            'notes' => $rawNotes !== '' ? $rawNotes : null,
+            'source_shipping_order_id' => $sourceShippingOrderId,
+            'source_work_order_id' => $sourceWorkOrderId,
+            'source_inventory_item_id' => $sourceInventoryItemId,
+        ],
+        'errors' => $errors,
+    ];
+}
+
+/**
+ * 標準化載具摘要列
+ *
+ * @param mixed $payloadValue
+ * @return array{summaries: array<int,array<string,mixed>>, errors: array<string,string>}
+ */
+function normalizeShippingOrderToolSummaries($payloadValue): array
+{
+    $errors = [];
+    $rows = [];
+
+    if (is_string($payloadValue)) {
+        $decoded = json_decode($payloadValue, true);
+        $rows = is_array($decoded) ? $decoded : [];
+    } elseif (is_array($payloadValue)) {
+        $rows = $payloadValue;
+    }
+
+    $summaries = [];
+    foreach ($rows as $index => $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        $toolName = trim((string)($row['tool_name'] ?? ''));
+        $toolType = trim((string)($row['tool_type'] ?? ''));
+        $rawQuantity = trim((string)($row['quantity'] ?? ''));
+        $rawUnitWeight = trim((string)($row['unit_weight_kg'] ?? ''));
+        $rawNotes = trim((string)($row['notes'] ?? ''));
+        $rawToolId = trim((string)($row['tool_id'] ?? ''));
+
+        $hasAnyValue = $toolName !== ''
+            || $toolType !== ''
+            || $rawQuantity !== ''
+            || $rawUnitWeight !== ''
+            || $rawNotes !== ''
+            || $rawToolId !== '';
+
+        if (!$hasAnyValue) {
+            continue;
+        }
+
+        if ($toolName === '') {
+            $errors["tool_summaries.$index.tool_name"] = '載具名稱為必填。';
+        }
+
+        $quantity = 0;
+        if ($rawQuantity === '' || !is_numeric($rawQuantity) || (float)$rawQuantity < 0) {
+            $errors["tool_summaries.$index.quantity"] = '載具數量必須為 0 或正整數。';
+        } else {
+            $quantity = (int)round((float)$rawQuantity);
+        }
+
+        $unitWeight = 0.0;
+        if ($rawUnitWeight === '' || !is_numeric($rawUnitWeight) || (float)$rawUnitWeight < 0) {
+            $errors["tool_summaries.$index.unit_weight_kg"] = '載具單重必須為 0 或正數。';
+        } else {
+            $unitWeight = round((float)$rawUnitWeight, 3);
+        }
+
+        $toolId = null;
+        if ($rawToolId !== '') {
+            $toolId = filter_var($rawToolId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($toolId === false) {
+                $errors["tool_summaries.$index.tool_id"] = '載具 ID 格式無效。';
+                $toolId = null;
+            }
+        }
+
+        $summaries[] = [
+            'tool_id' => $toolId,
+            'tool_name' => $toolName,
+            'tool_type' => $toolType !== '' ? $toolType : null,
+            'quantity' => $quantity,
+            'unit_weight_kg' => $unitWeight,
+            'total_weight_kg' => round($quantity * $unitWeight, 3),
+            'notes' => $rawNotes !== '' ? $rawNotes : null,
+        ];
+    }
+
+    return ['summaries' => $summaries, 'errors' => $errors];
+}
+
+/**
+ * 驗證出貨第一階段摘要與性質的最小守門
+ *
+ * @param string $shipmentPurpose
+ * @param array<string,mixed>|null $defectSummary
+ * @return array<string,string>
+ */
+function validateShippingPhase1BusinessRules(string $shipmentPurpose, ?array $defectSummary): array
+{
+    $errors = [];
+    $hasDefectSummary = $defectSummary
+        && (
+            (float)($defectSummary['defect_quantity'] ?? 0) > 0
+            || (float)($defectSummary['total_weight_kg'] ?? 0) > 0
+            || trim((string)($defectSummary['notes'] ?? '')) !== ''
+        );
+
+    if ($hasDefectSummary && $shipmentPurpose === 'normal') {
+        $errors['shipment_purpose'] = '有不良品摘要時，出貨性質不可為一般出貨。';
+    }
+
+    return $errors;
+}
+
+/**
+ * 取得出貨單不良品摘要
+ *
+ * @return array<string,mixed>|null
+ */
+function fetchShippingOrderDefectSummary(PDO $pdo, int $shippingOrderId): ?array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            shipping_order_id,
+            source_shipping_order_id,
+            source_work_order_id,
+            source_inventory_item_id,
+            defect_quantity,
+            weight_per_unit_g,
+            total_weight_kg,
+            notes
+        FROM shipping_order_defect_summaries
+        WHERE shipping_order_id = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$shippingOrderId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $row ?: null;
+}
+
+/**
+ * 取得出貨單載具摘要
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function fetchShippingOrderToolSummaries(PDO $pdo, int $shippingOrderId): array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            shipping_order_id,
+            tool_id,
+            tool_name,
+            tool_type,
+            unit_weight_kg,
+            quantity,
+            total_weight_kg,
+            notes
+        FROM shipping_order_tool_summaries
+        WHERE shipping_order_id = ?
+        ORDER BY id ASC
+    ");
+    $stmt->execute([$shippingOrderId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * 取得出貨單摘要的工單建議帶入值
+ *
+ * @return array{defect_summary: array<string,mixed>|null, tool_summaries: array<int,array<string,mixed>>}
+ */
+function fetchShippingOrderSummarySuggestions(PDO $pdo, int $shippingOrderId): array
+{
+    $sourceStmt = $pdo->prepare("
+        SELECT
+            soi.inventory_item_id,
+            ii.work_order_id AS source_work_order_id,
+            ii.weight_per_unit_g,
+            ii.total_defect_units,
+            ii.tool_statistics,
+            ii.total_tool_quantity,
+            ii.tool_weight_kg,
+            wopr.id AS partial_receipt_id,
+            wopr.shipping_tool_details
+        FROM shipping_order_items soi
+        LEFT JOIN inventory_items ii ON ii.id = soi.inventory_item_id
+        LEFT JOIN work_order_partial_receipts wopr ON wopr.inventory_item_id = ii.id
+        WHERE soi.shipping_order_id = ?
+        ORDER BY soi.id ASC
+    ");
+    $sourceStmt->execute([$shippingOrderId]);
+    $sourceRows = $sourceStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    if ($sourceRows === []) {
+        return [
+            'defect_summary' => null,
+            'tool_summaries' => [],
+        ];
+    }
+
+    $workOrderIds = [];
+    $inventoryItemIds = [];
+    $fallbackWeightByWorkOrder = [];
+    $partialReceiptIds = [];
+
+    foreach ($sourceRows as $row) {
+        $inventoryItemId = (int)($row['inventory_item_id'] ?? 0);
+        if ($inventoryItemId > 0) {
+            $inventoryItemIds[$inventoryItemId] = $inventoryItemId;
+        }
+
+        $workOrderId = (int)($row['source_work_order_id'] ?? 0);
+        if ($workOrderId > 0) {
+            $workOrderIds[$workOrderId] = $workOrderId;
+            if (!isset($fallbackWeightByWorkOrder[$workOrderId])) {
+                $fallbackWeightByWorkOrder[$workOrderId] = round((float)($row['weight_per_unit_g'] ?? 0), 3);
+            }
+        }
+
+        $partialReceiptId = (int)($row['partial_receipt_id'] ?? 0);
+        if ($partialReceiptId > 0) {
+            $partialReceiptIds[$partialReceiptId] = $partialReceiptId;
+        }
+    }
+
+    return [
+        'defect_summary' => buildShippingOrderSuggestedDefectSummary(
+            $pdo,
+            array_values($workOrderIds),
+            $fallbackWeightByWorkOrder,
+            array_values($inventoryItemIds),
+            $sourceRows
+        ),
+        'tool_summaries' => buildShippingOrderSuggestedToolSummaries(
+            $pdo,
+            $sourceRows,
+            array_values($partialReceiptIds)
+        ),
+    ];
+}
+
+/**
+ * @param list<int> $workOrderIds
+ * @param array<int,float> $fallbackWeightByWorkOrder
+ * @param list<int> $inventoryItemIds
+ * @param array<int,array<string,mixed>> $sourceRows
+ * @return array<string,mixed>|null
+ */
+function buildShippingOrderSuggestedDefectSummary(
+    PDO $pdo,
+    array $workOrderIds,
+    array $fallbackWeightByWorkOrder,
+    array $inventoryItemIds,
+    array $sourceRows
+): ?array {
+    $normalizedWorkOrderIds = array_values(array_filter(array_map('intval', $workOrderIds), static fn(int $id): bool => $id > 0));
+    $normalizedInventoryItemIds = array_values(array_filter(array_map('intval', $inventoryItemIds), static fn(int $id): bool => $id > 0));
+
+    $totalDefectQuantity = 0.0;
+    $totalDefectWeightKg = 0.0;
+
+    if ($normalizedWorkOrderIds !== []) {
+        $defectTotalsByWorkOrder = fetchShippingOrderSuggestedDefectTotalsByWorkOrder($pdo, $normalizedWorkOrderIds);
+        $weightPerUnitByWorkOrder = fetchShippingOrderSuggestedWeightByWorkOrder($pdo, $normalizedWorkOrderIds);
+
+        foreach ($normalizedWorkOrderIds as $workOrderId) {
+            $defectQuantity = round((float)($defectTotalsByWorkOrder[$workOrderId] ?? 0), 2);
+            if ($defectQuantity <= 0) {
+                continue;
+            }
+
+            $weightPerUnitG = round((float)($weightPerUnitByWorkOrder[$workOrderId] ?? $fallbackWeightByWorkOrder[$workOrderId] ?? 0), 3);
+            $totalDefectQuantity += $defectQuantity;
+            $totalDefectWeightKg += round(($defectQuantity * $weightPerUnitG) / 1000, 3);
+        }
+    } else {
+        $seenInventoryItems = [];
+        foreach ($sourceRows as $row) {
+            $inventoryItemId = (int)($row['inventory_item_id'] ?? 0);
+            if ($inventoryItemId <= 0 || isset($seenInventoryItems[$inventoryItemId])) {
+                continue;
+            }
+
+            $seenInventoryItems[$inventoryItemId] = true;
+            $defectQuantity = round((float)($row['total_defect_units'] ?? 0), 2);
+            $weightPerUnitG = round((float)($row['weight_per_unit_g'] ?? 0), 3);
+            if ($defectQuantity <= 0) {
+                continue;
+            }
+
+            $totalDefectQuantity += $defectQuantity;
+            $totalDefectWeightKg += round(($defectQuantity * $weightPerUnitG) / 1000, 3);
+        }
+    }
+
+    $totalDefectQuantity = round($totalDefectQuantity, 2);
+    $totalDefectWeightKg = round($totalDefectWeightKg, 3);
+    if ($totalDefectQuantity <= 0 && $totalDefectWeightKg <= 0) {
+        return null;
+    }
+
+    $weightPerUnitG = $totalDefectQuantity > 0
+        ? round(($totalDefectWeightKg * 1000) / $totalDefectQuantity, 3)
+        : 0.0;
+
+    return [
+        'defect_quantity' => $totalDefectQuantity,
+        'weight_per_unit_g' => $weightPerUnitG,
+        'total_weight_kg' => $totalDefectWeightKg,
+        'notes' => null,
+        'source_shipping_order_id' => null,
+        'source_work_order_id' => count($normalizedWorkOrderIds) === 1 ? $normalizedWorkOrderIds[0] : null,
+        'source_inventory_item_id' => count($normalizedInventoryItemIds) === 1 ? $normalizedInventoryItemIds[0] : null,
+    ];
+}
+
+/**
+ * @param list<int> $workOrderIds
+ * @return array<int,float>
+ */
+function fetchShippingOrderSuggestedDefectTotalsByWorkOrder(PDO $pdo, array $workOrderIds): array
+{
+    if ($workOrderIds === []) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($workOrderIds), '?'));
+    $sql = <<<SQL
+SELECT defect_source.work_order_id, SUM(defect_source.defect_quantity) AS total_quantity
+FROM (
+    SELECT work_order_id, defect_quantity
+    FROM work_order_screening_defects
+    WHERE work_order_id IN ($placeholders)
+
+    UNION ALL
+
+    SELECT work_order_id, defect_quantity
+    FROM work_order_machine_defects
+    WHERE work_order_id IN ($placeholders)
+) AS defect_source
+GROUP BY defect_source.work_order_id
+SQL;
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute(array_merge($workOrderIds, $workOrderIds));
+
+    $result = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $result[(int)$row['work_order_id']] = round((float)($row['total_quantity'] ?? 0), 2);
+    }
+
+    return $result;
+}
+
+/**
+ * @param list<int> $workOrderIds
+ * @return array<int,float>
+ */
+function fetchShippingOrderSuggestedWeightByWorkOrder(PDO $pdo, array $workOrderIds): array
+{
+    if ($workOrderIds === []) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($workOrderIds), '?'));
+    $stmt = $pdo->prepare("
+        SELECT id, weight_per_unit_g
+        FROM work_orders
+        WHERE id IN ({$placeholders})
+    ");
+    $stmt->execute($workOrderIds);
+
+    $result = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $result[(int)$row['id']] = round((float)($row['weight_per_unit_g'] ?? 0), 3);
+    }
+
+    return $result;
+}
+
+/**
+ * @param array<int,array<string,mixed>> $sourceRows
+ * @param list<int> $partialReceiptIds
+ * @return array<int,array<string,mixed>>
+ */
+function buildShippingOrderSuggestedToolSummaries(PDO $pdo, array $sourceRows, array $partialReceiptIds): array
+{
+    $toolDetailsByReceiptId = fetchShippingOrderSuggestedPartialReceiptTools($pdo, $partialReceiptIds);
+    $aggregated = [];
+
+    foreach ($sourceRows as $row) {
+        $partialReceiptId = (int)($row['partial_receipt_id'] ?? 0);
+        $receiptTools = $partialReceiptId > 0 ? ($toolDetailsByReceiptId[$partialReceiptId] ?? []) : [];
+
+        if ($receiptTools !== []) {
+            foreach ($receiptTools as $tool) {
+                appendShippingOrderSuggestedToolSummary($aggregated, [
+                    'tool_id' => $tool['tool_id'] ?? null,
+                    'tool_name' => $tool['tool_name'] ?? '',
+                    'tool_type' => $tool['tool_type'] ?? null,
+                    'quantity' => $tool['quantity'] ?? 0,
+                    'unit_weight_kg' => $tool['unit_weight_kg'] ?? 0,
+                    'total_weight_kg' => $tool['total_weight_kg'] ?? 0,
+                    'notes' => null,
+                ]);
+            }
+            continue;
+        }
+
+        $toolName = trim((string)($row['tool_statistics'] ?? ''));
+        $toolQuantity = (int)round((float)($row['total_tool_quantity'] ?? 0));
+        $toolTotalWeightKg = round((float)($row['tool_weight_kg'] ?? 0), 3);
+        $shippingToolDetails = trim((string)($row['shipping_tool_details'] ?? ''));
+        if ($toolName === '' && $shippingToolDetails !== '') {
+            $toolName = $shippingToolDetails;
+        }
+        if ($toolName === '' || $toolQuantity <= 0) {
+            continue;
+        }
+
+        foreach (parseShippingOrderToolStatisticsSuggestions($toolName, $toolQuantity, $toolTotalWeightKg) as $parsedSummary) {
+            appendShippingOrderSuggestedToolSummary($aggregated, $parsedSummary);
+        }
+    }
+
+    return array_values($aggregated);
+}
+
+/**
+ * @param list<int> $partialReceiptIds
+ * @return array<int,list<array<string,mixed>>>
+ */
+function fetchShippingOrderSuggestedPartialReceiptTools(PDO $pdo, array $partialReceiptIds): array
+{
+    $normalizedIds = array_values(array_filter(array_map('intval', $partialReceiptIds), static fn(int $id): bool => $id > 0));
+    if ($normalizedIds === []) {
+        return [];
+    }
+
+    $placeholders = implode(', ', array_fill(0, count($normalizedIds), '?'));
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            partial_receipt_id,
+            tool_id,
+            tool_name,
+            tool_type,
+            unit_weight_kg,
+            quantity,
+            total_weight_kg
+        FROM work_order_partial_receipt_tools
+        WHERE partial_receipt_id IN ({$placeholders})
+        ORDER BY partial_receipt_id ASC, id ASC
+    ");
+    $stmt->execute($normalizedIds);
+
+    $grouped = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $partialReceiptId = (int)($row['partial_receipt_id'] ?? 0);
+        if ($partialReceiptId <= 0) {
+            continue;
+        }
+
+        if (!isset($grouped[$partialReceiptId])) {
+            $grouped[$partialReceiptId] = [];
+        }
+
+        $grouped[$partialReceiptId][] = [
+            'id' => (int)($row['id'] ?? 0),
+            'partial_receipt_id' => $partialReceiptId,
+            'tool_id' => isset($row['tool_id']) ? (int)$row['tool_id'] : null,
+            'tool_name' => (string)($row['tool_name'] ?? ''),
+            'tool_type' => $row['tool_type'] !== null ? (string)$row['tool_type'] : null,
+            'unit_weight_kg' => round((float)($row['unit_weight_kg'] ?? 0), 3),
+            'quantity' => (int)round((float)($row['quantity'] ?? 0)),
+            'total_weight_kg' => round((float)($row['total_weight_kg'] ?? 0), 3),
+        ];
+    }
+
+    return $grouped;
+}
+
+/**
+ * @param array<string,array<string,mixed>> $aggregated
+ * @param array<string,mixed> $summary
+ */
+function appendShippingOrderSuggestedToolSummary(array &$aggregated, array $summary): void
+{
+    $toolName = trim((string)($summary['tool_name'] ?? ''));
+    if ($toolName === '') {
+        return;
+    }
+
+    $toolId = $summary['tool_id'] ?? null;
+    $toolType = $summary['tool_type'] !== null && $summary['tool_type'] !== '' ? (string)$summary['tool_type'] : null;
+    $unitWeightKg = round((float)($summary['unit_weight_kg'] ?? 0), 3);
+    $key = implode('|', [
+        $toolId !== null ? (string)(int)$toolId : '0',
+        $toolName,
+        $toolType ?? '',
+        number_format($unitWeightKg, 3, '.', ''),
+    ]);
+
+    if (!isset($aggregated[$key])) {
+        $aggregated[$key] = [
+            'tool_id' => $toolId !== null ? (int)$toolId : null,
+            'tool_name' => $toolName,
+            'tool_type' => $toolType,
+            'quantity' => 0,
+            'unit_weight_kg' => $unitWeightKg,
+            'total_weight_kg' => 0.0,
+            'notes' => null,
+        ];
+    }
+
+    $aggregated[$key]['quantity'] += (int)round((float)($summary['quantity'] ?? 0));
+    $aggregated[$key]['total_weight_kg'] = round(
+        (float)$aggregated[$key]['total_weight_kg'] + (float)($summary['total_weight_kg'] ?? 0),
+        3
+    );
+}
+
+/**
+ * @return array<int,array<string,mixed>>
+ */
+function parseShippingOrderToolStatisticsSuggestions(string $toolStatistics, int $totalQuantity, float $totalWeightKg): array
+{
+    $normalized = trim($toolStatistics);
+    if ($normalized === '' || $totalQuantity <= 0) {
+        return [];
+    }
+
+    $segments = preg_split('/[、\r\n]+/u', $normalized) ?: [];
+    $avgUnitWeightKg = $totalQuantity > 0 && $totalWeightKg > 0
+        ? round($totalWeightKg / $totalQuantity, 3)
+        : 0.0;
+    $result = [];
+    $allocatedQuantity = 0;
+
+    foreach ($segments as $segment) {
+        $segment = trim((string)$segment);
+        if ($segment === '') {
+            continue;
+        }
+
+        $quantity = 0;
+        $toolName = $segment;
+        if (preg_match('/^(.*?)\s+(\d+)\s*個\s*$/u', $segment, $matches) === 1) {
+            $toolName = trim((string)$matches[1]);
+            $quantity = (int)$matches[2];
+        } elseif (count($segments) === 1) {
+            $quantity = $totalQuantity;
+        }
+
+        if ($toolName === '' || $quantity <= 0) {
+            continue;
+        }
+
+        $unitWeightKg = $avgUnitWeightKg;
+        if (preg_match('/^\s*([\d.]+)\s*KG/iu', $toolName, $weightMatches) === 1) {
+            $unitWeightKg = round((float)$weightMatches[1], 3);
+        }
+
+        $lineTotalWeightKg = $unitWeightKg > 0
+            ? round($quantity * $unitWeightKg, 3)
+            : round($quantity * $avgUnitWeightKg, 3);
+
+        $allocatedQuantity += $quantity;
+        $result[] = [
+            'tool_id' => null,
+            'tool_name' => $toolName,
+            'tool_type' => null,
+            'quantity' => $quantity,
+            'unit_weight_kg' => $unitWeightKg,
+            'total_weight_kg' => $lineTotalWeightKg,
+            'notes' => null,
+        ];
+    }
+
+    if ($result !== []) {
+        return $result;
+    }
+
+    return [[
+        'tool_id' => null,
+        'tool_name' => $normalized,
+        'tool_type' => null,
+        'quantity' => $totalQuantity,
+        'unit_weight_kg' => $avgUnitWeightKg,
+        'total_weight_kg' => $totalWeightKg > 0 ? round($totalWeightKg, 3) : round($totalQuantity * $avgUnitWeightKg, 3),
+        'notes' => null,
+    ]];
+}
+
+/**
+ * 更新出貨單不良品摘要
+ *
+ * @param array<string,mixed>|null $summary
+ */
+function saveShippingOrderDefectSummary(PDO $pdo, int $shippingOrderId, ?array $summary): void
+{
+    if ($summary === null) {
+        $pdo->prepare('DELETE FROM shipping_order_defect_summaries WHERE shipping_order_id = ?')
+            ->execute([$shippingOrderId]);
+        return;
+    }
+
+    $existingStmt = $pdo->prepare('SELECT id FROM shipping_order_defect_summaries WHERE shipping_order_id = ? LIMIT 1');
+    $existingStmt->execute([$shippingOrderId]);
+    $existingId = $existingStmt->fetchColumn();
+
+    if ($existingId) {
+        $pdo->prepare("
+            UPDATE shipping_order_defect_summaries
+            SET
+                source_shipping_order_id = :source_shipping_order_id,
+                source_work_order_id = :source_work_order_id,
+                source_inventory_item_id = :source_inventory_item_id,
+                defect_quantity = :defect_quantity,
+                weight_per_unit_g = :weight_per_unit_g,
+                total_weight_kg = :total_weight_kg,
+                notes = :notes,
+                updated_at = NOW()
+            WHERE shipping_order_id = :shipping_order_id
+        ")->execute([
+            'source_shipping_order_id' => $summary['source_shipping_order_id'],
+            'source_work_order_id' => $summary['source_work_order_id'],
+            'source_inventory_item_id' => $summary['source_inventory_item_id'],
+            'defect_quantity' => $summary['defect_quantity'],
+            'weight_per_unit_g' => $summary['weight_per_unit_g'],
+            'total_weight_kg' => $summary['total_weight_kg'],
+            'notes' => $summary['notes'],
+            'shipping_order_id' => $shippingOrderId,
+        ]);
+        return;
+    }
+
+    $pdo->prepare("
+        INSERT INTO shipping_order_defect_summaries (
+            shipping_order_id,
+            source_shipping_order_id,
+            source_work_order_id,
+            source_inventory_item_id,
+            defect_quantity,
+            weight_per_unit_g,
+            total_weight_kg,
+            notes
+        ) VALUES (
+            :shipping_order_id,
+            :source_shipping_order_id,
+            :source_work_order_id,
+            :source_inventory_item_id,
+            :defect_quantity,
+            :weight_per_unit_g,
+            :total_weight_kg,
+            :notes
+        )
+    ")->execute([
+        'shipping_order_id' => $shippingOrderId,
+        'source_shipping_order_id' => $summary['source_shipping_order_id'],
+        'source_work_order_id' => $summary['source_work_order_id'],
+        'source_inventory_item_id' => $summary['source_inventory_item_id'],
+        'defect_quantity' => $summary['defect_quantity'],
+        'weight_per_unit_g' => $summary['weight_per_unit_g'],
+        'total_weight_kg' => $summary['total_weight_kg'],
+        'notes' => $summary['notes'],
+    ]);
+}
+
+/**
+ * 取代出貨單載具摘要
+ *
+ * @param array<int,array<string,mixed>> $summaries
+ */
+function replaceShippingOrderToolSummaries(PDO $pdo, int $shippingOrderId, array $summaries): void
+{
+    $pdo->prepare('DELETE FROM shipping_order_tool_summaries WHERE shipping_order_id = ?')
+        ->execute([$shippingOrderId]);
+
+    if ($summaries === []) {
+        return;
+    }
+
+    $stmt = $pdo->prepare("
+        INSERT INTO shipping_order_tool_summaries (
+            shipping_order_id,
+            tool_id,
+            tool_name,
+            tool_type,
+            unit_weight_kg,
+            quantity,
+            total_weight_kg,
+            notes
+        ) VALUES (
+            :shipping_order_id,
+            :tool_id,
+            :tool_name,
+            :tool_type,
+            :unit_weight_kg,
+            :quantity,
+            :total_weight_kg,
+            :notes
+        )
+    ");
+
+    foreach ($summaries as $summary) {
+        $stmt->execute([
+            'shipping_order_id' => $shippingOrderId,
+            'tool_id' => $summary['tool_id'],
+            'tool_name' => $summary['tool_name'],
+            'tool_type' => $summary['tool_type'],
+            'unit_weight_kg' => $summary['unit_weight_kg'],
+            'quantity' => $summary['quantity'],
+            'total_weight_kg' => $summary['total_weight_kg'],
+            'notes' => $summary['notes'],
+        ]);
+    }
+}
+
+/**
  * 轉換出貨單為 API 回應格式
  *
  * @param array<string,mixed> $row 資料庫原始資料
@@ -151,11 +983,15 @@ function transformShippingOrder(array $row): array
         'order_number' => $row['order_number'] ?? null,
         'shipping_date' => $row['shipping_date'],
         'delivery_method' => $row['delivery_method'],
+        'carrier' => $row['carrier'] ?? null,
+        'shipment_purpose' => $row['shipment_purpose'] ?? 'normal',
         'tracking_number' => $row['tracking_number'] ?? null,
         'consignee_name' => $row['consignee_name'],
         'consignee_address' => $row['consignee_address'],
         'status' => $row['status'],
         'status_label' => $row['status_label'] ?? null,
+        'return_status' => $row['return_status'] ?? 'none',
+        'has_return' => isset($row['has_return']) ? (bool)$row['has_return'] : false,
         'notes' => $row['notes'],
         'item_count' => isset($row['item_count']) ? (int)$row['item_count'] : 0,
         'total_quantity' => isset($row['total_quantity']) ? (float)$row['total_quantity'] : 0,

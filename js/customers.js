@@ -5,7 +5,7 @@
 (function() {
     'use strict';
 
-    function initializeCustomersModule(container) {
+    function initializeCustomersModule(container, context = null) {
         const moduleRoot = container.querySelector('[data-module="customers"]');
         if (!moduleRoot || moduleRoot.dataset.initialised === 'true') {
             return;
@@ -1139,6 +1139,17 @@ function setFieldValue(name, value, form = modalForm) {
             }
         }
 
+        function handleModuleContext(nextContext) {
+            const rawCustomerId = nextContext?.customerId ?? nextContext?.highlightId ?? null;
+            const customerId = Number.parseInt(rawCustomerId, 10);
+            if (!Number.isInteger(customerId) || customerId <= 0) {
+                return;
+            }
+
+            hideAlert();
+            openEditModal(customerId);
+        }
+
         async function fetchCustomerDetail(id) {
             const response = await fetch(`api/customers/show.php?id=${id}`, {
                 method: 'GET',
@@ -1671,8 +1682,13 @@ function setFieldValue(name, value, form = modalForm) {
             });
         }
 
+        container.addEventListener('module:context', (event) => {
+            handleModuleContext(event?.detail?.context ?? null);
+        });
+
         updateSortIndicators();
         loadCustomers(1);
+        handleModuleContext(context);
 
         // 建立資料同步輔助器
         if (typeof DataSync !== 'undefined') {
@@ -1681,6 +1697,10 @@ function setFieldValue(name, value, form = modalForm) {
                 debounceMs: 300
             });
         }
+
+        window.customersModule = {
+            viewDetail: openEditModal
+        };
     }
 
     window.initializeCustomersModule = initializeCustomersModule;

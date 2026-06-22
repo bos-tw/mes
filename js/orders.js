@@ -469,10 +469,10 @@
                 ordersCache.set(orderId, order);
                 const customerObj = order.customer || {};
                 const customerName = customerObj.name ? customerObj.name : (order.customer_name || '-');
+                const customerId = Number.parseInt(customerObj.id || order.customer_id, 10);
                 const customerIsActive = order.customer_is_active !== 0 && order.customer_is_active !== '0' && order.customer_is_active !== false;
-                const inactiveCustomerSuffix = customerName !== '-' && !customerIsActive
-                    ? ' <span class="text-muted">(已停用)</span>'
-                    : '';
+                const inactiveCustomerSuffix = customerName !== '-' && !customerIsActive ? ' <span class="text-muted">(已停用)</span>' : '';
+                const customerOpenLabel = escapeHtml(`查看客戶基本資料：${customerName}`);
                 const statusLabel = order.status_label || order.status || '-';
                 const isChecked = selectedOrders.has(orderId) ? 'checked' : '';
                 const isExpanded = expandedOrderIds.has(orderId);
@@ -490,7 +490,7 @@
                     <tr data-id="${orderId}"${isBelowMinimum ? ' class="row-warning"' : ''}>
                         <td class="checkbox-col"><input type="checkbox" data-action="select-row" ${isChecked}></td>
                         <td>${escapeHtml(order.order_number)}</td>
-                        <td>${escapeHtml(customerName)}${inactiveCustomerSuffix}</td>
+                        <td>${Number.isInteger(customerId) && customerId > 0 && customerName !== '-' ? `<button type="button" class="record-link-button" data-action="open-customer" data-customer-id="${customerId}" title="${customerOpenLabel}" aria-label="${customerOpenLabel}">${escapeHtml(customerName)}</button>` : escapeHtml(customerName)}${inactiveCustomerSuffix}</td>
                         <td>${formatDateTime(order.order_date)}${order.order_date ? ` <span class="weekday-text">${getWeekdayText(order.order_date)}</span>` : ''}</td>
                         <td>${formatDateTime(order.expected_delivery_date)}${order.expected_delivery_date ? ` <span class="weekday-text">${getWeekdayText(order.expected_delivery_date)}</span>` : ''}</td>
                         <td>${escapeHtml(displayNullableText(order.customer_po_number))}</td>
@@ -2047,6 +2047,16 @@ ${pages}
                     const orderId = Number.parseInt(target.dataset.orderId || '', 10);
                     if (Number.isInteger(orderId)) {
                         openOrderItems(orderId);
+                    }
+                    return;
+                }
+
+                if (action === 'open-customer') {
+                    const customerId = Number.parseInt(target.dataset.customerId || '', 10);
+                    if (Number.isInteger(customerId) && typeof window.openTab === 'function') {
+                        window.openTab('customers', '客戶基本資料', 'modules/customers.html', {
+                            context: { customerId }
+                        });
                     }
                     return;
                 }

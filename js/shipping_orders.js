@@ -217,6 +217,15 @@
                     }
 
                     switch (actionButton.dataset.action) {
+                        case 'open-customer': {
+                            const customerId = Number.parseInt(actionButton.dataset.customerId || '', 10);
+                            if (Number.isInteger(customerId) && typeof window.openTab === 'function') {
+                                window.openTab('customers', '客戶基本資料', 'modules/customers.html', {
+                                    context: { customerId }
+                                });
+                            }
+                            break;
+                        }
                         case 'print':
                             printShippingOrder(id);
                             break;
@@ -300,7 +309,17 @@
 
                 const submitButton = elements.modal.querySelector('[data-action="submit"]');
                 if (submitButton) {
-                    submitButton.addEventListener('click', handleSubmit);
+                    submitButton.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        handleSubmit();
+                    });
+                }
+
+                if (elements.modalForm) {
+                    elements.modalForm.addEventListener('submit', (event) => {
+                        event.preventDefault();
+                        handleSubmit();
+                    });
                 }
 
                 // Customer change -> filter orders
@@ -310,6 +329,46 @@
                         populateOrderSelect(customerSelect.value);
                     });
                 }
+
+                elements.modal.addEventListener('click', (event) => {
+                    const actionButton = event.target.closest('button[data-action]');
+                    if (!actionButton) {
+                        return;
+                    }
+
+                    switch (actionButton.dataset.action) {
+                        case 'add-tool-summary':
+                            event.preventDefault();
+                            appendToolSummaryRow();
+                            break;
+                        case 'remove-tool-summary': {
+                            event.preventDefault();
+                            const row = actionButton.closest('[data-tool-summary-row]');
+                            if (row) {
+                                row.remove();
+                            }
+                            if (getToolSummaryRowsContainer() && !getToolSummaryRowsContainer().querySelector('[data-tool-summary-row]')) {
+                                renderToolSummaryRows([]);
+                            }
+                            break;
+                        }
+                    }
+                });
+
+                elements.modal.addEventListener('input', (event) => {
+                    const target = event.target;
+                    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) {
+                        return;
+                    }
+
+                    if (target.name === 'defect_quantity' || target.name === 'defect_weight_per_unit_g') {
+                        recalculateDefectSummaryTotal();
+                    }
+
+                    if (target.hasAttribute('data-tool-summary-field')) {
+                        recalculateToolSummaryRow(target.closest('[data-tool-summary-row]'));
+                    }
+                });
             }
 
             // Detail modal
@@ -349,7 +408,17 @@
 
                 const submitButton = elements.addItemModal.querySelector('[data-action="submit-add-item"]');
                 if (submitButton) {
-                    submitButton.addEventListener('click', handleAddItem);
+                    submitButton.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        handleAddItem();
+                    });
+                }
+
+                if (elements.addItemForm) {
+                    elements.addItemForm.addEventListener('submit', (event) => {
+                        event.preventDefault();
+                        handleAddItem();
+                    });
                 }
 
                 // Inventory item selection change
@@ -433,6 +502,22 @@
             window.ModuleRenderer?.getFilterDrawerController?.('shipping_orders', moduleRoot)?.updateSummary();
         }
 
+        function appendSelectOption(select, value, label, extraAttributes = {}) {
+            if (!(select instanceof HTMLSelectElement)) {
+                return;
+            }
+
+            const option = document.createElement('option');
+            option.value = value == null ? '' : String(value);
+            option.textContent = label == null ? '' : String(label);
+            Object.entries(extraAttributes).forEach(([key, attrValue]) => {
+                if (attrValue !== null && attrValue !== undefined) {
+                    option.setAttribute(key, String(attrValue));
+                }
+            });
+            select.appendChild(option);
+        }
+
         function updateSelectionState() {
             if (!elements.tbody) {
                 return;
@@ -513,7 +598,7 @@
                 const currentValue = filterSelect.value;
                 filterSelect.innerHTML = '<option value="">-- 所有狀態 --</option>';
                 statusList.forEach(status => {
-                    filterSelect.innerHTML += `<option value="${escapeHtml(status.value_key)}">${escapeHtml(status.value_label)}</option>`;
+                    appendSelectOption(filterSelect, status.value_key, status.value_label);
                 });
                 filterSelect.value = currentValue;
             }
@@ -523,7 +608,7 @@
                 const currentValue = modalSelect.value;
                 modalSelect.innerHTML = '';
                 statusList.forEach(status => {
-                    modalSelect.innerHTML += `<option value="${escapeHtml(status.value_key)}">${escapeHtml(status.value_label)}</option>`;
+                    appendSelectOption(modalSelect, status.value_key, status.value_label);
                 });
                 // 預設選草稿
                 modalSelect.value = currentValue || 'draft';
@@ -617,7 +702,9 @@
             // API 返回 { success, order, items }，轉換為 { order, items } 結構
             return {
                 order: result.order,
-                items: result.items || []
+                items: result.items || [],
+                suggestedDefectSummary: result.suggested_defect_summary || null,
+                suggestedToolSummaries: result.suggested_tool_summaries || []
             };
         }
 
@@ -650,13 +737,16 @@ function renderTable(items) {
             elements.tbody.innerHTML = items.map(item => {
                 const statusClass = getStatusClass(item.status);
                 const isSelected = selectedShippingOrderIds.has(Number.parseInt(item.id, 10)) ? ' checked' : '';
+                const normalizedCustomerId = Number.parseInt(item.customer_id, 10);
+                const trimmedCustomerName = (item.customer_name || '').toString().trim();
+                const customerOpenLabel = escapeHtml(`查看客戶基本資料：${trimmedCustomerName}`);
                 return `
                 <tr data-id="${item.id}">
                     <td class="checkbox-col">
                         <input type="checkbox" data-action="select-row" value="${item.id}"${isSelected}>
                     </td>
                     <td><strong>${escapeHtml(item.shipping_order_number) || '-'}</strong></td>
-                    <td>${escapeHtml(item.customer_name) || '-'}</td>
+                    <td>${trimmedCustomerName && Number.isInteger(normalizedCustomerId) && normalizedCustomerId > 0 ? `<button type="button" class="record-link-button" data-action="open-customer" data-customer-id="${normalizedCustomerId}" title="${customerOpenLabel}" aria-label="${customerOpenLabel}">${escapeHtml(item.customer_name)}</button>` : escapeHtml(item.customer_name || '-')}</td>
                     <td>${item.shipping_date ? formatDate(item.shipping_date) : '-'}</td>
                     <td>${item.item_count || 0}</td>
                     <td>${formatNumber(item.total_quantity || 0)}</td>
@@ -740,7 +830,7 @@ function renderTable(items) {
                 const currentValue = filterSelect.value;
                 filterSelect.innerHTML = '<option value="">-- 所有客戶 --</option>';
                 state.customers.forEach(customer => {
-                    filterSelect.innerHTML += `<option value="${customer.id}">${escapeHtml(customer.customer_number)} - ${escapeHtml(customer.name)}</option>`;
+                    appendSelectOption(filterSelect, customer.id, `${customer.customer_number} - ${customer.name}`);
                 });
                 filterSelect.value = currentValue;
             }
@@ -750,7 +840,7 @@ function renderTable(items) {
                 const currentValue = modalSelect.value;
                 modalSelect.innerHTML = '<option value="">-- 請選擇客戶 --</option>';
                 state.customers.forEach(customer => {
-                    modalSelect.innerHTML += `<option value="${Number(customer.id)}">${escapeHtml(customer.customer_number)} - ${escapeHtml(customer.name)}</option>`;
+                    appendSelectOption(modalSelect, Number(customer.id), `${customer.customer_number} - ${customer.name}`);
                 });
                 modalSelect.value = currentValue;
             }
@@ -767,7 +857,182 @@ function renderTable(items) {
                 : state.orders;
 
             filteredOrders.forEach(order => {
-                select.innerHTML += `<option value="${order.id}">${escapeHtml(order.order_number)}</option>`;
+                appendSelectOption(select, order.id, order.order_number);
+            });
+        }
+
+        function getShipmentPurposeLabel(purpose) {
+            const labels = {
+                normal: '一般出貨',
+                defect_return: '不良回送',
+                tool_return: '載具歸還',
+                mixed: '混合出貨'
+            };
+            return labels[purpose] || purpose || '一般出貨';
+        }
+
+        function getToolSummaryRowsContainer() {
+            return elements.modalForm?.querySelector('[data-tool-summary-rows]') || null;
+        }
+
+        function buildToolSummaryRow(summary = {}) {
+            return `
+                <tr data-tool-summary-row>
+                    <td><input type="hidden" data-tool-summary-tool-id value="${escapeHtml(summary.tool_id ?? '')}"><input type="text" class="table-input" data-tool-summary-field="tool_name" value="${escapeHtml(summary.tool_name || '')}" placeholder="例如：塑膠桶"></td>
+                    <td><input type="text" class="table-input" data-tool-summary-field="tool_type" value="${escapeHtml(summary.tool_type || '')}" placeholder="例如：圓桶"></td>
+                    <td><input type="number" class="table-input text-right" data-tool-summary-field="quantity" min="0" step="1" value="${escapeHtml(summary.quantity ?? '')}" placeholder="0"></td>
+                    <td><input type="number" class="table-input text-right" data-tool-summary-field="unit_weight_kg" min="0" step="0.001" value="${escapeHtml(summary.unit_weight_kg ?? '')}" placeholder="0.000"></td>
+                    <td><input type="number" class="table-input text-right" data-tool-summary-total readonly value="${escapeHtml(summary.total_weight_kg ?? '')}" placeholder="0.000"></td>
+                    <td><input type="text" class="table-input" data-tool-summary-field="notes" value="${escapeHtml(summary.notes || '')}" placeholder="選填"></td>
+                    <td class="text-center">
+                        <button type="button" class="btn text" data-action="remove-tool-summary" title="移除載具摘要">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function recalculateToolSummaryRow(row) {
+            if (!row) {
+                return;
+            }
+
+            const quantityInput = row.querySelector('[data-tool-summary-field="quantity"]');
+            const unitWeightInput = row.querySelector('[data-tool-summary-field="unit_weight_kg"]');
+            const totalInput = row.querySelector('[data-tool-summary-total]');
+            if (!quantityInput || !unitWeightInput || !totalInput) {
+                return;
+            }
+
+            const quantity = Number.parseFloat(quantityInput.value || '0');
+            const unitWeight = Number.parseFloat(unitWeightInput.value || '0');
+            const totalWeight = Number.isFinite(quantity) && Number.isFinite(unitWeight)
+                ? (quantity * unitWeight)
+                : 0;
+            totalInput.value = totalWeight > 0 ? totalWeight.toFixed(3) : '';
+        }
+
+        function renderToolSummaryRows(summaries = []) {
+            const tbody = getToolSummaryRowsContainer();
+            if (!tbody) {
+                return;
+            }
+
+            if (!Array.isArray(summaries) || summaries.length === 0) {
+                tbody.innerHTML = `
+                    <tr class="empty-row">
+                        <td colspan="7" class="text-center">尚未新增載具摘要</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = summaries.map((summary) => buildToolSummaryRow(summary)).join('');
+            tbody.querySelectorAll('[data-tool-summary-row]').forEach((row) => recalculateToolSummaryRow(row));
+        }
+
+        function appendToolSummaryRow(summary = {}) {
+            const tbody = getToolSummaryRowsContainer();
+            if (!tbody) {
+                return;
+            }
+
+            const hasEmptyState = tbody.querySelector('.empty-row');
+            if (hasEmptyState) {
+                tbody.innerHTML = '';
+            }
+
+            tbody.insertAdjacentHTML('beforeend', buildToolSummaryRow(summary));
+            recalculateToolSummaryRow(tbody.lastElementChild);
+        }
+
+        function collectToolSummaries() {
+            const tbody = getToolSummaryRowsContainer();
+            if (!tbody) {
+                return [];
+            }
+
+            return Array.from(tbody.querySelectorAll('[data-tool-summary-row]')).map((row) => {
+                const getValue = (field) => row.querySelector(`[data-tool-summary-field="${field}"]`)?.value?.trim?.() || '';
+                const totalValue = row.querySelector('[data-tool-summary-total]')?.value?.trim?.() || '';
+                const rawToolId = row.querySelector('[data-tool-summary-tool-id]')?.value?.trim?.() || '';
+                return {
+                    tool_id: rawToolId === '' ? null : rawToolId,
+                    tool_name: getValue('tool_name'),
+                    tool_type: getValue('tool_type'),
+                    quantity: getValue('quantity'),
+                    unit_weight_kg: getValue('unit_weight_kg'),
+                    total_weight_kg: totalValue,
+                    notes: getValue('notes')
+                };
+            }).filter((summary) => Object.values(summary).some((value) => String(value || '').trim() !== ''));
+        }
+
+        function recalculateDefectSummaryTotal() {
+            const quantityField = elements.modalForm?.querySelector('[name="defect_quantity"]');
+            const unitWeightField = elements.modalForm?.querySelector('[name="defect_weight_per_unit_g"]');
+            const totalWeightField = elements.modalForm?.querySelector('[name="defect_total_weight_kg"]');
+            if (!quantityField || !unitWeightField || !totalWeightField) {
+                return;
+            }
+
+            const quantity = Number.parseFloat(quantityField.value || '0');
+            const unitWeight = Number.parseFloat(unitWeightField.value || '0');
+            if (Number.isFinite(quantity) && Number.isFinite(unitWeight) && quantity > 0 && unitWeight > 0) {
+                totalWeightField.value = ((quantity * unitWeight) / 1000).toFixed(3);
+            } else if (!quantityField.value && !unitWeightField.value) {
+                totalWeightField.value = '';
+            }
+        }
+
+        function hasMeaningfulDefectSummary(summary) {
+            if (!summary || typeof summary !== 'object') {
+                return false;
+            }
+
+            return Number(summary.defect_quantity || 0) > 0
+                || Number(summary.total_weight_kg || 0) > 0
+                || String(summary.notes || '').trim() !== ''
+                || Number(summary.source_work_order_id || 0) > 0
+                || Number(summary.source_inventory_item_id || 0) > 0
+                || Number(summary.source_shipping_order_id || 0) > 0;
+        }
+
+        function hasMeaningfulToolSummaries(summaries) {
+            return Array.isArray(summaries) && summaries.some((summary) => {
+                if (!summary || typeof summary !== 'object') {
+                    return false;
+                }
+
+                return String(summary.tool_name || '').trim() !== ''
+                    || Number(summary.quantity || 0) > 0
+                    || Number(summary.total_weight_kg || 0) > 0
+                    || String(summary.notes || '').trim() !== '';
+            });
+        }
+
+        function applyDefectSummaryToForm(summary) {
+            const fieldNames = [
+                'defect_quantity',
+                'defect_weight_per_unit_g',
+                'defect_total_weight_kg',
+                'defect_notes',
+                'defect_source_shipping_order_id',
+                'defect_source_work_order_id',
+                'defect_source_inventory_item_id'
+            ];
+
+            fieldNames.forEach((fieldName) => {
+                const input = elements.modalForm?.querySelector(`[name="${fieldName}"]`);
+                if (!input) {
+                    return;
+                }
+
+                const value = summary && summary[fieldName] !== undefined && summary[fieldName] !== null
+                    ? summary[fieldName]
+                    : '';
+                input.value = value;
             });
         }
 
@@ -790,7 +1055,7 @@ function renderTable(items) {
             if (customerSelect) {
                 customerSelect.innerHTML = '<option value="">-- 請選擇客戶 --</option>';
                 state.customers.forEach(customer => {
-                    customerSelect.innerHTML += `<option value="${customer.id}">${escapeHtml(customer.customer_number)} - ${escapeHtml(customer.name)}</option>`;
+                    appendSelectOption(customerSelect, customer.id, `${customer.customer_number} - ${customer.name}`);
                 });
             }
 
@@ -800,12 +1065,19 @@ function renderTable(items) {
                 statusSelect.innerHTML = '';
                 const statusList = state.shippingStatuses.length ? state.shippingStatuses : getDefaultShippingStatuses();
                 statusList.forEach(status => {
-                    statusSelect.innerHTML += `<option value="${escapeHtml(status.value_key)}">${escapeHtml(status.value_label)}</option>`;
+                    appendSelectOption(statusSelect, status.value_key, status.value_label);
                 });
                 statusSelect.value = 'draft'; // 預設選草稿
             }
 
+            const shipmentPurposeSelect = elements.modalForm.querySelector('[name="shipment_purpose"]');
+            if (shipmentPurposeSelect) {
+                shipmentPurposeSelect.value = 'normal';
+            }
+
             populateOrderSelect();
+            renderToolSummaryRows([]);
+            recalculateDefectSummaryTotal();
             elements.modal.classList.remove('hidden');
             hideModalAlert();
         }
@@ -828,6 +1100,17 @@ function renderTable(items) {
                     throw new Error('無法取得出貨單資料');
                 }
 
+                const existingDefectSummary = order.defect_summary || null;
+                const suggestedDefectSummary = data.suggestedDefectSummary || null;
+                const initialDefectSummary = hasMeaningfulDefectSummary(existingDefectSummary)
+                    ? existingDefectSummary
+                    : suggestedDefectSummary;
+                const existingToolSummaries = Array.isArray(order.tool_summaries) ? order.tool_summaries : [];
+                const suggestedToolSummaries = Array.isArray(data.suggestedToolSummaries) ? data.suggestedToolSummaries : [];
+                const initialToolSummaries = hasMeaningfulToolSummaries(existingToolSummaries)
+                    ? existingToolSummaries
+                    : suggestedToolSummaries;
+
                 state.editingId = id;
                 elements.modalForm.reset();
                 elements.modalTitle.textContent = '編輯出貨單';
@@ -839,7 +1122,7 @@ function renderTable(items) {
                     // 重新填充客戶選單
                     customerSelect.innerHTML = '<option value="">-- 請選擇客戶 --</option>';
                     state.customers.forEach(customer => {
-                        customerSelect.innerHTML += `<option value="${customer.id}">${escapeHtml(customer.customer_number)} - ${escapeHtml(customer.name)}</option>`;
+                        appendSelectOption(customerSelect, customer.id, `${customer.customer_number} - ${customer.name}`);
                     });
 
                     // 設定選中的客戶
@@ -863,7 +1146,7 @@ function renderTable(items) {
                     statusSelect.innerHTML = '';
                     const statusList = state.shippingStatuses.length ? state.shippingStatuses : getDefaultShippingStatuses();
                     statusList.forEach(status => {
-                        statusSelect.innerHTML += `<option value="${escapeHtml(status.value_key)}">${escapeHtml(status.value_label)}</option>`;
+                        appendSelectOption(statusSelect, status.value_key, status.value_label);
                     });
                     // 設定當前狀態值
                     if (order.status && !statusSelect.querySelector(`option[value="${order.status}"]`)) {
@@ -881,7 +1164,9 @@ function renderTable(items) {
                 const fieldsToPopulate = [
                     'id', 'shipping_order_number', 'shipping_date', 'delivery_method',
                     'consignee_name', 'consignee_address', 'carrier', 'tracking_number',
-                    'notes'
+                    'notes', 'shipment_purpose', 'defect_quantity', 'defect_weight_per_unit_g',
+                    'defect_total_weight_kg', 'defect_notes', 'defect_source_shipping_order_id',
+                    'defect_source_work_order_id', 'defect_source_inventory_item_id'
                 ];
 
                 fieldsToPopulate.forEach(key => {
@@ -891,6 +1176,23 @@ function renderTable(items) {
                     }
                 });
 
+                if (hasMeaningfulDefectSummary(initialDefectSummary)) {
+                    applyDefectSummaryToForm(initialDefectSummary);
+
+                    const shipmentPurposeInput = elements.modalForm.querySelector('[name="shipment_purpose"]');
+                    if (
+                        shipmentPurposeInput
+                        && (shipmentPurposeInput.value === '' || shipmentPurposeInput.value === 'normal')
+                        && Number(initialDefectSummary?.defect_quantity || 0) > 0
+                    ) {
+                        shipmentPurposeInput.value = 'mixed';
+                    }
+                } else {
+                    applyDefectSummaryToForm(null);
+                }
+
+                renderToolSummaryRows(initialToolSummaries);
+                recalculateDefectSummaryTotal();
                 elements.modal.classList.remove('hidden');
                 hideModalAlert();
             } catch (error) {
@@ -922,6 +1224,8 @@ function renderTable(items) {
 
         function renderDetailContent(data) {
             const { order, items } = data;
+            const defectSummary = order.defect_summary || null;
+            const toolSummaries = Array.isArray(order.tool_summaries) ? order.tool_summaries : [];
 
             // 退貨狀態徽章
             let returnStatusBadge = '';
@@ -957,6 +1261,10 @@ function renderTable(items) {
                             <div class="detail-item">
                                 <span class="detail-label">關聯訂單</span>
                                 <span class="detail-value">${escapeHtml(order.order_number) || '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">出貨性質</span>
+                                <span class="detail-value">${escapeHtml(getShipmentPurposeLabel(order.shipment_purpose))}</span>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">狀態</span>
@@ -1001,6 +1309,68 @@ function renderTable(items) {
                     <section class="detail-section">
                         <h4>備註</h4>
                         <p>${escapeHtml(order.notes)}</p>
+                    </section>
+                    ` : ''}
+
+                    ${(defectSummary || toolSummaries.length > 0) ? `
+                    <section class="detail-section">
+                        <h4>第一階段摘要</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">不良品總數量</span>
+                                <span class="detail-value">${defectSummary ? formatMetricNumber(defectSummary.defect_quantity || 0, 2) : '0.00'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">不良品單重</span>
+                                <span class="detail-value">${defectSummary ? `${formatMetricNumber(defectSummary.weight_per_unit_g || 0, 3)} g` : '0.000 g'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">不良品總重量</span>
+                                <span class="detail-value">${defectSummary ? `${formatMetricNumber(defectSummary.total_weight_kg || 0, 3)} kg` : '0.000 kg'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">載具摘要筆數</span>
+                                <span class="detail-value">${toolSummaries.length} 筆</span>
+                            </div>
+                            ${defectSummary && defectSummary.notes ? `
+                            <div class="detail-item" style="grid-column: 1 / -1;">
+                                <span class="detail-label">不良品摘要備註</span>
+                                <span class="detail-value">${escapeHtml(defectSummary.notes)}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </section>
+                    ` : ''}
+
+                    ${toolSummaries.length > 0 ? `
+                    <section class="detail-section">
+                        <h4>客戶載具摘要</h4>
+                        <div class="table-responsive">
+                            <table class="data-table compact">
+                                <thead>
+                                    <tr>
+                                        <th>載具名稱</th>
+                                        <th>類型</th>
+                                        <th>數量</th>
+                                        <th>單重(kg)</th>
+                                        <th>總重(kg)</th>
+                                        <th>備註</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${toolSummaries.map((summary) => `
+                                    <tr>
+                                        <td>${escapeHtml(summary.tool_name || '-')}</td>
+                                        <td>${escapeHtml(summary.tool_type || '-')}</td>
+                                        <td>${formatMetricNumber(summary.quantity || 0, 0)}</td>
+                                        <td>${formatMetricNumber(summary.unit_weight_kg || 0, 3)}</td>
+                                        <td>${formatMetricNumber(summary.total_weight_kg || 0, 3)}</td>
+                                        <td>${escapeHtml(summary.notes || '')}</td>
+                                    </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </section>
                     ` : ''}
 
@@ -1168,7 +1538,12 @@ function renderTable(items) {
                     const receiptType = String(item.receipt_type || 'standard').toLowerCase();
                     const receiptLabel = receiptType === 'partial' ? '（部分入庫）' : (receiptType === 'final' ? '（最終補入）' : '');
                     if (available > 0) {
-                        select.innerHTML += `<option value="${item.id}" data-available="${available}">${escapeHtml(item.inventory_number)}${receiptLabel} - ${escapeHtml(item.screening_item_name || '未知產品')} (可用: ${formatNumber(available)})</option>`;
+                        appendSelectOption(
+                            select,
+                            item.id,
+                            `${item.inventory_number}${receiptLabel} - ${item.screening_item_name || '未知產品'} (可用: ${formatNumber(available)})`,
+                            { 'data-available': available }
+                        );
                     }
                 });
 
@@ -1361,6 +1736,12 @@ function renderTable(items) {
             const data = {};
             for (const [key, value] of formData.entries()) {
                 data[key] = value || null;
+            }
+            data.tool_summaries = collectToolSummaries();
+            recalculateDefectSummaryTotal();
+            const defectTotalField = elements.modalForm?.querySelector('[name="defect_total_weight_kg"]');
+            if (defectTotalField) {
+                data.defect_total_weight_kg = defectTotalField.value || null;
             }
 
             try {
@@ -1665,6 +2046,26 @@ function renderTable(items) {
         function formatNumber(num) {
             if (num === null || num === undefined) return '0';
             return parseInt(num).toLocaleString();
+        }
+
+        function formatMetricNumber(num, decimals = 2) {
+            if (num === null || num === undefined || num === '') {
+                return Number(0).toLocaleString('zh-TW', {
+                    minimumFractionDigits: decimals,
+                    maximumFractionDigits: decimals
+                });
+            }
+            const parsed = Number.parseFloat(num);
+            if (!Number.isFinite(parsed)) {
+                return Number(0).toLocaleString('zh-TW', {
+                    minimumFractionDigits: decimals,
+                    maximumFractionDigits: decimals
+                });
+            }
+            return parsed.toLocaleString('zh-TW', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
         }
 
         function csvEscape(value) {

@@ -74,7 +74,7 @@ ModuleConfig.register('shipping_orders', {
         title: '新增出貨單',
         size: 'large',
         submitDataAction: 'submit',
-        hiddenFields: ['id'],
+        hiddenFields: ['id', 'defect_source_shipping_order_id', 'defect_source_work_order_id', 'defect_source_inventory_item_id'],
         formRows: [
             {
                 sections: [
@@ -95,6 +95,18 @@ ModuleConfig.register('shipping_orders', {
                                 label: '關聯訂單',
                                 type: 'select',
                                 options: [{ value: '', label: '-- 不關聯訂單 --' }]
+                            },
+                            {
+                                name: 'shipment_purpose',
+                                label: '出貨性質',
+                                type: 'select',
+                                required: true,
+                                options: [
+                                    { value: 'normal', label: '一般出貨' },
+                                    { value: 'defect_return', label: '不良回送' },
+                                    { value: 'tool_return', label: '載具歸還' },
+                                    { value: 'mixed', label: '混合出貨' }
+                                ]
                             },
                             { name: 'shipping_date', label: '出貨日期', type: 'date' },
                             {
@@ -143,6 +155,49 @@ ModuleConfig.register('shipping_orders', {
                 fields: [
                     { name: 'notes', label: '備註', type: 'textarea', rows: 2, fullWidth: true, placeholder: '出貨備註（選填）' }
                 ]
+            },
+            {
+                title: '不良品摘要',
+                gridColumns: 4,
+                fields: [
+                    { name: 'defect_quantity', label: '不良品總數量', type: 'number', min: 0, step: '0.01', placeholder: '0' },
+                    { name: 'defect_weight_per_unit_g', label: '不良品單重 (g)', type: 'number', min: 0, step: '0.001', placeholder: '0.000' },
+                    { name: 'defect_total_weight_kg', label: '不良品總重量 (kg)', type: 'number', min: 0, step: '0.001', placeholder: '0.000', readonly: true },
+                    { name: 'defect_notes', label: '不良品摘要備註', type: 'textarea', rows: 2, fullWidth: true, placeholder: '例如：待二次重篩 / 客戶要求回送' }
+                ]
+            },
+            {
+                title: '客戶載具摘要',
+                customHtml: `
+                <div class="subsection-header">
+                    <h4>本次歸還載具</h4>
+                    <div class="subsection-actions">
+                        <button type="button" class="btn outline small" data-action="add-tool-summary">
+                            <i class="fas fa-plus"></i> 新增載具
+                        </button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table compact">
+                        <thead>
+                            <tr>
+                                <th>載具名稱</th>
+                                <th>類型</th>
+                                <th>數量</th>
+                                <th>單重(kg)</th>
+                                <th>總重(kg)</th>
+                                <th>備註</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody data-tool-summary-rows>
+                            <tr class="empty-row">
+                                <td colspan="7" class="text-center">尚未新增載具摘要</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted small">第一階段先記錄本次出貨隨貨歸還的載具摘要，不在此處建立客戶載具往來總帳。</p>`
             }
         ]
     },
@@ -160,6 +215,7 @@ ModuleConfig.register('shipping_orders', {
         title: '新增出貨項目',
         icon: 'fa-plus',
         size: 'medium',
+        submitDataAction: 'submit-add-item',
         sections: [
             {
                 title: '選擇庫存項目',

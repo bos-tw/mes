@@ -101,6 +101,7 @@
 
             const action = target.dataset.action;
             const id = target.dataset.id;
+            const reportCode = target.dataset.reportCode;
 
             switch (action) {
                 case 'create':
@@ -108,6 +109,9 @@
                     break;
                 case 'edit':
                     openModal(id);
+                    break;
+                case 'preview':
+                    openPreview(reportCode);
                     break;
                 case 'delete':
                     confirmDelete(id);
@@ -139,6 +143,26 @@
                     }
                     break;
             }
+        }
+
+        function getPreviewUrl(reportCode) {
+            const previewPageMap = {
+                order_confirmation: 'print/order_confirmation_print.html?preview=1',
+                return_order: 'print/return_order_print.html?preview=1',
+                shipping_order: 'print/shipping_order_print.html?preview=1',
+                screening_inspection: 'print/screening_inspection_print.html?preview=1',
+                work_order: 'print/work_order_print.html?preview=1'
+            };
+            return previewPageMap[reportCode] || '';
+        }
+
+        function openPreview(reportCode) {
+            const previewUrl = getPreviewUrl(reportCode);
+            if (!previewUrl) {
+                showAlert('此報表尚未提供預覽功能', 'error');
+                return;
+            }
+            window.open(previewUrl, '_blank', 'noopener');
         }
 
         function handleFilter(e) {
@@ -209,13 +233,14 @@
                     (item.description.length > 50 ? item.description.substring(0, 50) + '...' : item.description) : '-';
                 const statusClass = item.is_active == 1 ? 'status-active' : 'status-inactive';
                 const statusText = item.is_active == 1 ? '啟用' : '停用';
+                const previewUrl = getPreviewUrl(item.report_code);
 
                 // 根據 report_code 判斷使用報表
                 let usedInText = '-';
                 if (item.report_code === 'screening_inspection') {
                     usedInText = '篩分檢驗結果報表';
                 } else if (item.report_code === 'work_order') {
-                    usedInText = '工單報表';
+                    usedInText = '生產命令單';
                 } else if (item.report_code === 'shipping_order') {
                     usedInText = '出貨單';
                 } else if (item.report_code === 'return_order') {
@@ -234,6 +259,11 @@
                         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                         <td>${formatDateTime(item.updated_at)}</td>
                         <td>
+                            ${previewUrl ? `
+                            <button type="button" class="btn text" data-action="preview" data-report-code="${safeEscapeHtml(item.report_code)}" title="預覽空白表單">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            ` : ''}
                             <button type="button" class="btn text" data-action="edit" data-id="${item.id}" title="編輯">
                                 <i class="fas fa-edit"></i>
                             </button>

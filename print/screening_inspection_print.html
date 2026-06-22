@@ -613,14 +613,21 @@
     // 從 URL 取得工單 ID
     const urlParams = new URLSearchParams(window.location.search);
     const workOrderId = urlParams.get('work_order_id') || urlParams.get('id');
+    const isPreviewMode = urlParams.get('preview') === '1';
 
-    if (!workOrderId) {
+    if (!workOrderId && !isPreviewMode) {
         showError('缺少工單 ID 參數');
         return;
     }
 
+    document.title = isPreviewMode ? '篩分檢驗結果報表 - 空白預覽' : '篩分檢驗結果報表 - 列印';
+
     // 載入報表資料
-    loadReportData(workOrderId);
+    if (isPreviewMode) {
+        loadPreviewReportData();
+    } else {
+        loadReportData(workOrderId);
+    }
 
     async function loadReportData(id) {
         try {
@@ -636,6 +643,67 @@
         } catch (error) {
             console.error('載入報表失敗:', error);
             showError('載入報表時發生錯誤');
+        }
+    }
+
+    async function loadPreviewReportData() {
+        try {
+            const [companyInfo, reportDesc] = await Promise.all([
+                loadCompanyInfo(1),
+                loadReportDescription('screening_inspection')
+            ]);
+
+            renderReport({
+                work_order: {
+                    id: 0,
+                    work_order_number: '',
+                    actual_end_date: '',
+                    assigned_employee_name: ''
+                },
+                order: {
+                    customer_po_number: '',
+                    order_number: ''
+                },
+                order_item: {
+                    part_number: '',
+                    drawing_number: '',
+                    customer_batch_number: ''
+                },
+                customer: {
+                    id: 1,
+                    name: '',
+                    name_en: '',
+                    address: '',
+                    phone: '',
+                    fax: '',
+                    tax_id: '',
+                    contact_person: ''
+                },
+                screening_item: {
+                    name: ''
+                },
+                screening_results: [],
+                summary: {
+                    total_units: 0,
+                    good_units: 0,
+                    defect_units: 0,
+                    defect_units_distribution: 0,
+                    defect_rate_percent: 0
+                },
+                chart_data: {
+                    labels: [],
+                    values: [],
+                    labels_en: []
+                },
+                company: companyInfo || {},
+                qrcode_url: '',
+                generated_at: '',
+                report_description: reportDesc?.description || '',
+                machine_runs: []
+            });
+        } catch (error) {
+            console.error('載入預覽報表失敗:', error);
+            showError('載入空白預覽時發生錯誤');
         }
     }
 
@@ -717,16 +785,40 @@
         return fallbackUrl;
     }
 
+    async function loadCompanyInfo(companyId) {
+        try {
+            const response = await fetch(`../api/companies/public_info.php?id=${companyId}`, { credentials: 'include' });
+            const result = await response.json();
+            return result.success && result.data ? result.data : null;
+        } catch (error) {
+            console.error('載入公司資訊失敗:', error);
+            return null;
+        }
+    }
+
+    async function loadReportDescription(reportCode) {
+        try {
+            const response = await fetch(`../api/report_descriptions/show.php?report_code=${reportCode}`, { credentials: 'include' });
+            const result = await response.json();
+            return result.success && result.data ? result.data : null;
+        } catch (error) {
+            console.error('載入報表說明失敗:', error);
+            return null;
+        }
+    }
+
     async function renderReport(data) {
         const { work_order, order, order_item, customer, screening_item,
                 screening_results, summary, chart_data, company, qrcode_url, generated_at,
                 report_description, machine_runs = [] } = data;
         const defectDistributionUnits = Number(summary.defect_units_distribution ?? summary.defect_units ?? 0);
 
-        // 生成 QR Code URL：優先確保靜態頁可用，再回退既有 URL
-        const localFallback = buildLocalStaticReportUrl(`export/qrcode_pages/${work_order.work_order_number}.html`);
-        const fallbackUrl = qrcode_url || localFallback || `${window.location.origin}/`;
-        const qrUrl = await ensureQrReportUrl(work_order.id, fallbackUrl);
+        let qrUrl = '';
+        if (!isPreviewMode && work_order.id > 0) {
+            const localFallback = buildLocalStaticReportUrl(`export/qrcode_pages/${work_order.work_order_number}.html`);
+            const fallbackUrl = qrcode_url || localFallback || `${window.location.origin}/`;
+            qrUrl = await ensureQrReportUrl(work_order.id, fallbackUrl);
+        }
 
         let html = `
             <!-- 標題區 -->
@@ -922,11 +1014,13 @@
             </div>
             ` : ''}
 
-            <!-- 報表說明區 -->
+            ${report_description ? `
+            <!-- 備註區 -->
             <div class="report-description-section">
-                <h4>📄 報表說明 <span class="title-en">Report Description</span></h4>
-                <div class="report-description-content">${escapeHtml(report_description || '本報表為篩分檢驗結果記錄，詳細說明各項不良品的分類及數量統計。如有任何疑問，請聯繫品管部門。\nThis report records the screening inspection results, detailing the classification and quantity statistics of defective items. For any questions, please contact the Quality Control Department.')}</div>
+                <h4>📄 備註 <span class="title-en">Form Notes</span></h4>
+                <div class="report-description-content">${escapeHtml(report_description)}</div>
             </div>
+            ` : ''}
         `;
 
         document.getElementById('reportContent').innerHTML = html;
@@ -949,7 +1043,7 @@
         }
 
         // 生成 QR Code (使用 qrcodejs)
-        if (typeof QRCode !== 'undefined') {
+        if (!isPreviewMode && qrUrl && typeof QRCode !== 'undefined') {
             const qrcodeContainer = document.getElementById('qrcode-container');
             if (qrcodeContainer) {
                 new QRCode(qrcodeContainer, {

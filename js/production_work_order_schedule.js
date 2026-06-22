@@ -175,6 +175,16 @@
                     return;
                 }
 
+                if (action === 'open-customer') {
+                    const customerId = parseInt(actionElement.dataset.customerId || '', 10);
+                    if (!customerId) {
+                        return;
+                    }
+
+                    openCustomerPage(customerId);
+                    return;
+                }
+
                 if (action === 'close-schedule-modal') {
                     closeScheduleModal();
                     return;
@@ -516,11 +526,14 @@
 
             const statusText = escapeHtmlSafe(order.status_label || '未設定');
             const scheduledText = `${formatDateTime(order.scheduled_start_date)} ~ ${formatDateTime(order.scheduled_end_date)}`;
+            const customerId = parseInt(order.customer_id || '', 10);
+            const customerName = order.customer_name || '-';
+            const customerLabel = escapeHtmlSafe(`查看客戶基本資料：${customerName}`);
 
             row.innerHTML = `
                 <td class="schedule-sequence">${sequence}</td>
                 <td>${renderScheduleWorkOrderLabel(order)}</td>
-                <td>${escapeHtmlSafe(order.customer_name || '-')}</td>
+                <td>${customerId > 0 && customerName !== '-' ? `<button type="button" class="record-link-button" data-action="open-customer" data-customer-id="${customerId}" title="${customerLabel}" aria-label="${customerLabel}">${escapeHtmlSafe(customerName)}</button>` : escapeHtmlSafe(customerName)}</td>
                 <td>${scheduledText}</td>
                 <td><span class="schedule-status-chip">${statusText}</span></td>
                 <td class="table-actions">
@@ -611,6 +624,17 @@
             }, 120);
         }
 
+        function openCustomerPage(customerId) {
+            if (typeof window.openTab !== 'function') {
+                showAlert('error', '無法切換到客戶基本資料頁面。');
+                return;
+            }
+
+            window.openTab('customers', '客戶基本資料', 'modules/customers.html', {
+                context: { customerId }
+            });
+        }
+
         function renderTimeTab() {
             if (!elements.timeBody) {
                 return;
@@ -648,10 +672,13 @@
                 row.className = `schedule-time-row${isSplitWorkOrder(order) ? ' schedule-row-split' : ''}`;
 
                 const windowText = `${formatDateTime(resolveProductionStart(order))} ~ ${formatDateTime(resolveProductionEnd(order))}`;
+                const customerId = parseInt(order.customer_id || '', 10);
+                const customerName = order.customer_name || '-';
+                const customerLabel = escapeHtmlSafe(`查看客戶基本資料：${customerName}`);
                 row.innerHTML = `
                     <td>${escapeHtmlSafe(resolveMachineName(order.machine_id) || '-')}</td>
                     <td>${renderScheduleWorkOrderLabel(order)}</td>
-                    <td>${escapeHtmlSafe(order.customer_name || '-')}</td>
+                    <td>${customerId > 0 && customerName !== '-' ? `<button type="button" class="record-link-button" data-action="open-customer" data-customer-id="${customerId}" title="${customerLabel}" aria-label="${customerLabel}">${escapeHtmlSafe(customerName)}</button>` : escapeHtmlSafe(customerName)}</td>
                     <td>${windowText}</td>
                     <td>${escapeHtmlSafe(getRemainingText(order, now))}</td>
                     <td class="table-actions">
@@ -767,11 +794,14 @@
                 const rowClass = isSplitWorkOrder(order) ? ' class="schedule-row-split"' : '';
                 const workOrderId = escapeHtmlSafe(String(order.work_order_id || order.id || ''));
                 const nodeKey = escapeHtmlSafe(String(order.node_key || order.id || ''));
+                const customerId = parseInt(order.customer_id || '', 10);
+                const customerName = order.customer_name || '-';
+                const customerLabel = escapeHtmlSafe(`查看客戶基本資料：${customerName}`);
                 return `
                     <tr${rowClass} data-work-order-id="${workOrderId}" data-node-key="${nodeKey}">
                         <td>${index + 1}</td>
                         <td>${renderScheduleWorkOrderLabel(order)}</td>
-                        <td>${escapeHtmlSafe(order.customer_name || '-')}</td>
+                        <td>${customerId > 0 && customerName !== '-' ? `<button type="button" class="record-link-button" data-action="open-customer" data-customer-id="${customerId}" title="${customerLabel}" aria-label="${customerLabel}">${escapeHtmlSafe(customerName)}</button>` : escapeHtmlSafe(customerName)}</td>
                         <td>${scheduledText}</td>
                         <td><span class="schedule-status-chip">${statusText}</span></td>
                     </tr>

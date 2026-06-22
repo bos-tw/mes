@@ -404,23 +404,35 @@
             // 從 URL 取得參數
             const urlParams = new URLSearchParams(window.location.search);
             const returnOrderId = urlParams.get('id');
+            const isPreviewMode = urlParams.get('preview') === '1';
 
-            if (!returnOrderId) {
+            if (!returnOrderId && !isPreviewMode) {
                 showError('缺少退貨單 ID 參數');
                 return;
             }
+
+            document.title = isPreviewMode ? '退貨單 - 空白預覽' : '退貨單 - 列印';
 
             // 載入所有資料
             loadAllData(returnOrderId);
 
             async function loadAllData(id) {
                 try {
-                    // 並行載入所有資料
-                    const [orderResult, companyInfo, companyLogo, reportDesc] = await Promise.all([
-                        loadReturnOrder(id),
+                    const loadTasks = [
                         loadCompanyInfo(1),
                         loadCompanyLogo(1),
                         loadReportDescription('return_order')
+                    ];
+
+                    if (isPreviewMode) {
+                        const [companyInfo, companyLogo, reportDesc] = await Promise.all(loadTasks);
+                        renderReturnOrder(buildPreviewReturnOrderData(), companyInfo, companyLogo, reportDesc);
+                        return;
+                    }
+
+                    const [orderResult, companyInfo, companyLogo, reportDesc] = await Promise.all([
+                        loadReturnOrder(id),
+                        ...loadTasks
                     ]);
 
                     if (orderResult) {
@@ -487,6 +499,19 @@
                     console.error('載入報表說明失敗:', e);
                 }
                 return reportDescriptionCache;
+            }
+
+            function buildPreviewReturnOrderData() {
+                return {
+                    return_order_number: '',
+                    return_date: '',
+                    processing_status: 'pending',
+                    customer_name: '',
+                    shipping_order_number: '',
+                    return_reason: '',
+                    notes: '',
+                    items: []
+                };
             }
 
             function renderReturnOrder(data, companyInfo, companyLogo, reportDesc) {
@@ -598,7 +623,7 @@
                                 <div class="notes-content">${escapeHtml(data.notes)}</div>
                                 ` : ''}
                                 ${reportNotes ? `
-                                <div class="notes-title" style="margin-top: 4px;">處理說明</div>
+                                <div class="notes-title" style="margin-top: 4px;">備註</div>
                                 <div class="notes-content">${escapeHtml(reportNotes)}</div>
                                 ` : ''}
                             </div>
