@@ -660,11 +660,13 @@ function checkPrintApiPaths() {
 // INDEX  index.html 中未載入的配置檔
 // ─────────────────────────────────────────────
 function checkConfigFilesLoadedInIndex() {
-    console.log('🔍 [INDEX] 檢查 index.html 是否載入所有配置檔...');
+    console.log('🔍 [INDEX] 檢查主入口是否載入所有配置檔...');
 
-    const indexContent = readFile('index.html');
+    const htmlContent = readFile('index.html');
+    const entryFile = htmlContent && isIndexHtmlRedirectEntrypoint(htmlContent) ? 'index.php' : 'index.html';
+    const indexContent = readFile(entryFile);
     if (!indexContent) {
-        warn('架構', 'index.html', 'INDEX 載入配置', '找不到 index.html', '確認檔案是否存在');
+        warn('架構', entryFile, 'INDEX 載入配置', `找不到 ${entryFile}，無法驗證配置載入`, '確認主入口檔案是否存在');
         return;
     }
 
@@ -676,8 +678,8 @@ function checkConfigFilesLoadedInIndex() {
     configFiles.forEach(fname => {
         if (!indexContent.includes(fname)) {
             err('架構', `core/configs/${fname}`, 'INDEX 配置未載入',
-                `配置檔 ${fname} 存在但未在 index.html 中以 <script> 標籤載入`,
-                `在 index.html 加入：<script src="core/configs/${fname}"></script>`);
+                `配置檔 ${fname} 存在但未在 ${entryFile} 中以 <script> 標籤載入`,
+                `在 ${entryFile} 加入：<script src="core/configs/${fname}"></script>`);
         }
     });
 }
@@ -788,7 +790,9 @@ function checkHelpDirectoryIntegrity() {
 function checkCoreScriptLoadOrder() {
     console.log('🔍 [C-1] 檢查 core/ 腳本載入順序...');
 
-    const indexContent = readFile('index.html');
+    const htmlContent = readFile('index.html');
+    const entryFile = htmlContent && isIndexHtmlRedirectEntrypoint(htmlContent) ? 'index.php' : 'index.html';
+    const indexContent = readFile(entryFile);
     if (!indexContent) return;
 
     const lines = indexContent.split('\n');
@@ -805,29 +809,29 @@ function checkCoreScriptLoadOrder() {
     });
 
     if (configLine === -1) {
-        err('架構', 'index.html', 'C-1 腳本順序',
-            'index.html 未載入 core/module-config.js',
+        err('架構', entryFile, 'C-1 腳本順序',
+            `${entryFile} 未載入 core/module-config.js`,
             '加入：<script src="core/module-config.js"></script>');
         return;
     }
 
     if (rendererLine === -1) {
-        err('架構', 'index.html', 'C-1 腳本順序',
-            'index.html 未載入 core/module-renderer.js',
+        err('架構', entryFile, 'C-1 腳本順序',
+            `${entryFile} 未載入 core/module-renderer.js`,
             '加入：<script src="core/module-renderer.js"></script>');
         return;
     }
 
     // module-config.js 必須在 module-renderer.js 之前
     if (configLine > rendererLine) {
-        err('架構', 'index.html', 'C-1 腳本順序',
+        err('架構', entryFile, 'C-1 腳本順序',
             'core/module-renderer.js 在 core/module-config.js 之前載入，會導致初始化失敗',
             '將 <script src="core/module-config.js"> 移到 module-renderer.js 之前');
     }
 
     // module-renderer.js 必須在所有 *.config.js 之前
     if (firstConfigFileLine !== Infinity && rendererLine > firstConfigFileLine) {
-        err('架構', 'index.html', 'C-1 腳本順序',
+        err('架構', entryFile, 'C-1 腳本順序',
             'core/configs/*.config.js 在 core/module-renderer.js 之前載入，配置呼叫 ModuleConfig.register() 時渲染引擎尚未就緒',
             '將 core/module-renderer.js 的 <script> 標籤移到所有 core/configs/ 載入之前');
     }
@@ -927,6 +931,11 @@ function formatMissingEntries(entries, key) {
     return entries.map(entry => typeof entry === 'string' ? entry : entry[key]).join(', ');
 }
 
+function isIndexHtmlRedirectEntrypoint(content) {
+    return /window\.location\.replace\(\s*target\s*\)/.test(content)
+        && /target\s*=\s*['"]index\.php['"]\s*\+/.test(content);
+}
+
 function checkIndexEntrypointParity() {
     console.log('🔍 [INDEX] 檢查 index.html / index.php 雙入口同步...');
 
@@ -934,6 +943,17 @@ function checkIndexEntrypointParity() {
     const phpContent = readFile('index.php');
     if (!htmlContent || !phpContent) {
         warn('架構', 'index.html, index.php', 'INDEX 雙入口同步', '缺少 index.html 或 index.php，無法比對雙入口', '確認兩個主入口檔案皆存在');
+        return;
+    }
+
+    const htmlRedirectsToPhp = isIndexHtmlRedirectEntrypoint(htmlContent);
+    if (htmlRedirectsToPhp) {
+        const hardcodedStaticVersion = /data-asset-version=["']static-html["']/.test(htmlContent);
+        if (hardcodedStaticVersion) {
+            err('架構', 'index.html', 'INDEX 靜態入口版本偵測衝突',
+                'index.html 轉址入口不可再保留 static-html asset version，否則前端版本偵測會永遠判定版本不同',
+                '保留純轉址到 index.php，正式資源版本統一由 index.php / api/cache_version.php 產生');
+        }
         return;
     }
 

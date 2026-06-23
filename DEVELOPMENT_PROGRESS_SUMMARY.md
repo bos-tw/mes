@@ -2,8 +2,9 @@
 
 更新時間：2026-06-23  
 目前分支：`main`  
-最新交付版本：`v3.0.8`  
-最新更新包：`dist/update_v3.0.8_20260623_212649.zip`
+最新已提交版本：`v3.0.8`  
+最新已產出更新包：`dist/update_v3.0.8_20260623_212649.zip`  
+目前未提交阻斷修復：`index.html` 靜態入口已改為轉址到 `index.php`，需重新驗證並產生新版更新包
 
 ## 1. 專案架構
 
@@ -37,14 +38,15 @@
   - 工單與出貨、退貨、不良品歷史的來源欄位與導頁追溯已補強。
   - 客戶載具以紀錄與客戶彙整為主，保留工單 / 出貨 / 退貨來源顯示。
 - 雙入口與權限同步修正：
-  - `index.html` / `index.php` 同步新增入口與 script/config 載入。
+  - `index.php` 為唯一完整主入口；`index.html` 已改為相容轉址頁，轉往 `index.php`。
   - 前端 `MODULE_LEGACY_PERMISSION_MAP` 與後端 `api/bootstrap.php` legacy map / alias 已同步。
   - `api/cache_version.php` 已加強，避免掃描暫存或權限問題導致入口快取版本失效。
+  - 遠端 `index.html` 原本使用 `data-asset-version="static-html"`，會和 `api/version.php` 動態版本永遠不一致，導致紅色「系統已更新」提示重整後仍反覆出現；已改為單一 `index.php` 主入口策略。
 - 「關於系統」版本顯示根治：
   - 移除 `index.html` / `index.php` 內硬編碼舊版本值。
   - `script.js` 改由 `system_update_logs` / `api/system_update_history.php` 載入版本；載入失敗時顯示 `未取得`。
-  - `tools/audit-system-health.js` 新增 `INDEX 關於系統版本硬編碼`，防止入口檔再硬編碼正式版本。
-  - `.github/copilot-instructions.md` 已記錄禁止硬編碼關於系統正式版本的規範。
+  - `tools/audit-system-health.js` 新增 `INDEX 關於系統版本硬編碼` 與 `INDEX 靜態入口版本偵測衝突`，防止入口檔再硬編碼正式版本或 static-html 版本值。
+  - `.github/copilot-instructions.md` 已記錄禁止硬編碼關於系統正式版本，以及 `index.html` 只能作轉址相容頁的規範。
 - 重要資料庫異動：
   - 新增 migration：`migrations/2026_06_23_add_rescreen_batches_foundation.sql`。
   - `tools/sync-local-schema.ps1` 的 `$migrationChecks` 已同步。
@@ -57,18 +59,22 @@
 ## 3. 待修 Bug
 
 - 已知問題：
+  - `v3.0.8` 遠端部署後，若使用者從 `index.html` 進入，紅色「系統已更新」提示會反覆顯示且立即重整無效。
   - 完整健康審計仍有 17 個既有 warning。
   - `api/status_board/update.php`、`api/status_board/delete.php` 仍允許 POST fallback。
   - 多個前端 JS 檔過大，例如 `js/work_orders.js`、`js/shipping_orders.js`、`js/orders.js`。
   - 多個模組仍存在 `status` / `status_lookup_id` 雙重狀態欄位。
 - 重現條件：
+  - 遠端開啟 `https://mes.sort.com.tw/index.html`，前端 `_currentVersion` 讀到 `static-html`，但 `api/version.php` 回傳更新後動態版本。
   - 執行 `node tools/audit-system-health.js`。
 - 目前推測原因：
+  - `index.html` 是靜態完整 SPA 入口，無法注入 `api/cache_version.php` 產生的版本值；立即重整只會重載同一個靜態入口，無法消除版本差異。
   - 歷史相容設計與大型前端模組累積，尚未分階段重構。
 
 ## 4. 下一步任務
 
 - P0
+  - 完成 `index.html` 轉址入口修正的驗證，重新產生新版更新包並部署測試。
   - 在遠端主機套用 `v3.0.8` 更新包，確認系統更新流程、migration、檔案覆蓋均成功。
   - 瀏覽器實測 `index.html` / `index.php` 入口一致性、側邊欄「二次重篩歷史紀錄」、關於系統版本顯示。
   - 實測退貨單建立二次重篩案件、案件列表搜尋、檢視追溯鏈、更新結果分流。
@@ -125,6 +131,7 @@
   - `tools/build-update-package.ps1`：已產出 `v3.0.8` 更新包
   - ZIP 讀取式驗證：`manifest.json` / files / migrations 清單均符合預期
 - 尚未驗證風險：
+  - `index.html` 轉址到 `index.php` 的阻斷修復尚未重新打包部署到遠端。
   - 尚未在遠端主機實際套用 `v3.0.8`。
   - 尚未完成瀏覽器端完整操作回歸與列印視覺回歸。
   - 尚未完成工單 → 退貨 → 二次重篩 → 再次不良 → 後續出貨的端到端資料流實測。

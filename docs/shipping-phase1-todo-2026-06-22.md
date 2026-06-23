@@ -14,9 +14,11 @@
 - [x] 第二階段已完成第一輪二次重篩案件骨架、客戶載具遺留分析與不良品歷史回送顯示
 - [x] 已補入口雙檔同步與遠端首頁排查修正：`index.html` / `index.php` 維持同內容主介面殼層
 - [x] 已將二次重篩入口改為一般使用者可理解的「二次重篩歷史紀錄」，並以搜尋列表 + 詳情時間線呈現追溯
-- [x] 已根治「index.php / index.html 看起來不同步」的主要原因：補齊前端 / 後端權限映射，並將雙入口與權限同步納入系統健康審計
-- [x] 已將雙入口同步與前後端權限映射排查規則記入 `.github/copilot-instructions.md`
-- [x] 已產生封閉測試更新包 `v3.0.7`，safe build 驗證 45 個主檔與 1 個 migration 均已納入
+- [x] 已根治「index.php / index.html 看起來不同步」的主要原因：補齊前端 / 後端權限映射，並將入口與權限同步納入系統健康審計
+- [x] 已將入口同步、前後端權限映射與 `index.html` 只能作為轉址相容頁的規則記入 `.github/copilot-instructions.md`
+- [x] 已修正遠端 `index.html` 因 `data-asset-version="static-html"` 導致紅色「系統已更新」提示永遠不消失的阻斷 bug
+- [x] 已產生正式測試更新包 `v3.0.8`，驗證 45 個主檔與 1 個 migration 均已納入
+- [ ] 需重新產生包含 `index.html` 轉址入口修正的更新包，部署後驗證紅色更新提示可消失
 - [ ] 實機操作、列印視覺驗證與使用者情境測試待進行
 
 ## P0：資料結構
@@ -217,7 +219,8 @@
 - [x] 若修改 `tools/audit-data-sync.js`，執行 `node --check tools/audit-data-sync.js`
 - [x] 若涉及 DataSync，執行 `node tools/audit-data-sync.js --write docs/data-sync-audit.md`
 - [x] 若有 migration，執行 `powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1`
-- [x] 主入口 / 側邊欄調整時，確認 `index.html` 與 `index.php` 同步
+- [x] 主入口 / 側邊欄調整時，確認 `index.php` 為唯一完整入口，`index.html` 僅為轉址相容頁
+- [ ] 重新驗證遠端以 `index.html` 進入時會轉往 `index.php`，且立即重整紅色提示不再重複出現
 - [x] 系統健康審計已新增雙入口同步與前後端權限映射同步檢查
 - [x] `tools/build-update-package-safe.ps1` 已修正 git 參數收集問題，並成功產生 v3.0.7 測試更新包
 - [x] 檢查工作樹，不可提交未追蹤測試圖片

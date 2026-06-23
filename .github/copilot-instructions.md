@@ -30,27 +30,29 @@
 
 ### 🧭 首頁入口雙檔同步規範（2026-05-14 新增，強制）
 
-1. 只要修改主系統入口頁的側邊欄選單、群組順序、模組連結或文案，`index.html` 與 `index.php` 必須同步修改。
-2. 禁止只改其中一個檔案，避免本機入口與伺服器入口顯示不一致。
-3. 若瀏覽器畫面與檔案內容不同，不可只判定為 `index.html` / `index.php` 未同步；必須同時檢查前端權限過濾是否把選單移除。
+1. 主系統唯一完整入口為 `index.php`；`index.html` 僅允許作為相容轉址頁，轉往 `index.php`。
+2. 禁止在 `index.html` 保留完整 SPA 殼層、側邊欄、script/config 載入或 `data-asset-version="static-html"`。
+3. 若瀏覽器畫面與檔案內容不同，不可只判定為入口不同步；必須同時檢查前端權限過濾與實際開啟的是 `index.html` 還是 `index.php`。
 4. 驗收時至少執行：
     - `git diff -- index.html index.php`
-    - 確認兩檔的主選單區塊順序一致（`<ul class="main-menu">` 內容一致）。
+    - 確認 `index.html` 只有轉址相容頁，完整主選單與 script/config 載入只存在於 `index.php`。
     - `node tools/audit-system-health.js --changed --base origin/main`
 5. 系統健康審計已包含：
     - `INDEX 雙入口選單不同步`
     - `INDEX 雙入口腳本不同步`
     - `INDEX 關於系統版本硬編碼`
+    - `INDEX 靜態入口版本偵測衝突`
     - `PERM 模組權限映射不同步`
     - `PERM 權限別名不同步`
 6. 回報變更時需明確標註：
-    - 已同步更新 `index.html`
-    - 已同步更新 `index.php`
+    - 已確認 `index.html` 仍為轉址相容頁
+    - 已同步更新主入口 `index.php`
     - 已確認前端 `script.js` 與後端 `api/bootstrap.php` 權限映射一致
-7. 「關於系統」的版本號、發布日期、文件版本禁止在 `index.html` / `index.php` 硬編碼正式版本值。
-    - 入口檔只能放「讀取中」或「未取得」等中性預設。
+7. 「關於系統」的版本號、發布日期、文件版本禁止在 `index.php` 硬編碼正式版本值。
+    - 入口檔只能放「讀取中」或「未取得」等中性預設；`index.html` 不得包含關於系統 modal。
     - 正式版本必須由 `system_update_logs` 經 `api/system_update_history.php` 載入。
     - 避免遠端 API 載入失敗時顯示過期版本，誤判為更新包未套用。
+8. 前端版本偵測必須以 `index.php` 注入的 `data-asset-version` 為基準；不可讓 `index.html` 使用固定值與 `api/version.php` 動態值比對，否則會造成「系統已更新」紅色提示永遠不消失。
 
 ### 🧭 側邊欄新功能納管規範（2026-05-18 新增，強制）
 
