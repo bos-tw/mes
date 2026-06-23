@@ -414,6 +414,228 @@ function fetchShippingOrderToolSummaries(PDO $pdo, int $shippingOrderId): array
 }
 
 /**
+ * 取得客戶載具紀錄與遺留分析
+ *
+ * 第一輪分析口徑：
+ * - 進場紀錄：訂單品項的 order_item_tools
+ * - 已歸還紀錄：出貨單載具摘要 shipping_order_tool_summaries（排除 cancelled）
+ * - 可能遺留：進場數量 - 已歸還數量
+ *
+ * @return array<string,mixed>|null
+ */
+function fetchCustomerToolAnalysis(PDO $pdo, int $customerId, int $shippingOrderId = 0): ?array
+{
+    if ($customerId <= 0) {
+        return null;
+    }
+
+    $incomingRecords = fetchCustomerIncomingToolRecords($pdo, $customerId);
+    $returnedRecords = fetchCustomerReturnedToolRecords($pdo, $customerId);
+    $currentShippingRecords = $shippingOrderId > 0 ? fetchShippingOrderToolSummaries($pdo, $shippingOrderId) : [];
+
+    $incomingMap = [];
+    $returnedMap = [];
+    $currentShippingMap = [];
+
+    foreach ($incomingRecords as $record) {
+        appendCustomerToolAggregate($incomingMap, $record, 'incoming');
+    }
+    foreach ($returnedRecords as $record) {
+        appendCustomerToolAggregate($returnedMap, $record, 'returned');
+    }
+    foreach ($currentShippingRecords as $record) {
+        appendCustomerToolAggregate($currentShippingMap, $record, 'returned');
+    }
+
+    $outstandingMap = [];
+    $keys = array_unique(array_merge(array_keys($incomingMap), array_keys($returnedMap)));
+    foreach ($keys as $key) {
+        $incoming = $incomingMap[$key] ?? null;
+        $returned = $returnedMap[$key] ?? null;
+        $toolName = trim((string)($incoming['tool_name'] ?? $returned['tool_name'] ?? ''));
+        if ($toolName === '') {
+            continue;
+        }
+
+        $incomingQty = (int)($incoming['incoming_quantity'] ?? 0);
+        $returnedQty = (int)($returned['returned_quantity'] ?? 0);
+        $outstandingQty = $incomingQty - $returnedQty;
+        $outstandingWeight = round((float)($incoming['incoming_total_weight_kg'] ?? 0) - (float)($returned['returned_total_weight_kg'] ?? 0), 3);
+
+        $outstandingMap[$key] = [
+            'tool_id' => $incoming['tool_id'] ?? $returned['tool_id'] ?? null,
+            'tool_name' => $toolName,
+            'tool_type' => $incoming['tool_type'] ?? $returned['tool_type'] ?? null,
+            'incoming_quantity' => $incomingQty,
+            'incoming_total_weight_kg' => round((float)($incoming['incoming_total_weight_kg'] ?? 0), 3),
+            'returned_quantity' => $returnedQty,
+            'returned_total_weight_kg' => round((float)($returned['returned_total_weight_kg'] ?? 0), 3),
+            'outstanding_quantity' => $outstandingQty,
+            'outstanding_total_weight_kg' => $outstandingWeight,
+            'status_label' => $outstandingQty > 0 ? '可能仍留廠' : ($outstandingQty < 0 ? '歸還數高於進場紀錄' : '已平衡'),
+        ];
+    }
+
+    usort($outstandingMap, static function (array $a, array $b): int {
+        return [(int)($b['outstanding_quantity'] ?? 0), (string)($a['tool_name'] ?? '')]
+            <=> [(int)($a['outstanding_quantity'] ?? 0), (string)($b['tool_name'] ?? '')];
+    });
+
+    return [
+        'customer_id' => $customerId,
+        'incoming_total_quantity' => array_sum(array_map(static fn(array $row): int => (int)($row['incoming_quantity'] ?? 0), $incomingMap)),
+        'returned_total_quantity' => array_sum(array_map(static fn(array $row): int => (int)($row['returned_quantity'] ?? 0), $returnedMap)),
+        'current_shipping_total_quantity' => array_sum(array_map(static fn(array $row): int => (int)($row['returned_quantity'] ?? 0), $currentShippingMap)),
+        'outstanding_total_quantity' => array_sum(array_map(static fn(array $row): int => (int)($row['outstanding_quantity'] ?? 0), $outstandingMap)),
+        'incoming_records' => array_values($incomingMap),
+        'returned_records' => array_values($returnedMap),
+        'current_shipping_records' => array_values($currentShippingMap),
+        'outstanding_records' => array_values($outstandingMap),
+        'basis_note' => '第一輪以訂單載具設定視為進場紀錄，以出貨單載具摘要視為歸還紀錄，供遺留分析參考。',
+    ];
+}
+
+/**
+ * @return list<array<string,mixed>>
+ */
+function fetchCustomerIncomingToolRecords(PDO $pdo, int $customerId): array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            oit.tool_id,
+            COALESCE(t.name, oit.tool_type, CONCAT('載具#', oit.id)) AS tool_name,
+            oit.tool_type,
+            oit.quantity,
+            oit.total_weight
+        FROM order_item_tools oit
+        INNER JOIN order_items oi ON oi.id = oit.order_item_id
+        INNER JOIN orders o ON o.id = oi.order_id
+        LEFT JOIN tools t ON t.id = oit.tool_id
+        WHERE o.customer_id = :customer_id
+          AND o.deleted_at IS NULL
+        ORDER BY tool_name ASC, oit.id ASC
+    ");
+    $stmt->execute(['customer_id' => $customerId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * @return list<array<string,mixed>>
+ */
+function fetchCustomerReturnedToolRecords(PDO $pdo, int $customerId): array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            sots.tool_id,
+            sots.tool_name,
+            sots.tool_type,
+            sots.quantity,
+            sots.total_weight_kg AS total_weight
+        FROM shipping_order_tool_summaries sots
+        INNER JOIN shipping_orders so ON so.id = sots.shipping_order_id
+        WHERE so.customer_id = :customer_id
+          AND so.deleted_at IS NULL
+          AND COALESCE(so.status, '') <> 'cancelled'
+        ORDER BY sots.tool_name ASC, sots.id ASC
+    ");
+    $stmt->execute(['customer_id' => $customerId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
+ * 依訂單品項取得載具設定摘要
+ *
+ * @param list<int> $orderItemIds
+ * @return array<int,list<array<string,mixed>>>
+ */
+function fetchOrderItemToolTraceMap(PDO $pdo, array $orderItemIds): array
+{
+    $normalizedIds = array_values(array_filter(array_map('intval', $orderItemIds), static fn(int $id): bool => $id > 0));
+    if ($normalizedIds === []) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($normalizedIds), '?'));
+    $stmt = $pdo->prepare("
+        SELECT
+            oit.order_item_id,
+            oit.tool_id,
+            COALESCE(t.name, oit.tool_type, CONCAT('載具#', oit.id)) AS tool_name,
+            oit.tool_type,
+            oit.quantity,
+            oit.total_weight
+        FROM order_item_tools oit
+        LEFT JOIN tools t ON t.id = oit.tool_id
+        WHERE oit.order_item_id IN ($placeholders)
+        ORDER BY oit.order_item_id ASC, oit.id ASC
+    ");
+    $stmt->execute($normalizedIds);
+
+    $grouped = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $orderItemId = (int)($row['order_item_id'] ?? 0);
+        if ($orderItemId <= 0) {
+            continue;
+        }
+        $grouped[$orderItemId] ??= [];
+        $grouped[$orderItemId][] = [
+            'tool_id' => isset($row['tool_id']) && $row['tool_id'] !== null ? (int)$row['tool_id'] : null,
+            'tool_name' => (string)($row['tool_name'] ?? ''),
+            'tool_type' => $row['tool_type'] !== null ? (string)$row['tool_type'] : null,
+            'quantity' => (int)round((float)($row['quantity'] ?? 0)),
+            'total_weight_kg' => round((float)($row['total_weight'] ?? 0), 3),
+        ];
+    }
+
+    return $grouped;
+}
+
+/**
+ * @param array<string,array<string,mixed>> $aggregate
+ * @param array<string,mixed> $record
+ */
+function appendCustomerToolAggregate(array &$aggregate, array $record, string $mode): void
+{
+    $toolName = trim((string)($record['tool_name'] ?? ''));
+    $toolType = trim((string)($record['tool_type'] ?? ''));
+    $toolId = isset($record['tool_id']) && $record['tool_id'] !== null ? (int)$record['tool_id'] : 0;
+    if ($toolName === '' && $toolType === '' && $toolId <= 0) {
+        return;
+    }
+
+    $key = sprintf(
+        '%d|%s|%s',
+        $toolId,
+        mb_strtolower($toolName, 'UTF-8'),
+        mb_strtolower($toolType, 'UTF-8')
+    );
+
+    if (!isset($aggregate[$key])) {
+        $aggregate[$key] = [
+            'tool_id' => $toolId > 0 ? $toolId : null,
+            'tool_name' => $toolName !== '' ? $toolName : ($toolType !== '' ? $toolType : '未命名載具'),
+            'tool_type' => $toolType !== '' ? $toolType : null,
+            'incoming_quantity' => 0,
+            'incoming_total_weight_kg' => 0.0,
+            'returned_quantity' => 0,
+            'returned_total_weight_kg' => 0.0,
+        ];
+    }
+
+    $quantity = (int)round((float)($record['quantity'] ?? 0));
+    $totalWeight = round((float)($record['total_weight'] ?? $record['total_weight_kg'] ?? 0), 3);
+
+    if ($mode === 'incoming') {
+        $aggregate[$key]['incoming_quantity'] += $quantity;
+        $aggregate[$key]['incoming_total_weight_kg'] = round((float)$aggregate[$key]['incoming_total_weight_kg'] + $totalWeight, 3);
+        return;
+    }
+
+    $aggregate[$key]['returned_quantity'] += $quantity;
+    $aggregate[$key]['returned_total_weight_kg'] = round((float)$aggregate[$key]['returned_total_weight_kg'] + $totalWeight, 3);
+}
+
+/**
  * 取得出貨單摘要的工單建議帶入值
  *
  * @return array{defect_summary: array<string,mixed>|null, tool_summaries: array<int,array<string,mixed>>}

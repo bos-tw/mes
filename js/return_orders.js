@@ -20,7 +20,7 @@
      * 初始化退貨單模組
      * @param {HTMLElement} container - 模組容器
      */
-    function initializeReturnOrdersModule(container) {
+    function initializeReturnOrdersModule(container, initialContext = null) {
         const moduleRoot = container.querySelector('[data-module="return_orders"]');
         if (!moduleRoot || moduleRoot.dataset.initialised === 'true') {
             return;
@@ -40,6 +40,8 @@
             total: 0,
             editingId: null,
             viewingId: null,
+            currentContext: initialContext || null,
+            originalShippingOrderId: '',
         };
 
         let dataSyncHelper = null;
@@ -180,6 +182,57 @@
             window.ModuleRenderer?.getFilterDrawerController?.('return_orders', moduleRoot)?.updateSummary();
         }
 
+        function getContextFilterPatch(context) {
+            if (!context || typeof context !== 'object') {
+                return null;
+            }
+
+            const patch = {};
+            const customerId = Number.parseInt(context.customerId ?? context.highlightCustomerId ?? '', 10);
+            const originalShippingOrderId = Number.parseInt(
+                context.originalShippingOrderId ?? context.shippingOrderId ?? context.highlightShippingOrderId ?? context.highlightId ?? '',
+                10
+            );
+            const returnOrderId = Number.parseInt(context.returnOrderId ?? context.id ?? '', 10);
+
+            if (Number.isInteger(customerId) && customerId > 0) {
+                patch.customerId = String(customerId);
+            }
+            if (Number.isInteger(originalShippingOrderId) && originalShippingOrderId > 0) {
+                patch.originalShippingOrderId = String(originalShippingOrderId);
+            }
+            if (Number.isInteger(returnOrderId) && returnOrderId > 0) {
+                patch.returnOrderId = returnOrderId;
+            }
+
+            return Object.keys(patch).length > 0 ? patch : null;
+        }
+
+        async function applyContext(context) {
+            state.currentContext = context || null;
+            const patch = getContextFilterPatch(context);
+            if (!patch) {
+                return;
+            }
+
+            state.page = 1;
+            state.customerId = patch.customerId ?? '';
+            state.originalShippingOrderId = patch.originalShippingOrderId ?? '';
+
+            if (elements.filterForm) {
+                const customerField = elements.filterForm.querySelector('[name="customer_id"]');
+                if (customerField) {
+                    customerField.value = state.customerId;
+                }
+            }
+
+            await loadData();
+
+            if (Number.isInteger(patch.returnOrderId) && patch.returnOrderId > 0) {
+                await viewDetail(patch.returnOrderId);
+            }
+        }
+
         function getCurrentPageRowIds() {
             const tbody = getTbody();
             if (!tbody) return [];
@@ -222,7 +275,8 @@
                 });
 
                 if (filters.keyword) params.append('keyword', filters.keyword);
-                if (filters.customerId) params.append('customer_id', filters.customerId);
+                if (state.customerId || filters.customerId) params.append('customer_id', state.customerId || filters.customerId);
+                if (state.originalShippingOrderId) params.append('original_shipping_order_id', state.originalShippingOrderId);
                 if (filters.status) params.append('status', filters.status);
                 if (filters.startDate) params.append('start_date', filters.startDate);
                 if (filters.endDate) params.append('end_date', filters.endDate);
@@ -533,6 +587,28 @@
                         <p>${escapeHtml(data.return_reason || '-')}</p>
                         <h4>備註</h4>
                         <p>${escapeHtml(data.notes || '-')}</p>
+                        <h4>二次重篩</h4>
+                        <div class="stack-sm">
+                            <div>
+                                ${Array.isArray(data.rescreen_batches) && data.rescreen_batches.length > 0
+                                    ? data.rescreen_batches.map((batch) => `
+                                        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+                                            <strong>${escapeHtml(batch.rescreen_batch_number || '')}</strong>
+                                            <span>${escapeHtml(batch.rescreen_type === 'relaxed_rescreen' ? '放寬重篩' : '嚴格重篩')}</span>
+                                            <span>${getStatusBadge(batch.status)}</span>
+                                            <button type="button" class="btn text" data-action="goto-rescreen-batch" data-id="${batch.id}">
+                                                <i class="fas fa-external-link-alt"></i> 查看
+                                            </button>
+                                        </div>
+                                    `).join('')
+                                    : '<p class="text-muted">目前尚未建立二次重篩案件。</p>'}
+                            </div>
+                            <div>
+                                <button type="button" class="btn outline" data-action="create-rescreen-batch" data-id="${data.id}">
+                                    <i class="fas fa-plus"></i> 由此退貨單建立二次重篩
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 ${data.items && data.items.length > 0 ? `
@@ -731,6 +807,9 @@
             if (elements.filterForm) {
                 elements.filterForm.addEventListener('submit', (e) => {
                     e.preventDefault();
+                    const filters = collectFilterValues();
+                    state.customerId = filters.customerId || '';
+                    state.originalShippingOrderId = '';
                     state.page = 1;
                     closeFilterDrawer();
                     loadData();
@@ -744,6 +823,8 @@
                         elements.filterForm.elements.perPage.value = '20';
                     }
                     state.page = 1;
+                    state.customerId = '';
+                    state.originalShippingOrderId = '';
                     closeFilterDrawer();
                     updateFilterSummary();
                     loadData();
@@ -858,6 +939,12 @@
                     closeFilterDrawer();
                 }
             });
+
+            container.addEventListener('module:context', (event) => {
+                applyContext(event.detail?.context || null).catch((error) => {
+                    console.error('return_orders: 套用 context 失敗', error);
+                });
+            });
         }
 
         // 處理模組內點擊事件
@@ -919,6 +1006,20 @@
                     const shippingOrderId = Number.parseInt(actionBtn.dataset.id || '', 10);
                     if (Number.isInteger(shippingOrderId)) {
                         goToShippingOrder(shippingOrderId);
+                    }
+                    break;
+                }
+                case 'create-rescreen-batch': {
+                    const returnOrderId = Number.parseInt(actionBtn.dataset.id || '', 10);
+                    if (Number.isInteger(returnOrderId)) {
+                        openRescreenBatchModule({ sourceReturnOrderId: returnOrderId, returnOrderId, action: 'create' });
+                    }
+                    break;
+                }
+                case 'goto-rescreen-batch': {
+                    const rescreenBatchId = Number.parseInt(actionBtn.dataset.id || '', 10);
+                    if (Number.isInteger(rescreenBatchId)) {
+                        openRescreenBatchModule({ rescreenBatchId });
                     }
                     break;
                 }
@@ -1177,10 +1278,23 @@
 
         // 跳轉到出貨單
         function goToShippingOrder(shippingOrderId) {
-            if (typeof window.openTab === 'function') {
+            const normalizedId = Number.parseInt(shippingOrderId, 10);
+            if (Number.isInteger(normalizedId) && normalizedId > 0 && typeof window.openTabAndNavigate === 'function') {
+                window.openTabAndNavigate('shipping_orders', '出貨單', { shippingOrderId: normalizedId });
+            } else if (typeof window.openTab === 'function') {
                 window.openTab('shipping_orders', '出貨單', 'modules/shipping_orders.html');
             } else {
                 console.warn('openTab 函數不存在');
+            }
+        }
+
+        function openRescreenBatchModule(context = {}) {
+            if (typeof window.openTabAndNavigate === 'function') {
+                window.openTabAndNavigate('rescreen_batches', '二次重篩案件', context);
+                return;
+            }
+            if (typeof window.openTab === 'function') {
+                window.openTab('rescreen_batches', '二次重篩案件', 'modules/rescreen_batches.html', context);
             }
         }
 
@@ -1241,13 +1355,24 @@
         window.returnOrdersModule = {
             print: printReturnOrder,
             goToShippingOrder: goToShippingOrder,
-            refresh: loadData
+            refresh: loadData,
+            openByContext(context) {
+                return applyContext(context);
+            }
         };
 
         // 初始化
         attachEventListeners();
         loadFilterOptions();
-        loadData();
+        const hasInitialContext = !!getContextFilterPatch(initialContext);
+        applyContext(initialContext).then(() => {
+            if (!hasInitialContext) {
+                loadData();
+            }
+        }).catch((error) => {
+            console.error('return_orders: 初始化 context 失敗', error);
+            loadData();
+        });
     }
 
     // 匯出初始化函數

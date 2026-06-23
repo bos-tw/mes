@@ -69,6 +69,8 @@ SELECT
     wo.order_item_id AS order_item_id,
     NULL AS shipping_order_id,
     CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS shipping_order_number,
+    CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS shipping_status,
+    CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS shipment_purpose,
     c.id AS customer_id,
     CONVERT(c.name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS customer_name,
     wosd.screening_service_id AS screening_service_id,
@@ -99,6 +101,8 @@ SELECT
     wo.order_item_id AS order_item_id,
     NULL AS shipping_order_id,
     CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS shipping_order_number,
+    CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS shipping_status,
+    CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS shipment_purpose,
     c.id AS customer_id,
     CONVERT(c.name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS customer_name,
     womd.screening_service_id AS screening_service_id,
@@ -129,6 +133,8 @@ SELECT
     wo.order_item_id AS order_item_id,
     so.id AS shipping_order_id,
     CONVERT(so.shipping_order_number USING utf8mb4) COLLATE utf8mb4_unicode_ci AS shipping_order_number,
+    CONVERT(so.status USING utf8mb4) COLLATE utf8mb4_unicode_ci AS shipping_status,
+    CONVERT(so.shipment_purpose USING utf8mb4) COLLATE utf8mb4_unicode_ci AS shipment_purpose,
     COALESCE(so.customer_id, o.customer_id) AS customer_id,
     CONVERT(c.name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS customer_name,
     NULL AS screening_service_id,
@@ -270,6 +276,7 @@ function enrichDefectHistoryRecords(PDO $pdo, array $rows): array
     }
 
     $manualTotals = fetchWorkOrderDefectDistributionTotals($pdo, array_keys($workOrderMeta));
+    $workOrderShippingLinks = fetchWorkOrderShippingDefectLinks($pdo, array_keys($workOrderMeta));
     $metricsMap = [];
 
     foreach ($workOrderMeta as $workOrderId => $meta) {
@@ -332,6 +339,18 @@ function enrichDefectHistoryRecords(PDO $pdo, array $rows): array
             'defect_distribution_units_total' => null,
             'order_net_weight_kg' => null,
             'actual_net_weight_kg' => null,
+            'shipping_annotation_flag' => false,
+            'shipping_annotation_label' => '未標註',
+            'shipping_annotation_shipping_order_id' => null,
+            'shipping_annotation_shipping_order_number' => '',
+            'shipping_return_required_flag' => false,
+            'shipping_return_required_label' => '否',
+            'returned_with_shipment_flag' => false,
+            'returned_with_shipment_label' => '未送回',
+            'shipping_status' => null,
+            'shipping_status_label' => '',
+            'related_return_order_count' => 0,
+            'related_return_order_label' => '0 筆',
         ];
 
         if ($sourceType === 'shipping_defect_summary') {
@@ -341,14 +360,156 @@ function enrichDefectHistoryRecords(PDO $pdo, array $rows): array
             $record['defect_units_estimated'] = round((float)$estimatedUnits, 2);
             $record['defect_weight_kg'] = round($shippingTotalWeightKg, 3);
             $record['defect_distribution_units_total'] = round((float)$record['recorded_defect_quantity'], 2);
+            applyShippingTraceMeta($record, [
+                'shipping_order_id' => $record['shipping_order_id'],
+                'shipping_order_number' => $record['shipping_order_number'],
+                'shipping_status' => $row['shipping_status'] ?? null,
+                'shipment_purpose' => $row['shipment_purpose'] ?? null,
+            ]);
         } elseif ($workOrderId > 0 && isset($metricsMap[$workOrderId])) {
             $record = array_merge($record, $metricsMap[$workOrderId]);
+            $shippingLinks = $workOrderShippingLinks[$workOrderId] ?? [];
+            if ($shippingLinks !== []) {
+                applyShippingTraceMeta($record, $shippingLinks[0]);
+            }
         }
 
         $result[] = $record;
     }
 
+    applyRelatedReturnOrderMeta($pdo, $result);
+
     return $result;
+}
+
+function applyRelatedReturnOrderMeta(PDO $pdo, array &$records): void
+{
+    if ($records === []) {
+        return;
+    }
+
+    $shippingOrderIds = [];
+    foreach ($records as $record) {
+        $shippingOrderId = (int)($record['shipping_annotation_shipping_order_id'] ?? $record['shipping_order_id'] ?? 0);
+        if ($shippingOrderId > 0) {
+            $shippingOrderIds[$shippingOrderId] = true;
+        }
+    }
+
+    if ($shippingOrderIds === []) {
+        return;
+    }
+
+    $statsMap = fetchReturnOrderStatsByShippingOrder($pdo, array_keys($shippingOrderIds));
+    foreach ($records as &$record) {
+        $shippingOrderId = (int)($record['shipping_annotation_shipping_order_id'] ?? $record['shipping_order_id'] ?? 0);
+        $count = (int)($statsMap[$shippingOrderId]['related_return_order_count'] ?? 0);
+        $record['related_return_order_count'] = $count;
+        $record['related_return_order_label'] = sprintf('%d 筆', $count);
+    }
+    unset($record);
+}
+
+function fetchWorkOrderShippingDefectLinks(PDO $pdo, array $workOrderIds): array
+{
+    $normalizedIds = array_values(array_filter(array_map('intval', $workOrderIds), static fn(int $id): bool => $id > 0));
+    if ($normalizedIds === []) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($normalizedIds), '?'));
+    $sql = <<<SQL
+SELECT
+    COALESCE(sods.source_work_order_id, ii.work_order_id) AS resolved_work_order_id,
+    so.id AS shipping_order_id,
+    so.shipping_order_number,
+    so.status AS shipping_status,
+    so.shipment_purpose,
+    so.shipping_date,
+    sods.id AS defect_summary_id
+FROM shipping_order_defect_summaries sods
+INNER JOIN shipping_orders so ON so.id = sods.shipping_order_id AND so.deleted_at IS NULL
+LEFT JOIN inventory_items ii ON ii.id = sods.source_inventory_item_id
+WHERE COALESCE(sods.source_work_order_id, ii.work_order_id) IN ($placeholders)
+ORDER BY so.shipping_date DESC, so.id DESC, sods.id DESC
+SQL;
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($normalizedIds);
+
+    $result = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $workOrderId = (int)($row['resolved_work_order_id'] ?? 0);
+        if ($workOrderId <= 0) {
+            continue;
+        }
+        $result[$workOrderId] ??= [];
+        $result[$workOrderId][] = [
+            'shipping_order_id' => (int)($row['shipping_order_id'] ?? 0),
+            'shipping_order_number' => (string)($row['shipping_order_number'] ?? ''),
+            'shipping_status' => (string)($row['shipping_status'] ?? ''),
+            'shipment_purpose' => (string)($row['shipment_purpose'] ?? ''),
+        ];
+    }
+
+    return $result;
+}
+
+function applyShippingTraceMeta(array &$record, array $shippingLink): void
+{
+    $shippingOrderId = (int)($shippingLink['shipping_order_id'] ?? 0);
+    $shippingOrderNumber = (string)($shippingLink['shipping_order_number'] ?? '');
+    $shippingStatus = (string)($shippingLink['shipping_status'] ?? '');
+    $shipmentPurpose = (string)($shippingLink['shipment_purpose'] ?? '');
+
+    $record['shipping_annotation_flag'] = $shippingOrderId > 0;
+    $record['shipping_annotation_shipping_order_id'] = $shippingOrderId > 0 ? $shippingOrderId : null;
+    $record['shipping_annotation_shipping_order_number'] = $shippingOrderNumber;
+    $record['shipping_annotation_label'] = $shippingOrderId > 0
+        ? sprintf('已標註%s', $shippingOrderNumber !== '' ? '：' . $shippingOrderNumber : '')
+        : '未標註';
+
+    $record['shipping_return_required_flag'] = $shippingOrderId > 0;
+    $record['shipping_return_required_label'] = $shippingOrderId > 0 ? '是' : '否';
+    $record['shipping_status'] = $shippingStatus !== '' ? $shippingStatus : null;
+    $record['shipping_status_label'] = getShippingStatusLabel($shippingStatus);
+
+    if ($shippingOrderId <= 0) {
+        $record['returned_with_shipment_flag'] = false;
+        $record['returned_with_shipment_label'] = '未送回';
+        return;
+    }
+
+    if (in_array($shippingStatus, ['shipped', 'delivered'], true)) {
+        $record['returned_with_shipment_flag'] = true;
+        $record['returned_with_shipment_label'] = '已隨貨送回';
+    } elseif ($shippingStatus === 'confirmed' || $shippingStatus === 'draft') {
+        $record['returned_with_shipment_flag'] = false;
+        $record['returned_with_shipment_label'] = '已標註待出貨';
+    } elseif ($shippingStatus === 'cancelled') {
+        $record['returned_with_shipment_flag'] = false;
+        $record['returned_with_shipment_label'] = '出貨已取消';
+    } else {
+        $record['returned_with_shipment_flag'] = false;
+        $record['returned_with_shipment_label'] = '未送回';
+    }
+
+    if ($shipmentPurpose !== '') {
+        $record['shipping_return_required_label'] = in_array($shipmentPurpose, ['defect_return', 'mixed'], true) ? '是' : '否';
+        $record['shipping_return_required_flag'] = $record['shipping_return_required_label'] === '是';
+    }
+}
+
+function getShippingStatusLabel(?string $status): string
+{
+    return match ((string)$status) {
+        'draft' => '草稿',
+        'confirmed' => '已確認',
+        'shipped' => '已出貨',
+        'delivered' => '已送達',
+        'cancelled' => '已取消',
+        default => (string)($status ?? ''),
+    };
 }
 
 function fetchWorkOrderDefectDistributionTotals(PDO $pdo, array $workOrderIds): array
@@ -381,6 +542,41 @@ SQL;
     $result = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
         $result[(int)$row['work_order_id']] = (float)($row['total_quantity'] ?? 0);
+    }
+
+    return $result;
+}
+
+function fetchReturnOrderStatsByShippingOrder(PDO $pdo, array $shippingOrderIds): array
+{
+    $normalizedIds = array_values(array_filter(array_map('intval', $shippingOrderIds), static fn(int $id): bool => $id > 0));
+    if ($normalizedIds === []) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($normalizedIds), '?'));
+    $sql = <<<SQL
+SELECT
+    ro.original_shipping_order_id AS shipping_order_id,
+    COUNT(*) AS related_return_order_count
+FROM return_orders ro
+WHERE ro.deleted_at IS NULL
+  AND ro.original_shipping_order_id IN ($placeholders)
+GROUP BY ro.original_shipping_order_id
+SQL;
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($normalizedIds);
+
+    $result = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $shippingOrderId = (int)($row['shipping_order_id'] ?? 0);
+        if ($shippingOrderId <= 0) {
+            continue;
+        }
+        $result[$shippingOrderId] = [
+            'related_return_order_count' => (int)($row['related_return_order_count'] ?? 0),
+        ];
     }
 
     return $result;

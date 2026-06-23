@@ -144,6 +144,8 @@
                     <td>${escapeHtml(r.notes || '')}</td>
                     <td class="actions-cell">
                         <button type="button" class="btn text" data-action="view" data-id="${r.id}" title="檢視"><i class="fas fa-eye"></i></button>
+                        <button type="button" class="btn text" data-action="open-shipping-order" data-id="${r.id}" title="開啟出貨單"><i class="fas fa-shipping-fast"></i></button>
+                        <button type="button" class="btn text" data-action="open-defect-history" data-id="${r.id}" title="開啟不良品歷史"><i class="fas fa-history"></i></button>
                         <button type="button" class="btn text" data-action="edit" data-id="${r.id}" title="編輯"><i class="fas fa-edit"></i></button>
                         <button type="button" class="btn text danger" data-action="delete" data-id="${r.id}" title="刪除"><i class="fas fa-trash"></i></button>
                     </td>
@@ -173,12 +175,16 @@
         `;
     }
 
+    function getShippingOrderOptionLabel(order) {
+        return order?.shipping_order_number || order?.order_number || `#${order?.id || ''}`;
+    }
+
     function renderFilters() {
         // Shipping orders dropdown
         if (dom.filterShippingOrder) {
-            const val = dom.filterShippingOrder.value;
+            const val = state.filters.shipping_order_id || dom.filterShippingOrder.value;
             dom.filterShippingOrder.innerHTML = `<option value="">全部出貨單</option>` +
-                state.shippingOrders.map(s => `<option value="${s.id}">${escapeHtml(s.order_number)}</option>`).join('');
+                state.shippingOrders.map(s => `<option value="${s.id}">${escapeHtml(getShippingOrderOptionLabel(s))}</option>`).join('');
             dom.filterShippingOrder.value = val;
         }
         // Result dropdown
@@ -198,7 +204,7 @@
         if (shippingOrderSelect) {
             const val = shippingOrderSelect.value;
             shippingOrderSelect.innerHTML = `<option value="">請選擇出貨單</option>` +
-                state.shippingOrders.map(s => `<option value="${s.id}">${escapeHtml(s.order_number)}</option>`).join('');
+                state.shippingOrders.map(s => `<option value="${s.id}">${escapeHtml(getShippingOrderOptionLabel(s))}</option>`).join('');
             shippingOrderSelect.value = val;
         }
         if (inspectorSelect) {
@@ -211,6 +217,39 @@
             const val = resultSelect.value;
             resultSelect.innerHTML = state.resultOptions.map(o => `<option value="${o.value}">${escapeHtml(o.label)}</option>`).join('');
             resultSelect.value = val || 'pass';
+        }
+    }
+
+    function getRecordById(id) {
+        return state.data.find((record) => Number(record.id) === Number(id)) || null;
+    }
+
+    function openShippingOrderModule(shippingOrderId) {
+        const normalizedId = Number.parseInt(shippingOrderId, 10);
+        if (!Number.isInteger(normalizedId) || normalizedId <= 0) {
+            return;
+        }
+
+        if (typeof window.openTabAndNavigate === 'function') {
+            window.openTabAndNavigate('shipping_orders', '出貨單', { shippingOrderId: normalizedId });
+        }
+    }
+
+    function openDefectHistoryModule(shippingOrderId) {
+        const normalizedId = Number.parseInt(shippingOrderId, 10);
+        if (!Number.isInteger(normalizedId) || normalizedId <= 0) {
+            return;
+        }
+
+        if (typeof window.openTabAndNavigate === 'function') {
+            window.openTabAndNavigate('defect_history_records', '不良品歷史紀錄', { shippingOrderId: normalizedId });
+            return;
+        }
+
+        if (typeof window.openTab === 'function') {
+            window.openTab('defect_history_records', '不良品歷史紀錄', 'modules/defect_history_records.html', {
+                context: { shippingOrderId: normalizedId }
+            });
         }
     }
 
@@ -230,13 +269,21 @@
                 <div class="detail-item"><span class="detail-label">建立時間</span><span class="detail-value">${escapeHtml(record.created_at || '')}</span></div>
                 <div class="detail-item"><span class="detail-label">更新時間</span><span class="detail-value">${escapeHtml(record.updated_at || '')}</span></div>
             </div>
+            <div class="detail-inline-actions">
+                <button type="button" class="btn outline small" data-action="open-shipping-order-from-detail">
+                    <i class="fas fa-shipping-fast"></i> 開啟出貨單
+                </button>
+                <button type="button" class="btn outline small" data-action="open-defect-history-from-detail">
+                    <i class="fas fa-history"></i> 開啟不良品歷史
+                </button>
+            </div>
         `;
     }
 
     /* =======================
      * Modal Functions
      * ======================= */
-    function openModal(record = null) {
+    function openModal(record = null, preset = {}) {
         state.editingId = record ? record.id : null;
         if (dom.modalTitle) {
             dom.modalTitle.textContent = record ? '編輯出貨品質檢驗' : '新增出貨品質檢驗';
@@ -273,6 +320,9 @@
             const now = new Date();
             const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
             setFieldValue('inspection_datetime', localIso);
+            if (preset.shipping_order_id) {
+                setFieldValue('shipping_order_id', preset.shipping_order_id);
+            }
         }
 
         dom.modal.classList.remove('hidden');
@@ -447,10 +497,34 @@
         }
     }
 
+    async function handleIncomingContext(context) {
+        if (!context || typeof context !== 'object') {
+            return;
+        }
+
+        const shippingOrderId = Number.parseInt(context.shippingOrderId ?? context.shipping_order_id ?? '', 10);
+        if (Number.isInteger(shippingOrderId) && shippingOrderId > 0) {
+            state.filters.shipping_order_id = String(shippingOrderId);
+            state.pagination.page = 1;
+            await loadData();
+        }
+
+        const inspectionId = Number.parseInt(context.inspectionId ?? context.inspection_id ?? '', 10);
+        if (Number.isInteger(inspectionId) && inspectionId > 0) {
+            const record = await fetchOne(inspectionId);
+            openDetailModal(record);
+            return;
+        }
+
+        if (context.action === 'create' && Number.isInteger(shippingOrderId) && shippingOrderId > 0) {
+            openModal(null, { shipping_order_id: shippingOrderId });
+        }
+    }
+
     /* =======================
      * Initialize
      * ======================= */
-    function initializeShippingQualityInspectionsModule(container) {
+    function initializeShippingQualityInspectionsModule(container, initialContext = null) {
         if (!cacheDom(container)) return;
         if (dom.moduleRoot.dataset.initialised === 'true') return;
         dom.moduleRoot.dataset.initialised = 'true';
@@ -469,6 +543,20 @@
 
             switch (action) {
                 case 'view': handleView(parseInt(id, 10)); break;
+                case 'open-shipping-order': {
+                    const record = getRecordById(id);
+                    if (record?.shipping_order_id) {
+                        openShippingOrderModule(record.shipping_order_id);
+                    }
+                    break;
+                }
+                case 'open-defect-history': {
+                    const record = getRecordById(id);
+                    if (record?.shipping_order_id) {
+                        openDefectHistoryModule(record.shipping_order_id);
+                    }
+                    break;
+                }
                 case 'edit': handleEdit(parseInt(id, 10)); break;
                 case 'delete': handleDelete(parseInt(id, 10)); break;
                 case 'prev-page':
@@ -494,9 +582,28 @@
                 case 'close-detail-modal':
                     closeDetailModal();
                     break;
+                case 'open-shipping-order-from-detail': {
+                    const record = getRecordById(state.viewingId);
+                    if (record?.shipping_order_id) {
+                        openShippingOrderModule(record.shipping_order_id);
+                    }
+                    break;
+                }
+                case 'open-defect-history-from-detail': {
+                    const record = getRecordById(state.viewingId);
+                    if (record?.shipping_order_id) {
+                        openDefectHistoryModule(record.shipping_order_id);
+                    }
+                    break;
+                }
                 case 'edit-from-detail':
-                    closeDetailModal();
-                    handleEdit(state.editingId);
+                    {
+                        const detailId = state.viewingId;
+                        closeDetailModal();
+                        if (detailId) {
+                            handleEdit(detailId);
+                        }
+                    }
                     break;
             }
         });
@@ -515,8 +622,29 @@
         }
 
         subscribeToChanges();
-        loadData();
+        loadData().then(() => handleIncomingContext(initialContext)).catch((err) => {
+            showAlert(err.message, 'error');
+        });
+
+        container.addEventListener('module:context', (event) => {
+            handleIncomingContext(event?.detail?.context ?? null).catch((err) => {
+                showAlert(err.message, 'error');
+            });
+        });
     }
+
+    window.shippingQualityInspectionsModule = {
+        openCreateForShippingOrder(shippingOrderId) {
+            handleIncomingContext({ shippingOrderId, action: 'create' }).catch((err) => {
+                showAlert(err.message, 'error');
+            });
+        },
+        viewDetail(inspectionId) {
+            handleIncomingContext({ inspectionId }).catch((err) => {
+                showAlert(err.message, 'error');
+            });
+        }
+    };
 
     window.initializeShippingQualityInspectionsModule = initializeShippingQualityInspectionsModule;
 })();

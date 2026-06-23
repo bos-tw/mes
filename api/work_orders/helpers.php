@@ -548,11 +548,16 @@ function fetchWorkOrderPartialReceiptLedger(PDO $pdo, int $workOrderId): array
             $summary['partial_shipped_net_weight_kg'] += $shippedNetWeightKg;
         }
 
+        $workOrderTypeLabel = match ((string)($row['work_order_type'] ?? 'normal')) {
+            'rescreen' => '二次重篩工單',
+            'split' => '拆分工單',
+            default => '一般工單',
+        };
         $sourceLabel = $row['machine_run_id']
             ? (trim((string)($row['run_label'] ?? '')) !== ''
                 ? (string)$row['run_label']
                 : (trim((string)($row['machine_name'] ?? '')) !== '' ? (string)$row['machine_name'] : '拆分機台'))
-            : '一般工單';
+            : $workOrderTypeLabel;
         $receiptId = (int)($row['id'] ?? 0);
         $shippingTools = $toolDetailsByReceiptId[$receiptId] ?? [];
         $shippingToolTotalWeightKg = 0.0;
@@ -1522,10 +1527,24 @@ function validateWorkOrderData(array $payload, bool $isUpdate = false): array
             $workOrderType = 'normal';
         }
 
-        if (!in_array($workOrderType, ['normal', 'split'], true)) {
-            $errors['work_order_type'] = '工單類型必須為 normal 或 split。';
+        if (!in_array($workOrderType, ['normal', 'split', 'rescreen'], true)) {
+            $errors['work_order_type'] = '工單類型必須為 normal、split 或 rescreen。';
         } else {
             $data['work_order_type'] = $workOrderType;
+        }
+    }
+
+    if (array_key_exists('source_rescreen_batch_id', $payload)) {
+        $sourceRescreenBatchId = $payload['source_rescreen_batch_id'];
+        if ($sourceRescreenBatchId === null || $sourceRescreenBatchId === '') {
+            $data['source_rescreen_batch_id'] = 0;
+        } else {
+            $validatedId = filter_var($sourceRescreenBatchId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+            if ($validatedId === false) {
+                $errors['source_rescreen_batch_id'] = '來源二次重篩案件 ID 必須為非負整數。';
+            } else {
+                $data['source_rescreen_batch_id'] = (int)$validatedId;
+            }
         }
     }
 

@@ -1,81 +1,85 @@
 # 開發進度摘要
 
-更新時間：2026-06-22  
+更新時間：2026-06-23  
 目前分支：`main`  
-最新交付版本：`v3.0.6`  
-更新包：`dist/update_v3.0.6_20260622_152759.zip`
+最新交付版本：`v3.0.8`  
+最新更新包：`dist/update_v3.0.8_20260623_212649.zip`
 
 ## 1. 專案架構
 
 - 目錄結構：
-  - `api/`：PHP API、權限、流程守門、報表端點。
-  - `js/`：桌面版原生 JavaScript 模組。
+  - `api/`：PHP API、權限守門、系統更新、流程追溯端點。
+  - `js/`：桌面版原生 JavaScript 模組與 DataSync。
+  - `modules/`：各功能 HTML 片段。
   - `core/configs/`：配置化模組定義。
-  - `print/`：列印模板。
-  - `migrations/`：MySQL migration。
+  - `migrations/`：MySQL schema / data migration。
   - `tools/`：schema sync、健康稽核、DataSync 稽核、更新包打包工具。
-  - `docs/`、`release-notes/`、`dist/`：技術文件、版本說明、更新包。
+  - `docs/`、`release-notes/`、`dist/`：計畫文件、版本說明、更新包輸出。
 - 技術棧：
-  - PHP 8、PDO、MySQL 8、Apache 24
-  - 原生 JavaScript / HTML / CSS
-  - Node.js 稽核工具
-  - PowerShell schema sync / 更新包工具
+  - PHP 8 + PDO + MySQL 8 + Apache 24。
+  - 原生 JavaScript / HTML / CSS。
+  - Node.js 稽核工具。
+  - PowerShell schema sync / 更新包工具。
 - 本輪主要涉及模組 / API / 資料表：
-  - 模組：`shipping_orders`、`shipping_order_items`、`report_descriptions`、`customers`、`inventory_items`、`work_orders`、`production_work_order_schedule`、`defect_history_records`
-  - API：`api/shipping_orders/*`、`api/defect_history_records/*`、`api/bootstrap.php`、`api/common/column_manager.js`
-  - 資料表：`shipping_orders`、`shipping_order_items`、`shipping_order_defect_summaries`、`shipping_order_tool_summaries`、`work_order_screening_defects`、`work_order_machine_defects`
+  - 模組：`rescreen_batches`、`return_orders`、`work_orders`、`shipping_orders`、`defect_history_records`、`customers`。
+  - API：`api/rescreen_batches/*`、`api/return_orders/*`、`api/work_orders/*`、`api/shipping_orders/*`、`api/defect_history_records/helpers.php`、`api/bootstrap.php`、`api/cache_version.php`。
+  - 資料表：`rescreen_batches`、`rescreen_batch_items`、`rescreen_batch_rules`、`rescreen_batch_defects`、`inventory_item_sources`、`work_orders.source_rescreen_batch_id`、`number_sequences.seq_key = RB`。
 
 ## 2. 已完成功能
 
-- 出貨單第一階段已落地：
-  - `shipment_purpose`、不良品摘要、客戶載具摘要資料結構與 CRUD 已完成。
-  - 出貨單主畫面 / 編輯 / 詳情 / 列印已支援上述欄位。
-  - A5 列印沿用既有版型，新增不良品摘要與載具摘要。
-  - 重量顯示規範已統一為小數點後 2 位。
-  - 工單 / 部分入庫可作為出貨摘要建議帶入來源，且仍可人工修改。
-  - 修正 SPA 分頁內 form 原生 submit 導致的離站警告。
-- 新增不良品歷史紀錄模組：
-  - 側邊欄入口、權限映射、模組設定、前端頁面、DataSync 依賴已接上。
-  - API 已可彙整工單不良與出貨不良摘要做跨模組查詢。
-- 報表 / UI 修正：
-  - 四種列表中的客戶名稱已可連到客戶基本資料。
-  - 表單備註列印、預覽與標題文案已補齊。
-  - 出貨單列印已移除關聯訂單顯示，保留出貨性質。
+- 二次重篩第一輪可實測：
+  - 新增 `rescreen_batches` 模組、側邊欄入口「二次重篩歷史紀錄」、配置檔、前端列表 / 檢視 / 編輯邏輯。
+  - 新增 `api/rescreen_batches/`：列表、檢視、更新、刪除、由退貨單建立重篩案件、共用 helpers。
+  - 重篩案件直接保存原始訂單、原始工單、退貨單、出貨單、來源庫存等追溯鏈。
+  - 支援 `strict_rescreen` / `relaxed_rescreen`，並保留規則快照、結果分流、不良來源。
+- 出貨 / 退貨 / 工單 / 不良品 / 客戶載具追溯補強：
+  - 退貨單可建立二次重篩案件。
+  - 工單與出貨、退貨、不良品歷史的來源欄位與導頁追溯已補強。
+  - 客戶載具以紀錄與客戶彙整為主，保留工單 / 出貨 / 退貨來源顯示。
+- 雙入口與權限同步修正：
+  - `index.html` / `index.php` 同步新增入口與 script/config 載入。
+  - 前端 `MODULE_LEGACY_PERMISSION_MAP` 與後端 `api/bootstrap.php` legacy map / alias 已同步。
+  - `api/cache_version.php` 已加強，避免掃描暫存或權限問題導致入口快取版本失效。
+- 「關於系統」版本顯示根治：
+  - 移除 `index.html` / `index.php` 內硬編碼舊版本值。
+  - `script.js` 改由 `system_update_logs` / `api/system_update_history.php` 載入版本；載入失敗時顯示 `未取得`。
+  - `tools/audit-system-health.js` 新增 `INDEX 關於系統版本硬編碼`，防止入口檔再硬編碼正式版本。
+  - `.github/copilot-instructions.md` 已記錄禁止硬編碼關於系統正式版本的規範。
 - 重要資料庫異動：
-  - migration：`migrations/2026_06_22_add_shipping_phase1_summary_tables.sql`
-  - `tools/sync-local-schema.ps1` 的 `$migrationChecks` 已同步更新。
-  - migration 具 `IF EXISTS` / `IF NOT EXISTS` 保護，可重複執行。
+  - 新增 migration：`migrations/2026_06_23_add_rescreen_batches_foundation.sql`。
+  - `tools/sync-local-schema.ps1` 的 `$migrationChecks` 已同步。
+  - migration 已修正為可重複執行，包含動態 SQL no-op 使用 `DO 0` 與 `number_sequences` RB 補資料防重入。
 - 版本與更新包：
-  - release note：`release-notes/2026-06-22-v3.0.6.txt`
-  - 更新包：`dist/update_v3.0.6_20260622_152759.zip`
-  - ZIP 已確認含 `manifest.json` 與本輪 migration。
+  - release note：`release-notes/2026-06-23-v3.0.8.txt`，只保留最新三筆。
+  - 正式更新包：`dist/update_v3.0.8_20260623_212649.zip`。
+  - ZIP 驗證：`manifest.json` 存在，`files/` 45 檔、migration 1 檔，無漏放 / 多放。
 
 ## 3. 待修 Bug
 
-- 無本輪新增且已確認的阻擋級功能 bug。
-- 已知問題仍以健康稽核既有 warning 為主：
+- 已知問題：
+  - 完整健康審計仍有 17 個既有 warning。
   - `api/status_board/update.php`、`api/status_board/delete.php` 仍允許 POST fallback。
-  - 多個 JS 檔案過大，`js/shipping_orders.js`、`js/work_orders.js`、`js/orders.js` 等已超過建議上限。
+  - 多個前端 JS 檔過大，例如 `js/work_orders.js`、`js/shipping_orders.js`、`js/orders.js`。
   - 多個模組仍存在 `status` / `status_lookup_id` 雙重狀態欄位。
 - 重現條件：
-  - 執行 `node tools/audit-system-health.js`
+  - 執行 `node tools/audit-system-health.js`。
 - 目前推測原因：
-  - 歷史模組累積、流程型 API 沿用舊相容策略、前端單檔功能持續擴張尚未拆模組。
+  - 歷史相容設計與大型前端模組累積，尚未分階段重構。
 
 ## 4. 下一步任務
 
 - P0
-  - 實機驗證出貨單第一階段：建立、編輯、加入品項、列印、純載具歸還、純不良品回送。
-  - 驗證更新包 `v3.0.6` 透過系統更新介面可正常套用。
-  - 依 `docs/shipping-phase2-implementation-plan-2026-06-22.md` 啟動第二階段第一項：出貨品質檢驗整合。
+  - 在遠端主機套用 `v3.0.8` 更新包，確認系統更新流程、migration、檔案覆蓋均成功。
+  - 瀏覽器實測 `index.html` / `index.php` 入口一致性、側邊欄「二次重篩歷史紀錄」、關於系統版本顯示。
+  - 實測退貨單建立二次重篩案件、案件列表搜尋、檢視追溯鏈、更新結果分流。
 - P1
-  - 補出貨品質檢驗與出貨單的顯示 / 建立入口 / 基本關聯。
-  - 補不良品追溯與出貨 / 退貨 / 工單導頁串接。
-  - 規劃客戶載具往來總帳資料模型與結餘口徑。
+  - 補齊二次重篩與不良品歷史的使用者導向檢視細節，降低一般使用者閱讀追溯鏈的負擔。
+  - 補強客戶載具遺留分析與出貨 / 退貨 / 工單紀錄彙整視圖。
+  - 實測二次重篩再次產生不良品後，不良品歷史紀錄的來源與回送狀態顯示。
 - P2
   - 清理 `audit-system-health` 既有 warning。
   - 拆分過大的前端模組。
-  - 整理雙重狀態欄位策略。
+  - 整理 `status` / `status_lookup_id` 雙重狀態欄位策略。
 
 ## 5. 驗證狀態
 
@@ -83,36 +87,44 @@
   - `node tools/audit-system-health.js`
   - `node tools/audit-system-health.js --changed --base origin/main`
   - `node tools/validate-config-modules.js`
-  - `node --check`：
-    - `api/common/column_manager.js`
-    - `core/configs/shipping_orders.config.js`
-    - `core/configs/defect_history_records.config.js`
-    - `core/module-renderer.js`
-    - `script.js`
-    - `js/customers.js`
-    - `js/data-sync.js`
-    - `js/defect_history_records.js`
-    - `js/inventory_items.js`
-    - `js/orders.js`
-    - `js/production_work_order_schedule.js`
-    - `js/report_descriptions.js`
-    - `js/shipping_orders.js`
-    - `js/work_orders.js`
-    - `tools/audit-data-sync.js`
-  - `php -l`：
-    - `api/bootstrap.php`
-    - `api/shipping_orders/index.php`
-    - `api/shipping_orders/show.php`
-    - `api/shipping_orders/update.php`
-    - `api/defect_history_records/helpers.php`
-    - `api/defect_history_records/index.php`
-    - `api/defect_history_records/update.php`
-    - `api/defect_history_records/delete.php`
-    - `index.php`
-  - `node tools/audit-data-sync.js --write docs/data-sync-audit.md`：`P0=0`、`P1=0`
-  - `powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1`：`Applied: 21, Pending: 0`
-  - `tools/build-update-package.ps1`：已產出 `v3.0.6` 更新包
+  - `node --check script.js`
+  - `node --check tools/audit-system-health.js`
+  - `node --check js/data-sync.js`
+  - `node --check tools/audit-data-sync.js`
+  - `node --check js/customers.js`
+  - `node --check js/defect_history_records.js`
+  - `node --check js/return_orders.js`
+  - `node --check js/shipping_orders.js`
+  - `node --check js/shipping_quality_inspections.js`
+  - `node --check js/work_orders.js`
+  - `node --check js/rescreen_batches.js`
+  - `php -l api/bootstrap.php`
+  - `php -l api/cache_version.php`
+  - `php -l api/common/workflow_guard.php`
+  - `php -l api/customers/show.php`
+  - `php -l api/defect_history_records/helpers.php`
+  - `php -l api/number_sequences/helpers.php`
+  - `php -l api/return_orders/helpers.php`
+  - `php -l api/return_orders/index.php`
+  - `php -l api/shipping_orders/helpers.php`
+  - `php -l api/shipping_orders/show.php`
+  - `php -l api/work_orders/helpers.php`
+  - `php -l api/work_orders/index.php`
+  - `php -l api/work_orders/show.php`
+  - `php -l api/work_orders/update.php`
+  - `php -l api/rescreen_batches/helpers.php`
+  - `php -l api/rescreen_batches/index.php`
+  - `php -l api/rescreen_batches/show.php`
+  - `php -l api/rescreen_batches/update.php`
+  - `php -l api/rescreen_batches/create_from_return.php`
+  - `php -l api/rescreen_batches/delete.php`
+  - `php -l api/system_update_history.php`
+  - `node tools/audit-data-sync.js --write docs/data-sync-audit.md`：`P0=0`、`P1=0`、`P2=10`
+  - `powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1`：`Applied: 22, Pending: 0`
+  - migration 重複執行 smoke test：通過
+  - `tools/build-update-package.ps1`：已產出 `v3.0.8` 更新包
+  - ZIP 讀取式驗證：`manifest.json` / files / migrations 清單均符合預期
 - 尚未驗證風險：
-  - 未做完整瀏覽器實機回歸與列印視覺驗證。
-  - 未透過系統更新介面實際套用 `v3.0.6`。
-  - 未做完整端到端資料流回歸（工單 → 庫存 → 出貨 → 退貨 / 二次重篩）。
+  - 尚未在遠端主機實際套用 `v3.0.8`。
+  - 尚未完成瀏覽器端完整操作回歸與列印視覺回歸。
+  - 尚未完成工單 → 退貨 → 二次重篩 → 再次不良 → 後續出貨的端到端資料流實測。

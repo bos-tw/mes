@@ -35,6 +35,7 @@
         partialReceiptModal: moduleRoot.querySelector('[data-work-order-partial-receipt-modal]'),
         partialReceiptForm: moduleRoot.querySelector('[data-partial-receipt-form]'),
         partialReceiptRows: moduleRoot.querySelector('[data-work-order-partial-receipts-rows]'),
+        customerToolAnalysis: moduleRoot.querySelector('[data-work-order-customer-tool-analysis]'),
         balanceAlert: moduleRoot.querySelector('[data-work-order-balance-alert]'),
         completionModal: moduleRoot.querySelector('[data-work-order-completion-modal]'),
         completionForm: moduleRoot.querySelector('[data-work-order-completion-form]'),
@@ -3052,6 +3053,105 @@
         });
     }
 
+    function renderWorkOrderCustomerToolAnalysis(workOrder) {
+        const container = elements.customerToolAnalysis;
+        if (!container) {
+            return;
+        }
+
+        const analysis = workOrder?.customer_tool_analysis || null;
+        const toolDetails = Array.isArray(workOrder?.tool_details) ? workOrder.tool_details : [];
+        const partialReceipts = Array.isArray(workOrder?.partial_receipts) ? workOrder.partial_receipts : [];
+
+        if (!analysis) {
+            container.classList.add('text-muted');
+            container.innerHTML = '尚無客戶載具分析資料。';
+            return;
+        }
+
+        const outstandingRecords = Array.isArray(analysis.outstanding_records)
+            ? analysis.outstanding_records.filter((record) =>
+                Number(record.incoming_quantity || 0) > 0 || Number(record.returned_quantity || 0) > 0
+            )
+            : [];
+
+        container.classList.remove('text-muted');
+        container.innerHTML = `
+            <div class="detail-grid" style="margin-bottom: 0.75rem;">
+                <div class="detail-item">
+                    <div class="detail-label">工單來源載具</div>
+                    <div class="detail-value">${escapeHtml(String(toolDetails.length || 0))} 種</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">部分入庫載具紀錄</div>
+                    <div class="detail-value">${escapeHtml(String(partialReceipts.filter((receipt) => String(receipt.shipping_tool_details || '').trim() !== '').length))} 筆</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">客戶可能仍留廠</div>
+                    <div class="detail-value ${Number(analysis.outstanding_total_quantity || 0) > 0 ? 'text-danger' : 'text-success'}">${escapeHtml(String(analysis.outstanding_total_quantity || 0))} 個</div>
+                </div>
+                <div class="detail-item full-width">
+                    <div class="detail-label">分析口徑</div>
+                    <div class="detail-value">${escapeHtml(analysis.basis_note || '-')}</div>
+                </div>
+            </div>
+            ${toolDetails.length > 0 ? `
+            <div class="table-responsive" style="margin-bottom: 0.75rem;">
+                <table class="data-table compact">
+                    <thead>
+                        <tr>
+                            <th>工單載具名稱</th>
+                            <th>類型</th>
+                            <th>數量</th>
+                            <th>單重(kg)</th>
+                            <th>總重(kg)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${toolDetails.map((tool) => `
+                        <tr>
+                            <td>${escapeHtml(tool.tool_name || '-')}</td>
+                            <td>${escapeHtml(tool.tool_type || '-')}</td>
+                            <td class="text-right">${escapeHtml(String(tool.quantity || 0))}</td>
+                            <td class="text-right">${escapeHtml(String(tool.unit_weight_kg || 0))}</td>
+                            <td class="text-right">${escapeHtml(String(tool.total_weight_kg || 0))}</td>
+                        </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            ` : '<div class="text-muted" style="margin-bottom: 0.75rem;">此工單目前沒有訂單載具設定。</div>'}
+            ${outstandingRecords.length > 0 ? `
+            <div class="table-responsive">
+                <table class="data-table compact">
+                    <thead>
+                        <tr>
+                            <th>載具名稱</th>
+                            <th>類型</th>
+                            <th>進場</th>
+                            <th>已歸還</th>
+                            <th>可能留廠</th>
+                            <th>狀態</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${outstandingRecords.slice(0, 8).map((record) => `
+                        <tr>
+                            <td>${escapeHtml(record.tool_name || '-')}</td>
+                            <td>${escapeHtml(record.tool_type || '-')}</td>
+                            <td class="text-right">${escapeHtml(String(record.incoming_quantity || 0))}</td>
+                            <td class="text-right">${escapeHtml(String(record.returned_quantity || 0))}</td>
+                            <td class="text-right ${Number(record.outstanding_quantity || 0) > 0 ? 'text-danger' : ''}">${escapeHtml(String(record.outstanding_quantity || 0))}</td>
+                            <td>${escapeHtml(record.status_label || '-')}</td>
+                        </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            ` : '<div class="text-muted">目前沒有可分析的客戶載具進出紀錄。</div>'}
+        `;
+    }
+
     function calculateCurrentProducedNetWeightKg() {
         if (!elements.editModalForm) {
             return 0;
@@ -4673,7 +4773,7 @@
                 ['工單號碼', '工單類型', '訂單號碼', '客戶名稱', '受篩產品', '機台', '開始日期', '結束日期', '狀態'],
                 ...rows.map((row) => [
                     row.work_order_number || '',
-                    row.work_order_type === 'split' ? '拆分工單' : '一般工單',
+                    getWorkOrderTypeLabel(row.work_order_type, Number.parseInt(row.machine_run_count, 10) || 0, row.rescreen_batch_number || ''),
                     row.order_number || '',
                     row.customer_name || '',
                     row.screening_item_name || '',
@@ -4715,6 +4815,17 @@
         // 開啟篩分檢驗報表列印頁面
         const printUrl = `print/screening_inspection_print.html?work_order_id=${workOrderId}`;
         window.open(printUrl, '_blank');
+    }
+
+    function getWorkOrderTypeLabel(workOrderType, machineRunCount = 0, rescreenBatchNumber = '') {
+        const normalizedType = String(workOrderType || 'normal').toLowerCase();
+        if (normalizedType === 'split') {
+            return `拆分工單${machineRunCount > 0 ? ` (${machineRunCount} 台)` : ''}`;
+        }
+        if (normalizedType === 'rescreen') {
+            return rescreenBatchNumber ? `二次重篩工單 (${rescreenBatchNumber})` : '二次重篩工單';
+        }
+        return '一般工單';
     }
 
     // Render Functions
@@ -4781,11 +4892,10 @@
             // checkbox 狀態
             const isChecked = selectedWorkOrders.has(item.id) ? 'checked' : '';
             const isSplitWorkOrder = item.work_order_type === 'split';
+            const isRescreenWorkOrder = item.work_order_type === 'rescreen';
             const machineRunCount = Math.max(0, Number.parseInt(item.machine_run_count, 10) || 0);
-            const workOrderTypeLabel = isSplitWorkOrder
-                ? `拆分工單${machineRunCount > 0 ? ` (${machineRunCount} 台)` : ''}`
-                : '一般工單';
-            const workOrderTypeClass = isSplitWorkOrder ? 'split' : 'normal';
+            const workOrderTypeLabel = getWorkOrderTypeLabel(item.work_order_type, machineRunCount, item.rescreen_batch_number || '');
+            const workOrderTypeClass = isSplitWorkOrder ? 'split' : (isRescreenWorkOrder ? 'rescreen' : 'normal');
 
             return `
             <tr data-id="${item.id}" data-status-key="${statusKeyAttr}" data-status-label="${statusLabelAttr}"${completedRowClass}>
@@ -4981,6 +5091,7 @@
         state.editingStatusLookupId = null;
         state.editingHasInventory = false;
         state.editingInventoryItemId = null;
+        state.currentWorkOrder = null;
         state.orderItemDetails = null;
         state.images = [];
         state.productionRecordModes.create = 'preset';
@@ -5015,6 +5126,7 @@
         renderWorkOrderBalanceSummary({});
         renderWorkOrderBalanceAlert([]);
         renderPartialReceiptHistory([]);
+        renderWorkOrderCustomerToolAnalysis(null);
         state.formSnapshots.edit = null;
     }
 
@@ -5048,6 +5160,7 @@
                         : '建立本次部分入庫';
                 }
                 populateForm(result.data, true);
+                renderWorkOrderCustomerToolAnalysis(result.data);
                 refreshWorkOrderBalancePresentation(result.data);
                 state.images = result.data.images || [];
                 renderImages(true);

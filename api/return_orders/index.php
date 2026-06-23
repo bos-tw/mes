@@ -19,6 +19,7 @@
  * | perPage      | int    | 否   | 20     | 每頁筆數，最大 100             |
  * | keyword      | string | 否   | ''     | 關鍵字搜尋（退貨單號、客戶名稱）|
  * | customer_id  | int    | 否   |        | 依客戶篩選                    |
+ * | original_shipping_order_id | int | 否 |      | 依原出貨單篩選                |
  * | status       | string | 否   |        | 依處理狀態篩選                |
  * | start_date   | date   | 否   |        | 退貨日期起                    |
  * | end_date     | date   | 否   |        | 退貨日期迄                    |
@@ -92,6 +93,7 @@ function handleList(PDO $pdo): void
 
     $keyword = trim($_GET['keyword'] ?? '');
     $customerId = $_GET['customer_id'] ?? '';
+    $originalShippingOrderId = $_GET['original_shipping_order_id'] ?? '';
     $status = trim($_GET['status'] ?? '');
     $startDate = $_GET['start_date'] ?? '';
     $endDate = $_GET['end_date'] ?? '';
@@ -124,6 +126,11 @@ function handleList(PDO $pdo): void
     if ($customerId !== '') {
         $where[] = 'ro.customer_id = :customer_id';
         $params['customer_id'] = (int)$customerId;
+    }
+
+    if ($originalShippingOrderId !== '') {
+        $where[] = 'ro.original_shipping_order_id = :original_shipping_order_id';
+        $params['original_shipping_order_id'] = (int)$originalShippingOrderId;
     }
 
     if ($status !== '') {

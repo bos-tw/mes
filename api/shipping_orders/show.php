@@ -100,6 +100,7 @@ try {
             si.name AS screening_item_name,
             si.item_number AS screening_item_number,
             wo.work_order_number,
+            wo.order_item_id AS source_order_item_id,
             wopr.receipt_number AS partial_receipt_number,
             wopr.receipt_status AS partial_receipt_status,
             wopr.shipping_tool_details AS partial_receipt_shipping_tool_details,
@@ -138,6 +139,16 @@ try {
     $itemsStmt = $pdo->prepare($itemsSql);
     $itemsStmt->execute(['shipping_order_id' => $id]);
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $orderItemToolMap = fetchOrderItemToolTraceMap($pdo, array_values(array_unique(array_filter(array_map(
+        static fn(array $item): int => (int)($item['source_order_item_id'] ?? 0),
+        $items
+    )))));
+    foreach ($items as &$item) {
+        $sourceOrderItemId = (int)($item['source_order_item_id'] ?? 0);
+        $item['order_item_tools'] = $sourceOrderItemId > 0 ? ($orderItemToolMap[$sourceOrderItemId] ?? []) : [];
+    }
+    unset($item);
 
     $order['items'] = $items;
 
@@ -184,6 +195,7 @@ try {
     $order['shipment_purpose'] = $order['shipment_purpose'] ?? 'normal';
     $order['defect_summary'] = $effectiveDefectSummary;
     $order['tool_summaries'] = $effectiveToolSummaries;
+    $order['customer_tool_analysis'] = fetchCustomerToolAnalysis($pdo, (int)($order['customer_id'] ?? 0), (int)$id);
     $order['defect_quantity'] = $effectiveDefectSummary['defect_quantity'] ?? null;
     $order['defect_weight_per_unit_g'] = $effectiveDefectSummary['weight_per_unit_g'] ?? null;
     $order['defect_total_weight_kg'] = $effectiveDefectSummary['total_weight_kg'] ?? null;
@@ -191,6 +203,65 @@ try {
     $order['defect_source_shipping_order_id'] = $effectiveDefectSummary['source_shipping_order_id'] ?? null;
     $order['defect_source_work_order_id'] = $effectiveDefectSummary['source_work_order_id'] ?? null;
     $order['defect_source_inventory_item_id'] = $effectiveDefectSummary['source_inventory_item_id'] ?? null;
+
+    $qualitySummarySql = "
+        SELECT
+            COUNT(*) AS inspection_count,
+            SUM(CASE WHEN inspection_result = 'pass' THEN 1 ELSE 0 END) AS pass_count,
+            SUM(CASE WHEN inspection_result = 'fail' THEN 1 ELSE 0 END) AS fail_count,
+            SUM(CASE WHEN inspection_result = 'conditional' THEN 1 ELSE 0 END) AS conditional_count,
+            MAX(inspection_datetime) AS latest_inspection_datetime
+        FROM shipping_quality_inspections
+        WHERE shipping_order_id = :shipping_order_id
+    ";
+    $qualitySummaryStmt = $pdo->prepare($qualitySummarySql);
+    $qualitySummaryStmt->execute(['shipping_order_id' => $id]);
+    $qualitySummaryRow = $qualitySummaryStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $latestInspectionSql = "
+        SELECT
+            sqi.id,
+            sqi.inspection_datetime,
+            sqi.inspection_result,
+            sqi.sample_quantity_pcs,
+            sqi.defective_quantity_pcs,
+            sqi.rejection_rate_ppm,
+            sqi.notes,
+            e.name AS inspector_name,
+            e.employee_number AS inspector_number
+        FROM shipping_quality_inspections sqi
+        LEFT JOIN employees e ON e.id = sqi.inspector_id
+        WHERE sqi.shipping_order_id = :shipping_order_id
+        ORDER BY sqi.inspection_datetime DESC, sqi.id DESC
+        LIMIT 5
+    ";
+    $latestInspectionStmt = $pdo->prepare($latestInspectionSql);
+    $latestInspectionStmt->execute(['shipping_order_id' => $id]);
+    $qualityInspections = $latestInspectionStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $latestInspection = $qualityInspections[0] ?? null;
+    $order['quality_inspections_summary'] = [
+        'inspection_count' => (int)($qualitySummaryRow['inspection_count'] ?? 0),
+        'pass_count' => (int)($qualitySummaryRow['pass_count'] ?? 0),
+        'fail_count' => (int)($qualitySummaryRow['fail_count'] ?? 0),
+        'conditional_count' => (int)($qualitySummaryRow['conditional_count'] ?? 0),
+        'latest_inspection_datetime' => $qualitySummaryRow['latest_inspection_datetime'] ?? null,
+        'latest_inspection_id' => $latestInspection ? (int)$latestInspection['id'] : null,
+        'latest_inspection_result' => $latestInspection['inspection_result'] ?? null,
+    ];
+    $order['quality_inspections'] = array_map(static function (array $inspection): array {
+        return [
+            'id' => (int)$inspection['id'],
+            'inspection_datetime' => $inspection['inspection_datetime'],
+            'inspection_result' => $inspection['inspection_result'] ?? 'pass',
+            'sample_quantity_pcs' => (int)($inspection['sample_quantity_pcs'] ?? 0),
+            'defective_quantity_pcs' => (int)($inspection['defective_quantity_pcs'] ?? 0),
+            'rejection_rate_ppm' => (float)($inspection['rejection_rate_ppm'] ?? 0),
+            'notes' => $inspection['notes'] ?? '',
+            'inspector_name' => $inspection['inspector_name'] ?? '',
+            'inspector_number' => $inspection['inspector_number'] ?? '',
+        ];
+    }, $qualityInspections);
 
     jsonResponse([
         'success' => true,

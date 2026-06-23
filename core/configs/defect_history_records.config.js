@@ -48,6 +48,8 @@ ModuleConfig.register('defect_history_records', {
         { key: 'customer_name', label: '客戶', sortable: false, selectable: true },
         { key: 'defect_item_name', label: '不良項目', sortable: false, selectable: true },
         { key: 'recorded_defect_quantity', label: '記錄數量', sortable: false, selectable: true },
+        { key: 'shipping_annotation_label', label: '出貨單標註', sortable: false, selectable: true },
+        { key: 'returned_with_shipment_label', label: '隨貨送回狀態', sortable: false, selectable: true },
         { key: 'defect_units_estimated', label: '推算不良支數', sortable: false, selectable: true },
         { key: 'defect_weight_kg', label: '推算不良重量(kg)', sortable: false, selectable: true },
         { key: 'actions', label: '操作', sortable: false, selectable: false }

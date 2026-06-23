@@ -1,0 +1,88 @@
+<div class="modal-overlay hidden" data-rescreen-batches-modal>
+    <div class="modal-window large">
+        <button type="button" class="modal-close" data-action="close-modal" aria-label="關閉">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3 data-modal-title>新增二次重篩紀錄</h3>
+        <div class="modal-alert hidden" data-rescreen-batches-modal-alert role="alert"></div>
+
+        <form data-rescreen-batches-form novalidate>
+            <input type="hidden" name="id">
+            <div class="form-row">
+                <section class="form-section">
+                    <h4>來源與類型</h4>
+                    <div class="form-grid">
+                        <label class="inline-label">
+                            <span>來源退貨單 <abbr title="必填">*</abbr></span>
+                            <select name="source_return_order_id" required>
+                                <option value="">-- 請選擇退貨單 --</option>
+                            </select>
+                        </label>
+                        <label class="inline-label">
+                            <span>案件類型 <abbr title="必填">*</abbr></span>
+                            <select name="rescreen_type" required>
+                                <option value="strict_rescreen">嚴格重篩</option>
+                                <option value="relaxed_rescreen">放寬重篩</option>
+                            </select>
+                        </label>
+                        <label class="inline-label">
+                            <span>建立原因</span>
+                            <select name="request_reason_code">
+                                <option value="">-- 請選擇 --</option>
+                                <option value="customer_strict_request">客戶要求更嚴格</option>
+                                <option value="high_defect_relax">不良率高，客戶同意放寬後再篩</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </label>
+                        <label class="inline-label">
+                            <span>案件狀態</span>
+                            <select name="status">
+                                <option value="draft">草稿</option>
+                                <option value="planned">已排程</option>
+                                <option value="in_progress">進行中</option>
+                                <option value="completed">已完成</option>
+                                <option value="cancelled">已取消</option>
+                            </select>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <h4>案件備註</h4>
+                    <div class="form-grid">
+                        <label class="inline-label full-width">
+                            <span>備註</span>
+                            <textarea name="notes" rows="3" placeholder="補充這次二次重篩的背景、交辦事項或追蹤重點"></textarea>
+                        </label>
+                    </div>
+                </section>
+            </div>
+
+            <section class="form-section">
+                <h4>來源摘要</h4>
+                <div class="detail-grid" data-rescreen-source-summary>
+                    <p class="text-muted">請先選擇退貨單。</p>
+                </div>
+            </section>
+
+            <div class="form-actions align-right">
+                <button type="button" class="btn outline" data-action="cancel">取消</button>
+                <button type="submit" class="btn primary">儲存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" data-rescreen-batches-detail-modal>
+    <div class="modal-window xlarge">
+        <button type="button" class="modal-close" data-action="close-detail-modal" aria-label="關閉">
+            <i class="fas fa-times"></i>
+        </button>
+        <h3><i class="fas fa-redo"></i> 二次重篩歷史詳情</h3>
+        <div class="detail-content" data-rescreen-batches-detail></div>
+        <div class="form-actions align-right">
+            <button type="button" class="btn outline" data-action="close-detail-modal">關閉</button>
+            <button type="button" class="btn primary" data-action="edit-from-detail">編輯</button>
+        </div>
+    </div>
+</div>

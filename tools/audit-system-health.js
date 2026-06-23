@@ -495,6 +495,18 @@ function checkDualStatusFields() {
     const affected = [];
     const skipDirs = new Set(['common', 'docs', 'tools', 'workflow_guard']);
 
+    const isKnownCrossModuleStatusUsage = (content, rel) => {
+        if (!rel.startsWith('api/rescreen_batches/')) {
+            return false;
+        }
+        const statementChunks = content.split(/;\s*(?:\r?\n|$)/);
+        return !statementChunks.some(chunk => (
+            chunk.includes('rescreen_batches')
+            && chunk.includes('status_lookup_id')
+            && /[`'"]status[`'"]/.test(chunk)
+        ));
+    };
+
     const walkDir = (dir) => {
         fs.readdirSync(dir).forEach(item => {
             const full = path.join(dir, item);
@@ -508,11 +520,11 @@ function checkDualStatusFields() {
             }
             if (!item.endsWith('.php')) return;
 
+            const rel = path.relative(ROOT, full).replace(/\\/g, '/');
             const content = fs.readFileSync(full, 'utf-8');
             if (content.includes('status_lookup_id') && /[`'"]status[`'"]/.test(content)) {
-                const rel = path.relative(ROOT, full).replace(/\\/g, '/');
                 // 排除 bootstrap / lookup 本身
-                if (!rel.includes('bootstrap') && !rel.includes('lookup')) {
+                if (!rel.includes('bootstrap') && !rel.includes('lookup') && !isKnownCrossModuleStatusUsage(content, rel)) {
                     affected.push(rel);
                 }
             }
@@ -880,6 +892,159 @@ function checkModuleHtmlStyle() {
     });
 }
 
+function extractSidebarPages(content) {
+    if (!content) return [];
+    const pages = [];
+    const pattern = /<a\b[^>]*\bdata-page=["']([^"']+)["'][^>]*\bdata-title=["']([^"']*)["'][^>]*>/g;
+    let match;
+    while ((match = pattern.exec(content)) !== null) {
+        pages.push({
+            page: match[1],
+            title: match[2]
+        });
+    }
+    return pages;
+}
+
+function extractLocalScripts(content) {
+    if (!content) return [];
+    const scripts = [];
+    const pattern = /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/g;
+    let match;
+    while ((match = pattern.exec(content)) !== null) {
+        const src = match[1]
+            .replace(/\?v=<\?= \$ver \?>/g, '')
+            .replace(/\?v=<\?= htmlspecialchars\(\$ver, ENT_QUOTES, 'UTF-8'\) \?>/g, '')
+            .replace(/\?v=[^"']+$/g, '');
+        if (!src.startsWith('http://') && !src.startsWith('https://')) {
+            scripts.push(src);
+        }
+    }
+    return scripts;
+}
+
+function formatMissingEntries(entries, key) {
+    return entries.map(entry => typeof entry === 'string' ? entry : entry[key]).join(', ');
+}
+
+function checkIndexEntrypointParity() {
+    console.log('🔍 [INDEX] 檢查 index.html / index.php 雙入口同步...');
+
+    const htmlContent = readFile('index.html');
+    const phpContent = readFile('index.php');
+    if (!htmlContent || !phpContent) {
+        warn('架構', 'index.html, index.php', 'INDEX 雙入口同步', '缺少 index.html 或 index.php，無法比對雙入口', '確認兩個主入口檔案皆存在');
+        return;
+    }
+
+    const htmlPages = extractSidebarPages(htmlContent);
+    const phpPages = extractSidebarPages(phpContent);
+    const htmlPageKeys = new Set(htmlPages.map(item => `${item.page}::${item.title}`));
+    const phpPageKeys = new Set(phpPages.map(item => `${item.page}::${item.title}`));
+    const missingInHtml = phpPages.filter(item => !htmlPageKeys.has(`${item.page}::${item.title}`));
+    const missingInPhp = htmlPages.filter(item => !phpPageKeys.has(`${item.page}::${item.title}`));
+
+    if (missingInHtml.length > 0 || missingInPhp.length > 0) {
+        err('架構', 'index.html, index.php', 'INDEX 雙入口選單不同步',
+            `主選單不同步。index.html 缺少：${formatMissingEntries(missingInHtml, 'page') || '無'}；index.php 缺少：${formatMissingEntries(missingInPhp, 'page') || '無'}`,
+            '同步 index.html 與 index.php 的 <ul class="main-menu"> data-page/data-title 項目');
+    }
+
+    const htmlScripts = new Set(extractLocalScripts(htmlContent));
+    const phpScripts = new Set(extractLocalScripts(phpContent));
+    const missingScriptInHtml = [...phpScripts].filter(src => !htmlScripts.has(src));
+    const missingScriptInPhp = [...htmlScripts].filter(src => !phpScripts.has(src));
+    if (missingScriptInHtml.length > 0 || missingScriptInPhp.length > 0) {
+        err('架構', 'index.html, index.php', 'INDEX 雙入口腳本不同步',
+            `本地腳本載入不同步。index.html 缺少：${missingScriptInHtml.join(', ') || '無'}；index.php 缺少：${missingScriptInPhp.join(', ') || '無'}`,
+            '同步 index.html 與 index.php 的本地 <script src> 清單');
+    }
+
+    const staleVersionPattern = /id=["']system-(?:version|release-date|file-version)["'][^>]*>\s*(?:v\d+\.\d+\.\d+|\d{4}-\d{2}-\d{2}|\d{8}(?:\.\d+)?)\s*</;
+    const htmlHasStaleVersion = staleVersionPattern.test(htmlContent);
+    const phpHasStaleVersion = staleVersionPattern.test(phpContent);
+    if (htmlHasStaleVersion || phpHasStaleVersion) {
+        err('架構', 'index.html, index.php', 'INDEX 關於系統版本硬編碼',
+            `關於系統版本欄位不可硬編碼正式版本值。index.html：${htmlHasStaleVersion ? '有' : '無'}；index.php：${phpHasStaleVersion ? '有' : '無'}`,
+            '版本號、發布日期、文件版本需由 system_update_logs / system_update_history.php 載入；入口檔只能使用「讀取中」或「未取得」等中性預設值');
+    }
+}
+
+function extractJsObjectMap(content, objectName) {
+    if (!content) return {};
+    const start = content.indexOf(`const ${objectName} = Object.freeze({`);
+    if (start < 0) return {};
+    const bodyStart = content.indexOf('{', start);
+    const bodyEnd = content.indexOf('});', bodyStart);
+    if (bodyStart < 0 || bodyEnd < 0) return {};
+    return extractSimpleMap(content.slice(bodyStart + 1, bodyEnd));
+}
+
+function extractPhpArrayMap(content, variableName) {
+    if (!content) return {};
+    const pattern = new RegExp(`${variableName}\\s*=\\s*\\[([\\s\\S]*?)\\];`);
+    const match = pattern.exec(content);
+    return match ? extractSimpleMap(match[1]) : {};
+}
+
+function extractSimpleMap(body) {
+    const map = {};
+    const patterns = [
+        /['"]([^'"]+)['"]\s*=>\s*['"]([^'"]+)['"]/g,
+        /([A-Za-z0-9_]+)\s*:\s*['"]([^'"]+)['"]/g,
+        /['"]([^'"]+)['"]\s*:\s*['"]([^'"]+)['"]/g
+    ];
+    patterns.forEach(pattern => {
+        let match;
+        while ((match = pattern.exec(body)) !== null) {
+            map[match[1]] = match[2];
+        }
+    });
+    return map;
+}
+
+function checkFrontendBackendPermissionParity() {
+    console.log('🔍 [PERM] 檢查前後端權限映射同步...');
+
+    const scriptContent = readFile('script.js');
+    const bootstrapContent = readFile('api/bootstrap.php');
+    if (!scriptContent || !bootstrapContent) {
+        warn('安全性/架構', 'script.js, api/bootstrap.php', 'PERM 權限映射同步', '缺少 script.js 或 api/bootstrap.php，無法比對權限映射', '確認前後端權限檔案皆存在');
+        return;
+    }
+
+    const frontendLegacy = extractJsObjectMap(scriptContent, 'MODULE_LEGACY_PERMISSION_MAP');
+    const backendLegacy = extractPhpArrayMap(bootstrapContent, 'static \\$legacyPermissionMap');
+    const modules = new Set([...Object.keys(frontendLegacy), ...Object.keys(backendLegacy)]);
+    const mismatches = [];
+    modules.forEach(moduleName => {
+        if ((frontendLegacy[moduleName] || '') !== (backendLegacy[moduleName] || '')) {
+            mismatches.push(`${moduleName}: frontend=${frontendLegacy[moduleName] || '缺少'}, backend=${backendLegacy[moduleName] || '缺少'}`);
+        }
+    });
+    if (mismatches.length > 0) {
+        err('安全性/架構', 'script.js, api/bootstrap.php', 'PERM 模組權限映射不同步',
+            `前後端模組舊權限映射不同步：${mismatches.join('; ')}`,
+            '同步 script.js 的 MODULE_LEGACY_PERMISSION_MAP 與 api/bootstrap.php 的 $legacyPermissionMap');
+    }
+
+    const frontendAlias = extractJsObjectMap(scriptContent, 'PERMISSION_ALIAS_MAP');
+    const aliasFunctionMatch = /function\s+getPermissionAliasMap\(\):\s*array\s*\{([\s\S]*?)\n\}/.exec(bootstrapContent);
+    const backendAlias = aliasFunctionMatch ? extractPhpArrayMap(aliasFunctionMatch[1], 'static \\$aliasMap') : {};
+    const aliasKeys = new Set([...Object.keys(frontendAlias), ...Object.keys(backendAlias)]);
+    const aliasMismatches = [];
+    aliasKeys.forEach(permissionName => {
+        if ((frontendAlias[permissionName] || '') !== (backendAlias[permissionName] || '')) {
+            aliasMismatches.push(`${permissionName}: frontend=${frontendAlias[permissionName] || '缺少'}, backend=${backendAlias[permissionName] || '缺少'}`);
+        }
+    });
+    if (aliasMismatches.length > 0) {
+        err('安全性/架構', 'script.js, api/bootstrap.php', 'PERM 權限別名不同步',
+            `前後端權限中文別名不同步：${aliasMismatches.join('; ')}`,
+            '同步 script.js 的 PERMISSION_ALIAS_MAP 與 api/bootstrap.php 的 getPermissionAliasMap()');
+    }
+}
+
 // ─────────────────────────────────────────────
 // P-1  PHP API 端點安全性基準（requireAuth + strict_types）
 // ─────────────────────────────────────────────
@@ -1217,6 +1382,8 @@ function runAllChecks() {
         showDatabaseHints();
         checkPrintApiPaths();
         checkConfigFilesLoadedInIndex();
+        checkIndexEntrypointParity();
+        checkFrontendBackendPermissionParity();
         checkExportEndpoints();
         checkHelpDirectoryIntegrity();
         checkCoreScriptLoadOrder();

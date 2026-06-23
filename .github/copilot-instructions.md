@@ -24,19 +24,33 @@
    - 已完成且可運作
    - 已順手改善
    - 建議後續處理
-5. 每輪對話結束時，若需留下供下一輪銜接的進度紀錄，僅更新 `DEVELOPMENT_PROGRESS_SUMMARY.md`；避免分散寫在多份追蹤文件。
-6. 非對話結束時，禁止因單次或多次檔案修改而即時更新進度摘要；統一在該輪對話收尾時一次整理更新。
+5. 若本輪任務已有對應的 `todo`、`plan`、階段規劃或追蹤文件，開發過程中只要發生實作、驗證、設計調整或決策變更，必須即時同步更新；不可集中到最後一次補寫。
+6. 每輪對話結束時，若需留下供下一輪銜接的進度紀錄，僅更新 `DEVELOPMENT_PROGRESS_SUMMARY.md`；避免分散寫在多份追蹤文件。
+7. 非對話結束時，禁止因單次或多次檔案修改而即時更新進度摘要；統一在該輪對話收尾時一次整理更新。
 
 ### 🧭 首頁入口雙檔同步規範（2026-05-14 新增，強制）
 
 1. 只要修改主系統入口頁的側邊欄選單、群組順序、模組連結或文案，`index.html` 與 `index.php` 必須同步修改。
 2. 禁止只改其中一個檔案，避免本機入口與伺服器入口顯示不一致。
-3. 驗收時至少執行：
+3. 若瀏覽器畫面與檔案內容不同，不可只判定為 `index.html` / `index.php` 未同步；必須同時檢查前端權限過濾是否把選單移除。
+4. 驗收時至少執行：
     - `git diff -- index.html index.php`
     - 確認兩檔的主選單區塊順序一致（`<ul class="main-menu">` 內容一致）。
-4. 回報變更時需明確標註：
+    - `node tools/audit-system-health.js --changed --base origin/main`
+5. 系統健康審計已包含：
+    - `INDEX 雙入口選單不同步`
+    - `INDEX 雙入口腳本不同步`
+    - `INDEX 關於系統版本硬編碼`
+    - `PERM 模組權限映射不同步`
+    - `PERM 權限別名不同步`
+6. 回報變更時需明確標註：
     - 已同步更新 `index.html`
     - 已同步更新 `index.php`
+    - 已確認前端 `script.js` 與後端 `api/bootstrap.php` 權限映射一致
+7. 「關於系統」的版本號、發布日期、文件版本禁止在 `index.html` / `index.php` 硬編碼正式版本值。
+    - 入口檔只能放「讀取中」或「未取得」等中性預設。
+    - 正式版本必須由 `system_update_logs` 經 `api/system_update_history.php` 載入。
+    - 避免遠端 API 載入失敗時顯示過期版本，誤判為更新包未套用。
 
 ### 🧭 側邊欄新功能納管規範（2026-05-18 新增，強制）
 
@@ -68,6 +82,8 @@
     - `getPermissionAliasMap()` 補上同一組權限別名。
     - `autoEnforcePermission()` 的 `$legacyPermissionMap` 補上同一組模組映射。
 3. 前後端映射必須一致，禁止只改單邊。
+4. 若後端允許某模組使用舊權限，但前端未同步 `MODULE_LEGACY_PERMISSION_MAP`，側邊欄會在載入後被前端隱藏；這會造成「檔案已有選單、畫面卻沒有」的嚴重誤判。
+5. 新模組若暫時沿用既有權限，必須清楚記錄映射，例如：`rescreen_batches -> manage_return_orders`。
 
 #### E. 角色預設授權策略（建議，非阻斷）
 
@@ -84,6 +100,12 @@
     - 有權限：看得到側邊欄功能。
     - 無權限：看不到側邊欄功能。
 4. 在「角色權限關聯」可搜尋到該權限並可編輯角色。
+5. 若畫面缺少側邊欄入口，排查順序固定為：
+    - 檢查 `index.html` / `index.php` 是否都有 `data-page`
+    - 檢查 `index.php` 實際輸出是否包含該 `data-page`
+    - 檢查 `script.js` 的 `MODULE_LEGACY_PERMISSION_MAP` / `PERMISSION_ALIAS_MAP`
+    - 檢查 `api/bootstrap.php` 的 `$legacyPermissionMap` / `getPermissionAliasMap()`
+    - 重跑 `node tools/audit-system-health.js --changed --base origin/main`
 
 ---
 

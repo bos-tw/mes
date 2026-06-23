@@ -178,6 +178,7 @@ $ver = $cacheVersion['version'];
                             <ul class="submenu">
                                 <li><a href="#" data-page="production_quality_records" data-title="生產品質檢驗"><i class="fas fa-microscope"></i> 生產品質檢驗</a></li>
                                 <li><a href="#" data-page="defect_history_records" data-title="不良品歷史紀錄"><i class="fas fa-history"></i> 不良品歷史紀錄</a></li>
+                                <li><a href="#" data-page="rescreen_batches" data-title="二次重篩歷史紀錄"><i class="fas fa-redo"></i> 二次重篩歷史紀錄</a></li>
                                 <li><a href="#" data-page="shipping_quality_inspections" data-title="出貨品質檢驗"><i class="fas fa-search"></i> 出貨品質檢驗</a></li>
                                 <li><a href="#" data-page="quality_issue_reports" data-title="品質異常報告"><i class="fas fa-exclamation-triangle"></i> 品質異常報告</a></li>
                             </ul>
@@ -379,15 +380,15 @@ $ver = $cacheVersion['version'];
                 <div class="version-details">
                     <div class="version-item">
                         <span class="version-label">版本號：</span>
-                        <span class="version-value" id="system-version">v2.1.3</span>
+                        <span class="version-value" id="system-version">讀取中</span>
                     </div>
                     <div class="version-item">
                         <span class="version-label">發布日期：</span>
-                        <span class="version-value" id="system-release-date">2026-06-19</span>
+                        <span class="version-value" id="system-release-date">讀取中</span>
                     </div>
                     <div class="version-item">
                         <span class="version-label">文件版本：</span>
-                        <span class="version-value" id="system-file-version">20260619.1</span>
+                        <span class="version-value" id="system-file-version">讀取中</span>
                     </div>
                 </div>
 
@@ -439,6 +440,7 @@ $ver = $cacheVersion['version'];
     <script defer src="core/configs/system_parameters.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/orders.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/return_orders.config.js?v=<?= $ver ?>"></script>
+    <script defer src="core/configs/rescreen_batches.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/shipping_orders.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/shipping_order_items.config.js?v=<?= $ver ?>"></script>
     <script defer src="core/configs/return_order_items.config.js?v=<?= $ver ?>"></script>
@@ -502,6 +504,7 @@ $ver = $cacheVersion['version'];
     <script defer src="js/shipping_orders.js?v=<?= $ver ?>"></script>
     <script defer src="js/shipping_order_items.js?v=<?= $ver ?>"></script>
     <script defer src="js/return_orders.js?v=<?= $ver ?>"></script>
+    <script defer src="js/rescreen_batches.js?v=<?= $ver ?>"></script>
     <script defer src="js/production_quality_records.js?v=<?= $ver ?>"></script>
     <script defer src="js/defect_history_records.js?v=<?= $ver ?>"></script>
     <script defer src="js/dashboard.js?v=<?= $ver ?>"></script>

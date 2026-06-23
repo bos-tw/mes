@@ -75,15 +75,15 @@ function Is-ExcludedPath {
 function Get-GitLines {
     param(
         [string]$RepoRoot,
-        [string[]]$Args,
+        [string[]]$GitArgs,
         [switch]$AllowFailure
     )
 
-    $output = & git -C $RepoRoot @Args 2>$null
+    $output = & git -C $RepoRoot @GitArgs 2>$null
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -ne 0 -and -not $AllowFailure) {
-        $argText = ($Args -join ' ')
+        $argText = ($GitArgs -join ' ')
         throw "Git command failed: git -C $RepoRoot $argText"
     }
 
@@ -105,23 +105,23 @@ if (!(Test-Path $summaryFull -PathType Leaf)) {
 $changedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
 
 if (-not $SkipFromRefDiff) {
-    $refLines = Get-GitLines -RepoRoot $repoRoot -Args @('diff', '--name-only', "$FromRef..HEAD")
+    $refLines = Get-GitLines -RepoRoot $repoRoot -GitArgs @('diff', '--name-only', "$FromRef..HEAD")
     foreach ($line in $refLines) {
         [void]$changedSet.Add((Normalize-RelativePath -Path $line))
     }
 }
 
-$workingLines = Get-GitLines -RepoRoot $repoRoot -Args @('diff', '--name-only')
+$workingLines = Get-GitLines -RepoRoot $repoRoot -GitArgs @('diff', '--name-only')
 foreach ($line in $workingLines) {
     [void]$changedSet.Add((Normalize-RelativePath -Path $line))
 }
 
-$stagedLines = Get-GitLines -RepoRoot $repoRoot -Args @('diff', '--name-only', '--cached')
+$stagedLines = Get-GitLines -RepoRoot $repoRoot -GitArgs @('diff', '--name-only', '--cached')
 foreach ($line in $stagedLines) {
     [void]$changedSet.Add((Normalize-RelativePath -Path $line))
 }
 
-$untrackedLines = Get-GitLines -RepoRoot $repoRoot -Args @('ls-files', '--others', '--exclude-standard')
+$untrackedLines = Get-GitLines -RepoRoot $repoRoot -GitArgs @('ls-files', '--others', '--exclude-standard')
 foreach ($line in $untrackedLines) {
     [void]$changedSet.Add((Normalize-RelativePath -Path $line))
 }

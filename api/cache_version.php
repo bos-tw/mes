@@ -75,42 +75,54 @@ function mesBuildFrontendCacheVersion(?string $baseDir = null): array
         }
 
         if (is_file($target)) {
-            $mtime = (int)filemtime($target);
+            $mtime = @filemtime($target);
+            if ($mtime === false) {
+                continue;
+            }
+            $mtime = (int)$mtime;
             if ($mtime > $latestMtime) {
                 $latestMtime = $mtime;
             }
             continue;
         }
 
-        if (!is_dir($target)) {
+        if (!is_dir($target) || !is_readable($target)) {
             continue;
         }
 
-        $iter = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($target, FilesystemIterator::SKIP_DOTS)
-        );
-        foreach ($iter as $file) {
-            if (!$file->isFile()) {
-                continue;
-            }
+        try {
+            $iter = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($target, FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($iter as $file) {
+                if (!$file->isFile()) {
+                    continue;
+                }
 
-            $extension = strtolower($file->getExtension());
-            if (!in_array($extension, $allowedExtensions, true)) {
-                continue;
-            }
+                $extension = strtolower($file->getExtension());
+                if (!in_array($extension, $allowedExtensions, true)) {
+                    continue;
+                }
 
-            $mtime = (int)$file->getMTime();
-            if ($mtime > $latestMtime) {
-                $latestMtime = $mtime;
+                $mtime = $file->getMTime();
+                if ($mtime > $latestMtime) {
+                    $latestMtime = $mtime;
+                }
             }
+        } catch (Throwable $exception) {
+            error_log(sprintf(
+                '[cache_version] Skip unreadable frontend scan target "%s": %s',
+                $target,
+                $exception->getMessage()
+            ));
         }
     }
 
     $stampPath = mesFrontendCacheStampPath($baseDir);
     if (is_file($stampPath)) {
-        $stampMtime = (int)filemtime($stampPath);
-        if ($stampMtime > $latestMtime) {
-            $latestMtime = $stampMtime;
+        $stampMtime = @filemtime($stampPath);
+        if ($stampMtime !== false && (int)$stampMtime > $latestMtime) {
+            $latestMtime = (int)$stampMtime;
         }
     }
 

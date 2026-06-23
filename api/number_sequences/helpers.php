@@ -170,6 +170,7 @@ function getManagedNumberSequenceDefinitions(): array
         'INV' => ['label' => '庫存', 'default_prefix' => 'INV'],
         'SO' => ['label' => '出貨單', 'default_prefix' => 'SO'],
         'RO' => ['label' => '退貨單', 'default_prefix' => 'RO'],
+        'RB' => ['label' => '二次重篩案件', 'default_prefix' => 'RB'],
         'WOPR' => ['label' => '部分入庫', 'default_prefix' => 'WOPR'],
     ];
 }

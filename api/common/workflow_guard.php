@@ -440,6 +440,19 @@ function assessReturnOrderDelete(PDO $pdo, int $id): array
         return workflowBlocked('此退貨單已產生庫存異動，不能直接刪除。請改用沖銷或作廢流程。', ["庫存異動：{$txnCount} 筆"], 'return_or_void');
     }
 
+    if (workflowColumnExists($pdo, 'rescreen_batches', 'source_return_order_id')) {
+        $rescreenStmt = $pdo->prepare('SELECT COUNT(*) FROM rescreen_batches WHERE source_return_order_id = :id AND deleted_at IS NULL');
+        $rescreenStmt->execute(['id' => $id]);
+        $rescreenCount = (int)$rescreenStmt->fetchColumn();
+        if ($rescreenCount > 0) {
+            return workflowBlocked(
+                '此退貨單已建立二次重篩案件，不能直接刪除。請先處理二次重篩追溯鏈。',
+                ["二次重篩案件：{$rescreenCount} 筆"],
+                'rescreen_trace_cleanup'
+            );
+        }
+    }
+
     $impacts = [];
     if ($itemCount > 0) {
         $impacts[] = "將同步移除退貨流程關聯品項：{$itemCount} 筆";

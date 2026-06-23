@@ -62,6 +62,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../shipping_orders/helpers.php';
 
 requireAuth();
 
@@ -124,6 +125,8 @@ if (!$customer) {
         'message' => '找不到指定的客戶。',
     ], 404);
 }
+
+$customer['customer_tool_analysis'] = fetchCustomerToolAnalysis($pdo, $id);
 
 jsonResponse([
     'success' => true,

@@ -55,6 +55,7 @@ requireAuth();
 requireMethod(['PUT', 'PATCH']);
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$employeePermissions = (array)(($_SESSION['employee']['permissions'] ?? []));
 
 if ($id <= 0) {
     jsonResponse(['success' => false, 'message' => '無效的工單ID。'], 400);

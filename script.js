@@ -1296,6 +1296,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         production_work_order_schedule: 'manage_work_orders',
         work_order_first_piece_dimensions: 'manage_work_orders',
         work_order_images: 'manage_work_orders',
+        work_order_completion_images: 'manage_work_orders',
+        work_order_defect_images: 'manage_work_orders',
+        work_order_tool_condition_images: 'manage_work_orders',
         machines: 'manage_machines',
         machine_capabilities: 'manage_machines',
         machine_maintenance_tasks: 'manage_maintenance_tasks',
@@ -1309,6 +1312,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         shipping_quality_inspections: 'manage_shipping_quality',
         return_orders: 'manage_return_orders',
         return_order_items: 'manage_return_orders',
+        rescreen_batches: 'manage_return_orders',
         production_records: 'manage_production_records',
         production_quality_records: 'manage_production_quality',
         defect_history_records: 'manage_production_quality',
@@ -1352,6 +1356,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         manage_production_records: '生產紀錄',
         manage_shipping_orders: '出貨單',
         manage_return_orders: '退貨單',
+        manage_rescreen_batches: '二次重篩歷史紀錄',
         manage_daily_inspections: '每日機台檢驗',
         manage_production_quality: '生產品質檢驗',
         manage_shipping_quality: '出貨品質檢驗',
@@ -1867,6 +1872,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    function applyVersionUnavailable() {
+        if (systemVersionEl) {
+            systemVersionEl.textContent = '未取得';
+        }
+
+        if (systemReleaseDateEl) {
+            systemReleaseDateEl.textContent = '未取得';
+        }
+
+        if (systemFileVersionEl) {
+            systemFileVersionEl.textContent = '未取得';
+        }
+    }
+
     async function loadVersionHistory() {
         if (!systemUpdateListEl) {
             return;
@@ -1892,6 +1911,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             applyLatestVersion(data.latest || null);
             renderUpdateList(Array.isArray(data.data) ? data.data : []);
         } catch (error) {
+            applyVersionUnavailable();
             renderUpdateMessage('無法載入更新紀錄。');
             console.warn('[version-modal] 載入版本更新紀錄失敗:', error);
         }

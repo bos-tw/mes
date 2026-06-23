@@ -42,6 +42,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/../work_order_operation_logs_helper.php';
+require_once __DIR__ . '/../shipping_orders/helpers.php';
 
 /**
  * Work Order Details API Endpoint
@@ -82,6 +83,7 @@ try {
             oi.total_units,
             oi.customer_sample_status,
             lv_sample.value_label AS customer_sample_status_label,
+            rb.rescreen_batch_number,
             m.machine_number,
             m.name AS machine_name,
             mc.capability_name AS machine_capability_name,
@@ -97,6 +99,7 @@ try {
         LEFT JOIN orders o ON oi.order_id = o.id
         LEFT JOIN customers c ON o.customer_id = c.id
         LEFT JOIN screening_items si ON oi.screening_item_id = si.id
+        LEFT JOIN rescreen_batches rb ON rb.id = NULLIF(wo.source_rescreen_batch_id, 0)
         LEFT JOIN machines m ON wo.machine_id = m.id
         LEFT JOIN machine_capabilities mc ON m.machine_capability_id = mc.id
         LEFT JOIN employees e1 ON wo.assigned_employee_id = e1.id
@@ -209,6 +212,7 @@ try {
     $workOrder['defect_images'] = fetchWorkOrderExecutionImages($pdo, 'work_order_defect_images', $id);
     $workOrder['tool_condition_images'] = fetchWorkOrderExecutionImages($pdo, 'work_order_tool_condition_images', $id);
     $workOrder['operation_logs'] = fetchWorkOrderOperationLogs($pdo, $id, 50);
+    $workOrder['customer_tool_analysis'] = fetchCustomerToolAnalysis($pdo, (int)($workOrder['customer_id'] ?? 0));
 
     // Get production records
     $productionSourceModeSelect = workOrderTableHasColumn($pdo, 'production_records', 'production_source_mode')

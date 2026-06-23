@@ -173,6 +173,7 @@ function handleListWorkOrders(PDO $pdo): void
             wo.work_order_number,
             wo.work_order_type,
             wo.order_item_id,
+            wo.source_rescreen_batch_id,
             wo.machine_id,
             wo.machine_sequence,
             wo.assigned_employee_id,
@@ -196,6 +197,7 @@ function handleListWorkOrders(PDO $pdo): void
             c.name AS customer_name,
             c.is_active AS customer_is_active,
             si.name AS screening_item_name,
+            rb.rescreen_batch_number,
             m.name AS machine_name,
             e1.name AS assigned_employee_name,
             e2.name AS calibration_employee_name,
@@ -221,6 +223,7 @@ function handleListWorkOrders(PDO $pdo): void
         LEFT JOIN orders o ON oi.order_id = o.id
         LEFT JOIN customers c ON o.customer_id = c.id
         LEFT JOIN screening_items si ON oi.screening_item_id = si.id
+        LEFT JOIN rescreen_batches rb ON rb.id = NULLIF(wo.source_rescreen_batch_id, 0)
         LEFT JOIN machines m ON wo.machine_id = m.id
         LEFT JOIN employees e1 ON wo.assigned_employee_id = e1.id
         LEFT JOIN employees e2 ON wo.calibration_employee_id = e2.id
@@ -349,6 +352,9 @@ function handleCreateWorkOrder(PDO $pdo): void
     if (!array_key_exists('tool_statistics', $data) || $data['tool_statistics'] === null) {
         $data['tool_statistics'] = $orderItemDetails['tool_statistics'] ?? null;
     }
+    if (!array_key_exists('source_rescreen_batch_id', $data)) {
+        $data['source_rescreen_batch_id'] = 0;
+    }
 
     $workOrderType = (string)($data['work_order_type'] ?? 'normal');
     $validatedMachineRuns = [];
@@ -377,15 +383,26 @@ function handleCreateWorkOrder(PDO $pdo): void
     }
 
     // Prevent duplicate work orders for the same order item
-    $dupStmt = $pdo->prepare(
-        "SELECT work_order_number FROM work_orders WHERE order_item_id = :order_item_id AND deleted_at IS NULL LIMIT 1"
-    );
-    $dupStmt->execute(['order_item_id' => $data['order_item_id']]);
+    $dupStmt = $pdo->prepare("
+        SELECT work_order_number
+        FROM work_orders
+        WHERE order_item_id = :order_item_id
+          AND source_rescreen_batch_id = :source_rescreen_batch_id
+          AND deleted_at IS NULL
+        LIMIT 1
+    ");
+    $dupStmt->execute([
+        'order_item_id' => $data['order_item_id'],
+        'source_rescreen_batch_id' => (int)($data['source_rescreen_batch_id'] ?? 0),
+    ]);
     $existingWorkOrderNumber = $dupStmt->fetchColumn();
     if ($existingWorkOrderNumber !== false) {
+        $duplicateMessage = $workOrderType === 'rescreen'
+            ? '此二次重篩案件已建立執行工單，請勿重複建立。'
+            : '此客戶批號已建立工單，請勿重複建立。';
         jsonResponse([
             'success' => false,
-            'message' => '此客戶批號已建立工單，請勿重複建立。',
+            'message' => $duplicateMessage,
             'work_order_number' => $existingWorkOrderNumber,
         ], 409);
         return;
@@ -523,14 +540,25 @@ function handleCreateWorkOrder(PDO $pdo): void
 
         if ($t instanceof PDOException
             && $t->getCode() === '23000'
-            && str_contains($t->getMessage(), 'uk_work_orders_order_item_active')) {
+            && (str_contains($t->getMessage(), 'uk_work_orders_order_item_active')
+                || str_contains($t->getMessage(), 'uk_work_orders_order_item_source_active'))) {
             $existingStmt = $pdo->prepare(
-                "SELECT work_order_number FROM work_orders WHERE order_item_id = :order_item_id AND deleted_at IS NULL LIMIT 1"
+                "SELECT work_order_number
+                 FROM work_orders
+                 WHERE order_item_id = :order_item_id
+                   AND source_rescreen_batch_id = :source_rescreen_batch_id
+                   AND deleted_at IS NULL
+                 LIMIT 1"
             );
-            $existingStmt->execute(['order_item_id' => $data['order_item_id']]);
+            $existingStmt->execute([
+                'order_item_id' => $data['order_item_id'],
+                'source_rescreen_batch_id' => (int)($data['source_rescreen_batch_id'] ?? 0),
+            ]);
             jsonResponse([
                 'success' => false,
-                'message' => '此客戶批號已建立工單，請勿重複建立。',
+                'message' => $workOrderType === 'rescreen'
+                    ? '此二次重篩案件已建立執行工單，請勿重複建立。'
+                    : '此客戶批號已建立工單，請勿重複建立。',
                 'work_order_number' => $existingStmt->fetchColumn() ?: null,
             ], 409);
             return;

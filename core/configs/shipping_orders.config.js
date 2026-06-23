@@ -157,6 +157,25 @@ ModuleConfig.register('shipping_orders', {
                 ]
             },
             {
+                title: '出貨品質檢驗',
+                customHtml: `
+                <div class="detail-grid">
+                    <div class="detail-item" style="grid-column: 1 / -1;">
+                        <span class="detail-label">關聯狀態</span>
+                        <span class="detail-value" data-shipping-quality-summary-text>請先儲存出貨單後，再建立或查看出貨品質檢驗。</span>
+                    </div>
+                </div>
+                <div class="subsection-actions" style="margin-top: 0.75rem;">
+                    <button type="button" class="btn outline" data-action="open-quality-inspection-list" disabled>
+                        <i class="fas fa-clipboard-list"></i> 查看品質檢驗
+                    </button>
+                    <button type="button" class="btn primary" data-action="open-quality-inspection-create" disabled>
+                        <i class="fas fa-plus"></i> 建立品質檢驗
+                    </button>
+                </div>
+                <p class="text-muted small" style="margin-top: 0.75rem;">第二階段先提供可視、可建、可追入口，暫不把品質檢驗設為出貨守門條件。</p>`
+            },
+            {
                 title: '不良品摘要',
                 gridColumns: 4,
                 fields: [

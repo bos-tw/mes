@@ -232,7 +232,7 @@
             }
 
             if (state.rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" class="text-center">目前沒有不良品歷史資料</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="13" class="text-center">目前沒有不良品歷史資料</td></tr>';
                 return;
             }
 
@@ -252,6 +252,8 @@
                         <td>${escapeHtml(row.customer_name || '-')}</td>
                         <td>${escapeHtml(row.defect_item_name || '-')}</td>
                         <td class="text-right">${escapeHtml(recordedQuantity)}</td>
+                        <td>${escapeHtml(row.shipping_annotation_label || '未標註')}</td>
+                        <td>${escapeHtml(row.returned_with_shipment_label || '未送回')}</td>
                         <td class="text-right">${escapeHtml(estimatedUnits)}</td>
                         <td class="text-right">${escapeHtml(defectWeight)}</td>
                         <td class="actions-cell">
@@ -261,6 +263,7 @@
                             ${row.order_id ? '<button type="button" class="btn text" data-action="open-order" title="開啟訂單"><i class="fas fa-file-invoice"></i></button>' : ''}
                             ${row.work_order_id ? '<button type="button" class="btn text" data-action="open-work-order" title="開啟工單"><i class="fas fa-clipboard"></i></button>' : ''}
                             ${row.shipping_order_id ? '<button type="button" class="btn text" data-action="open-shipping-order" title="開啟出貨單"><i class="fas fa-shipping-fast"></i></button>' : ''}
+                            ${(row.shipping_annotation_shipping_order_id || row.shipping_order_id) ? '<button type="button" class="btn text" data-action="open-return-orders" title="開啟退貨單"><i class="fas fa-undo"></i></button>' : ''}
                             ${row.customer_id ? '<button type="button" class="btn text" data-action="open-customer" title="開啟客戶"><i class="fas fa-handshake"></i></button>' : ''}
                         </td>
                     </tr>
@@ -298,6 +301,8 @@
             const orderNetWeight = record.order_net_weight_kg == null ? '-' : `${formatNumber(record.order_net_weight_kg, 3)} kg`;
             const actualNetWeight = record.actual_net_weight_kg == null ? '-' : `${formatNumber(record.actual_net_weight_kg, 3)} kg`;
             const totalWeight = record.total_weight_kg == null ? '-' : `${formatNumber(record.total_weight_kg, 3)} kg`;
+            const shippingStatusLabel = record.shipping_status_label || '-';
+            const relatedReturnOrderLabel = record.related_return_order_label || '0 筆';
 
             detailContent.innerHTML = `
                 <div class="detail-grid">
@@ -309,6 +314,11 @@
                     <div class="detail-item"><label>客戶</label><span>${escapeHtml(record.customer_name || '-')}</span></div>
                     <div class="detail-item"><label>不良項目</label><span>${escapeHtml(record.defect_item_name || '-')}</span></div>
                     <div class="detail-item"><label>記錄數量</label><span>${escapeHtml(formatNumber(record.recorded_defect_quantity, 2))}</span></div>
+                    <div class="detail-item"><label>出貨單標註</label><span>${escapeHtml(record.shipping_annotation_label || '未標註')}</span></div>
+                    <div class="detail-item"><label>需隨貨送回</label><span>${escapeHtml(record.shipping_return_required_label || '否')}</span></div>
+                    <div class="detail-item"><label>已隨貨送回</label><span>${escapeHtml(record.returned_with_shipment_label || '未送回')}</span></div>
+                    <div class="detail-item"><label>對應出貨狀態</label><span>${escapeHtml(shippingStatusLabel)}</span></div>
+                    <div class="detail-item"><label>關聯退貨單</label><span>${escapeHtml(relatedReturnOrderLabel)}</span></div>
                     <div class="detail-item"><label>推算不良支數</label><span>${escapeHtml(estimatedUnits)}</span></div>
                     <div class="detail-item"><label>推算不良重量</label><span>${escapeHtml(defectWeight)}</span></div>
                     <div class="detail-item"><label>人工分布總數</label><span>${escapeHtml(distributionUnits)}</span></div>
@@ -322,6 +332,7 @@
                     ${record.order_id ? '<button type="button" class="btn outline small" data-action="open-order"><i class="fas fa-file-invoice"></i> 開啟訂單</button>' : ''}
                     ${record.work_order_id ? '<button type="button" class="btn outline small" data-action="open-work-order"><i class="fas fa-clipboard"></i> 開啟工單</button>' : ''}
                     ${record.shipping_order_id ? '<button type="button" class="btn outline small" data-action="open-shipping-order"><i class="fas fa-shipping-fast"></i> 開啟出貨單</button>' : ''}
+                    ${(record.shipping_annotation_shipping_order_id || record.shipping_order_id) ? '<button type="button" class="btn outline small" data-action="open-return-orders"><i class="fas fa-undo"></i> 開啟退貨單</button>' : ''}
                     ${record.customer_id ? '<button type="button" class="btn outline small" data-action="open-customer"><i class="fas fa-handshake"></i> 開啟客戶</button>' : ''}
                 </div>
             `;
@@ -387,6 +398,28 @@
                         });
                     }
                     break;
+                case 'open-return-orders': {
+                    const shippingOrderId = Number.parseInt(
+                        String(record.shipping_annotation_shipping_order_id || record.shipping_order_id || ''),
+                        10
+                    );
+                    if (Number.isInteger(shippingOrderId) && shippingOrderId > 0) {
+                        if (typeof window.openTabAndNavigate === 'function') {
+                            window.openTabAndNavigate('return_orders', '退貨單', {
+                                originalShippingOrderId: shippingOrderId,
+                                shippingOrderId
+                            });
+                        } else if (typeof window.openTab === 'function') {
+                            window.openTab('return_orders', '退貨單', 'modules/return_orders.html', {
+                                context: {
+                                    originalShippingOrderId: shippingOrderId,
+                                    shippingOrderId
+                                }
+                            });
+                        }
+                    }
+                    break;
+                }
             }
         }
 

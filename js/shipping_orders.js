@@ -294,8 +294,64 @@
                             }
                             break;
                         case 'view-return-orders':
-                            window.openTab?.('return_orders', '退貨單', 'modules/return_orders.html');
+                            if (Number.isInteger(orderId)) {
+                                openReturnOrdersModule({
+                                    originalShippingOrderId: orderId,
+                                    shippingOrderId: orderId
+                                });
+                            }
                             break;
+                        case 'open-defect-history':
+                            if (Number.isInteger(orderId)) {
+                                openDefectHistoryModule({ shippingOrderId: orderId });
+                            }
+                            break;
+                        case 'open-source-work-order': {
+                            const workOrderId = Number.parseInt(actionButton.dataset.workOrderId || '', 10);
+                            if (Number.isInteger(workOrderId) && typeof window.openTabAndNavigate === 'function') {
+                                window.openTabAndNavigate('work_orders', '生產工單', { workOrderId });
+                            }
+                            break;
+                        }
+                        case 'open-source-shipping-order': {
+                            const sourceShippingOrderId = Number.parseInt(actionButton.dataset.shippingOrderId || '', 10);
+                            if (Number.isInteger(sourceShippingOrderId) && typeof window.openTabAndNavigate === 'function') {
+                                window.openTabAndNavigate('shipping_orders', '出貨單', { shippingOrderId: sourceShippingOrderId });
+                            }
+                            break;
+                        }
+                        case 'open-source-inventory-item':
+                            openInventoryItemModule(actionButton.dataset.inventoryItemId || '');
+                            break;
+                        case 'open-customer': {
+                            const customerId = Number.parseInt(actionButton.dataset.customerId || '', 10);
+                            if (Number.isInteger(customerId) && typeof window.openTab === 'function') {
+                                window.openTab('customers', '客戶基本資料', 'modules/customers.html', {
+                                    context: { customerId }
+                                });
+                            }
+                            break;
+                        }
+                        case 'open-quality-inspection-list':
+                            if (Number.isInteger(orderId)) {
+                                openShippingQualityInspectionModule({ shippingOrderId: orderId });
+                            }
+                            break;
+                        case 'open-quality-inspection-create':
+                            if (Number.isInteger(orderId)) {
+                                openShippingQualityInspectionModule({ shippingOrderId: orderId, action: 'create' });
+                            }
+                            break;
+                        case 'view-quality-inspection': {
+                            const inspectionId = Number.parseInt(actionButton.dataset.inspectionId || '', 10);
+                            if (Number.isInteger(orderId) && Number.isInteger(inspectionId)) {
+                                openShippingQualityInspectionModule({
+                                    shippingOrderId: orderId,
+                                    inspectionId
+                                });
+                            }
+                            break;
+                        }
                     }
                 });
             }
@@ -352,6 +408,23 @@
                             }
                             break;
                         }
+                        case 'open-quality-inspection-list':
+                            event.preventDefault();
+                            if (!actionButton.disabled) {
+                                openShippingQualityInspectionModule({
+                                    shippingOrderId: Number.parseInt(actionButton.dataset.shippingOrderId || '', 10)
+                                });
+                            }
+                            break;
+                        case 'open-quality-inspection-create':
+                            event.preventDefault();
+                            if (!actionButton.disabled) {
+                                openShippingQualityInspectionModule({
+                                    shippingOrderId: Number.parseInt(actionButton.dataset.shippingOrderId || '', 10),
+                                    action: 'create'
+                                });
+                            }
+                            break;
                     }
                 });
 
@@ -704,7 +777,9 @@
                 order: result.order,
                 items: result.items || [],
                 suggestedDefectSummary: result.suggested_defect_summary || null,
-                suggestedToolSummaries: result.suggested_tool_summaries || []
+                suggestedToolSummaries: result.suggested_tool_summaries || [],
+                qualityInspectionsSummary: result.order?.quality_inspections_summary || null,
+                qualityInspections: result.order?.quality_inspections || []
             };
         }
 
@@ -869,6 +944,116 @@ function renderTable(items) {
                 mixed: '混合出貨'
             };
             return labels[purpose] || purpose || '一般出貨';
+        }
+
+        function getInspectionResultLabel(result) {
+            const labels = {
+                pass: '合格',
+                fail: '不合格',
+                conditional: '有條件合格'
+            };
+            return labels[result] || result || '未設定';
+        }
+
+        function getInspectionResultClass(result) {
+            if (result === 'pass') return 'active';
+            if (result === 'fail') return 'inactive';
+            if (result === 'conditional') return 'pending';
+            return '';
+        }
+
+        function buildQualityInspectionSummaryText(order) {
+            const summary = order?.quality_inspections_summary || null;
+            if (!order || !order.id) {
+                return '請先儲存出貨單後，再建立或查看出貨品質檢驗。';
+            }
+
+            if (!summary || Number(summary.inspection_count || 0) <= 0) {
+                return '目前尚未建立出貨品質檢驗，可直接從此處建立第一筆。';
+            }
+
+            const latestText = summary.latest_inspection_datetime
+                ? `${formatDateTime(summary.latest_inspection_datetime)} / ${getInspectionResultLabel(summary.latest_inspection_result)}`
+                : getInspectionResultLabel(summary.latest_inspection_result);
+
+            return `已建立 ${summary.inspection_count} 筆；最新檢驗：${latestText || '尚未設定'}。`;
+        }
+
+        function renderQualityInspectionModalEntry(order = null) {
+            const summaryText = elements.modalForm?.querySelector('[data-shipping-quality-summary-text]');
+            const listButton = elements.modalForm?.querySelector('[data-action="open-quality-inspection-list"]');
+            const createButton = elements.modalForm?.querySelector('[data-action="open-quality-inspection-create"]');
+            const shippingOrderId = Number.parseInt(order?.id || '', 10);
+            const hasOrderId = Number.isInteger(shippingOrderId) && shippingOrderId > 0;
+
+            if (summaryText) {
+                summaryText.textContent = buildQualityInspectionSummaryText(order);
+            }
+
+            [listButton, createButton].forEach((button) => {
+                if (!button) {
+                    return;
+                }
+
+                button.disabled = !hasOrderId;
+                if (hasOrderId) {
+                    button.dataset.shippingOrderId = String(shippingOrderId);
+                } else {
+                    delete button.dataset.shippingOrderId;
+                }
+            });
+        }
+
+        function openShippingQualityInspectionModule(context = {}) {
+            if (typeof window.openTabAndNavigate === 'function') {
+                window.openTabAndNavigate('shipping_quality_inspections', '出貨品質檢驗', context);
+                return;
+            }
+
+            if (typeof window.openTab === 'function') {
+                window.openTab('shipping_quality_inspections', '出貨品質檢驗', 'modules/shipping_quality_inspections.html', {
+                    context
+                });
+            }
+        }
+
+        function openDefectHistoryModule(context = {}) {
+            if (typeof window.openTabAndNavigate === 'function') {
+                window.openTabAndNavigate('defect_history_records', '不良品歷史紀錄', context);
+                return;
+            }
+
+            if (typeof window.openTab === 'function') {
+                window.openTab('defect_history_records', '不良品歷史紀錄', 'modules/defect_history_records.html', {
+                    context
+                });
+            }
+        }
+
+        function openReturnOrdersModule(context = {}) {
+            if (typeof window.openTabAndNavigate === 'function') {
+                window.openTabAndNavigate('return_orders', '退貨單', context);
+                return;
+            }
+
+            if (typeof window.openTab === 'function') {
+                window.openTab('return_orders', '退貨單', 'modules/return_orders.html', {
+                    context
+                });
+            }
+        }
+
+        function openInventoryItemModule(inventoryItemId) {
+            const normalizedId = Number.parseInt(inventoryItemId, 10);
+            if (!Number.isInteger(normalizedId) || normalizedId <= 0) {
+                return;
+            }
+
+            if (typeof window.openTab === 'function') {
+                window.openTab('inventory_items', '庫存項目', 'modules/inventory_items.html', {
+                    context: { inventoryItemId: normalizedId }
+                });
+            }
         }
 
         function getToolSummaryRowsContainer() {
@@ -1076,6 +1261,7 @@ function renderTable(items) {
             }
 
             populateOrderSelect();
+            renderQualityInspectionModalEntry(null);
             renderToolSummaryRows([]);
             recalculateDefectSummaryTotal();
             elements.modal.classList.remove('hidden');
@@ -1191,6 +1377,7 @@ function renderTable(items) {
                     applyDefectSummaryToForm(null);
                 }
 
+                renderQualityInspectionModalEntry(order);
                 renderToolSummaryRows(initialToolSummaries);
                 recalculateDefectSummaryTotal();
                 elements.modal.classList.remove('hidden');
@@ -1226,6 +1413,59 @@ function renderTable(items) {
             const { order, items } = data;
             const defectSummary = order.defect_summary || null;
             const toolSummaries = Array.isArray(order.tool_summaries) ? order.tool_summaries : [];
+            const customerToolAnalysis = order.customer_tool_analysis || null;
+            const qualitySummary = order.quality_inspections_summary || null;
+            const qualityInspections = Array.isArray(order.quality_inspections) ? order.quality_inspections : [];
+            const uniqueWorkOrders = Array.from(new Map(
+                items
+                    .filter((item) => Number.parseInt(item.work_order_id || '', 10) > 0)
+                    .map((item) => [Number.parseInt(item.work_order_id, 10), {
+                        id: Number.parseInt(item.work_order_id, 10),
+                        number: item.work_order_number || `#${item.work_order_id}`
+                    }])
+            ).values());
+            const uniqueInventoryItems = Array.from(new Map(
+                items
+                    .filter((item) => Number.parseInt(item.inventory_item_id || '', 10) > 0)
+                    .map((item) => [Number.parseInt(item.inventory_item_id, 10), {
+                        id: Number.parseInt(item.inventory_item_id, 10),
+                        number: item.inventory_number || `#${item.inventory_item_id}`
+                    }])
+            ).values());
+            const partialReceiptItems = items.filter((item) => String(item.partial_receipt_number || '').trim() !== '');
+            const sourceToolRecords = items
+                .map((item) => {
+                    const sourceNote = String(item.partial_receipt_shipping_tool_details || item.tool_statistics || '').trim();
+                    if (sourceNote === '') {
+                        return null;
+                    }
+                    return {
+                        inventoryNumber: item.inventory_number || '-',
+                        productName: item.screening_item_name || item.product_name || '-',
+                        sourceNote
+                    };
+                })
+                .filter(Boolean);
+            const toolTraceRows = items.map((item) => {
+                const orderItemTools = Array.isArray(item.order_item_tools) ? item.order_item_tools : [];
+                const orderToolText = orderItemTools.length > 0
+                    ? orderItemTools.map((tool) => `${tool.tool_name || '-'} x ${tool.quantity || 0}`).join('、')
+                    : '-';
+                const workOrderToolText = String(item.tool_statistics || '').trim() || '-';
+                const partialReceiptToolText = String(item.partial_receipt_shipping_tool_details || '').trim() || '-';
+                const shippingSummaryText = toolSummaries.length > 0
+                    ? toolSummaries.map((tool) => `${tool.tool_name || '-'} x ${tool.quantity || 0}`).join('、')
+                    : '-';
+
+                return {
+                    inventoryNumber: item.inventory_number || '-',
+                    productName: item.screening_item_name || item.product_name || '-',
+                    orderToolText,
+                    workOrderToolText,
+                    partialReceiptToolText,
+                    shippingSummaryText
+                };
+            });
 
             // 退貨狀態徽章
             let returnStatusBadge = '';
@@ -1305,6 +1545,132 @@ function renderTable(items) {
                         </div>
                     </section>
 
+                    <section class="detail-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                            <h4 style="margin: 0;">追溯總覽</h4>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button type="button" class="btn outline" data-action="open-defect-history" data-order-id="${order.id}">
+                                    <i class="fas fa-history"></i> 不良品歷史
+                                </button>
+                                <button type="button" class="btn outline" data-action="open-quality-inspection-list" data-order-id="${order.id}">
+                                    <i class="fas fa-clipboard-list"></i> 品質檢驗
+                                </button>
+                                ${order.return_orders && order.return_orders.length > 0 ? `
+                                <button type="button" class="btn outline" data-action="view-return-orders" data-order-id="${order.id}">
+                                    <i class="fas fa-undo"></i> 退貨單
+                                </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">來源訂單</span>
+                                <span class="detail-value">${escapeHtml(order.order_number || '-')}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">來源工單數</span>
+                                <span class="detail-value">${uniqueWorkOrders.length} 筆</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">來源庫存數</span>
+                                <span class="detail-value">${uniqueInventoryItems.length} 筆</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">部分入庫來源</span>
+                                <span class="detail-value">${partialReceiptItems.length} 筆</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">關聯品質檢驗</span>
+                                <span class="detail-value">${qualitySummary ? `${qualitySummary.inspection_count || 0} 筆` : '0 筆'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">關聯退貨單</span>
+                                <span class="detail-value">${order.return_orders ? `${order.return_orders.length} 筆` : '0 筆'}</span>
+                            </div>
+                            ${uniqueWorkOrders.length > 0 ? `
+                            <div class="detail-item" style="grid-column: 1 / -1;">
+                                <span class="detail-label">來源工單</span>
+                                <span class="detail-value" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                    ${uniqueWorkOrders.map((workOrder) => `<button type="button" class="btn outline small" data-action="open-source-work-order" data-order-id="${order.id}" data-work-order-id="${workOrder.id}"><i class="fas fa-clipboard"></i> ${escapeHtml(workOrder.number)}</button>`).join('')}
+                                </span>
+                            </div>
+                            ` : ''}
+                            ${uniqueInventoryItems.length > 0 ? `
+                            <div class="detail-item" style="grid-column: 1 / -1;">
+                                <span class="detail-label">來源庫存</span>
+                                <span class="detail-value" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                    ${uniqueInventoryItems.slice(0, 6).map((inventory) => `<button type="button" class="btn outline small" data-action="open-source-inventory-item" data-order-id="${order.id}" data-inventory-item-id="${inventory.id}"><i class="fas fa-boxes"></i> ${escapeHtml(inventory.number)}</button>`).join('')}
+                                    ${uniqueInventoryItems.length > 6 ? `<span class="text-muted">另有 ${uniqueInventoryItems.length - 6} 筆</span>` : ''}
+                                </span>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </section>
+
+                    <section class="detail-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                            <h4 style="margin: 0;">出貨品質檢驗</h4>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button type="button" class="btn outline" data-action="open-quality-inspection-list" data-order-id="${order.id}">
+                                    <i class="fas fa-clipboard-list"></i> 查看檢驗列表
+                                </button>
+                                <button type="button" class="btn primary" data-action="open-quality-inspection-create" data-order-id="${order.id}">
+                                    <i class="fas fa-plus"></i> 建立檢驗
+                                </button>
+                            </div>
+                        </div>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">檢驗筆數</span>
+                                <span class="detail-value">${qualitySummary ? `${qualitySummary.inspection_count || 0} 筆` : '0 筆'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">最新結果</span>
+                                <span class="detail-value">${qualitySummary && qualitySummary.latest_inspection_result ? `<span class="status-badge ${getInspectionResultClass(qualitySummary.latest_inspection_result)}">${escapeHtml(getInspectionResultLabel(qualitySummary.latest_inspection_result))}</span>` : '尚未建立'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">合格 / 不合格 / 有條件</span>
+                                <span class="detail-value">${qualitySummary ? `${qualitySummary.pass_count || 0} / ${qualitySummary.fail_count || 0} / ${qualitySummary.conditional_count || 0}` : '0 / 0 / 0'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">最新檢驗時間</span>
+                                <span class="detail-value">${qualitySummary?.latest_inspection_datetime ? formatDateTime(qualitySummary.latest_inspection_datetime) : '-'}</span>
+                            </div>
+                        </div>
+                        ${qualityInspections.length > 0 ? `
+                        <div class="table-responsive" style="margin-top: 1rem;">
+                            <table class="data-table compact">
+                                <thead>
+                                    <tr>
+                                        <th>檢驗時間</th>
+                                        <th>檢驗員</th>
+                                        <th>抽樣數量</th>
+                                        <th>不良數量</th>
+                                        <th>結果</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${qualityInspections.map((inspection) => `
+                                    <tr>
+                                        <td>${inspection.inspection_datetime ? formatDateTime(inspection.inspection_datetime) : '-'}</td>
+                                        <td>${escapeHtml(inspection.inspector_name || inspection.inspector_number || '-')}</td>
+                                        <td>${formatNumber(inspection.sample_quantity_pcs || 0)}</td>
+                                        <td>${formatNumber(inspection.defective_quantity_pcs || 0)}</td>
+                                        <td><span class="status-badge ${getInspectionResultClass(inspection.inspection_result)}">${escapeHtml(getInspectionResultLabel(inspection.inspection_result))}</span></td>
+                                        <td>
+                                            <button type="button" class="btn text" data-action="view-quality-inspection" data-order-id="${order.id}" data-inspection-id="${inspection.id}" title="查看檢驗">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        ` : '<p class="text-muted">尚未建立出貨品質檢驗，這一輪先提供關聯入口與追蹤，不強制守門。</p>'}
+                    </section>
+
                     ${order.notes ? `
                     <section class="detail-section">
                         <h4>備註</h4>
@@ -1314,7 +1680,14 @@ function renderTable(items) {
 
                     ${(defectSummary || toolSummaries.length > 0) ? `
                     <section class="detail-section">
-                        <h4>第一階段摘要</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                            <h4 style="margin: 0;">第一階段摘要</h4>
+                            ${defectSummary ? `
+                            <button type="button" class="btn outline" data-action="open-defect-history" data-order-id="${order.id}">
+                                <i class="fas fa-history"></i> 查看不良品歷史
+                            </button>
+                            ` : ''}
+                        </div>
                         <div class="detail-grid">
                             <div class="detail-item">
                                 <span class="detail-label">不良品總數量</span>
@@ -1336,6 +1709,16 @@ function renderTable(items) {
                             <div class="detail-item" style="grid-column: 1 / -1;">
                                 <span class="detail-label">不良品摘要備註</span>
                                 <span class="detail-value">${escapeHtml(defectSummary.notes)}</span>
+                            </div>
+                            ` : ''}
+                            ${defectSummary && (defectSummary.source_work_order_id || defectSummary.source_shipping_order_id || defectSummary.source_inventory_item_id) ? `
+                            <div class="detail-item" style="grid-column: 1 / -1;">
+                                <span class="detail-label">不良品摘要來源</span>
+                                <span class="detail-value" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                    ${defectSummary.source_work_order_id ? `<button type="button" class="btn outline small" data-action="open-source-work-order" data-order-id="${order.id}" data-work-order-id="${defectSummary.source_work_order_id}"><i class="fas fa-clipboard"></i> 工單 #${escapeHtml(String(defectSummary.source_work_order_id))}</button>` : ''}
+                                    ${defectSummary.source_inventory_item_id ? `<button type="button" class="btn outline small" data-action="open-source-inventory-item" data-order-id="${order.id}" data-inventory-item-id="${defectSummary.source_inventory_item_id}"><i class="fas fa-boxes"></i> 庫存 #${escapeHtml(String(defectSummary.source_inventory_item_id))}</button>` : ''}
+                                    ${defectSummary.source_shipping_order_id ? `<button type="button" class="btn outline small" data-action="open-source-shipping-order" data-order-id="${order.id}" data-shipping-order-id="${defectSummary.source_shipping_order_id}"><i class="fas fa-shipping-fast"></i> 原出貨單 #${escapeHtml(String(defectSummary.source_shipping_order_id))}</button>` : ''}
+                                </span>
                             </div>
                             ` : ''}
                         </div>
@@ -1371,6 +1754,129 @@ function renderTable(items) {
                                 </tbody>
                             </table>
                         </div>
+                    </section>
+                    ` : ''}
+
+                    ${customerToolAnalysis ? `
+                    <section class="detail-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                            <h4 style="margin: 0;">客戶載具紀錄與遺留分析</h4>
+                            <button type="button" class="btn outline" data-action="open-customer" data-customer-id="${order.customer_id || ''}" title="開啟客戶">
+                                <i class="fas fa-handshake"></i> 客戶資料
+                            </button>
+                        </div>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">進場載具紀錄</span>
+                                <span class="detail-value">${formatNumber(customerToolAnalysis.incoming_total_quantity || 0)} 個</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">歷史已歸還</span>
+                                <span class="detail-value">${formatNumber(customerToolAnalysis.returned_total_quantity || 0)} 個</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">本單歸還摘要</span>
+                                <span class="detail-value">${formatNumber(customerToolAnalysis.current_shipping_total_quantity || 0)} 個</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">可能仍留廠</span>
+                                <span class="detail-value ${Number(customerToolAnalysis.outstanding_total_quantity || 0) > 0 ? 'text-danger' : 'text-success'}">${formatNumber(customerToolAnalysis.outstanding_total_quantity || 0)} 個</span>
+                            </div>
+                            <div class="detail-item" style="grid-column: 1 / -1;">
+                                <span class="detail-label">分析口徑</span>
+                                <span class="detail-value">${escapeHtml(customerToolAnalysis.basis_note || '-')}</span>
+                            </div>
+                        </div>
+                        ${sourceToolRecords.length > 0 ? `
+                        <div style="margin-top: 1rem;">
+                            <h5 style="margin-bottom: 0.5rem;">本次來源載具紀錄</h5>
+                            <div class="table-responsive">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th>來源庫存</th>
+                                            <th>產品</th>
+                                            <th>來源載具紀錄</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${sourceToolRecords.map((record) => `
+                                        <tr>
+                                            <td>${escapeHtml(record.inventoryNumber)}</td>
+                                            <td>${escapeHtml(record.productName)}</td>
+                                            <td>${escapeHtml(record.sourceNote)}</td>
+                                        </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        ` : '<p class="text-muted" style="margin-top: 1rem;">本次出貨來源尚未整理出可用的工單 / 部分入庫載具紀錄。</p>'}
+                        ${toolTraceRows.length > 0 ? `
+                        <div style="margin-top: 1rem;">
+                            <h5 style="margin-bottom: 0.5rem;">訂單 / 工單 / 出貨載具對照</h5>
+                            <div class="table-responsive">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th>來源庫存</th>
+                                            <th>產品</th>
+                                            <th>訂單載具設定</th>
+                                            <th>工單載具紀錄</th>
+                                            <th>部分入庫載具</th>
+                                            <th>本單出貨摘要</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${toolTraceRows.map((record) => `
+                                        <tr>
+                                            <td>${escapeHtml(record.inventoryNumber)}</td>
+                                            <td>${escapeHtml(record.productName)}</td>
+                                            <td>${escapeHtml(record.orderToolText)}</td>
+                                            <td>${escapeHtml(record.workOrderToolText)}</td>
+                                            <td>${escapeHtml(record.partialReceiptToolText)}</td>
+                                            <td>${escapeHtml(record.shippingSummaryText)}</td>
+                                        </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        ` : ''}
+                        ${customerToolAnalysis.outstanding_records && customerToolAnalysis.outstanding_records.length > 0 ? `
+                        <div style="margin-top: 1rem;">
+                            <h5 style="margin-bottom: 0.5rem;">客戶載具遺留分析</h5>
+                            <div class="table-responsive">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th>載具名稱</th>
+                                            <th>類型</th>
+                                            <th>進場</th>
+                                            <th>已歸還</th>
+                                            <th>可能留廠</th>
+                                            <th>狀態</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${customerToolAnalysis.outstanding_records
+                                            .filter((record) => Number(record.incoming_quantity || 0) > 0 || Number(record.returned_quantity || 0) > 0)
+                                            .slice(0, 12)
+                                            .map((record) => `
+                                            <tr>
+                                                <td>${escapeHtml(record.tool_name || '-')}</td>
+                                                <td>${escapeHtml(record.tool_type || '-')}</td>
+                                                <td class="text-right">${formatNumber(record.incoming_quantity || 0)}</td>
+                                                <td class="text-right">${formatNumber(record.returned_quantity || 0)}</td>
+                                                <td class="text-right ${Number(record.outstanding_quantity || 0) > 0 ? 'text-danger' : ''}">${formatNumber(record.outstanding_quantity || 0)}</td>
+                                                <td>${escapeHtml(record.status_label || '-')}</td>
+                                            </tr>
+                                            `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        ` : ''}
                     </section>
                     ` : ''}
 
@@ -1474,7 +1980,7 @@ function renderTable(items) {
                                         <td><span class="status-badge">${ro.processing_status || '-'}</span></td>
                                         <td>${formatNumber(ro.total_quantity || 0)}</td>
                                         <td>
-                                            <button type="button" class="btn text" data-action="view-return-orders" title="查看退貨單">
+                                            <button type="button" class="btn text" data-action="view-return-orders" data-order-id="${order.id}" title="查看退貨單">
                                                 <i class="fas fa-eye"></i>
                                             </button>
                                         </td>

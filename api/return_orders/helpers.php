@@ -79,6 +79,24 @@ function getReturnOrderDetails(PDO $pdo, int $id): ?array
     $stmt->execute(['id' => $id]);
     $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    if ($order) {
+        $rescreenStmt = $pdo->prepare("
+            SELECT
+                id,
+                rescreen_batch_number,
+                rescreen_type,
+                status,
+                rescreen_work_order_id,
+                created_at
+            FROM rescreen_batches
+            WHERE source_return_order_id = :source_return_order_id
+              AND deleted_at IS NULL
+            ORDER BY id DESC
+        ");
+        $rescreenStmt->execute(['source_return_order_id' => $id]);
+        $order['rescreen_batches'] = $rescreenStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
     return $order ?: null;
 }
 
