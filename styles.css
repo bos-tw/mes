@@ -5598,7 +5598,7 @@ td.actions-col {
 
 [data-work-orders-edit-modal] .screening-service-notes-input {
     width: 100%;
-    min-width: 220px;
+    min-width: 0;
     min-height: 32px;
     height: 32px;
     padding: 4px 6px;
@@ -6243,6 +6243,16 @@ td.actions-col {
     height: 34px;
     padding: 4px 6px;
     vertical-align: middle;
+}
+
+[data-screening-services-table] th:first-child,
+[data-screening-services-table] td:first-child,
+[data-edit-screening-services-table] th:first-child,
+[data-edit-screening-services-table] td:first-child {
+    width: auto;
+    min-width: 140px;
+    white-space: normal;
+    word-break: keep-all;
 }
 
 [data-work-orders-edit-modal] .screening-service-defect-input,

@@ -68,6 +68,7 @@ try {
         SELECT
             wo.*,
             o.order_number,
+            o.customer_id AS customer_id,
             o.customer_po_number,
             o.expected_delivery_date,
             c.name AS customer_name,
@@ -126,6 +127,9 @@ try {
         $workOrder['tool_quantity'] = (int)($orderItemMetrics['tool_quantity'] ?? 0);
         $workOrder['tool_details'] = $orderItemMetrics['tool_details'] ?? [];
         $workOrder['drawings'] = $orderItemMetrics['drawings'] ?? fetchWorkOrderDrawings($pdo, (int)$workOrder['order_item_id']);
+        if (trim((string)($workOrder['drawing_number'] ?? '')) === '' && trim((string)($orderItemMetrics['drawing_number'] ?? '')) !== '') {
+            $workOrder['drawing_number'] = $orderItemMetrics['drawing_number'];
+        }
     } else {
         $workOrder['tool_statistics'] = '';
         $workOrder['total_tool_weight'] = 0.0;

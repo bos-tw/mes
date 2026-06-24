@@ -2693,7 +2693,7 @@
 
     async function loadMachines() {
         try {
-            const response = await fetch('api/machines/index.php');
+            const response = await fetch('api/machines/index.php?perPage=100');
             const result = await response.json();
             if (result.success) {
                 state.machines = result.data;

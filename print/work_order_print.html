@@ -632,20 +632,23 @@
         const runRecords = run && Array.isArray(run.production_records) ? run.production_records : [];
         const targetUnits = run ? toNumber(run.planned_units) : toNumber(wo.total_units);
         const configuredCount = runRecords.length || assignedRowCount || toNumber(wo.tool_quantity);
-        const rowCount = Math.max(4, Math.round(configuredCount) || 0);
-        const targets = distributeCardTargets(targetUnits, rowCount);
+        const cardCount = Math.max(0, Math.round(configuredCount) || 0);
+        const rowCount = Math.max(4, cardCount);
+        const targets = distributeCardTargets(targetUnits, cardCount);
 
         return {
             compact: rowCount > 6,
             rowCount,
+            cardCount,
             html: Array.from({ length: rowCount }, (_, index) => {
                 const record = runRecords[index] || {};
-                const cardNumber = index + 1;
+                const hasCard = index < cardCount;
+                const cardNumber = hasCard ? index + 1 : '';
                 const target = record.card_number || targets[index] || '';
                 return `
                     <tr>
                         <td>${escapeHtml(cardNumber)}</td>
-                        <td>${target ? formatInt(target) : ''}</td>
+                        <td>${hasCard && target ? formatInt(target) : ''}</td>
                         <td></td>
                         <td></td>
                         <td></td>
@@ -706,6 +709,9 @@
         const splitUnitsHint = context.isSplit
             ? `<span class="split-subvalue">本份分配：${formatInt(context.targetUnits)} 支</span>`
             : '';
+        const displayToolQuantity = context.isSplit
+            ? cardRows.cardCount
+            : Math.max(0, Math.round(toNumber(wo.tool_quantity)) || 0);
 
         return `
 <article class="sheet${densityClass}" data-work-order-type="${escapeHtml(wo.work_order_type || 'normal')}">
@@ -777,7 +783,7 @@
                         <td class="label-cell">總支數</td>
                         <td>${formatInt(wo.total_units)}${splitUnitsHint}</td>
                         <td class="label-cell">載具數量</td>
-                        <td>${wo.tool_quantity || ''}</td>
+                        <td>${displayToolQuantity || ''}</td>
                     </tr>
                     <tr>
                         <td class="label-cell">載具統計</td>

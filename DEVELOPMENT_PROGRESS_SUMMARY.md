@@ -2,16 +2,16 @@
 
 更新時間：2026-06-24  
 目前分支：`main`  
-最新交付版本：`v3.0.10`  
-最新更新包：`dist/update_v3.0.10_20260624_090950.zip`
+最新交付版本：`v3.0.11`  
+最新更新包：`dist/update_v3.0.11_20260624_204240.zip`
 
 ## 1. 專案架構
 
 - 目錄結構：
-  - `api/`：PHP API、權限守門、系統更新、流程追溯端點。
-  - `js/`：桌面版原生 JavaScript 模組與 DataSync。
-  - `modules/`：功能 HTML 片段。
-  - `core/configs/`：配置化模組定義。
+  - `api/`：PHP API、權限守門、工單 / 出貨 / 客戶載具分析資料端點。
+  - `js/`：原生 JavaScript 功能模組與前端互動邏輯。
+  - `modules/`：功能頁 HTML 片段。
+  - `print/`：列印版型。
   - `migrations/`：MySQL schema / data migration。
   - `tools/`：schema sync、健康稽核、DataSync 稽核、更新包打包工具。
   - `release-notes/`：一鍵更新包變更摘要。
@@ -22,27 +22,35 @@
   - Node.js 稽核工具。
   - PowerShell schema sync / 更新包工具。
 - 本輪主要涉及模組 / API / 資料表：
-  - 模組：主入口 `index.php`、相容轉址入口 `index.html`。
-  - API：無 PHP API 邏輯異動；入口仍依賴 `api/cache_version.php` 產生前端資源版本。
-  - 資料表：本輪無資料表異動。
+  - 模組：生產工單、出貨單列印、生產命令單列印。
+  - API：`api/work_orders/show.php`。
+  - 前端：`js/work_orders.js`、`modules/work_orders.html`、`styles.css`。
+  - 列印：`print/shipping_order_print.html`、`print/work_order_print.html`。
+  - 資料表：讀取既有 `orders.customer_id`、`order_item_tools`、`shipping_order_tool_summaries`，本輪無 schema 異動。
 
 ## 2. 已完成功能
 
 - 本次新增或修改項目：
-  - 修正遠端主入口白畫面問題：移除 `index.php` 的 `declare(strict_types=1);`，避免遠端檔案前置 BOM、空白或主機插入內容時觸發 `strict_types declaration must be the very first statement` fatal。
-  - 保留單一完整主入口策略：`index.php` 是完整系統入口，`index.html` 仍只做相容轉址到 `index.php`。
-  - 新增 release note：`release-notes/2026-06-24-v3.0.10.txt`，固定三筆摘要。
+  - 出貨單列印主表簡化為現場指定欄位：桶號、批號、規格、料號、類別、重量、單重、數量、桶數。
+  - 出貨單列印新增 `經辦` 為登入者，移除製單人員、出貨人員、不良品摘要、客戶載具摘要，並保留原表單排版風格。
+  - 出貨單列印字體放大、表格標題上下 padding 微調。
+  - 生產命令單 `圖面號碼` 改為當工單欄位空白時，回補訂單品項即時計算資料。
+  - 生產命令單卡號列不再因最少列數補空白而誤顯卡號；`載具數量` 與實際卡號數量一致。
+  - 生產工單 `指派機台` 下拉改為載入 `api/machines/index.php?perPage=100`，避免只拿到預設 10 筆。
+  - 生產工單篩分服務明細欄寬調整：縮小 PPM、公差、不良品數量與備註欄，讓服務項目完整呈現。
+  - 工單客戶載具遺留分析修正：`api/work_orders/show.php` 補回 `o.customer_id AS customer_id`，讓既有 `fetchCustomerToolAnalysis()` 可取得正確客戶。
+  - 新增 release note：`release-notes/2026-06-24-v3.0.11.txt`，固定三筆摘要。
 - 重要資料庫異動：
   - 本輪無 migration。
   - 本輪無 schema 異動。
   - 未修改 `tools/sync-local-schema.ps1` 的 `$migrationChecks`。
 - 版本與更新包資訊：
-  - `v3.0.10`：遠端入口相容性熱修更新包。
-  - 更新包：`dist/update_v3.0.10_20260624_090950.zip`。
+  - 版本：`v3.0.11`。
+  - 更新包：`dist/update_v3.0.11_20260624_204240.zip`。
   - 打包方式：使用 `tools/build-update-package.ps1`。
-  - 打包檔案：`index.php`、`release-notes/2026-06-24-v3.0.10.txt`。
-  - migrations：0。
-  - 已確認 ZIP 內含 `manifest.json`，且 entries 為 `files/index.php`、`files/release-notes/2026-06-24-v3.0.10.txt`、`manifest.json`。
+  - 打包檔案：`api/work_orders/show.php`、`js/work_orders.js`、`modules/work_orders.html`、`print/shipping_order_print.html`、`print/work_order_print.html`、`styles.css`、`release-notes/2026-06-24-v3.0.11.txt`。
+  - migrations：0，打包時已明確傳 `-Migrations @()`。
+  - 已確認 ZIP 內含 `manifest.json`。
 
 ## 3. 待修 Bug
 
@@ -50,24 +58,25 @@
   - 完整健康審計仍有 17 個既有 warning。
   - `api/status_board/update.php`、`api/status_board/delete.php` 仍允許 POST fallback。
   - 多個前端 JS 檔過大，例如 `js/work_orders.js`、`js/shipping_orders.js`、`js/orders.js`、`js/order_items.js`。
+  - `modules/order_items.html` 仍有既有 inline style warning。
   - 多個模組仍存在 `status` / `status_lookup_id` 雙重狀態欄位。
 - 重現條件：
   - 既有 warning：執行 `node tools/audit-system-health.js`。
-  - 遠端入口白畫面舊問題：遠端 `index.php` 在 `declare(strict_types=1);` 前存在任何輸出、BOM、空白或插入內容時，PHP 會 fatal；本輪已移除入口檔的 strict_types 宣告。
+  - 若工單客戶載具分析仍顯示無資料，需確認該客戶是否真的有 `order_item_tools` 或 `shipping_order_tool_summaries` 紀錄。
 - 目前推測原因：
-  - 既有 warning 來自歷史相容策略、大型前端模組累積與欄位過渡期設計。
-  - 遠端入口白畫面是 PHP `strict_types` 宣告位置限制與遠端檔案前置內容衝突，不是 `.htaccess` rewrite 問題。
+  - 健康審計 warning 來自歷史相容策略、大型前端模組累積與欄位過渡期設計。
+  - 客戶載具分析目前仍是第一輪摘要：以訂單載具設定視為進場、出貨單載具摘要視為歸還，尚未形成正式客戶載具流水帳。
 
 ## 4. 下一步任務
 
 - P0
-  - 遠端套用 `v3.0.10`，確認 `https://mes.sort.com.tw/`、`/index.php`、登入後主系統與「安全設定 > 一鍵更新」均可正常開啟。
-  - 遠端確認 `index.html` 仍會轉往 `index.php`，且不再發生白畫面或「系統已更新」提示反覆出現。
-  - 遠端確認 `v3.0.8` 二次重篩 migration / 檔案與 `v3.0.9` 入口版本偵測修補已套用；若缺漏需依版本順序補套。
+  - 遠端套用 `v3.0.11`，確認更新包可正常套用且 `manifest.json` 被系統更新流程讀取。
+  - 瀏覽器實測生產工單編輯視窗：指派機台完整清單、篩分服務明細欄寬、客戶載具遺留分析、圖面號碼帶入。
+  - 瀏覽器或列印預覽實測出貨單與生產命令單版面。
 - P1
-  - 瀏覽器實測側邊欄「二次重篩歷史紀錄」、退貨單建立二次重篩案件、案件列表搜尋、詳情追溯鏈。
+  - 若現場需要，將客戶載具紀錄從第一輪摘要升級為獨立客戶載具總覽 / 流水帳。
   - 補齊二次重篩完成後的新庫存建立、再次不良閉環與不良品歷史正式納管。
-  - 補強客戶載具遺留分析與出貨 / 退貨 / 工單紀錄彙整視圖。
+  - 釐清工單 / 批次 / 出貨單層級的載具顯示口徑，避免只用客戶層級造成現場誤解。
 - P2
   - 清理 `audit-system-health` 既有 warning。
   - 拆分過大的前端模組。
@@ -76,18 +85,16 @@
 ## 5. 驗證狀態
 
 - 已執行的檢查：
-  - `git fetch --all --prune`
-  - `git status --short`
-  - `git checkout main`
-  - `git pull --ff-only origin main`
-  - `powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1`：`Applied: 22, Pending: 0`，schema already in sync。
-  - `php -l index.php`：通過。
-  - `node tools/audit-system-health.js --changed --base origin/main`：新增 0、阻擋 0。
-  - `node tools/audit-system-health.js`：錯誤 0、警告 17、提示 11。
-  - `tools/build-update-package.ps1`：已產出 `v3.0.10` 更新包。
-  - ZIP 讀取式驗證：`manifest.json` 存在，版本、檔案清單、migration 數量符合預期。
+  - 初始化時已完成 `git fetch --all --prune`、`git checkout main`、`git pull --ff-only origin main`。
+  - 初始化時已完成 `powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1`。
+  - `node --check js/work_orders.js`：通過。
+  - `php -l api/work_orders/show.php`：通過。
+  - `node tools/audit-system-health.js --changed --base origin/main`：通過，未新增審計問題。
+  - `node tools/audit-system-health.js`：通過，0 errors、17 warnings、11 infos。
+  - `tools/build-update-package.ps1`：已產出 `v3.0.11` 更新包。
+  - ZIP 讀取式驗證：`manifest.json` 存在，包內檔案清單符合 `-Files`。
 - 尚未驗證的風險：
-  - 尚未在遠端透過一鍵更新實際套用 `v3.0.10`。
-  - 尚未完成遠端登入後主系統完整瀏覽器回歸。
-  - 尚未完成二次重篩端到端資料流實測。
-  - `dist/update_v3.0.10_20260624_090950.zip` 因 `.gitignore` 規則不會進入 Git commit，需保留本機交付檔或另行上傳到遠端更新流程使用。
+  - 尚未在遠端透過一鍵更新實際套用 `v3.0.11`。
+  - 尚未完成瀏覽器實機回歸。
+  - 尚未完成出貨單與生產命令單列印視覺確認。
+  - `dist/update_v3.0.11_20260624_204240.zip` 因 `.gitignore` 規則不會進入 Git commit，需保留本機交付檔或另行上傳到遠端更新流程使用。
