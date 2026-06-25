@@ -323,6 +323,13 @@
                         case 'open-source-inventory-item':
                             openInventoryItemModule(actionButton.dataset.inventoryItemId || '');
                             break;
+                        case 'open-rescreen-batch': {
+                            const rescreenBatchId = Number.parseInt(actionButton.dataset.rescreenBatchId || '', 10);
+                            if (Number.isInteger(rescreenBatchId)) {
+                                openRescreenBatchModule({ rescreenBatchId });
+                            }
+                            break;
+                        }
                         case 'open-customer': {
                             const customerId = Number.parseInt(actionButton.dataset.customerId || '', 10);
                             if (Number.isInteger(customerId) && typeof window.openTab === 'function') {
@@ -1056,6 +1063,16 @@ function renderTable(items) {
             }
         }
 
+        function openRescreenBatchModule(context = {}) {
+            if (typeof window.openTabAndNavigate === 'function') {
+                window.openTabAndNavigate('rescreen_batches', '二次篩選紀錄', context);
+                return;
+            }
+            if (typeof window.openTab === 'function') {
+                window.openTab('rescreen_batches', '二次篩選紀錄', 'modules/rescreen_batches.html', context);
+            }
+        }
+
         function getToolSummaryRowsContainer() {
             return elements.modalForm?.querySelector('[data-tool-summary-rows]') || null;
         }
@@ -1416,6 +1433,63 @@ function renderTable(items) {
             const customerToolAnalysis = order.customer_tool_analysis || null;
             const qualitySummary = order.quality_inspections_summary || null;
             const qualityInspections = Array.isArray(order.quality_inspections) ? order.quality_inspections : [];
+            const normalizeRescreenSources = (sources) => Array.from(new Map(
+                (Array.isArray(sources) ? sources : [])
+                    .filter((source) => {
+                        const batchId = Number.parseInt(source?.rescreen_batch_id || '', 10);
+                        return (Number.isInteger(batchId) && batchId > 0) || String(source?.rescreen_batch_number || '').trim() !== '';
+                    })
+                    .map((source) => {
+                        const batchId = Number.parseInt(source.rescreen_batch_id || '', 10);
+                        const sourceId = Number.parseInt(source.source_id || '', 10);
+                        const key = Number.isInteger(batchId) && batchId > 0
+                            ? `batch:${batchId}`
+                            : `source:${Number.isInteger(sourceId) ? sourceId : String(source.rescreen_batch_number || '').trim()}`;
+                        return [key, {
+                            sourceId: Number.isInteger(sourceId) ? sourceId : null,
+                            sourceType: source.source_type || '',
+                            batchId: Number.isInteger(batchId) ? batchId : null,
+                            batchNumber: source.rescreen_batch_number || '-',
+                            secondScreeningReason: source.second_screening_reason || '',
+                            rescreenType: source.rescreen_type || '',
+                            status: source.rescreen_batch_status || '',
+                            sourceWorkOrderId: Number.parseInt(source.source_work_order_id || '', 10) || null,
+                            sourceWorkOrderNumber: source.source_work_order_number || null,
+                            sourceReturnOrderId: Number.parseInt(source.source_return_order_id || '', 10) || null,
+                            sourceReturnOrderNumber: source.source_return_order_number || null,
+                            sourceShippingOrderId: Number.parseInt(source.source_shipping_order_id || '', 10) || null,
+                            sourceShippingOrderNumber: source.source_shipping_order_number || null,
+                            orderNumber: source.order_number || null,
+                            notes: source.notes || null,
+                        }];
+                    })
+            ).values());
+            const rescreenTraceRows = items.flatMap((item) => {
+                const sources = normalizeRescreenSources(item.rescreen_sources);
+                return sources.map((source) => ({
+                    inventoryId: Number.parseInt(item.inventory_item_id || '', 10) || null,
+                    inventoryNumber: item.inventory_number || '-',
+                    productName: item.screening_item_name || item.product_name || '-',
+                    batchId: source.batchId,
+                    batchNumber: source.batchNumber,
+                    secondScreeningReason: source.secondScreeningReason,
+                    rescreenType: source.rescreenType,
+                    sourceWorkOrderId: source.sourceWorkOrderId,
+                    sourceWorkOrderNumber: source.sourceWorkOrderNumber,
+                    sourceReturnOrderId: source.sourceReturnOrderId,
+                    sourceReturnOrderNumber: source.sourceReturnOrderNumber,
+                    sourceShippingOrderId: source.sourceShippingOrderId,
+                    sourceShippingOrderNumber: source.sourceShippingOrderNumber,
+                    orderNumber: source.orderNumber,
+                    notes: source.notes,
+                }));
+            });
+            const uniqueRescreenBatches = Array.from(new Map(
+                rescreenTraceRows.map((row) => {
+                    const key = row.batchId ? `batch:${row.batchId}` : `batch-number:${row.batchNumber}`;
+                    return [key, row];
+                })
+            ).values());
             const uniqueWorkOrders = Array.from(new Map(
                 items
                     .filter((item) => Number.parseInt(item.work_order_id || '', 10) > 0)
@@ -1580,6 +1654,10 @@ function renderTable(items) {
                                 <span class="detail-value">${partialReceiptItems.length} 筆</span>
                             </div>
                             <div class="detail-item">
+                                <span class="detail-label">二次篩選來源</span>
+                                <span class="detail-value">${uniqueRescreenBatches.length} 筆</span>
+                            </div>
+                            <div class="detail-item">
                                 <span class="detail-label">關聯品質檢驗</span>
                                 <span class="detail-value">${qualitySummary ? `${qualitySummary.inspection_count || 0} 筆` : '0 筆'}</span>
                             </div>
@@ -1601,6 +1679,19 @@ function renderTable(items) {
                                 <span class="detail-value" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
                                     ${uniqueInventoryItems.slice(0, 6).map((inventory) => `<button type="button" class="btn outline small" data-action="open-source-inventory-item" data-order-id="${order.id}" data-inventory-item-id="${inventory.id}"><i class="fas fa-boxes"></i> ${escapeHtml(inventory.number)}</button>`).join('')}
                                     ${uniqueInventoryItems.length > 6 ? `<span class="text-muted">另有 ${uniqueInventoryItems.length - 6} 筆</span>` : ''}
+                                </span>
+                            </div>
+                            ` : ''}
+                            ${uniqueRescreenBatches.length > 0 ? `
+                            <div class="detail-item" style="grid-column: 1 / -1;">
+                                <span class="detail-label">二次篩選案件</span>
+                                <span class="detail-value" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                    ${uniqueRescreenBatches.map((batch) => `
+                                        <button type="button" class="btn outline small" data-action="open-rescreen-batch" data-order-id="${order.id}" data-rescreen-batch-id="${batch.batchId || ''}">
+                                            <i class="fas fa-microscope"></i> ${escapeHtml(batch.batchNumber)}
+                                        </button>
+                                        <span class="text-muted small">${escapeHtml(getSecondScreeningReasonLabel(batch.secondScreeningReason))}</span>
+                                    `).join('')}
                                 </span>
                             </div>
                             ` : ''}
@@ -1927,6 +2018,11 @@ function renderTable(items) {
                                                     ? `<div class="text-muted small">來源：${escapeHtml(item.partial_receipt_number)} / ${escapeHtml(item.partial_receipt_source_label || '一般工單')}</div>`
                                                     : ''
                                             }
+                                            ${normalizeRescreenSources(item.rescreen_sources).length > 0 ? `
+                                                <div class="text-muted small">
+                                                    ${normalizeRescreenSources(item.rescreen_sources).map((source) => `二次篩選：${escapeHtml(source.batchNumber)} / ${escapeHtml(getSecondScreeningReasonLabel(source.secondScreeningReason))}`).join('<br>')}
+                                                </div>
+                                            ` : ''}
                                         </td>
                                         <td>${escapeHtml(item.screening_item_name || item.product_name) || '-'}</td>
                                         <td>${formatNumber(item.shipped_quantity)}</td>
@@ -1957,6 +2053,49 @@ function renderTable(items) {
                         </div>
                         ` : '<p class="text-muted">尚無出貨項目，可新增多筆項目</p>'}
                     </section>
+
+                    ${rescreenTraceRows.length > 0 ? `
+                    <section class="detail-section">
+                        <h4>二次篩選來源追溯</h4>
+                        <div class="table-responsive">
+                            <table class="data-table compact">
+                                <thead>
+                                    <tr>
+                                        <th>出貨庫存</th>
+                                        <th>產品</th>
+                                        <th>二次篩選案件</th>
+                                        <th>理由</th>
+                                        <th>來源工單</th>
+                                        <th>來源退貨</th>
+                                        <th>來源訂單 / 出貨</th>
+                                        <th>備註</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rescreenTraceRows.map((trace) => `
+                                    <tr>
+                                        <td>
+                                            ${trace.inventoryId ? `<button type="button" class="btn text" data-action="open-source-inventory-item" data-order-id="${order.id}" data-inventory-item-id="${trace.inventoryId}">${escapeHtml(trace.inventoryNumber)}</button>` : escapeHtml(trace.inventoryNumber)}
+                                        </td>
+                                        <td>${escapeHtml(trace.productName)}</td>
+                                        <td>
+                                            ${trace.batchId ? `<button type="button" class="btn text" data-action="open-rescreen-batch" data-order-id="${order.id}" data-rescreen-batch-id="${trace.batchId}">${escapeHtml(trace.batchNumber)}</button>` : escapeHtml(trace.batchNumber)}
+                                            <div class="text-muted small">${escapeHtml(getRescreenTypeLabel(trace.rescreenType))}</div>
+                                        </td>
+                                        <td>${escapeHtml(getSecondScreeningReasonLabel(trace.secondScreeningReason))}</td>
+                                        <td>
+                                            ${trace.sourceWorkOrderId ? `<button type="button" class="btn text" data-action="open-source-work-order" data-order-id="${order.id}" data-work-order-id="${trace.sourceWorkOrderId}">${escapeHtml(trace.sourceWorkOrderNumber || `#${trace.sourceWorkOrderId}`)}</button>` : '-'}
+                                        </td>
+                                        <td>${escapeHtml(trace.sourceReturnOrderNumber || '-')}</td>
+                                        <td>${escapeHtml([trace.orderNumber, trace.sourceShippingOrderNumber].filter(Boolean).join(' / ') || '-')}</td>
+                                        <td>${escapeHtml(trace.notes || '-')}</td>
+                                    </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    ` : ''}
 
                     ${order.return_orders && order.return_orders.length > 0 ? `
                     <section class="detail-section">
@@ -2626,6 +2765,22 @@ function renderTable(items) {
                 'freight': '貨運'
             };
             return escapeHtml(labels[method] || method || '-');
+        }
+
+        function getSecondScreeningReasonLabel(reason) {
+            const labels = {
+                relaxed_after_high_defect: '不良過多，客戶放寬後再篩',
+                customer_required_second_pass: '客戶每批要求二次篩選'
+            };
+            return labels[reason] || reason || '-';
+        }
+
+        function getRescreenTypeLabel(type) {
+            const labels = {
+                relaxed_rescreen: '放寬後重篩',
+                strict_rescreen: '嚴格重篩'
+            };
+            return labels[type] || type || '-';
         }
 
         // ===== 退貨功能 =====

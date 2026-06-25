@@ -446,8 +446,8 @@ function assessReturnOrderDelete(PDO $pdo, int $id): array
         $rescreenCount = (int)$rescreenStmt->fetchColumn();
         if ($rescreenCount > 0) {
             return workflowBlocked(
-                '此退貨單已建立二次重篩案件，不能直接刪除。請先處理二次重篩追溯鏈。',
-                ["二次重篩案件：{$rescreenCount} 筆"],
+                '此退貨單已建立二次篩選案件，不能直接刪除。請先處理二次篩選追溯鏈。',
+                ["二次篩選案件：{$rescreenCount} 筆"],
                 'rescreen_trace_cleanup'
             );
         }

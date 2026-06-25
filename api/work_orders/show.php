@@ -41,6 +41,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/../rescreen_batches/helpers.php';
 require_once __DIR__ . '/../work_order_operation_logs_helper.php';
 require_once __DIR__ . '/../shipping_orders/helpers.php';
 
@@ -404,26 +405,8 @@ try {
     ), 2);
 
     $secondScreeningStmt = $pdo->prepare("
-        SELECT
-            rb.id,
-            rb.rescreen_batch_number,
-            rb.rescreen_type,
-            rb.second_screening_reason,
-            rb.customer_approval_reference,
-            rb.status,
-            rb.received_total_quantity,
-            rb.received_total_weight_kg,
-            rb.rescreen_output_good_units,
-            rb.rescreen_output_defect_units,
-            rb.rescreen_output_scrap_units,
-            rb.source_return_order_id,
-            ro.return_order_number,
-            rb.rescreen_work_order_id,
-            exec_wo.work_order_number AS rescreen_work_order_number,
-            rb.created_at
+        SELECT rb.id
         FROM rescreen_batches rb
-        LEFT JOIN return_orders ro ON ro.id = rb.source_return_order_id
-        LEFT JOIN work_orders exec_wo ON exec_wo.id = rb.rescreen_work_order_id
         WHERE rb.deleted_at IS NULL
           AND (
               rb.source_work_order_id = :work_order_id
@@ -435,7 +418,11 @@ try {
         'work_order_id' => $id,
         'source_rescreen_batch_id' => (int)($workOrder['source_rescreen_batch_id'] ?? 0),
     ]);
-    $workOrder['second_screening_batches'] = $secondScreeningStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $secondScreeningBatchIds = array_map('intval', $secondScreeningStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
+    $workOrder['second_screening_batches'] = array_values(array_filter(array_map(
+        static fn(int $batchId): ?array => getRescreenBatchDetails($pdo, $batchId),
+        $secondScreeningBatchIds
+    )));
     $workOrder['second_screening_count'] = count($workOrder['second_screening_batches']);
 
     jsonResponse([

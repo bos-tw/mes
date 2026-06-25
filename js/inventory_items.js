@@ -1,12 +1,6 @@
-/**
- * Inventory Items Module
- * 管理庫存項目的 CRUD 操作
- */
-
 (function() {
     'use strict';
 
-    // 初始化函數,當模組被載入時呼叫
     function initializeInventoryItemsModule(container, initialContext = null) {
         const moduleRoot = container.querySelector('[data-module="inventory_items"]');
         if (!moduleRoot || moduleRoot.dataset.initialised === 'true') {
@@ -14,8 +8,6 @@
         }
 
         moduleRoot.dataset.initialised = 'true';
-
-    // DOM Elements
     const elements = {
         alert: moduleRoot.querySelector('[data-inventory-items-alert]'),
         table: moduleRoot.querySelector('[data-inventory-items-table]'),
@@ -40,8 +32,6 @@
         shippingForm: moduleRoot.querySelector('[data-shipping-form]'),
         shippingModalAlert: moduleRoot.querySelector('[data-shipping-modal-alert]'),
     };
-
-    // State
     const state = {
         currentPage: 1,
         perPage: 20,
@@ -55,11 +45,22 @@
         employees: [],
         deleteBlockReasons: new Map(),
     };
-
-    // Initialize
+    let inventorySourceChainScriptPromise = null;
     init();
 
+    function ensureInventorySourceChainScript() {
+        if (window.InventoryItemsSourceChain) return Promise.resolve();
+        if (!inventorySourceChainScriptPromise) inventorySourceChainScriptPromise = new Promise((resolve, reject) => {
+            const script = Object.assign(document.createElement('script'), { src: 'js/inventory_items_source_chain.js' });
+            script.onload = resolve;
+            script.onerror = () => reject(new Error('來源鏈模組載入失敗'));
+            document.head.appendChild(script);
+        });
+        return inventorySourceChainScriptPromise;
+    }
+
     function init() {
+        ensureInventorySourceChainScript().catch(() => {});
         loadCustomers();
         loadScreeningItems();
         loadWorkOrders();
@@ -639,9 +640,10 @@ function renderTable(items) {
     function renderDetailView(data) {
         if (!elements.detailContent) return;
 
-        const { item, transactions, shipping_history: shippingHistory } = data;
+        const { item, transactions, shipping_history: shippingHistory, source_chain: sourceChain = [] } = data;
         const receiptTypeLabel = escapeHtml(item.receipt_type_label || '一般入庫');
         const formatWeightUnits = (netWeightKg, units) => `${Number(netWeightKg || 0).toFixed(2)} kg / ${formatNumber(units || 0)} 支`;
+        const sourceChainSection = window.InventoryItemsSourceChain?.renderSection(sourceChain, { escapeHtml }) || '';
 
         elements.detailContent.innerHTML = `
             <dl class="detail-list inventory-detail-list">
@@ -720,6 +722,7 @@ function renderTable(items) {
                     </div>
                 </dl>
             </div>
+            ${sourceChainSection}
 
             ${(item.receipt_type === 'partial' && item.partial_receipt_tool_breakdown) ? `
             <div class="detail-section">
@@ -1194,6 +1197,7 @@ function renderTable(items) {
         try {
             state.editingId = inventoryItemId;
             const data = await loadInventoryItemDetails(inventoryItemId);
+            await ensureInventorySourceChainScript();
 
             if (!data) {
                 throw new Error('無法載入庫存項目詳情');
@@ -1754,7 +1758,6 @@ function renderTable(items) {
         loadInventoryItems();
     }
 
-    // Alert Functions
     function showAlert(type, message) {
         if (!elements.alert) return;
 
@@ -1784,7 +1787,6 @@ function renderTable(items) {
         elements.modalAlert.className = 'modal-alert hidden';
     }
 
-    // Utility Functions
     function formatNumber(num) {
         if (num === null || num === undefined) return '0';
         const rounded = Math.round(parseFloat(num) * 100) / 100;
@@ -1964,7 +1966,6 @@ function renderTable(items) {
         });
     }
 
-    // Public API
     window.inventoryItemsModule = {
         viewDetail: openDetailModal,
         edit: openEditModal,
@@ -1992,7 +1993,6 @@ function renderTable(items) {
 
     } // End of initializeInventoryItemsModule
 
-    // Export - 暴露到全域供 script.js 註冊
     window.initializeInventoryItemsModule = initializeInventoryItemsModule;
 
 })();

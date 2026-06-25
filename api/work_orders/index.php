@@ -92,7 +92,10 @@ function handleListWorkOrders(PDO $pdo): void
     $offset = ($page - 1) * $perPage;
 
     // Build WHERE clause
-    $where = ['wo.deleted_at IS NULL'];
+    $where = [
+        'wo.deleted_at IS NULL',
+        "COALESCE(wo.work_order_type, 'normal') <> 'rescreen'",
+    ];
     $params = [];
 
     if ($keyword !== '') {
@@ -236,7 +239,7 @@ function handleListWorkOrders(PDO $pdo): void
                 COUNT(*) AS second_screening_count,
                 MAX(id) AS second_screening_batch_id,
                 GROUP_CONCAT(rescreen_batch_number ORDER BY id DESC SEPARATOR ', ') AS second_screening_batch_numbers,
-                GROUP_CONCAT(DISTINCT second_screening_reason ORDER BY second_screening_reason SEPARATOR ', ') AS second_screening_reasons,
+                GROUP_CONCAT(DISTINCT second_screening_reason ORDER BY second_screening_reason SEPARATOR '||') AS second_screening_reasons,
                 GROUP_CONCAT(DISTINCT status ORDER BY status SEPARATOR ', ') AS second_screening_statuses
             FROM rescreen_batches
             WHERE deleted_at IS NULL

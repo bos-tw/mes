@@ -107,6 +107,37 @@
             });
         }
 
+        function getSecondScreeningReasonLabel(reason) {
+            const labels = {
+                relaxed_after_high_defect: '不良過多，客戶放寬後再篩',
+                customer_required_second_pass: '客戶每批要求二次篩選',
+            };
+            return labels[reason] || reason || '';
+        }
+
+        function renderSecondScreeningTrace(record) {
+            if (!record.rescreen_batch_id && !record.rescreen_batch_number) {
+                return '';
+            }
+
+            const traceParts = [];
+            if (record.rescreen_batch_number) {
+                traceParts.push(`案件 ${record.rescreen_batch_number}`);
+            }
+            if (record.second_screening_reason_label || record.second_screening_reason) {
+                traceParts.push(record.second_screening_reason_label || getSecondScreeningReasonLabel(record.second_screening_reason));
+            }
+            if (record.rescreen_round) {
+                traceParts.push(`第 ${record.rescreen_round} 輪`);
+            }
+
+            if (traceParts.length === 0) {
+                return '';
+            }
+
+            return `<div class="subtext">二次篩選：${escapeHtml(traceParts.join(' / '))}</div>`;
+        }
+
         function getContextFilterPatch(context) {
             if (!context || typeof context !== 'object') {
                 return null;
@@ -245,7 +276,7 @@
                 return `
                     <tr data-record-id="${rowId}">
                         <td>${escapeHtml(row.occurred_at || '-')}</td>
-                        <td>${escapeHtml(row.source_type_label || '-')}</td>
+                        <td>${escapeHtml(row.source_type_label || '-')}${renderSecondScreeningTrace(row)}</td>
                         <td>${escapeHtml(row.order_number || '-')}</td>
                         <td>${escapeHtml(row.work_order_number || '-')}</td>
                         <td>${escapeHtml(row.shipping_order_number || '-')}</td>
@@ -309,6 +340,9 @@
             detailContent.innerHTML = `
                 <div class="detail-grid">
                     <div class="detail-item"><label>來源</label><span>${escapeHtml(record.source_type_label || '-')}</span></div>
+                    <div class="detail-item"><label>二次篩選案件</label><span>${escapeHtml(record.rescreen_batch_number || '-')}</span></div>
+                    <div class="detail-item"><label>二次篩選原因</label><span>${escapeHtml(record.second_screening_reason_label || getSecondScreeningReasonLabel(record.second_screening_reason) || '-')}</span></div>
+                    <div class="detail-item"><label>二次篩選輪次</label><span>${escapeHtml(record.rescreen_round ? `第 ${record.rescreen_round} 輪` : '-')}</span></div>
                     <div class="detail-item"><label>發生時間</label><span>${escapeHtml(record.occurred_at || '-')}</span></div>
                     <div class="detail-item"><label>訂單編號</label><span>${escapeHtml(record.order_number || '-')}</span></div>
                     <div class="detail-item"><label>工單編號</label><span>${escapeHtml(record.work_order_number || '-')}</span></div>

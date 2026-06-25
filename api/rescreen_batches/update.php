@@ -34,8 +34,34 @@ if ($validation['errors'] !== []) {
 
 $data = $validation['data'];
 $rulesPayload = isset($payload['rules']) && is_array($payload['rules']) ? $payload['rules'] : null;
+$defectsPayload = isset($payload['defects']) && is_array($payload['defects']) ? $payload['defects'] : null;
+$productionRecordsPayload = isset($payload['production_records']) && is_array($payload['production_records']) ? $payload['production_records'] : null;
 
-if ($data === [] && $rulesPayload === null) {
+if ($defectsPayload !== null) {
+    $defectValidation = validateRescreenDefectPayload($defectsPayload);
+    if ($defectValidation['errors'] !== []) {
+        jsonResponse([
+            'success' => false,
+            'message' => '二次篩分服務明細驗證失敗。',
+            'errors' => $defectValidation['errors'],
+        ], 400);
+    }
+    $defectsPayload = $defectValidation['data'];
+}
+
+if ($productionRecordsPayload !== null) {
+    $recordValidation = validateRescreenProductionRecordPayload($productionRecordsPayload);
+    if ($recordValidation['errors'] !== []) {
+        jsonResponse([
+            'success' => false,
+            'message' => '二次篩選生產記錄驗證失敗。',
+            'errors' => $recordValidation['errors'],
+        ], 400);
+    }
+    $productionRecordsPayload = $recordValidation['data'];
+}
+
+if ($data === [] && $rulesPayload === null && $defectsPayload === null && $productionRecordsPayload === null) {
     jsonResponse(['success' => false, 'message' => '沒有可更新的欄位。'], 400);
 }
 
@@ -92,10 +118,21 @@ try {
         }
     }
 
+    $currentEmployeeId = isset($_SESSION['employee']['id']) ? (int)$_SESSION['employee']['id'] : null;
+    if ($defectsPayload !== null) {
+        saveRescreenBatchDefectRows($pdo, $id, $defectsPayload, $currentEmployeeId);
+    }
+    if ($productionRecordsPayload !== null) {
+        saveRescreenBatchProductionRecords($pdo, $id, (int)($existing['source_work_order_id'] ?? 0), $productionRecordsPayload, $currentEmployeeId);
+    }
+    refreshRescreenBatchExecutionSummary($pdo, $id);
+
     $updated = getRescreenBatchDetails($pdo, $id);
     logAuditAction('Update rescreen batch', 'rescreen_batches', $id, [
         'updated_fields' => array_keys($data),
         'rules_updated' => $rulesPayload !== null,
+        'defects_updated' => $defectsPayload !== null,
+        'production_records_updated' => $productionRecordsPayload !== null,
     ]);
     $pdo->commit();
 

@@ -85,6 +85,7 @@ function getReturnOrderDetails(PDO $pdo, int $id): ?array
                 id,
                 rescreen_batch_number,
                 rescreen_type,
+                second_screening_reason,
                 status,
                 rescreen_work_order_id,
                 created_at

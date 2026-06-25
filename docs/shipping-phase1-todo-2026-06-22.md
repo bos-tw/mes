@@ -4,6 +4,8 @@
 狀態：第一階段 P0 已完成，待你自行實機驗證；第二階段已開始開發  
 對應計畫：`docs/shipping-phase1-implementation-plan-2026-06-22.md`、`docs/shipping-phase2-implementation-plan-2026-06-22.md`
 
+> 2026-06-25 起，二次重篩 / 二次篩選相關設計與實作追蹤已收斂到 `docs/second-screening-implementation-plan-2026-06-25.md` 與 `docs/second-screening-todo-2026-06-25.md`。本文件中的舊描述僅保留歷程脈絡，實際狀態請以新版文件為準。
+
 ## 本次進度摘要
 
 - [x] 第一階段 P0 資料結構、API、前端、A5 列印與基本守門已完成

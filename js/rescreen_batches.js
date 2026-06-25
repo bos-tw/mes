@@ -22,6 +22,7 @@
             viewingId: null,
             currentContext: initialContext || null,
             data: [],
+            sourceWorkOrderDetails: null,
         };
 
         let dataSyncHelper = null;
@@ -39,6 +40,8 @@
             detailContent: document.querySelector('[data-rescreen-batches-detail]'),
             createBtn: moduleRoot.querySelector('[data-action="create"]'),
             sourceSummary: document.querySelector('[data-rescreen-source-summary]'),
+            defectEditor: document.querySelector('[data-rescreen-defect-editor]'),
+            productionEditor: document.querySelector('[data-rescreen-production-editor]'),
         };
 
         const tbody = elements.table?.querySelector('tbody');
@@ -66,7 +69,7 @@
         }
 
         function getTypeLabel(type) {
-            return type === 'relaxed_rescreen' ? '放寬二篩' : '嚴格二篩';
+            return type === 'relaxed_rescreen' ? '放寬後重篩' : '嚴格重篩';
         }
 
         function getStatusBadge(status) {
@@ -101,12 +104,16 @@
         }
 
         function getSecondScreeningReasonLabel(reason, legacyCode = '') {
+            const normalizedReason = String(reason || '').trim();
             const map = {
                 relaxed_after_high_defect: '不良過多，客戶放寬後再篩',
                 customer_required_second_pass: '客戶每批要求二次篩選',
             };
-            if (map[reason]) {
-                return map[reason];
+            if (map[normalizedReason]) {
+                return map[normalizedReason];
+            }
+            if (normalizedReason !== '') {
+                return normalizedReason;
             }
             return getRequestReasonLabel(legacyCode);
         }
@@ -125,6 +132,23 @@
         function formatQuantity(value, unit = '') {
             const text = value == null || value === '' ? '0' : String(value);
             return `${text}${unit ? ` ${unit}` : ''}`;
+        }
+
+        function formatDateTime(value) {
+            if (!value) {
+                return '-';
+            }
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) {
+                return String(value);
+            }
+            return date.toLocaleString('zh-TW', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
         }
 
         function buildStatusBadgeElement(status) {
@@ -149,6 +173,49 @@
             }
             return span;
         }
+        function buildDefectEditorRows(rows = []) {
+            if (!elements.defectEditor) return;
+            const helper = window.RescreenBatchEditorHelper;
+            elements.defectEditor.innerHTML = helper
+                ? helper.buildDefectEditorHtml(rows, escapeHtml)
+                : '<p class="text-muted">二次篩分服務明細編輯器載入失敗。</p>';
+        }
+
+        function buildDefaultDefectRowsFromWorkOrder(workOrder) { return window.RescreenBatchEditorHelper?.buildDefaultDefectRowsFromWorkOrder(workOrder) || []; }
+
+        function buildProductionEditorRows(rows = []) {
+            if (!elements.productionEditor) return;
+            const helper = window.RescreenBatchEditorHelper;
+            elements.productionEditor.innerHTML = helper
+                ? helper.buildProductionEditorHtml(rows, escapeHtml)
+                : '<p class="text-muted">二次篩選生產記錄編輯器載入失敗。</p>';
+        }
+
+        function collectDefectRows() {
+            return window.RescreenBatchEditorHelper?.collectDefectRows(elements.defectEditor) || [];
+        }
+
+        function collectProductionRecordRows() {
+            return window.RescreenBatchEditorHelper?.collectProductionRecordRows(elements.productionEditor) || [];
+        }
+
+        function setExecutionResultFormDefaults(values = {}) {
+            [['started_at', values.started_at || ''], ['completed_at', values.completed_at || ''], ['rescreen_output_good_units', values.rescreen_output_good_units ?? ''], ['rescreen_output_defect_units', values.rescreen_output_defect_units ?? ''], ['rescreen_output_scrap_units', values.rescreen_output_scrap_units ?? '']].forEach(([name, value]) => setFormValue(name, value));
+        }
+
+        function appendProductionRecordRow(initialRow = {}) {
+            if (!elements.productionEditor) return;
+            const tbody = elements.productionEditor.querySelector('tbody');
+            if (!tbody) {
+                buildProductionEditorRows([initialRow]);
+                return;
+            }
+            const helper = window.RescreenBatchEditorHelper;
+            if (!helper) return;
+            tbody.insertAdjacentHTML('beforeend', helper.buildProductionEditorRowHtml(initialRow, escapeHtml));
+            const emptyHint = elements.productionEditor.querySelector('.text-muted.mt-2');
+            if (emptyHint) emptyHint.remove();
+        }
 
         function collectFilters() {
             if (!elements.filterForm) {
@@ -159,6 +226,7 @@
                 keyword: String(formData.get('keyword') || '').trim(),
                 customer_id: String(formData.get('customer_id') || '').trim(),
                 rescreen_type: String(formData.get('rescreen_type') || '').trim(),
+                second_screening_reason: String(formData.get('second_screening_reason') || '').trim(),
                 status: String(formData.get('status') || '').trim(),
                 perPage: String(formData.get('perPage') || '20').trim(),
             };
@@ -215,7 +283,7 @@
         async function loadWorkOrderSourceSummary(workOrderId) {
             const normalizedId = Number.parseInt(workOrderId, 10);
             if (!elements.sourceSummary || !Number.isInteger(normalizedId) || normalizedId <= 0) {
-                return;
+                return null;
             }
             elements.sourceSummary.innerHTML = '<p class="text-muted">正在載入來源工單...</p>';
             try {
@@ -223,9 +291,10 @@
                 const result = await response.json();
                 if (!result.success) {
                     elements.sourceSummary.innerHTML = `<p class="text-danger">${escapeHtml(result.message || '載入來源工單失敗')}</p>`;
-                    return;
+                    return null;
                 }
                 const data = result.data || {};
+                state.sourceWorkOrderDetails = data;
                 elements.sourceSummary.innerHTML = `
                     <div class="detail-item"><span class="detail-label">來源工單</span><span class="detail-value">${escapeHtml(data.work_order_number || '-')}</span></div>
                     <div class="detail-item"><span class="detail-label">客戶</span><span class="detail-value">${escapeHtml(data.customer_name || '-')}</span></div>
@@ -234,9 +303,11 @@
                     <div class="detail-item"><span class="detail-label">預估數量</span><span class="detail-value">${formatQuantity(data.total_units || 0, '支')}</span></div>
                     <div class="detail-item"><span class="detail-label">預估重量</span><span class="detail-value">${formatQuantity(data.total_weight_kg || 0, 'kg')}</span></div>
                 `;
+                return data;
             } catch (error) {
                 console.error('loadWorkOrderSourceSummary failed:', error);
                 elements.sourceSummary.innerHTML = '<p class="text-danger">載入來源工單失敗。</p>';
+                return null;
             }
         }
 
@@ -326,6 +397,7 @@
                 if (filters.keyword) params.set('keyword', filters.keyword);
                 if (filters.customer_id) params.set('customer_id', filters.customer_id);
                 if (filters.rescreen_type) params.set('rescreen_type', filters.rescreen_type);
+                if (filters.second_screening_reason) params.set('second_screening_reason', filters.second_screening_reason);
                 if (filters.status) params.set('status', filters.status);
                 if (state.sourceReturnOrderId) params.set('source_return_order_id', state.sourceReturnOrderId);
                 if (state.sourceWorkOrderId) params.set('source_work_order_id', state.sourceWorkOrderId);
@@ -360,8 +432,8 @@
                 (item) => item.return_order_number || '',
                 (item) => item.shipping_order_number || '-',
                 (item) => item.source_work_order_number || '-',
-                (item) => item.rescreen_work_order_number || '-',
                 (item) => String(item.received_total_quantity || 0),
+                (item) => formatDateTime(item.created_at),
             ];
 
             state.data.forEach((item) => {
@@ -414,12 +486,15 @@
             elements.modal?.classList.add('hidden');
             elements.modalForm?.reset();
             state.editingId = null;
+            state.sourceWorkOrderDetails = null;
             setFormValue('source_work_order_id', '');
             const returnSelect = elements.modalForm?.querySelector('[name="source_return_order_id"]');
             if (returnSelect) {
                 returnSelect.disabled = false;
             }
             hideAlert(true);
+            buildDefectEditorRows([]);
+            buildProductionEditorRows([]);
             loadReturnOrderSummary('');
         }
 
@@ -449,21 +524,33 @@
                     returnSelect.disabled = true;
                 }
                 setFormValue('rescreen_type', prefillContext?.rescreenType || 'strict_rescreen');
-                setFormValue('second_screening_reason', prefillContext?.secondScreeningReason || 'customer_required_second_pass');
+                setFormValue(
+                    'second_screening_reason',
+                    getSecondScreeningReasonLabel(prefillContext?.secondScreeningReason) || '客戶每批要求二次篩選'
+                );
                 setFormValue('source_defect_history_record_id', prefillContext?.sourceDefectHistoryRecordId || '');
                 setFormValue('customer_approval_reference', prefillContext?.customerApprovalReference || '');
                 setFormValue('notes', prefillContext?.notes || '');
-                await loadWorkOrderSourceSummary(selectedWorkOrderId);
+                setExecutionResultFormDefaults();
+                const workOrderData = await loadWorkOrderSourceSummary(selectedWorkOrderId);
+                buildDefectEditorRows(buildDefaultDefectRowsFromWorkOrder(workOrderData));
+                buildProductionEditorRows([]);
             } else {
                 if (returnSelect) {
                     returnSelect.disabled = false;
                 }
                 setFormValue('rescreen_type', prefillContext?.rescreenType || 'relaxed_rescreen');
-                setFormValue('second_screening_reason', prefillContext?.secondScreeningReason || 'relaxed_after_high_defect');
+                setFormValue(
+                    'second_screening_reason',
+                    getSecondScreeningReasonLabel(prefillContext?.secondScreeningReason) || '不良過多，客戶放寬後再篩'
+                );
                 setFormValue('source_defect_history_record_id', prefillContext?.sourceDefectHistoryRecordId || '');
                 setFormValue('customer_approval_reference', prefillContext?.customerApprovalReference || '');
                 setFormValue('notes', prefillContext?.notes || '');
+                setExecutionResultFormDefaults();
                 await loadReturnOrderSummary(selectedReturnOrderId);
+                buildDefectEditorRows([]);
+                buildProductionEditorRows([]);
             }
             openModal();
         }
@@ -490,6 +577,15 @@
                 setFormValue('customer_approval_reference', data.customer_approval_reference || '');
                 setFormValue('status', data.status || 'draft');
                 setFormValue('notes', data.notes || '');
+                setExecutionResultFormDefaults({
+                    started_at: window.RescreenBatchEditorHelper?.formatDateTimeLocalValue(data.started_at || '') || '',
+                    completed_at: window.RescreenBatchEditorHelper?.formatDateTimeLocalValue(data.completed_at || '') || '',
+                    rescreen_output_good_units: data.rescreen_output_good_units ?? '',
+                    rescreen_output_defect_units: data.rescreen_output_defect_units ?? '',
+                    rescreen_output_scrap_units: data.rescreen_output_scrap_units ?? '',
+                });
+                buildDefectEditorRows(Array.isArray(data.defects) ? data.defects : []);
+                buildProductionEditorRows(Array.isArray(data.production_records) ? data.production_records : []);
                 const returnSelect = elements.modalForm?.querySelector('[name="source_return_order_id"]');
                 if (returnSelect) {
                     returnSelect.disabled = !data.source_return_order_id && !!data.source_work_order_id;
@@ -517,6 +613,14 @@
             if (!elements.modalForm) return;
             const formData = new FormData(elements.modalForm);
             const data = Object.fromEntries(formData.entries());
+            const defectRows = collectDefectRows();
+            const productionRecordRows = collectProductionRecordRows();
+            if (defectRows.length > 0 || state.editingId) {
+                data.defects = defectRows;
+            }
+            if (productionRecordRows.length > 0 || state.editingId) {
+                data.production_records = productionRecordRows;
+            }
             const url = state.editingId ? `${API_BASE}/update.php?id=${state.editingId}` : `${API_BASE}/index.php`;
             const method = state.editingId ? 'PUT' : 'POST';
 
@@ -600,7 +704,29 @@
             if (!elements.detailContent) return;
             const items = Array.isArray(data.items) ? data.items : [];
             const defects = Array.isArray(data.defects) ? data.defects : [];
+            const productionRecords = Array.isArray(data.production_records) ? data.production_records : [];
             const hasDefects = defects.length > 0;
+            const defectRecorderNames = Array.from(new Set(
+                defects
+                    .map((defect) => String(defect.defect_recorded_by_name || '').trim())
+                    .filter(Boolean)
+            ));
+            const latestDefectRecord = defects.reduce((latest, defect) => {
+                const recordedAt = String(defect.defect_recorded_at || '').trim();
+                if (!recordedAt) {
+                    return latest;
+                }
+                if (!latest || recordedAt > String(latest.defect_recorded_at || '').trim()) {
+                    return defect;
+                }
+                return latest;
+            }, null);
+            const screeningOperatorLabel = defectRecorderNames.join('、')
+                || data.rescreen_assigned_employee_name
+                || data.rescreen_calibration_employee_name
+                || '-';
+            const screeningStartAt = data.started_at || '';
+            const screeningCompletedAt = data.completed_at || '';
             const resultLabel = data.status === 'completed'
                 ? (hasDefects ? '已完成，有再次不良需處置' : '已完成，未記錄再次不良')
                 : '尚未完成，結果待確認';
@@ -652,8 +778,8 @@
                             </tr>
                             <tr>
                                 <td>4</td>
-                                <td>二次篩選</td>
-                                <td>${escapeHtml(data.rescreen_batch_number || '-')} / ${escapeHtml(data.rescreen_work_order_number || '-')}</td>
+                                <td>二次篩選案件</td>
+                                <td>${escapeHtml(data.rescreen_batch_number || '-')}</td>
                                 <td>${escapeHtml(getSecondScreeningReasonLabel(data.second_screening_reason, data.request_reason_code))}；目前${escapeHtml(resultLabel)}。</td>
                             </tr>
                         </tbody>
@@ -665,8 +791,19 @@
                         <dt>原因</dt><dd>${escapeHtml(getSecondScreeningReasonLabel(data.second_screening_reason, data.request_reason_code))}</dd>
                         <dt>客戶通知 / 標準佐證</dt><dd>${escapeHtml(data.customer_approval_reference || '-')}</dd>
                         <dt>說明</dt><dd>${escapeHtml(data.decision_notes || data.notes || '-')}</dd>
-                        <dt>執行工單</dt><dd>${escapeHtml(data.rescreen_work_order_number || '尚未建立')}</dd>
+                        <dt>關聯原始工單</dt><dd>${escapeHtml(data.source_work_order_number || '-')}</dd>
                     </dl>
+                </div>
+                <div class="detail-section">
+                    <h4>執行人員與時間</h4>
+                    <div class="detail-grid">
+                        <div class="detail-item"><span class="detail-label">主要篩選人員</span><span class="detail-value">${escapeHtml(screeningOperatorLabel)}</span></div>
+                        <div class="detail-item"><span class="detail-label">校機 / 協助人員</span><span class="detail-value">${escapeHtml(data.rescreen_calibration_employee_name || '-')}</span></div>
+                        <div class="detail-item"><span class="detail-label">二篩開始時間</span><span class="detail-value">${escapeHtml(formatDateTime(screeningStartAt))}</span></div>
+                        <div class="detail-item"><span class="detail-label">二篩完成時間</span><span class="detail-value">${escapeHtml(formatDateTime(screeningCompletedAt))}</span></div>
+                        <div class="detail-item"><span class="detail-label">再次不良最後記錄人員</span><span class="detail-value">${escapeHtml(latestDefectRecord?.defect_recorded_by_name || '-')}</span></div>
+                        <div class="detail-item"><span class="detail-label">再次不良最後記錄時間</span><span class="detail-value">${escapeHtml(formatDateTime(latestDefectRecord?.defect_recorded_at || ''))}</span></div>
+                    </div>
                 </div>
                 <div class="detail-section">
                     <h4>來源明細</h4>
@@ -700,10 +837,10 @@
                 ${renderRuleTable('原始標準快照', data.rules?.original || [])}
                 ${renderRuleTable('二次篩選標準快照', data.rules?.rescreen || [])}
                 <div class="detail-section">
-                    <h4>二篩後再次不良</h4>
+                    <h4>二次篩分服務明細</h4>
                     ${defects.length === 0 ? '<p class="text-muted">目前尚無二次篩選再次不良紀錄。</p>' : `
                         <table class="data-table compact">
-                            <thead><tr><th>服務</th><th>不良數量</th><th>重量(kg)</th><th>支數</th><th>處置</th><th>備註</th></tr></thead>
+                            <thead><tr><th>服務</th><th>不良數量</th><th>重量(kg)</th><th>支數</th><th>處置</th><th>記錄人員</th><th>記錄時間</th><th>備註</th></tr></thead>
                             <tbody>
                                 ${defects.map((defect) => `
                                     <tr>
@@ -712,7 +849,32 @@
                                         <td>${escapeHtml(defect.defect_weight_kg || 0)}</td>
                                         <td>${escapeHtml(defect.defect_units || 0)}</td>
                                         <td>${escapeHtml(getDispositionLabel(defect.disposition))}</td>
+                                        <td>${escapeHtml(defect.defect_recorded_by_name || '-')}</td>
+                                        <td>${escapeHtml(formatDateTime(defect.defect_recorded_at || ''))}</td>
                                         <td>${escapeHtml(defect.notes || '-')}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `}
+                </div>
+                <div class="detail-section">
+                    <h4>二次篩選生產記錄</h4>
+                    ${productionRecords.length === 0 ? '<p class="text-muted">目前尚無二次篩選生產記錄。</p>' : `
+                        <table class="data-table compact">
+                            <thead><tr><th>卡號/桶號</th><th>重量(kg)</th><th>日期</th><th>時間</th><th>機台</th><th>載具</th><th>載具重(kg)</th><th>記錄人員</th><th>備註</th></tr></thead>
+                            <tbody>
+                                ${productionRecords.map((record) => `
+                                    <tr>
+                                        <td>${escapeHtml(record.card_number || '-')}</td>
+                                        <td>${escapeHtml(record.weight_kg ?? '-')}</td>
+                                        <td>${escapeHtml(record.production_date || '-')}</td>
+                                        <td>${escapeHtml(record.production_time || '-')}</td>
+                                        <td>${escapeHtml(record.machine_name || record.machine_type || '-')}</td>
+                                        <td>${escapeHtml(record.tool_name || '-')}</td>
+                                        <td>${escapeHtml(record.tool_weight_kg ?? '-')}</td>
+                                        <td>${escapeHtml(record.employee_name || '-')}</td>
+                                        <td>${escapeHtml(record.notes || '-')}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -733,6 +895,8 @@
                 viewDetail(id);
             } else if (action === 'edit' && Number.isInteger(id)) {
                 openEditModal(id);
+            } else if (action === 'add-production-record') {
+                appendProductionRecordRow();
             }
         }
 
@@ -749,6 +913,8 @@
             } else if (action === 'edit-from-detail' && state.viewingId) {
                 closeDetailModal();
                 openEditModal(state.viewingId);
+            } else if (action === 'remove-production-record') {
+                button.closest('[data-rescreen-production-row]')?.remove();
             }
         }
 

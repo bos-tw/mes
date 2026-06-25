@@ -1,6 +1,6 @@
 ModuleConfig.register('rescreen_batches', {
-    title: '二次篩選歷史紀錄',
-    subtitle: '查詢放寬後二篩、客戶每批要求二篩、執行工單與追溯結果',
+    title: '二次篩選紀錄',
+    subtitle: '查詢放寬後重篩、客戶每批要求二次篩選、原始工單關聯與完整追溯結果',
 
     requiresHtmlModal: true,
     hasColumnSelector: true,
@@ -10,7 +10,7 @@ ModuleConfig.register('rescreen_batches', {
     useGenericFilterDrawer: true,
 
     actions: [
-        { label: '新增二篩紀錄', icon: 'fa-plus', action: 'create', style: 'primary' }
+        { label: '新增二次篩選案件', icon: 'fa-plus', action: 'create', style: 'primary' }
     ],
 
     filters: [
@@ -23,13 +23,19 @@ ModuleConfig.register('rescreen_batches', {
         },
         {
             name: 'rescreen_type',
-            label: '二篩類型',
+            label: '二篩方式',
             type: 'select',
             options: [
                 { value: '', label: '-- 所有類型 --' },
-                { value: 'strict_rescreen', label: '嚴格二篩' },
-                { value: 'relaxed_rescreen', label: '放寬二篩' }
+                { value: 'strict_rescreen', label: '嚴格重篩' },
+                { value: 'relaxed_rescreen', label: '放寬後重篩' }
             ]
+        },
+        {
+            name: 'second_screening_reason',
+            label: '二篩原因',
+            type: 'text',
+            placeholder: '搜尋二次篩選原因'
         },
         {
             name: 'status',
@@ -64,7 +70,6 @@ ModuleConfig.register('rescreen_batches', {
         { key: 'return_order_number', label: '退貨單', sortable: false, selectable: true },
         { key: 'shipping_order_number', label: '原出貨單', sortable: false, selectable: true },
         { key: 'source_work_order_number', label: '原始工單', sortable: false, selectable: true },
-        { key: 'rescreen_work_order_number', label: '二篩工單', sortable: false, selectable: true },
         { key: 'received_total_quantity', label: '來源數量', sortable: false, selectable: true },
         { key: 'status', label: '狀態', sortable: true, selectable: true },
         { key: 'created_at', label: '建立時間', sortable: true, selectable: true },
@@ -72,7 +77,7 @@ ModuleConfig.register('rescreen_batches', {
     ],
 
     detailModal: {
-        title: '二次篩選歷史詳情',
+        title: '二次篩選詳情',
         icon: 'fa-redo',
         hasEdit: true
     }

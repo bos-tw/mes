@@ -29,10 +29,7 @@
                         </label>
                         <label class="inline-label">
                             <span>二次篩選原因 <abbr title="必填">*</abbr></span>
-                            <select name="second_screening_reason" required>
-                                <option value="customer_required_second_pass">客戶每批要求二次篩選</option>
-                                <option value="relaxed_after_high_defect">不良過多，客戶放寬後再篩</option>
-                            </select>
+                            <input type="text" name="second_screening_reason" maxlength="255" required placeholder="請輸入本次二次篩選原因">
                         </label>
                         <label class="inline-label">
                             <span>案件狀態</span>
@@ -67,6 +64,46 @@
                 <div class="detail-grid" data-rescreen-source-summary>
                     <p class="text-muted">請先選擇退貨單，或從生產工單建立二次篩選。</p>
                 </div>
+            </section>
+
+            <section class="form-section">
+                <h4>二篩執行結果</h4>
+                <div class="form-grid">
+                    <label class="inline-label">
+                        <span>開始時間</span>
+                        <input type="datetime-local" name="started_at" readonly>
+                    </label>
+                    <label class="inline-label">
+                        <span>完成時間</span>
+                        <input type="datetime-local" name="completed_at" readonly>
+                    </label>
+                    <label class="inline-label">
+                        <span>良品數</span>
+                        <input type="number" name="rescreen_output_good_units" min="0" step="0.01" placeholder="0" readonly>
+                    </label>
+                    <label class="inline-label">
+                        <span>再次不良數</span>
+                        <input type="number" name="rescreen_output_defect_units" min="0" step="0.01" placeholder="0" readonly>
+                    </label>
+                    <label class="inline-label">
+                        <span>報廢 / 其他處置數</span>
+                        <input type="number" name="rescreen_output_scrap_units" min="0" step="0.01" placeholder="0" readonly>
+                    </label>
+                </div>
+                <p class="text-muted">以上摘要會依二次篩分服務明細與生產記錄自動計算，儲存後同步更新。</p>
+            </section>
+
+            <section class="form-section">
+                <h4>二次篩分服務不良明細</h4>
+                <div data-rescreen-defect-editor></div>
+            </section>
+
+            <section class="form-section">
+                <div class="form-section-heading">
+                    <h4>二次篩選生產記錄</h4>
+                    <button type="button" class="btn outline small" data-action="add-production-record">新增一筆</button>
+                </div>
+                <div data-rescreen-production-editor></div>
             </section>
 
             <div class="form-actions align-right">

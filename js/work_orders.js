@@ -4383,7 +4383,7 @@
         const existingBatchId = Number.parseInt(item.second_screening_batch_id || item.source_rescreen_batch_id || '', 10);
         const hasExistingBatch = Number.isInteger(existingBatchId) && existingBatchId > 0;
 
-        window.openTab('rescreen_batches', '二次篩選歷史紀錄', 'modules/rescreen_batches.html', {
+        window.openTab('rescreen_batches', '二次篩選紀錄', 'modules/rescreen_batches.html', {
             context: hasExistingBatch
                 ? {
                     action: 'view',
@@ -5066,7 +5066,98 @@
             relaxed_after_high_defect: '放寬後二篩',
             customer_required_second_pass: '每批二篩',
         };
-        return map[String(reason || '').trim()] || '';
+        const normalizedReason = String(reason || '').trim();
+        return map[normalizedReason] || normalizedReason;
+    }
+
+    function getSecondScreeningStatusLabel(status) {
+        const map = {
+            draft: '草稿',
+            planned: '已排程',
+            in_progress: '進行中',
+            completed: '已完成',
+            cancelled: '已取消',
+        };
+        return map[String(status || '').trim()] || (status || '-');
+    }
+
+    function getSecondScreeningDispositionLabel(disposition) {
+        const map = {
+            rework: '可再處理',
+            scrap: '報廢',
+            return_to_customer: '退回客戶',
+            hold: '暫留待判',
+            other: '其他',
+        };
+        const normalizedDisposition = String(disposition || '').trim();
+        return map[normalizedDisposition] || normalizedDisposition || '-';
+    }
+
+    function formatSecondScreeningMetric(value, suffix = '') {
+        if (value === null || value === undefined || value === '') {
+            return '-';
+        }
+
+        return `${String(value)}${suffix}`;
+    }
+
+    function formatSecondScreeningProductionMoment(record) {
+        const dateText = String(record?.production_date || '').trim();
+        const timeText = String(record?.production_time || '').trim();
+        if (!dateText && !timeText) {
+            return '-';
+        }
+
+        return [dateText || '-', timeText].filter(Boolean).join(' ');
+    }
+
+    function renderSecondScreeningDefectDetails(defects) {
+        if (!Array.isArray(defects) || defects.length === 0) {
+            return '<p class="text-muted small">尚未記錄服務明細。</p>';
+        }
+
+        return `
+            <ul class="work-order-second-screening-detail-list">
+                ${defects.map((defect) => `
+                    <li class="work-order-second-screening-detail-item">
+                        <strong>${escapeHtml(defect.service_name || '-')}</strong>
+                        <span>${escapeHtml([
+                            `不良 ${formatSecondScreeningMetric(defect.defect_quantity)}`,
+                            `支數 ${formatSecondScreeningMetric(defect.defect_units)}`,
+                            `處置 ${getSecondScreeningDispositionLabel(defect.disposition)}`,
+                            defect.defect_recorded_by_name ? `人員 ${defect.defect_recorded_by_name}` : '',
+                            defect.defect_recorded_at ? `時間 ${formatDateTime(defect.defect_recorded_at)}` : '',
+                        ].filter(Boolean).join(' / '))}</span>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+    }
+
+    function renderSecondScreeningProductionDetails(records) {
+        if (!Array.isArray(records) || records.length === 0) {
+            return '<p class="text-muted small">尚未記錄生產記錄。</p>';
+        }
+
+        return `
+            <ul class="work-order-second-screening-detail-list">
+                ${records.map((record) => `
+                    <li class="work-order-second-screening-detail-item">
+                        <strong>${escapeHtml(record.card_number || formatSecondScreeningProductionMoment(record))}</strong>
+                        <span>${escapeHtml([
+                            `重量 ${formatSecondScreeningMetric(record.weight_kg, ' kg')}`,
+                            `時間 ${formatSecondScreeningProductionMoment(record)}`,
+                            `機台 ${record.machine_name || record.machine_type || '-'}`,
+                            `載具 ${record.tool_name || '-'}`,
+                            record.tool_weight_kg !== null && record.tool_weight_kg !== undefined && record.tool_weight_kg !== ''
+                                ? `載具重 ${formatSecondScreeningMetric(record.tool_weight_kg, ' kg')}`
+                                : '',
+                            record.employee_name ? `人員 ${record.employee_name}` : '',
+                        ].filter(Boolean).join(' / '))}</span>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
     }
 
     function getSecondScreeningSummary(item) {
@@ -5089,7 +5180,7 @@
         }
 
         const reasonLabels = String(item.second_screening_reasons || '')
-            .split(',')
+            .split('||')
             .map((reason) => getSecondScreeningReasonLabel(reason.trim()))
             .filter(Boolean)
             .join('、');
@@ -5127,14 +5218,24 @@
                         `再次不良 ${escapeHtml(String(batch.rescreen_output_defect_units ?? '-'))}`,
                         `報廢 ${escapeHtml(String(batch.rescreen_output_scrap_units ?? '-'))}`,
                     ].join(' / ');
+                    const serviceResults = Array.isArray(batch.defects) ? batch.defects : [];
+                    const productionRecords = Array.isArray(batch.production_records) ? batch.production_records : [];
                     return `
                         <article class="work-order-second-screening-card">
                             <div>
                                 <strong>${escapeHtml(batch.rescreen_batch_number || '-')}</strong>
                                 <span class="text-muted">${escapeHtml(reasonLabel)}</span>
                             </div>
-                            <div class="text-muted small">執行工單：${escapeHtml(batch.rescreen_work_order_number || '尚未建立')}</div>
+                            <div class="text-muted small">案件狀態：${escapeHtml(getSecondScreeningStatusLabel(batch.status))}</div>
                             <div class="text-muted small">結果：${resultText}</div>
+                            <div class="work-order-second-screening-detail-block">
+                                <div class="text-muted small">服務明細：${serviceResults.length > 0 ? `${serviceResults.length} 項` : '尚未記錄'}</div>
+                                ${renderSecondScreeningDefectDetails(serviceResults)}
+                            </div>
+                            <div class="work-order-second-screening-detail-block">
+                                <div class="text-muted small">生產記錄：${productionRecords.length > 0 ? `${productionRecords.length} 筆` : '尚未記錄'}</div>
+                                ${renderSecondScreeningProductionDetails(productionRecords)}
+                            </div>
                             <button type="button" class="btn outline small" data-action="open-second-screening-summary" data-mode="view" data-batch-id="${escapeHtml(String(batch.id || ''))}">檢視二次篩選</button>
                         </article>
                     `;

@@ -110,6 +110,14 @@
         };
         const selectedReturnOrderIds = new Set();
 
+        function getSecondScreeningReasonLabel(reason) {
+            const labels = {
+                relaxed_after_high_defect: '不良過多，客戶放寬後再篩',
+                customer_required_second_pass: '客戶每批要求二次篩選',
+            };
+            return labels[reason] || reason || '';
+        }
+
         // 取得 tbody
         function getTbody() {
             return elements.table ? elements.table.querySelector('tbody') : null;
@@ -587,25 +595,26 @@
                         <p>${escapeHtml(data.return_reason || '-')}</p>
                         <h4>備註</h4>
                         <p>${escapeHtml(data.notes || '-')}</p>
-                        <h4>二次重篩</h4>
+                        <h4>二次篩選</h4>
                         <div class="stack-sm">
                             <div>
                                 ${Array.isArray(data.rescreen_batches) && data.rescreen_batches.length > 0
                                     ? data.rescreen_batches.map((batch) => `
                                         <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">
                                             <strong>${escapeHtml(batch.rescreen_batch_number || '')}</strong>
-                                            <span>${escapeHtml(batch.rescreen_type === 'relaxed_rescreen' ? '放寬重篩' : '嚴格重篩')}</span>
+                                            <span>${escapeHtml(batch.rescreen_type === 'relaxed_rescreen' ? '放寬後重篩' : '嚴格重篩')}</span>
+                                            ${batch.second_screening_reason ? `<span class="text-muted">${escapeHtml(getSecondScreeningReasonLabel(batch.second_screening_reason))}</span>` : ''}
                                             <span>${getStatusBadge(batch.status)}</span>
                                             <button type="button" class="btn text" data-action="goto-rescreen-batch" data-id="${batch.id}">
                                                 <i class="fas fa-external-link-alt"></i> 查看
                                             </button>
                                         </div>
                                     `).join('')
-                                    : '<p class="text-muted">目前尚未建立二次重篩案件。</p>'}
+                                    : '<p class="text-muted">目前尚未建立二次篩選案件。</p>'}
                             </div>
                             <div>
                                 <button type="button" class="btn outline" data-action="create-rescreen-batch" data-id="${data.id}">
-                                    <i class="fas fa-plus"></i> 由此退貨單建立二次重篩
+                                    <i class="fas fa-plus"></i> 由此退貨單建立二次篩選
                                 </button>
                             </div>
                         </div>
@@ -1290,11 +1299,11 @@
 
         function openRescreenBatchModule(context = {}) {
             if (typeof window.openTabAndNavigate === 'function') {
-                window.openTabAndNavigate('rescreen_batches', '二次重篩案件', context);
+                window.openTabAndNavigate('rescreen_batches', '二次篩選紀錄', context);
                 return;
             }
             if (typeof window.openTab === 'function') {
-                window.openTab('rescreen_batches', '二次重篩案件', 'modules/rescreen_batches.html', context);
+                window.openTab('rescreen_batches', '二次篩選紀錄', 'modules/rescreen_batches.html', context);
             }
         }
 

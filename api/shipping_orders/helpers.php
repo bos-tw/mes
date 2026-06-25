@@ -414,6 +414,86 @@ function fetchShippingOrderToolSummaries(PDO $pdo, int $shippingOrderId): array
 }
 
 /**
+ * 取得出貨來源庫存對應的二次篩選追溯鏈
+ *
+ * @param list<int> $inventoryItemIds
+ * @return array<int,list<array<string,mixed>>>
+ */
+function fetchShippingOrderRescreenSourceMap(PDO $pdo, array $inventoryItemIds): array
+{
+    $normalizedIds = array_values(array_filter(array_map('intval', $inventoryItemIds), static fn(int $id): bool => $id > 0));
+    if ($normalizedIds === []) {
+        return [];
+    }
+
+    $placeholders = implode(', ', array_fill(0, count($normalizedIds), '?'));
+    $stmt = $pdo->prepare("
+        SELECT
+            iis.inventory_item_id,
+            iis.source_id,
+            iis.source_type,
+            iis.source_order_id,
+            o.order_number,
+            iis.source_order_item_id,
+            iis.source_work_order_id,
+            src_wo.work_order_number AS source_work_order_number,
+            iis.source_shipping_order_id,
+            src_so.shipping_order_number AS source_shipping_order_number,
+            iis.source_return_order_id,
+            ro.return_order_number,
+            iis.source_rescreen_batch_id AS rescreen_batch_id,
+            rb.rescreen_batch_number,
+            rb.second_screening_reason,
+            rb.rescreen_type,
+            rb.status AS rescreen_batch_status,
+            iis.notes
+        FROM inventory_item_sources iis
+        LEFT JOIN orders o ON o.id = iis.source_order_id
+        LEFT JOIN work_orders src_wo ON src_wo.id = iis.source_work_order_id
+        LEFT JOIN shipping_orders src_so ON src_so.id = iis.source_shipping_order_id
+        LEFT JOIN return_orders ro ON ro.id = iis.source_return_order_id
+        LEFT JOIN rescreen_batches rb ON rb.id = iis.source_rescreen_batch_id
+        WHERE iis.inventory_item_id IN ({$placeholders})
+        ORDER BY iis.inventory_item_id ASC, iis.id ASC
+    ");
+    $stmt->execute($normalizedIds);
+
+    $grouped = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $inventoryItemId = (int)($row['inventory_item_id'] ?? 0);
+        if ($inventoryItemId <= 0) {
+            continue;
+        }
+
+        if (!isset($grouped[$inventoryItemId])) {
+            $grouped[$inventoryItemId] = [];
+        }
+
+        $grouped[$inventoryItemId][] = [
+            'source_id' => isset($row['source_id']) ? (int)$row['source_id'] : null,
+            'source_type' => (string)($row['source_type'] ?? ''),
+            'source_order_id' => isset($row['source_order_id']) ? (int)$row['source_order_id'] : null,
+            'order_number' => $row['order_number'] ?? null,
+            'source_order_item_id' => isset($row['source_order_item_id']) ? (int)$row['source_order_item_id'] : null,
+            'source_work_order_id' => isset($row['source_work_order_id']) ? (int)$row['source_work_order_id'] : null,
+            'source_work_order_number' => $row['source_work_order_number'] ?? null,
+            'source_shipping_order_id' => isset($row['source_shipping_order_id']) ? (int)$row['source_shipping_order_id'] : null,
+            'source_shipping_order_number' => $row['source_shipping_order_number'] ?? null,
+            'source_return_order_id' => isset($row['source_return_order_id']) ? (int)$row['source_return_order_id'] : null,
+            'source_return_order_number' => $row['return_order_number'] ?? null,
+            'rescreen_batch_id' => isset($row['rescreen_batch_id']) ? (int)$row['rescreen_batch_id'] : null,
+            'rescreen_batch_number' => $row['rescreen_batch_number'] ?? null,
+            'second_screening_reason' => $row['second_screening_reason'] ?? null,
+            'rescreen_type' => $row['rescreen_type'] ?? null,
+            'rescreen_batch_status' => $row['rescreen_batch_status'] ?? null,
+            'notes' => $row['notes'] ?? null,
+        ];
+    }
+
+    return $grouped;
+}
+
+/**
  * 取得客戶載具紀錄與遺留分析
  *
  * 第一輪分析口徑：

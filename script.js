@@ -2373,6 +2373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     registerModuleInitializer('shipping_orders', window.initializeShippingOrdersModule);
     registerModuleInitializer('shipping_order_items', window.initializeShippingOrderItemsModule);
     registerModuleInitializer('return_orders', window.initializeReturnOrdersModule);
+    registerModuleInitializer('rescreen_batches', window.initializeRescreenBatchesModule);
     registerModuleInitializer('production_quality_records', window.initializeProductionQualityRecordsModule);
     registerModuleInitializer('defect_history_records', window.initializeDefectHistoryRecordsModule);
     registerModuleInitializer('dashboard', window.initializeDashboardModule);
@@ -2386,6 +2387,151 @@ document.addEventListener('DOMContentLoaded', async () => {
     registerModuleInitializer('daily_machine_inspections', window.initializeDailyMachineInspectionsModule);
     registerModuleInitializer('daily_machine_inspection_items', window.initializeDailyMachineInspectionItemsModule);
     registerModuleInitializer('shipping_quality_inspections', window.initializeShippingQualityInspectionsModule);
+
+    window.RescreenBatchEditorHelper = {
+        formatDateTimeLocalValue(value) {
+            if (!value) return '';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return String(value).slice(0, 16).replace(' ', 'T');
+            const pad = (part) => String(part).padStart(2, '0');
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        },
+        buildDefectEditorHtml(rows, escapeHtml) {
+            if (!Array.isArray(rows) || rows.length === 0) {
+                return '<p class="text-muted">建立案件後，會依原始工單的篩分服務自動帶入二次篩分服務明細。</p>';
+            }
+            return `
+                <div class="table-responsive">
+                    <table class="data-table compact">
+                        <thead>
+                            <tr>
+                                <th>服務</th>
+                                <th>不良數量</th>
+                                <th>重量(kg)</th>
+                                <th>支數</th>
+                                <th>處置</th>
+                                <th>記錄時間</th>
+                                <th>備註</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows.map((row, index) => `
+                                <tr data-rescreen-defect-row>
+                                    <td>
+                                        <input type="hidden" data-field="id" value="${escapeHtml(String(row.id || ''))}">
+                                        <input type="hidden" data-field="screening_service_id" value="${escapeHtml(String(row.screening_service_id || ''))}">
+                                        <input type="hidden" data-field="source_defect_history_record_id" value="${escapeHtml(String(row.source_defect_history_record_id || ''))}">
+                                        <input type="hidden" data-field="service_name" value="${escapeHtml(String(row.service_name || ''))}">
+                                        <strong>${escapeHtml(row.service_name || `服務 ${index + 1}`)}</strong>
+                                    </td>
+                                    <td><input type="number" min="0" step="0.01" data-field="defect_quantity" value="${escapeHtml(String(row.defect_quantity ?? 0))}"></td>
+                                    <td><input type="number" min="0" step="0.001" data-field="defect_weight_kg" value="${escapeHtml(String(row.defect_weight_kg ?? 0))}"></td>
+                                    <td><input type="number" min="0" step="0.01" data-field="defect_units" value="${escapeHtml(String(row.defect_units ?? 0))}"></td>
+                                    <td>
+                                        <select data-field="disposition">
+                                            <option value="">-- 未指定 --</option>
+                                            <option value="rework"${row.disposition === 'rework' ? ' selected' : ''}>可再處理</option>
+                                            <option value="scrap"${row.disposition === 'scrap' ? ' selected' : ''}>報廢</option>
+                                            <option value="return_to_customer"${row.disposition === 'return_to_customer' ? ' selected' : ''}>退回客戶</option>
+                                            <option value="hold"${row.disposition === 'hold' ? ' selected' : ''}>暫留待判</option>
+                                            <option value="other"${row.disposition === 'other' ? ' selected' : ''}>其他</option>
+                                        </select>
+                                    </td>
+                                    <td><input type="datetime-local" data-field="recorded_at" value="${escapeHtml(window.RescreenBatchEditorHelper.formatDateTimeLocalValue(row.defect_recorded_at || row.recorded_at || ''))}"></td>
+                                    <td><input type="text" data-field="notes" value="${escapeHtml(String(row.notes || ''))}" placeholder="補充這個服務的不良狀況"></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        },
+        buildDefaultDefectRowsFromWorkOrder(workOrder) {
+            const services = Array.isArray(workOrder?.screening_services_details) ? workOrder.screening_services_details : [];
+            return services.map((service) => ({
+                screening_service_id: service.id || service.screening_service_id || '',
+                service_name: service.custom_service_name || service.screening_service_name || '',
+                defect_quantity: 0,
+                defect_weight_kg: 0,
+                defect_units: 0,
+                disposition: '',
+                recorded_at: '',
+                notes: '',
+                source_defect_history_record_id: '',
+            })).filter((row) => String(row.service_name || '').trim() !== '');
+        },
+        collectDefectRows(editor) {
+            if (!editor) return [];
+            return Array.from(editor.querySelectorAll('[data-rescreen-defect-row]')).map((row) => ({
+                id: row.querySelector('[data-field="id"]')?.value || '',
+                screening_service_id: row.querySelector('[data-field="screening_service_id"]')?.value || '',
+                service_name: row.querySelector('[data-field="service_name"]')?.value || '',
+                source_defect_history_record_id: row.querySelector('[data-field="source_defect_history_record_id"]')?.value || '',
+                defect_quantity: row.querySelector('[data-field="defect_quantity"]')?.value || '0',
+                defect_weight_kg: row.querySelector('[data-field="defect_weight_kg"]')?.value || '0',
+                defect_units: row.querySelector('[data-field="defect_units"]')?.value || '0',
+                disposition: row.querySelector('[data-field="disposition"]')?.value || '',
+                recorded_at: row.querySelector('[data-field="recorded_at"]')?.value || '',
+                notes: row.querySelector('[data-field="notes"]')?.value || '',
+            }));
+        },
+        buildProductionEditorHtml(rows, escapeHtml) {
+            const normalizedRows = Array.isArray(rows) && rows.length > 0 ? rows : [];
+            return `
+                <div class="table-responsive">
+                    <table class="data-table compact">
+                        <thead>
+                            <tr>
+                                <th>卡號/桶號</th>
+                                <th>重量(kg)</th>
+                                <th>日期</th>
+                                <th>時間</th>
+                                <th>機台</th>
+                                <th>載具</th>
+                                <th>載具重(kg)</th>
+                                <th>備註</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${normalizedRows.map((row) => window.RescreenBatchEditorHelper.buildProductionEditorRowHtml(row, escapeHtml)).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ${normalizedRows.length === 0 ? '<p class="text-muted mt-2">尚未記錄二次篩選生產資料，可按「新增一筆」補登。</p>' : ''}
+            `;
+        },
+        buildProductionEditorRowHtml(row = {}, escapeHtml) {
+            return `
+                <tr data-rescreen-production-row>
+                    <td><input type="hidden" data-field="id" value="${escapeHtml(String(row.id || ''))}"><input type="text" data-field="card_number" value="${escapeHtml(String(row.card_number || ''))}" placeholder="卡號"></td>
+                    <td><input type="number" min="0" step="0.01" data-field="weight_kg" value="${escapeHtml(String(row.weight_kg ?? ''))}"></td>
+                    <td><input type="date" data-field="production_date" value="${escapeHtml(String(row.production_date || ''))}"></td>
+                    <td><input type="time" data-field="production_time" value="${escapeHtml(String(row.production_time || ''))}"></td>
+                    <td><input type="text" data-field="machine_type" value="${escapeHtml(String(row.machine_type || row.machine_name || ''))}" placeholder="機台"></td>
+                    <td><input type="text" data-field="tool_name" value="${escapeHtml(String(row.tool_name || ''))}" placeholder="載具"></td>
+                    <td><input type="number" min="0" step="0.001" data-field="tool_weight_kg" value="${escapeHtml(String(row.tool_weight_kg ?? ''))}"></td>
+                    <td><input type="text" data-field="notes" value="${escapeHtml(String(row.notes || ''))}" placeholder="備註"></td>
+                    <td><button type="button" class="btn text" data-action="remove-production-record" title="刪除"><i class="fas fa-trash"></i></button></td>
+                </tr>
+            `;
+        },
+        collectProductionRecordRows(editor) {
+            if (!editor) return [];
+            return Array.from(editor.querySelectorAll('[data-rescreen-production-row]')).map((row) => ({
+                id: row.querySelector('[data-field="id"]')?.value || '',
+                card_number: row.querySelector('[data-field="card_number"]')?.value || '',
+                weight_kg: row.querySelector('[data-field="weight_kg"]')?.value || '',
+                production_date: row.querySelector('[data-field="production_date"]')?.value || '',
+                production_time: row.querySelector('[data-field="production_time"]')?.value || '',
+                machine_type: row.querySelector('[data-field="machine_type"]')?.value || '',
+                tool_name: row.querySelector('[data-field="tool_name"]')?.value || '',
+                tool_weight_kg: row.querySelector('[data-field="tool_weight_kg"]')?.value || '',
+                notes: row.querySelector('[data-field="notes"]')?.value || '',
+                production_source_mode: 'manual',
+            }));
+        }
+    };
     registerModuleInitializer('production_records', window.initializeProductionRecordsModule);
     // 系統設定模組
     registerModuleInitializer('lookup_domains', window.initializeLookupDomainsModule);

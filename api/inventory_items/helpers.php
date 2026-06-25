@@ -260,6 +260,47 @@ function getInventoryItemDetails(PDO $pdo, int $id): ?array
 }
 
 /**
+ * @return list<array<string,mixed>>
+ */
+function getInventoryItemSourceChain(PDO $pdo, int $inventoryItemId): array
+{
+    if ($inventoryItemId <= 0) {
+        return [];
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT
+            iis.source_type,
+            iis.source_id,
+            iis.source_order_id,
+            o.order_number,
+            iis.source_order_item_id,
+            iis.source_work_order_id,
+            wo.work_order_number,
+            iis.source_shipping_order_id,
+            so.shipping_order_number,
+            iis.source_return_order_id,
+            ro.return_order_number,
+            iis.source_rescreen_batch_id,
+            rb.rescreen_batch_number,
+            rb.second_screening_reason,
+            rb.rescreen_type,
+            iis.notes
+        FROM inventory_item_sources iis
+        LEFT JOIN orders o ON o.id = iis.source_order_id
+        LEFT JOIN work_orders wo ON wo.id = iis.source_work_order_id
+        LEFT JOIN shipping_orders so ON so.id = iis.source_shipping_order_id
+        LEFT JOIN return_orders ro ON ro.id = iis.source_return_order_id
+        LEFT JOIN rescreen_batches rb ON rb.id = iis.source_rescreen_batch_id
+        WHERE iis.inventory_item_id = :inventory_item_id
+        ORDER BY iis.id ASC
+    ");
+    $stmt->execute(['inventory_item_id' => $inventoryItemId]);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+/**
  * Check if inventory item can be deleted
  */
 function canDeleteInventoryItem(PDO $pdo, int $id, array $options = []): array

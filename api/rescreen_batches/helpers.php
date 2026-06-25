@@ -19,34 +19,34 @@ function rescreenBatchTypeOptions(): array
     return ['strict_rescreen', 'relaxed_rescreen'];
 }
 
-function secondScreeningReasonOptions(): array
+function defaultSecondScreeningReasonText(?string $requestReasonCode = null, ?string $rescreenType = null): string
 {
-    return ['relaxed_after_high_defect', 'customer_required_second_pass'];
+    $legacyReason = trim((string)$requestReasonCode);
+    if ($legacyReason === 'high_defect_relax') {
+        return '不良過多，客戶放寬後再篩';
+    }
+    if ($legacyReason === 'customer_strict_request') {
+        return '客戶每批要求二次篩選';
+    }
+
+    return $rescreenType === 'relaxed_rescreen'
+        ? '不良過多，客戶放寬後再篩'
+        : '客戶每批要求二次篩選';
 }
 
 function normalizeSecondScreeningReason(?string $reason, ?string $requestReasonCode = null, ?string $rescreenType = null): string
 {
     $normalized = trim((string)$reason);
-    if (in_array($normalized, secondScreeningReasonOptions(), true)) {
-        return $normalized;
+    if ($normalized !== '') {
+        return mb_substr($normalized, 0, 255);
     }
 
-    $legacyReason = trim((string)$requestReasonCode);
-    if ($legacyReason === 'high_defect_relax') {
-        return 'relaxed_after_high_defect';
-    }
-    if ($legacyReason === 'customer_strict_request') {
-        return 'customer_required_second_pass';
-    }
-
-    return $rescreenType === 'relaxed_rescreen'
-        ? 'relaxed_after_high_defect'
-        : 'customer_required_second_pass';
+    return defaultSecondScreeningReasonText($requestReasonCode, $rescreenType);
 }
 
-function legacyRequestReasonCodeFromSecondReason(string $reason): string
+function legacyRequestReasonCodeFromRescreenType(string $rescreenType): string
 {
-    return $reason === 'relaxed_after_high_defect'
+    return $rescreenType === 'relaxed_rescreen'
         ? 'high_defect_relax'
         : 'customer_strict_request';
 }
@@ -93,17 +93,21 @@ function validateRescreenBatchPayload(array $payload, bool $isUpdate = false): a
     }
 
     if (!$isUpdate || array_key_exists('second_screening_reason', $payload)) {
+        $rawSecondScreeningReason = trim((string)($payload['second_screening_reason'] ?? ''));
+        if ($rawSecondScreeningReason === '' && $isUpdate) {
+            $errors['second_screening_reason'] = '二次篩選原因為必填。';
+        }
         $secondScreeningReason = normalizeSecondScreeningReason(
             isset($payload['second_screening_reason']) ? (string)$payload['second_screening_reason'] : null,
             isset($payload['request_reason_code']) ? (string)$payload['request_reason_code'] : null,
             $data['rescreen_type'] ?? null
         );
-        if (!in_array($secondScreeningReason, secondScreeningReasonOptions(), true)) {
-            $errors['second_screening_reason'] = '二次篩選原因不正確。';
+        if ($secondScreeningReason === '') {
+            $errors['second_screening_reason'] = '二次篩選原因為必填。';
         } else {
             $data['second_screening_reason'] = $secondScreeningReason;
-            if (!isset($data['request_reason_code'])) {
-                $data['request_reason_code'] = legacyRequestReasonCodeFromSecondReason($secondScreeningReason);
+            if (!isset($data['request_reason_code']) && isset($data['rescreen_type'])) {
+                $data['request_reason_code'] = legacyRequestReasonCodeFromRescreenType((string)$data['rescreen_type']);
             }
         }
     }
@@ -203,6 +207,151 @@ function normalizeRescreenDateTime($value): ?string
     }
 
     return null;
+}
+
+/**
+ * @param array<int,array<string,mixed>> $rows
+ * @return array{data: array<int,array<string,mixed>>, errors: array<string,string>}
+ */
+function validateRescreenDefectPayload(array $rows): array
+{
+    $errors = [];
+    $data = [];
+
+    foreach ($rows as $index => $row) {
+        if (!is_array($row)) {
+            $errors["defects.$index"] = '二次篩分服務明細格式不正確。';
+            continue;
+        }
+
+        $serviceId = filter_var($row['screening_service_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $serviceName = trim((string)($row['service_name'] ?? ''));
+        if ($serviceName === '' && $serviceId === false) {
+            $errors["defects.$index.service_name"] = '二次篩分服務名稱不可空白。';
+            continue;
+        }
+
+        $defectQuantity = filter_var($row['defect_quantity'] ?? 0, FILTER_VALIDATE_FLOAT);
+        if ($defectQuantity === false || $defectQuantity < 0) {
+            $errors["defects.$index.defect_quantity"] = '二次篩分不良數量必須為非負數。';
+            continue;
+        }
+
+        $defectWeightKg = null;
+        if (($row['defect_weight_kg'] ?? '') !== '') {
+            $defectWeightKg = filter_var($row['defect_weight_kg'], FILTER_VALIDATE_FLOAT);
+            if ($defectWeightKg === false || $defectWeightKg < 0) {
+                $errors["defects.$index.defect_weight_kg"] = '二次篩分不良重量必須為非負數。';
+                continue;
+            }
+        }
+
+        $defectUnits = null;
+        if (($row['defect_units'] ?? '') !== '') {
+            $defectUnits = filter_var($row['defect_units'], FILTER_VALIDATE_FLOAT);
+            if ($defectUnits === false || $defectUnits < 0) {
+                $errors["defects.$index.defect_units"] = '二次篩分不良支數必須為非負數。';
+                continue;
+            }
+        }
+
+        $recordedAt = normalizeRescreenDateTime($row['recorded_at'] ?? null) ?? date('Y-m-d H:i:s');
+        $disposition = trim((string)($row['disposition'] ?? ''));
+        $notes = trim((string)($row['notes'] ?? ''));
+
+        $data[] = [
+            'id' => filter_var($row['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: null,
+            'screening_service_id' => $serviceId !== false ? (int)$serviceId : null,
+            'service_name' => $serviceName !== '' ? mb_substr($serviceName, 0, 255) : ('服務#' . (string)$serviceId),
+            'defect_quantity' => round((float)$defectQuantity, 2),
+            'defect_weight_kg' => $defectWeightKg !== null ? round((float)$defectWeightKg, 3) : 0.0,
+            'defect_units' => $defectUnits !== null ? round((float)$defectUnits, 2) : 0.0,
+            'disposition' => $disposition !== '' ? mb_substr($disposition, 0, 30) : null,
+            'notes' => $notes !== '' ? $notes : null,
+            'recorded_at' => $recordedAt,
+            'source_defect_history_record_id' => filter_var($row['source_defect_history_record_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: null,
+            'sort_order' => $index + 1,
+        ];
+    }
+
+    return ['data' => $data, 'errors' => $errors];
+}
+
+function isMeaningfulRescreenProductionRecord(array $row): bool
+{
+    foreach ([
+        'card_number',
+        'weight_kg',
+        'production_date',
+        'production_time',
+        'machine_id',
+        'tool_name',
+        'tool_weight_kg',
+        'notes',
+    ] as $field) {
+        $value = $row[$field] ?? null;
+        if ($value !== null && trim((string)$value) !== '') {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * @param array<int,array<string,mixed>> $rows
+ * @return array{data: array<int,array<string,mixed>>, errors: array<string,string>}
+ */
+function validateRescreenProductionRecordPayload(array $rows): array
+{
+    $errors = [];
+    $data = [];
+
+    foreach ($rows as $index => $row) {
+        if (!is_array($row) || !isMeaningfulRescreenProductionRecord($row)) {
+            continue;
+        }
+
+        $weightKg = null;
+        if (($row['weight_kg'] ?? '') !== '') {
+            $weightKg = filter_var($row['weight_kg'], FILTER_VALIDATE_FLOAT);
+            if ($weightKg === false || $weightKg < 0) {
+                $errors["production_records.$index.weight_kg"] = '二次篩選生產記錄重量必須為非負數。';
+                continue;
+            }
+        }
+
+        $toolWeightKg = null;
+        if (($row['tool_weight_kg'] ?? '') !== '') {
+            $toolWeightKg = filter_var($row['tool_weight_kg'], FILTER_VALIDATE_FLOAT);
+            if ($toolWeightKg === false || $toolWeightKg < 0) {
+                $errors["production_records.$index.tool_weight_kg"] = '二次篩選生產記錄載具重量必須為非負數。';
+                continue;
+            }
+        }
+
+        $machineId = filter_var($row['machine_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $productionDate = trim((string)($row['production_date'] ?? ''));
+        $productionTime = trim((string)($row['production_time'] ?? ''));
+        $notes = trim((string)($row['notes'] ?? ''));
+
+        $data[] = [
+            'id' => filter_var($row['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: null,
+            'production_source_mode' => trim((string)($row['production_source_mode'] ?? '')) ?: 'preset',
+            'card_number' => trim((string)($row['card_number'] ?? '')) ?: null,
+            'weight_kg' => $weightKg !== null ? round((float)$weightKg, 2) : null,
+            'production_date' => $productionDate !== '' ? $productionDate : null,
+            'production_time' => $productionTime !== '' ? $productionTime : null,
+            'machine_id' => $machineId !== false ? (int)$machineId : null,
+            'machine_type' => trim((string)($row['machine_type'] ?? '')) ?: null,
+            'tool_name' => trim((string)($row['tool_name'] ?? '')) ?: null,
+            'tool_weight_kg' => $toolWeightKg !== null ? round((float)$toolWeightKg, 3) : null,
+            'notes' => $notes !== '' ? $notes : null,
+            'sort_order' => $index + 1,
+        ];
+    }
+
+    return ['data' => $data, 'errors' => $errors];
 }
 
 function fetchReturnOrderSourceProfile(PDO $pdo, int $returnOrderId): ?array
@@ -420,7 +569,7 @@ function createRescreenBatchFromReturnOrder(PDO $pdo, int $returnOrderId, array 
 
     $payload['source_return_order_id'] = $returnOrderId;
     if (empty($payload['second_screening_reason']) && empty($payload['request_reason_code'])) {
-        $payload['second_screening_reason'] = 'relaxed_after_high_defect';
+        $payload['second_screening_reason'] = defaultSecondScreeningReasonText(null, 'relaxed_rescreen');
     }
     if (empty($payload['rescreen_type'])) {
         $payload['rescreen_type'] = 'relaxed_rescreen';
@@ -436,17 +585,21 @@ function createRescreenBatchFromWorkOrder(PDO $pdo, int $workOrderId, array $pay
         throw new RuntimeException('找不到指定的來源工單。');
     }
 
+    $rescreenType = isset($payload['rescreen_type']) ? trim((string)$payload['rescreen_type']) : 'strict_rescreen';
+    if ($rescreenType === '') {
+        $rescreenType = 'strict_rescreen';
+    }
     $secondScreeningReason = normalizeSecondScreeningReason(
-        isset($payload['second_screening_reason']) ? (string)$payload['second_screening_reason'] : 'customer_required_second_pass',
+        isset($payload['second_screening_reason']) ? (string)$payload['second_screening_reason'] : defaultSecondScreeningReasonText(null, $rescreenType),
         isset($payload['request_reason_code']) ? (string)$payload['request_reason_code'] : null,
-        isset($payload['rescreen_type']) ? (string)$payload['rescreen_type'] : 'strict_rescreen'
+        $rescreenType
     );
     $sourceDefectHistoryRecordId = filter_var(
         $payload['source_defect_history_record_id'] ?? null,
         FILTER_VALIDATE_INT,
         ['options' => ['min_range' => 1]]
     );
-    if ($secondScreeningReason === 'relaxed_after_high_defect' && $sourceDefectHistoryRecordId === false) {
+    if ($rescreenType === 'relaxed_rescreen' && $sourceDefectHistoryRecordId === false) {
         throw new InvalidArgumentException('從不良紀錄建立放寬後二次篩選時，必須帶入來源不良紀錄。');
     }
 
@@ -454,12 +607,12 @@ function createRescreenBatchFromWorkOrder(PDO $pdo, int $workOrderId, array $pay
         SELECT id, rescreen_batch_number
         FROM rescreen_batches
         WHERE source_work_order_id = :source_work_order_id
-          AND second_screening_reason = :second_screening_reason
+          AND rescreen_type = :rescreen_type
           AND deleted_at IS NULL
     ";
     $existingParams = [
         'source_work_order_id' => $workOrderId,
-        'second_screening_reason' => $secondScreeningReason,
+        'rescreen_type' => $rescreenType,
     ];
     if ($sourceDefectHistoryRecordId !== false) {
         $existingSql .= " AND source_defect_history_record_id = :source_defect_history_record_id";
@@ -477,9 +630,7 @@ function createRescreenBatchFromWorkOrder(PDO $pdo, int $workOrderId, array $pay
     $payload['source_work_order_id'] = $workOrderId;
     $payload['second_screening_reason'] = $secondScreeningReason;
     if (empty($payload['rescreen_type'])) {
-        $payload['rescreen_type'] = $secondScreeningReason === 'relaxed_after_high_defect'
-            ? 'relaxed_rescreen'
-            : 'strict_rescreen';
+        $payload['rescreen_type'] = $rescreenType;
     }
 
     return createSecondScreeningBatchFromSourceProfile($pdo, $sourceProfile, $payload, $currentEmployee);
@@ -576,7 +727,7 @@ function createSecondScreeningBatchFromSourceProfile(PDO $pdo, array $sourceProf
         'source_order_item_id' => $sourceProfile['primary_order_item_id'] ?: null,
         'source_work_order_id' => $sourceWorkOrderId ?: null,
         'rescreen_type' => $rescreenType,
-        'request_reason_code' => $data['request_reason_code'] ?? legacyRequestReasonCodeFromSecondReason($secondScreeningReason),
+        'request_reason_code' => $data['request_reason_code'] ?? legacyRequestReasonCodeFromRescreenType($rescreenType),
         'second_screening_reason' => $secondScreeningReason,
         'customer_approval_reference' => $data['customer_approval_reference'] ?? null,
         'source_requirement_id' => $data['source_requirement_id'] ?? null,
@@ -643,23 +794,429 @@ function createSecondScreeningBatchFromSourceProfile(PDO $pdo, array $sourceProf
     }
 
     seedRescreenBatchRulesFromOrderItem($pdo, $batchId, (int)($sourceProfile['primary_order_item_id'] ?? 0));
+    seedRescreenBatchDefectRowsFromRules($pdo, $batchId, (int)($sourceProfile['primary_work_order_id'] ?? 0));
 
-    $rescreenWorkOrderId = maybeCreateRescreenExecutionWorkOrder($pdo, $batchId, $sourceProfile, $currentEmployee);
-    if ($rescreenWorkOrderId > 0) {
-        $updateBatchStmt = $pdo->prepare("
-            UPDATE rescreen_batches
-            SET
-                rescreen_work_order_id = :rescreen_work_order_id,
-                status = CASE WHEN status = 'draft' THEN 'planned' ELSE status END
-            WHERE id = :id
-        ");
-        $updateBatchStmt->execute([
-            'rescreen_work_order_id' => $rescreenWorkOrderId,
-            'id' => $batchId,
-        ]);
+    $currentEmployeeId = isset($currentEmployee['id']) ? (int)$currentEmployee['id'] : null;
+    if (isset($payload['defects']) && is_array($payload['defects'])) {
+        $defectValidation = validateRescreenDefectPayload($payload['defects']);
+        if ($defectValidation['errors'] !== []) {
+            throw new InvalidArgumentException(implode(' ', array_values($defectValidation['errors'])));
+        }
+        saveRescreenBatchDefectRows($pdo, $batchId, $defectValidation['data'], $currentEmployeeId);
     }
+    if (isset($payload['production_records']) && is_array($payload['production_records'])) {
+        $recordValidation = validateRescreenProductionRecordPayload($payload['production_records']);
+        if ($recordValidation['errors'] !== []) {
+            throw new InvalidArgumentException(implode(' ', array_values($recordValidation['errors'])));
+        }
+        saveRescreenBatchProductionRecords($pdo, $batchId, (int)($sourceProfile['primary_work_order_id'] ?? 0), $recordValidation['data'], $currentEmployeeId);
+    }
+    refreshRescreenBatchExecutionSummary($pdo, $batchId);
 
     return getRescreenBatchDetails($pdo, $batchId) ?? [];
+}
+
+function seedRescreenBatchDefectRowsFromRules(PDO $pdo, int $batchId, int $sourceWorkOrderId = 0): void
+{
+    if ($batchId <= 0) {
+        return;
+    }
+
+    $existingStmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM rescreen_batch_defects
+        WHERE rescreen_batch_id = :rescreen_batch_id
+    ");
+    $existingStmt->execute(['rescreen_batch_id' => $batchId]);
+    if ((int)$existingStmt->fetchColumn() > 0) {
+        return;
+    }
+
+    $itemStmt = $pdo->prepare("
+        SELECT id, return_order_item_id
+        FROM rescreen_batch_items
+        WHERE rescreen_batch_id = :rescreen_batch_id
+        ORDER BY id ASC
+        LIMIT 1
+    ");
+    $itemStmt->execute(['rescreen_batch_id' => $batchId]);
+    $firstItem = $itemStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $rulesStmt = $pdo->prepare("
+        SELECT screening_service_id, service_name
+        FROM rescreen_batch_rules
+        WHERE rescreen_batch_id = :rescreen_batch_id
+          AND rule_stage = 'rescreen'
+        ORDER BY id ASC
+    ");
+    $rulesStmt->execute(['rescreen_batch_id' => $batchId]);
+    $rows = $rulesStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($rows === []) {
+        return;
+    }
+
+    $insertStmt = $pdo->prepare("
+        INSERT INTO rescreen_batch_defects (
+            rescreen_batch_id,
+            rescreen_batch_item_id,
+            screening_service_id,
+            service_name,
+            defect_quantity,
+            defect_weight_kg,
+            defect_units,
+            source_return_order_item_id,
+            source_defect_history_record_id,
+            rescreen_round,
+            notes,
+            disposition,
+            recorded_at,
+            recorded_by_employee_id
+        ) VALUES (
+            :rescreen_batch_id,
+            :rescreen_batch_item_id,
+            :screening_service_id,
+            :service_name,
+            0,
+            0,
+            0,
+            :source_return_order_item_id,
+            NULL,
+            1,
+            NULL,
+            NULL,
+            NOW(),
+            NULL
+        )
+    ");
+
+    foreach ($rows as $row) {
+        $insertStmt->execute([
+            'rescreen_batch_id' => $batchId,
+            'rescreen_batch_item_id' => !empty($firstItem['id']) ? (int)$firstItem['id'] : null,
+            'screening_service_id' => !empty($row['screening_service_id']) ? (int)$row['screening_service_id'] : null,
+            'service_name' => trim((string)($row['service_name'] ?? '')) ?: '未命名服務',
+            'source_return_order_item_id' => !empty($firstItem['return_order_item_id']) ? (int)$firstItem['return_order_item_id'] : null,
+        ]);
+    }
+}
+
+/**
+ * @param array<int,array<string,mixed>> $rows
+ */
+function saveRescreenBatchDefectRows(PDO $pdo, int $batchId, array $rows, ?int $employeeId): float
+{
+    $batchItemStmt = $pdo->prepare("
+        SELECT id, return_order_item_id
+        FROM rescreen_batch_items
+        WHERE rescreen_batch_id = :rescreen_batch_id
+        ORDER BY id ASC
+        LIMIT 1
+    ");
+    $batchItemStmt->execute(['rescreen_batch_id' => $batchId]);
+    $firstItem = $batchItemStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $pdo->prepare('DELETE FROM rescreen_batch_defects WHERE rescreen_batch_id = :rescreen_batch_id')
+        ->execute(['rescreen_batch_id' => $batchId]);
+
+    if ($rows === []) {
+        return 0.0;
+    }
+
+    $insertStmt = $pdo->prepare("
+        INSERT INTO rescreen_batch_defects (
+            rescreen_batch_id,
+            rescreen_batch_item_id,
+            screening_service_id,
+            service_name,
+            defect_quantity,
+            defect_weight_kg,
+            defect_units,
+            source_return_order_item_id,
+            source_defect_history_record_id,
+            rescreen_round,
+            notes,
+            disposition,
+            recorded_at,
+            recorded_by_employee_id
+        ) VALUES (
+            :rescreen_batch_id,
+            :rescreen_batch_item_id,
+            :screening_service_id,
+            :service_name,
+            :defect_quantity,
+            :defect_weight_kg,
+            :defect_units,
+            :source_return_order_item_id,
+            :source_defect_history_record_id,
+            1,
+            :notes,
+            :disposition,
+            :recorded_at,
+            :recorded_by_employee_id
+        )
+    ");
+
+    $totalDefectQuantity = 0.0;
+    foreach ($rows as $row) {
+        $insertStmt->execute([
+            'rescreen_batch_id' => $batchId,
+            'rescreen_batch_item_id' => !empty($firstItem['id']) ? (int)$firstItem['id'] : null,
+            'screening_service_id' => $row['screening_service_id'],
+            'service_name' => $row['service_name'],
+            'defect_quantity' => $row['defect_quantity'],
+            'defect_weight_kg' => $row['defect_weight_kg'],
+            'defect_units' => $row['defect_units'],
+            'source_return_order_item_id' => !empty($firstItem['return_order_item_id']) ? (int)$firstItem['return_order_item_id'] : null,
+            'source_defect_history_record_id' => $row['source_defect_history_record_id'],
+            'notes' => $row['notes'],
+            'disposition' => $row['disposition'],
+            'recorded_at' => $row['recorded_at'],
+            'recorded_by_employee_id' => $employeeId,
+        ]);
+        $totalDefectQuantity += (float)$row['defect_quantity'];
+    }
+
+    return round($totalDefectQuantity, 2);
+}
+
+/**
+ * @param array<int,array<string,mixed>> $rows
+ */
+function saveRescreenBatchProductionRecords(PDO $pdo, int $batchId, int $sourceWorkOrderId, array $rows, ?int $employeeId): void
+{
+    $pdo->prepare('DELETE FROM rescreen_batch_production_records WHERE rescreen_batch_id = :rescreen_batch_id')
+        ->execute(['rescreen_batch_id' => $batchId]);
+
+    if ($rows === []) {
+        return;
+    }
+
+    $machineStmt = $pdo->prepare('SELECT name FROM machines WHERE id = :id LIMIT 1');
+    $insertStmt = $pdo->prepare("
+        INSERT INTO rescreen_batch_production_records (
+            rescreen_batch_id,
+            source_work_order_id,
+            production_source_mode,
+            card_number,
+            weight_kg,
+            production_date,
+            production_time,
+            machine_id,
+            machine_type,
+            tool_name,
+            tool_weight_kg,
+            employee_id,
+            notes,
+            sort_order
+        ) VALUES (
+            :rescreen_batch_id,
+            :source_work_order_id,
+            :production_source_mode,
+            :card_number,
+            :weight_kg,
+            :production_date,
+            :production_time,
+            :machine_id,
+            :machine_type,
+            :tool_name,
+            :tool_weight_kg,
+            :employee_id,
+            :notes,
+            :sort_order
+        )
+    ");
+
+    foreach ($rows as $row) {
+        $machineType = $row['machine_type'];
+        if (!empty($row['machine_id'])) {
+            $machineStmt->execute(['id' => (int)$row['machine_id']]);
+            $machineType = $machineStmt->fetchColumn() ?: $machineType;
+        }
+        $insertStmt->execute([
+            'rescreen_batch_id' => $batchId,
+            'source_work_order_id' => $sourceWorkOrderId > 0 ? $sourceWorkOrderId : null,
+            'production_source_mode' => $row['production_source_mode'],
+            'card_number' => $row['card_number'],
+            'weight_kg' => $row['weight_kg'],
+            'production_date' => $row['production_date'],
+            'production_time' => $row['production_time'],
+            'machine_id' => $row['machine_id'],
+            'machine_type' => $machineType,
+            'tool_name' => $row['tool_name'],
+            'tool_weight_kg' => $row['tool_weight_kg'],
+            'employee_id' => $employeeId,
+            'notes' => $row['notes'],
+            'sort_order' => $row['sort_order'],
+        ]);
+    }
+}
+
+function buildRescreenBatchExecutionTimestamp(?string $productionDate, ?string $productionTime): ?string
+{
+    $date = trim((string)$productionDate);
+    if ($date === '') {
+        return null;
+    }
+    $time = trim((string)$productionTime);
+    if ($time === '') {
+        $time = '00:00:00';
+    } elseif (strlen($time) === 5) {
+        $time .= ':00';
+    }
+
+    return "{$date} {$time}";
+}
+
+function resolveRescreenBatchDefectUnitsValue(array $row, float $unitWeightG): float
+{
+    $defectUnits = round((float)($row['defect_units'] ?? 0), 2);
+    if ($defectUnits > 0.0001) {
+        return $defectUnits;
+    }
+
+    $defectQuantity = round((float)($row['defect_quantity'] ?? 0), 2);
+    if ($defectQuantity > 0.0001) {
+        return $defectQuantity;
+    }
+
+    $defectWeightKg = round((float)($row['defect_weight_kg'] ?? 0), 3);
+    if ($defectWeightKg > 0.0001 && $unitWeightG > 0.0001) {
+        return round(($defectWeightKg * 1000) / $unitWeightG, 2);
+    }
+
+    return 0.0;
+}
+
+function refreshRescreenBatchExecutionSummary(PDO $pdo, int $batchId): void
+{
+    if ($batchId <= 0) {
+        return;
+    }
+
+    $batchStmt = $pdo->prepare("
+        SELECT
+            rb.id,
+            rb.status,
+            rb.started_at,
+            rb.completed_at,
+            rb.received_total_quantity,
+            rb.source_work_order_id,
+            wo.weight_per_unit_g
+        FROM rescreen_batches rb
+        LEFT JOIN work_orders wo ON wo.id = rb.source_work_order_id
+        WHERE rb.id = :id
+          AND rb.deleted_at IS NULL
+        LIMIT 1
+    ");
+    $batchStmt->execute(['id' => $batchId]);
+    $batch = $batchStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$batch) {
+        return;
+    }
+
+    $unitWeightG = round((float)($batch['weight_per_unit_g'] ?? 0), 3);
+
+    $defectStmt = $pdo->prepare("
+        SELECT defect_quantity, defect_weight_kg, defect_units, disposition, recorded_at
+        FROM rescreen_batch_defects
+        WHERE rescreen_batch_id = :rescreen_batch_id
+        ORDER BY id ASC
+    ");
+    $defectStmt->execute(['rescreen_batch_id' => $batchId]);
+    $defectRows = $defectStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $productionStmt = $pdo->prepare("
+        SELECT weight_kg, tool_weight_kg, production_date, production_time
+        FROM rescreen_batch_production_records
+        WHERE rescreen_batch_id = :rescreen_batch_id
+        ORDER BY sort_order ASC, id ASC
+    ");
+    $productionStmt->execute(['rescreen_batch_id' => $batchId]);
+    $productionRows = $productionStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $defectUnits = 0.0;
+    $scrapUnits = 0.0;
+    $timestamps = [];
+
+    foreach ($defectRows as $row) {
+        $rowUnits = resolveRescreenBatchDefectUnitsValue($row, $unitWeightG);
+        if ($rowUnits <= 0.0001) {
+            continue;
+        }
+        $disposition = trim((string)($row['disposition'] ?? ''));
+        if ($disposition === 'scrap') {
+            $scrapUnits += $rowUnits;
+        } else {
+            $defectUnits += $rowUnits;
+        }
+        $recordedAt = trim((string)($row['recorded_at'] ?? ''));
+        if ($recordedAt !== '') {
+            $timestamps[] = $recordedAt;
+        }
+    }
+
+    $processedGrossWeightKg = 0.0;
+    $processedToolWeightKg = 0.0;
+    foreach ($productionRows as $row) {
+        $processedGrossWeightKg += max(0, (float)($row['weight_kg'] ?? 0));
+        $processedToolWeightKg += max(0, (float)($row['tool_weight_kg'] ?? 0));
+        $executionTimestamp = buildRescreenBatchExecutionTimestamp(
+            isset($row['production_date']) ? (string)$row['production_date'] : null,
+            isset($row['production_time']) ? (string)$row['production_time'] : null
+        );
+        if ($executionTimestamp !== null) {
+            $timestamps[] = $executionTimestamp;
+        }
+    }
+
+    $processedNetWeightKg = max(0, $processedGrossWeightKg - $processedToolWeightKg);
+    $processedUnits = $unitWeightG > 0.0001
+        ? round(($processedNetWeightKg * 1000) / $unitWeightG, 2)
+        : 0.0;
+
+    $goodUnits = 0.0;
+    if ($processedUnits > 0.0001) {
+        $goodUnits = max(0, $processedUnits - $defectUnits - $scrapUnits);
+    } elseif (trim((string)($batch['status'] ?? '')) === 'completed') {
+        $goodUnits = max(0, round((float)($batch['received_total_quantity'] ?? 0), 2) - $defectUnits - $scrapUnits);
+    }
+
+    sort($timestamps);
+    $existingStartedAt = trim((string)($batch['started_at'] ?? ''));
+    $existingCompletedAt = trim((string)($batch['completed_at'] ?? ''));
+    $startedAt = $existingStartedAt !== '' ? $existingStartedAt : ($timestamps[0] ?? null);
+    $completedAt = $existingCompletedAt !== '' ? $existingCompletedAt : null;
+    if (trim((string)($batch['status'] ?? '')) === 'completed') {
+        $completedAt = $existingCompletedAt !== '' ? $existingCompletedAt : (!empty($timestamps) ? end($timestamps) : $startedAt);
+    }
+
+    $resultCategory = determineRescreenResultCategory(
+        round($goodUnits, 2),
+        round($defectUnits, 2),
+        round($scrapUnits, 2),
+        (string)($batch['status'] ?? 'draft')
+    );
+
+    $updateStmt = $pdo->prepare("
+        UPDATE rescreen_batches
+        SET
+            started_at = :started_at,
+            completed_at = :completed_at,
+            rescreen_output_good_units = :rescreen_output_good_units,
+            rescreen_output_defect_units = :rescreen_output_defect_units,
+            rescreen_output_scrap_units = :rescreen_output_scrap_units,
+            result_category = :result_category
+        WHERE id = :id
+    ");
+    $updateStmt->execute([
+        'started_at' => $startedAt,
+        'completed_at' => $completedAt,
+        'rescreen_output_good_units' => round($goodUnits, 2),
+        'rescreen_output_defect_units' => round($defectUnits, 2),
+        'rescreen_output_scrap_units' => round($scrapUnits, 2),
+        'result_category' => $resultCategory,
+        'id' => $batchId,
+    ]);
 }
 
 function seedRescreenBatchRulesFromOrderItem(PDO $pdo, int $batchId, int $orderItemId): void
@@ -1234,7 +1791,12 @@ function getRescreenBatchDetails(PDO $pdo, int $id): ?array
             oi.part_number,
             si.name AS screening_item_name,
             source_wo.work_order_number AS source_work_order_number,
-            exec_wo.work_order_number AS rescreen_work_order_number
+            exec_wo.work_order_number AS rescreen_work_order_number,
+            exec_wo.actual_start_date AS rescreen_work_order_started_at,
+            exec_wo.actual_end_date AS rescreen_work_order_ended_at,
+            exec_wo.completed_at AS rescreen_work_order_completed_at,
+            exec_assigned.name AS rescreen_assigned_employee_name,
+            exec_calibration.name AS rescreen_calibration_employee_name
         FROM rescreen_batches rb
         LEFT JOIN customers c ON c.id = rb.customer_id
         LEFT JOIN return_orders ro ON ro.id = rb.source_return_order_id
@@ -1244,6 +1806,8 @@ function getRescreenBatchDetails(PDO $pdo, int $id): ?array
         LEFT JOIN screening_items si ON si.id = oi.screening_item_id
         LEFT JOIN work_orders source_wo ON source_wo.id = rb.source_work_order_id
         LEFT JOIN work_orders exec_wo ON exec_wo.id = rb.rescreen_work_order_id
+        LEFT JOIN employees exec_assigned ON exec_assigned.id = exec_wo.assigned_employee_id
+        LEFT JOIN employees exec_calibration ON exec_calibration.id = exec_wo.calibration_employee_id
         WHERE rb.id = :id
           AND rb.deleted_at IS NULL
         LIMIT 1
@@ -1301,13 +1865,31 @@ function getRescreenBatchDetails(PDO $pdo, int $id): ?array
     }
 
     $defectsStmt = $pdo->prepare("
-        SELECT *
-        FROM rescreen_batch_defects
-        WHERE rescreen_batch_id = :rescreen_batch_id
-        ORDER BY id ASC
+        SELECT
+            rbd.*,
+            rbd.recorded_at AS defect_recorded_at,
+            defect_employee.name AS defect_recorded_by_name
+        FROM rescreen_batch_defects rbd
+        LEFT JOIN employees defect_employee ON defect_employee.id = rbd.recorded_by_employee_id
+        WHERE rbd.rescreen_batch_id = :rescreen_batch_id
+        ORDER BY rbd.id ASC
     ");
     $defectsStmt->execute(['rescreen_batch_id' => $id]);
     $batch['defects'] = $defectsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $productionStmt = $pdo->prepare("
+        SELECT
+            rbpr.*,
+            m.name AS machine_name,
+            e.name AS employee_name
+        FROM rescreen_batch_production_records rbpr
+        LEFT JOIN machines m ON m.id = rbpr.machine_id
+        LEFT JOIN employees e ON e.id = rbpr.employee_id
+        WHERE rbpr.rescreen_batch_id = :rescreen_batch_id
+        ORDER BY rbpr.sort_order ASC, rbpr.id ASC
+    ");
+    $productionStmt->execute(['rescreen_batch_id' => $id]);
+    $batch['production_records'] = $productionStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     return $batch;
 }
@@ -1360,6 +1942,12 @@ function listRescreenBatches(PDO $pdo, array $filters): array
     if ($rescreenType !== '') {
         $where[] = 'rb.rescreen_type = :rescreen_type';
         $params['rescreen_type'] = $rescreenType;
+    }
+
+    $secondScreeningReason = trim((string)($filters['second_screening_reason'] ?? ''));
+    if ($secondScreeningReason !== '') {
+        $where[] = 'rb.second_screening_reason LIKE :second_screening_reason';
+        $params['second_screening_reason'] = '%' . $secondScreeningReason . '%';
     }
 
     $sourceReturnOrderId = filter_var($filters['source_return_order_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);

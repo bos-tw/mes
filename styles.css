@@ -1389,10 +1389,19 @@ body.login-page {
 
 .content-header.with-actions {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 16px;
+}
+
+.content-header.with-actions > div:first-child {
+    flex: 1 1 320px;
+    min-width: 0;
+}
+
+.content-header.with-actions > div:first-child h2 {
+    margin: 0;
 }
 
 /* Sticky header for long tables */
@@ -1410,12 +1419,14 @@ body.login-page {
 .content-header.with-actions .subtitle {
     font-size: var(--font-base);
     color: var(--color-text-muted);
-    margin-top: 4px;
+    margin: 4px 0 0;
 }
 
 .header-actions {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    justify-content: flex-end;
+    flex-wrap: wrap;
     gap: 12px;
 }
 
@@ -10617,6 +10628,56 @@ select option:disabled {
     display: grid;
     gap: 0.4rem;
     padding: 0.75rem;
+}
+
+.work-order-second-screening-detail-block {
+    border-top: 1px solid #e2e8f0;
+    margin-top: 0.1rem;
+    padding-top: 0.45rem;
+}
+
+.work-order-second-screening-inline-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    font-size: var(--font-xs);
+    color: var(--color-text-secondary);
+}
+
+.work-order-second-screening-detail-list {
+    display: grid;
+    gap: 0.35rem;
+    list-style: none;
+    margin: 0.45rem 0 0;
+    padding: 0;
+}
+
+.work-order-second-screening-detail-item {
+    align-items: flex-start;
+    background: #f8fbff;
+    border: 1px solid #dbeafe;
+    border-radius: 6px;
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.45rem 0.55rem;
+}
+
+.work-order-second-screening-detail-item strong {
+    color: #0f172a;
+    font-size: var(--font-sm);
+}
+
+.work-order-second-screening-detail-item span {
+    color: var(--color-text-secondary);
+    font-size: var(--font-xs);
+    line-height: 1.5;
+}
+
+.form-section-heading {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
 }
 
 .production-schedule-table tbody tr.schedule-row.dragging {

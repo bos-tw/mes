@@ -140,13 +140,20 @@ try {
     $itemsStmt->execute(['shipping_order_id' => $id]);
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    $inventoryItemIds = array_values(array_unique(array_filter(array_map(
+        static fn(array $item): int => (int)($item['inventory_item_id'] ?? 0),
+        $items
+    ))));
     $orderItemToolMap = fetchOrderItemToolTraceMap($pdo, array_values(array_unique(array_filter(array_map(
         static fn(array $item): int => (int)($item['source_order_item_id'] ?? 0),
         $items
     )))));
+    $rescreenSourceMap = fetchShippingOrderRescreenSourceMap($pdo, $inventoryItemIds);
     foreach ($items as &$item) {
         $sourceOrderItemId = (int)($item['source_order_item_id'] ?? 0);
+        $inventoryItemId = (int)($item['inventory_item_id'] ?? 0);
         $item['order_item_tools'] = $sourceOrderItemId > 0 ? ($orderItemToolMap[$sourceOrderItemId] ?? []) : [];
+        $item['rescreen_sources'] = $inventoryItemId > 0 ? ($rescreenSourceMap[$inventoryItemId] ?? []) : [];
     }
     unset($item);
 

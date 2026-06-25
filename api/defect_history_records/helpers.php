@@ -34,6 +34,16 @@ function getDefectHistorySourceTypeLabel(string $sourceType): string
     return $labels[$sourceType] ?? $sourceType;
 }
 
+function getSecondScreeningReasonLabel(string $reason): string
+{
+    static $labels = [
+        'relaxed_after_high_defect' => '不良過多，客戶放寬後再篩',
+        'customer_required_second_pass' => '客戶每批要求二次篩選',
+    ];
+
+    return $labels[$reason] ?? $reason;
+}
+
 function readDefectHistoryFilters(): array
 {
     $perPage = (int)($_GET['perPage'] ?? 20);
@@ -84,6 +94,7 @@ SELECT
     NULL AS source_return_order_item_id,
     NULL AS rescreen_batch_id,
     CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS rescreen_batch_number,
+    CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS second_screening_reason,
     NULL AS rescreen_round,
     CONVERT(wosd.notes USING utf8mb4) COLLATE utf8mb4_unicode_ci AS notes
 FROM work_order_screening_defects wosd
@@ -121,6 +132,7 @@ SELECT
     NULL AS source_return_order_item_id,
     NULL AS rescreen_batch_id,
     CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS rescreen_batch_number,
+    CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS second_screening_reason,
     NULL AS rescreen_round,
     CONVERT(womd.notes USING utf8mb4) COLLATE utf8mb4_unicode_ci AS notes
 FROM work_order_machine_defects womd
@@ -139,8 +151,8 @@ SELECT
     COALESCE(rb.completed_at, rb.started_at, rbd.created_at) AS occurred_at,
     rb.source_order_id AS order_id,
     CONVERT(o.order_number USING utf8mb4) COLLATE utf8mb4_unicode_ci AS order_number,
-    rb.rescreen_work_order_id AS work_order_id,
-    CONVERT(exec_wo.work_order_number USING utf8mb4) COLLATE utf8mb4_unicode_ci AS work_order_number,
+    COALESCE(rb.source_work_order_id, rb.rescreen_work_order_id) AS work_order_id,
+    CONVERT(COALESCE(source_wo.work_order_number, exec_wo.work_order_number) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS work_order_number,
     CAST('rescreen' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS work_order_type,
     rb.source_order_item_id AS order_item_id,
     rb.source_shipping_order_id AS shipping_order_id,
@@ -152,17 +164,19 @@ SELECT
     rbd.screening_service_id AS screening_service_id,
     CONVERT(COALESCE(NULLIF(rbd.service_name, ''), ss.name, CONCAT('服務#', rbd.screening_service_id)) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS defect_item_name,
     CAST(rbd.defect_quantity AS DECIMAL(14,2)) AS recorded_defect_quantity,
-    exec_wo.weight_per_unit_g AS weight_per_unit_g,
+    COALESCE(source_wo.weight_per_unit_g, exec_wo.weight_per_unit_g) AS weight_per_unit_g,
     CAST(rbd.defect_weight_kg AS DECIMAL(10,3)) AS total_weight_kg,
     rb.source_return_order_id AS source_return_order_id,
     rbd.source_return_order_item_id AS source_return_order_item_id,
     rb.id AS rescreen_batch_id,
     CONVERT(rb.rescreen_batch_number USING utf8mb4) COLLATE utf8mb4_unicode_ci AS rescreen_batch_number,
+    CONVERT(rb.second_screening_reason USING utf8mb4) COLLATE utf8mb4_unicode_ci AS second_screening_reason,
     rbd.rescreen_round AS rescreen_round,
     CONVERT(rbd.notes USING utf8mb4) COLLATE utf8mb4_unicode_ci AS notes
 FROM rescreen_batch_defects rbd
 INNER JOIN rescreen_batches rb ON rb.id = rbd.rescreen_batch_id AND rb.deleted_at IS NULL
 LEFT JOIN work_orders exec_wo ON exec_wo.id = rb.rescreen_work_order_id AND exec_wo.deleted_at IS NULL
+LEFT JOIN work_orders source_wo ON source_wo.id = rb.source_work_order_id AND source_wo.deleted_at IS NULL
 LEFT JOIN orders o ON o.id = rb.source_order_id AND o.deleted_at IS NULL
 LEFT JOIN shipping_orders so ON so.id = rb.source_shipping_order_id AND so.deleted_at IS NULL
 LEFT JOIN customers c ON c.id = rb.customer_id AND c.deleted_at IS NULL
@@ -196,6 +210,7 @@ SELECT
     NULL AS source_return_order_item_id,
     NULL AS rescreen_batch_id,
     CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS rescreen_batch_number,
+    CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS second_screening_reason,
     NULL AS rescreen_round,
     CONVERT(sods.notes USING utf8mb4) COLLATE utf8mb4_unicode_ci AS notes
 FROM shipping_order_defect_summaries sods
@@ -385,6 +400,10 @@ function enrichDefectHistoryRecords(PDO $pdo, array $rows): array
             'source_return_order_item_id' => isset($row['source_return_order_item_id']) && $row['source_return_order_item_id'] !== null ? (int)$row['source_return_order_item_id'] : null,
             'rescreen_batch_id' => isset($row['rescreen_batch_id']) && $row['rescreen_batch_id'] !== null ? (int)$row['rescreen_batch_id'] : null,
             'rescreen_batch_number' => (string)($row['rescreen_batch_number'] ?? ''),
+            'second_screening_reason' => (string)($row['second_screening_reason'] ?? ''),
+            'second_screening_reason_label' => trim((string)($row['second_screening_reason'] ?? '')) !== ''
+                ? getSecondScreeningReasonLabel((string)$row['second_screening_reason'])
+                : '',
             'rescreen_round' => isset($row['rescreen_round']) && $row['rescreen_round'] !== null ? (int)$row['rescreen_round'] : null,
             'customer_id' => isset($row['customer_id']) && $row['customer_id'] !== null ? (int)$row['customer_id'] : null,
             'customer_name' => (string)($row['customer_name'] ?? ''),

@@ -77,11 +77,13 @@ try {
     ");
     $transStmt->execute(['inventory_item_id' => $id]);
     $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
+    $sourceChain = getInventoryItemSourceChain($pdo, $id);
 
     jsonResponse([
         'success' => true,
         'item' => $item,
         'transactions' => $transactions,
+        'source_chain' => $sourceChain,
     ]);
 
 } catch (Throwable $e) {
