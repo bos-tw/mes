@@ -17,6 +17,7 @@ function getDefectHistorySourceTypeOptions(): array
     return [
         ['value' => 'work_order_screening', 'label' => '工單篩分不良'],
         ['value' => 'work_order_machine', 'label' => '拆分機台不良'],
+        ['value' => 'rescreen_batch_defect', 'label' => '二次篩選再次不良'],
         ['value' => 'shipping_defect_summary', 'label' => '出貨不良摘要'],
     ];
 }
@@ -26,6 +27,7 @@ function getDefectHistorySourceTypeLabel(string $sourceType): string
     static $labels = [
         'work_order_screening' => '工單篩分不良',
         'work_order_machine' => '拆分機台不良',
+        'rescreen_batch_defect' => '二次篩選再次不良',
         'shipping_defect_summary' => '出貨不良摘要',
     ];
 
@@ -78,6 +80,11 @@ SELECT
     CAST(wosd.defect_quantity AS DECIMAL(14,2)) AS recorded_defect_quantity,
     NULL AS weight_per_unit_g,
     NULL AS total_weight_kg,
+    NULL AS source_return_order_id,
+    NULL AS source_return_order_item_id,
+    NULL AS rescreen_batch_id,
+    CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS rescreen_batch_number,
+    NULL AS rescreen_round,
     CONVERT(wosd.notes USING utf8mb4) COLLATE utf8mb4_unicode_ci AS notes
 FROM work_order_screening_defects wosd
 INNER JOIN work_orders wo ON wo.id = wosd.work_order_id AND wo.deleted_at IS NULL
@@ -110,6 +117,11 @@ SELECT
     CAST(womd.defect_quantity AS DECIMAL(14,2)) AS recorded_defect_quantity,
     NULL AS weight_per_unit_g,
     NULL AS total_weight_kg,
+    NULL AS source_return_order_id,
+    NULL AS source_return_order_item_id,
+    NULL AS rescreen_batch_id,
+    CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS rescreen_batch_number,
+    NULL AS rescreen_round,
     CONVERT(womd.notes USING utf8mb4) COLLATE utf8mb4_unicode_ci AS notes
 FROM work_order_machine_defects womd
 INNER JOIN work_orders wo ON wo.id = womd.work_order_id AND wo.deleted_at IS NULL
@@ -117,6 +129,44 @@ LEFT JOIN order_items oi ON oi.id = wo.order_item_id
 LEFT JOIN orders o ON o.id = oi.order_id AND o.deleted_at IS NULL
 LEFT JOIN customers c ON c.id = o.customer_id AND c.deleted_at IS NULL
 LEFT JOIN screening_services ss ON ss.id = womd.screening_service_id
+
+UNION ALL
+
+SELECT
+    CAST('rescreen_batch_defect' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS source_type,
+    CONVERT(CONCAT('rescreen_batch_defect:', rbd.id) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS row_key,
+    rbd.id AS source_record_id,
+    COALESCE(rb.completed_at, rb.started_at, rbd.created_at) AS occurred_at,
+    rb.source_order_id AS order_id,
+    CONVERT(o.order_number USING utf8mb4) COLLATE utf8mb4_unicode_ci AS order_number,
+    rb.rescreen_work_order_id AS work_order_id,
+    CONVERT(exec_wo.work_order_number USING utf8mb4) COLLATE utf8mb4_unicode_ci AS work_order_number,
+    CAST('rescreen' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS work_order_type,
+    rb.source_order_item_id AS order_item_id,
+    rb.source_shipping_order_id AS shipping_order_id,
+    CONVERT(so.shipping_order_number USING utf8mb4) COLLATE utf8mb4_unicode_ci AS shipping_order_number,
+    CONVERT(so.status USING utf8mb4) COLLATE utf8mb4_unicode_ci AS shipping_status,
+    CONVERT(so.shipment_purpose USING utf8mb4) COLLATE utf8mb4_unicode_ci AS shipment_purpose,
+    rb.customer_id AS customer_id,
+    CONVERT(c.name USING utf8mb4) COLLATE utf8mb4_unicode_ci AS customer_name,
+    rbd.screening_service_id AS screening_service_id,
+    CONVERT(COALESCE(NULLIF(rbd.service_name, ''), ss.name, CONCAT('服務#', rbd.screening_service_id)) USING utf8mb4) COLLATE utf8mb4_unicode_ci AS defect_item_name,
+    CAST(rbd.defect_quantity AS DECIMAL(14,2)) AS recorded_defect_quantity,
+    exec_wo.weight_per_unit_g AS weight_per_unit_g,
+    CAST(rbd.defect_weight_kg AS DECIMAL(10,3)) AS total_weight_kg,
+    rb.source_return_order_id AS source_return_order_id,
+    rbd.source_return_order_item_id AS source_return_order_item_id,
+    rb.id AS rescreen_batch_id,
+    CONVERT(rb.rescreen_batch_number USING utf8mb4) COLLATE utf8mb4_unicode_ci AS rescreen_batch_number,
+    rbd.rescreen_round AS rescreen_round,
+    CONVERT(rbd.notes USING utf8mb4) COLLATE utf8mb4_unicode_ci AS notes
+FROM rescreen_batch_defects rbd
+INNER JOIN rescreen_batches rb ON rb.id = rbd.rescreen_batch_id AND rb.deleted_at IS NULL
+LEFT JOIN work_orders exec_wo ON exec_wo.id = rb.rescreen_work_order_id AND exec_wo.deleted_at IS NULL
+LEFT JOIN orders o ON o.id = rb.source_order_id AND o.deleted_at IS NULL
+LEFT JOIN shipping_orders so ON so.id = rb.source_shipping_order_id AND so.deleted_at IS NULL
+LEFT JOIN customers c ON c.id = rb.customer_id AND c.deleted_at IS NULL
+LEFT JOIN screening_services ss ON ss.id = rbd.screening_service_id
 
 UNION ALL
 
@@ -142,6 +192,11 @@ SELECT
     CAST(sods.defect_quantity AS DECIMAL(14,2)) AS recorded_defect_quantity,
     sods.weight_per_unit_g AS weight_per_unit_g,
     sods.total_weight_kg AS total_weight_kg,
+    NULL AS source_return_order_id,
+    NULL AS source_return_order_item_id,
+    NULL AS rescreen_batch_id,
+    CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci AS rescreen_batch_number,
+    NULL AS rescreen_round,
     CONVERT(sods.notes USING utf8mb4) COLLATE utf8mb4_unicode_ci AS notes
 FROM shipping_order_defect_summaries sods
 INNER JOIN shipping_orders so ON so.id = sods.shipping_order_id AND so.deleted_at IS NULL
@@ -326,6 +381,11 @@ function enrichDefectHistoryRecords(PDO $pdo, array $rows): array
             'work_order_number' => (string)($row['work_order_number'] ?? ''),
             'shipping_order_id' => isset($row['shipping_order_id']) && $row['shipping_order_id'] !== null ? (int)$row['shipping_order_id'] : null,
             'shipping_order_number' => (string)($row['shipping_order_number'] ?? ''),
+            'source_return_order_id' => isset($row['source_return_order_id']) && $row['source_return_order_id'] !== null ? (int)$row['source_return_order_id'] : null,
+            'source_return_order_item_id' => isset($row['source_return_order_item_id']) && $row['source_return_order_item_id'] !== null ? (int)$row['source_return_order_item_id'] : null,
+            'rescreen_batch_id' => isset($row['rescreen_batch_id']) && $row['rescreen_batch_id'] !== null ? (int)$row['rescreen_batch_id'] : null,
+            'rescreen_batch_number' => (string)($row['rescreen_batch_number'] ?? ''),
+            'rescreen_round' => isset($row['rescreen_round']) && $row['rescreen_round'] !== null ? (int)$row['rescreen_round'] : null,
             'customer_id' => isset($row['customer_id']) && $row['customer_id'] !== null ? (int)$row['customer_id'] : null,
             'customer_name' => (string)($row['customer_name'] ?? ''),
             'defect_item_name' => (string)($row['defect_item_name'] ?? ''),
@@ -358,6 +418,19 @@ function enrichDefectHistoryRecords(PDO $pdo, array $rows): array
                 ? workOrderDefectUnitsFromWeight($shippingTotalWeightKg, $shippingWeightPerUnit)
                 : (float)$record['recorded_defect_quantity'];
             $record['defect_units_estimated'] = round((float)$estimatedUnits, 2);
+            $record['defect_weight_kg'] = round($shippingTotalWeightKg, 3);
+            $record['defect_distribution_units_total'] = round((float)$record['recorded_defect_quantity'], 2);
+            applyShippingTraceMeta($record, [
+                'shipping_order_id' => $record['shipping_order_id'],
+                'shipping_order_number' => $record['shipping_order_number'],
+                'shipping_status' => $row['shipping_status'] ?? null,
+                'shipment_purpose' => $row['shipment_purpose'] ?? null,
+            ]);
+        } elseif ($sourceType === 'rescreen_batch_defect') {
+            if ($workOrderId > 0 && isset($metricsMap[$workOrderId])) {
+                $record = array_merge($record, $metricsMap[$workOrderId]);
+            }
+            $record['defect_units_estimated'] = round((float)$record['recorded_defect_quantity'], 2);
             $record['defect_weight_kg'] = round($shippingTotalWeightKg, 3);
             $record['defect_distribution_units_total'] = round((float)$record['recorded_defect_quantity'], 2);
             applyShippingTraceMeta($record, [

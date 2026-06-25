@@ -19,28 +19,69 @@ function rescreenBatchTypeOptions(): array
     return ['strict_rescreen', 'relaxed_rescreen'];
 }
 
+function secondScreeningReasonOptions(): array
+{
+    return ['relaxed_after_high_defect', 'customer_required_second_pass'];
+}
+
+function normalizeSecondScreeningReason(?string $reason, ?string $requestReasonCode = null, ?string $rescreenType = null): string
+{
+    $normalized = trim((string)$reason);
+    if (in_array($normalized, secondScreeningReasonOptions(), true)) {
+        return $normalized;
+    }
+
+    $legacyReason = trim((string)$requestReasonCode);
+    if ($legacyReason === 'high_defect_relax') {
+        return 'relaxed_after_high_defect';
+    }
+    if ($legacyReason === 'customer_strict_request') {
+        return 'customer_required_second_pass';
+    }
+
+    return $rescreenType === 'relaxed_rescreen'
+        ? 'relaxed_after_high_defect'
+        : 'customer_required_second_pass';
+}
+
+function legacyRequestReasonCodeFromSecondReason(string $reason): string
+{
+    return $reason === 'relaxed_after_high_defect'
+        ? 'high_defect_relax'
+        : 'customer_strict_request';
+}
+
 function validateRescreenBatchPayload(array $payload, bool $isUpdate = false): array
 {
     $errors = [];
     $data = [];
 
-    if (!$isUpdate || array_key_exists('source_return_order_id', $payload)) {
+    if (array_key_exists('source_return_order_id', $payload)) {
         $returnOrderId = filter_var(
             $payload['source_return_order_id'] ?? null,
             FILTER_VALIDATE_INT,
             ['options' => ['min_range' => 1]]
         );
-        if ($returnOrderId === false) {
-            $errors['source_return_order_id'] = '來源退貨單為必填。';
-        } else {
+        if ($returnOrderId !== false) {
             $data['source_return_order_id'] = (int)$returnOrderId;
+        }
+    }
+
+    if (array_key_exists('source_work_order_id', $payload)) {
+        $sourceWorkOrderId = filter_var(
+            $payload['source_work_order_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        if ($sourceWorkOrderId !== false) {
+            $data['source_work_order_id'] = (int)$sourceWorkOrderId;
         }
     }
 
     if (!$isUpdate || array_key_exists('rescreen_type', $payload)) {
         $rescreenType = trim((string)($payload['rescreen_type'] ?? 'strict_rescreen'));
         if (!in_array($rescreenType, rescreenBatchTypeOptions(), true)) {
-            $errors['rescreen_type'] = '二次重篩類型必須為 strict_rescreen 或 relaxed_rescreen。';
+            $errors['rescreen_type'] = '二次篩選類型必須為 strict_rescreen 或 relaxed_rescreen。';
         } else {
             $data['rescreen_type'] = $rescreenType;
         }
@@ -49,6 +90,45 @@ function validateRescreenBatchPayload(array $payload, bool $isUpdate = false): a
     if (array_key_exists('request_reason_code', $payload)) {
         $requestReasonCode = trim((string)($payload['request_reason_code'] ?? ''));
         $data['request_reason_code'] = $requestReasonCode !== '' ? mb_substr($requestReasonCode, 0, 50) : null;
+    }
+
+    if (!$isUpdate || array_key_exists('second_screening_reason', $payload)) {
+        $secondScreeningReason = normalizeSecondScreeningReason(
+            isset($payload['second_screening_reason']) ? (string)$payload['second_screening_reason'] : null,
+            isset($payload['request_reason_code']) ? (string)$payload['request_reason_code'] : null,
+            $data['rescreen_type'] ?? null
+        );
+        if (!in_array($secondScreeningReason, secondScreeningReasonOptions(), true)) {
+            $errors['second_screening_reason'] = '二次篩選原因不正確。';
+        } else {
+            $data['second_screening_reason'] = $secondScreeningReason;
+            if (!isset($data['request_reason_code'])) {
+                $data['request_reason_code'] = legacyRequestReasonCodeFromSecondReason($secondScreeningReason);
+            }
+        }
+    }
+
+    if (array_key_exists('customer_approval_reference', $payload)) {
+        $approvalReference = trim((string)($payload['customer_approval_reference'] ?? ''));
+        $data['customer_approval_reference'] = $approvalReference !== '' ? $approvalReference : null;
+    }
+
+    if (array_key_exists('source_requirement_id', $payload)) {
+        $sourceRequirementId = filter_var(
+            $payload['source_requirement_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $data['source_requirement_id'] = $sourceRequirementId !== false ? (int)$sourceRequirementId : null;
+    }
+
+    if (array_key_exists('source_defect_history_record_id', $payload)) {
+        $sourceDefectHistoryRecordId = filter_var(
+            $payload['source_defect_history_record_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $data['source_defect_history_record_id'] = $sourceDefectHistoryRecordId !== false ? (int)$sourceDefectHistoryRecordId : null;
     }
 
     if (array_key_exists('result_category', $payload)) {
@@ -182,7 +262,7 @@ function fetchReturnOrderSourceProfile(PDO $pdo, int $returnOrderId): ?array
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     if ($items === []) {
-        throw new RuntimeException('此退貨單沒有可建立二次重篩的退貨品項。');
+        throw new RuntimeException('此退貨單沒有可建立二次篩選的退貨品項。');
     }
 
     $sourceOrderIds = [];
@@ -233,6 +313,91 @@ function fetchReturnOrderSourceProfile(PDO $pdo, int $returnOrderId): ?array
     ];
 }
 
+function fetchWorkOrderSecondScreeningSourceProfile(PDO $pdo, int $workOrderId): ?array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            wo.id AS source_work_order_id,
+            wo.work_order_number,
+            wo.order_item_id,
+            wo.total_weight_kg,
+            wo.total_units,
+            wo.weight_per_unit_g,
+            wo.customer_instructions,
+            wo.other_notes,
+            oi.order_id,
+            oi.screening_item_id,
+            oi.customer_batch_number,
+            oi.part_number,
+            oi.sub_item_number,
+            oi.total_weight_kg AS order_item_total_weight_kg,
+            oi.total_units AS order_item_total_units,
+            si.name AS screening_item_name,
+            o.customer_id,
+            o.order_number,
+            c.name AS customer_name
+        FROM work_orders wo
+        INNER JOIN order_items oi ON oi.id = wo.order_item_id
+        INNER JOIN orders o ON o.id = oi.order_id
+        LEFT JOIN screening_items si ON si.id = oi.screening_item_id
+        LEFT JOIN customers c ON c.id = o.customer_id
+        WHERE wo.id = :id
+          AND wo.deleted_at IS NULL
+        LIMIT 1
+    ");
+    $stmt->execute(['id' => $workOrderId]);
+    $sourceWorkOrder = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$sourceWorkOrder) {
+        return null;
+    }
+
+    $weightPerUnitG = round((float)($sourceWorkOrder['weight_per_unit_g'] ?? 0), 3);
+    $sourceQuantity = round((float)($sourceWorkOrder['total_units'] ?? 0), 2);
+    if ($sourceQuantity <= 0) {
+        $sourceQuantity = round((float)($sourceWorkOrder['order_item_total_units'] ?? 0), 2);
+    }
+    $sourceWeightKg = round((float)($sourceWorkOrder['total_weight_kg'] ?? 0), 3);
+    if ($sourceWeightKg <= 0) {
+        $sourceWeightKg = round((float)($sourceWorkOrder['order_item_total_weight_kg'] ?? 0), 3);
+    }
+    if ($sourceWeightKg <= 0 && $weightPerUnitG > 0 && $sourceQuantity > 0) {
+        $sourceWeightKg = round(($sourceQuantity * $weightPerUnitG) / 1000, 3);
+    }
+
+    $item = [
+        'return_order_item_id' => null,
+        'shipping_order_item_id' => null,
+        'shipping_order_id' => null,
+        'inventory_item_id' => null,
+        'order_id' => (int)$sourceWorkOrder['order_id'],
+        'order_item_id' => (int)$sourceWorkOrder['order_item_id'],
+        'source_work_order_id' => (int)$sourceWorkOrder['source_work_order_id'],
+        'returned_quantity' => $sourceQuantity,
+        'returned_unit' => '支',
+        'shipped_unit' => '支',
+        'estimated_weight_kg' => $sourceWeightKg,
+        'reason' => '客戶規格要求二次篩選',
+        'source_notes' => trim((string)($sourceWorkOrder['other_notes'] ?? '')) ?: null,
+        'screening_item_name' => $sourceWorkOrder['screening_item_name'] ?? null,
+    ];
+
+    return [
+        'return_order' => null,
+        'source_work_order' => $sourceWorkOrder,
+        'items' => [$item],
+        'source_order_ids' => [(int)$sourceWorkOrder['order_id']],
+        'source_order_item_ids' => [(int)$sourceWorkOrder['order_item_id']],
+        'source_work_order_ids' => [(int)$sourceWorkOrder['source_work_order_id']],
+        'primary_order_id' => (int)$sourceWorkOrder['order_id'],
+        'primary_order_item_id' => (int)$sourceWorkOrder['order_item_id'],
+        'primary_work_order_id' => (int)$sourceWorkOrder['source_work_order_id'],
+        'primary_customer_id' => (int)$sourceWorkOrder['customer_id'],
+        'primary_shipping_order_id' => null,
+        'received_total_quantity' => $sourceQuantity,
+        'received_total_weight_kg' => $sourceWeightKg,
+    ];
+}
+
 function createRescreenBatchFromReturnOrder(PDO $pdo, int $returnOrderId, array $payload, ?array $currentEmployee): array
 {
     $sourceProfile = fetchReturnOrderSourceProfile($pdo, $returnOrderId);
@@ -250,18 +415,102 @@ function createRescreenBatchFromReturnOrder(PDO $pdo, int $returnOrderId, array 
     $existingStmt->execute(['source_return_order_id' => $returnOrderId]);
     $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
     if ($existing) {
-        throw new RuntimeException('此退貨單已建立二次重篩案件：' . (string)$existing['rescreen_batch_number']);
+        throw new RuntimeException('此退貨單已建立二次篩選案件：' . (string)$existing['rescreen_batch_number']);
     }
 
-    $validation = validateRescreenBatchPayload(array_merge($payload, ['source_return_order_id' => $returnOrderId]), false);
+    $payload['source_return_order_id'] = $returnOrderId;
+    if (empty($payload['second_screening_reason']) && empty($payload['request_reason_code'])) {
+        $payload['second_screening_reason'] = 'relaxed_after_high_defect';
+    }
+    if (empty($payload['rescreen_type'])) {
+        $payload['rescreen_type'] = 'relaxed_rescreen';
+    }
+
+    return createSecondScreeningBatchFromSourceProfile($pdo, $sourceProfile, $payload, $currentEmployee);
+}
+
+function createRescreenBatchFromWorkOrder(PDO $pdo, int $workOrderId, array $payload, ?array $currentEmployee): array
+{
+    $sourceProfile = fetchWorkOrderSecondScreeningSourceProfile($pdo, $workOrderId);
+    if ($sourceProfile === null) {
+        throw new RuntimeException('找不到指定的來源工單。');
+    }
+
+    $secondScreeningReason = normalizeSecondScreeningReason(
+        isset($payload['second_screening_reason']) ? (string)$payload['second_screening_reason'] : 'customer_required_second_pass',
+        isset($payload['request_reason_code']) ? (string)$payload['request_reason_code'] : null,
+        isset($payload['rescreen_type']) ? (string)$payload['rescreen_type'] : 'strict_rescreen'
+    );
+    $sourceDefectHistoryRecordId = filter_var(
+        $payload['source_defect_history_record_id'] ?? null,
+        FILTER_VALIDATE_INT,
+        ['options' => ['min_range' => 1]]
+    );
+    if ($secondScreeningReason === 'relaxed_after_high_defect' && $sourceDefectHistoryRecordId === false) {
+        throw new InvalidArgumentException('從不良紀錄建立放寬後二次篩選時，必須帶入來源不良紀錄。');
+    }
+
+    $existingSql = "
+        SELECT id, rescreen_batch_number
+        FROM rescreen_batches
+        WHERE source_work_order_id = :source_work_order_id
+          AND second_screening_reason = :second_screening_reason
+          AND deleted_at IS NULL
+    ";
+    $existingParams = [
+        'source_work_order_id' => $workOrderId,
+        'second_screening_reason' => $secondScreeningReason,
+    ];
+    if ($sourceDefectHistoryRecordId !== false) {
+        $existingSql .= " AND source_defect_history_record_id = :source_defect_history_record_id";
+        $existingParams['source_defect_history_record_id'] = (int)$sourceDefectHistoryRecordId;
+    }
+    $existingSql .= " LIMIT 1";
+
+    $existingStmt = $pdo->prepare($existingSql);
+    $existingStmt->execute($existingParams);
+    $existing = $existingStmt->fetch(PDO::FETCH_ASSOC);
+    if ($existing) {
+        throw new RuntimeException('此工單已建立二次篩選案件：' . (string)$existing['rescreen_batch_number']);
+    }
+
+    $payload['source_work_order_id'] = $workOrderId;
+    $payload['second_screening_reason'] = $secondScreeningReason;
+    if (empty($payload['rescreen_type'])) {
+        $payload['rescreen_type'] = $secondScreeningReason === 'relaxed_after_high_defect'
+            ? 'relaxed_rescreen'
+            : 'strict_rescreen';
+    }
+
+    return createSecondScreeningBatchFromSourceProfile($pdo, $sourceProfile, $payload, $currentEmployee);
+}
+
+function createSecondScreeningBatchFromSourceProfile(PDO $pdo, array $sourceProfile, array $payload, ?array $currentEmployee): array
+{
+    $validation = validateRescreenBatchPayload($payload, false);
     if ($validation['errors'] !== []) {
         throw new InvalidArgumentException(implode(' ', array_values($validation['errors'])));
     }
     $data = $validation['data'];
 
-    $returnOrder = $sourceProfile['return_order'];
+    $returnOrder = $sourceProfile['return_order'] ?? null;
+    $sourceWorkOrder = $sourceProfile['source_work_order'] ?? null;
+    $sourceReturnOrderId = isset($data['source_return_order_id']) ? (int)$data['source_return_order_id'] : null;
+    $sourceWorkOrderId = isset($sourceProfile['primary_work_order_id']) ? (int)$sourceProfile['primary_work_order_id'] : null;
+    $customerId = $returnOrder !== null
+        ? (int)$returnOrder['customer_id']
+        : (int)($sourceProfile['primary_customer_id'] ?? 0);
+    if ($customerId <= 0) {
+        throw new RuntimeException('來源資料缺少客戶資訊，無法建立二次篩選案件。');
+    }
+
     $status = (string)($data['status'] ?? 'draft');
     $rescreenType = (string)($data['rescreen_type'] ?? 'strict_rescreen');
+    $secondScreeningReason = normalizeSecondScreeningReason(
+        $data['second_screening_reason'] ?? null,
+        $data['request_reason_code'] ?? null,
+        $rescreenType
+    );
     $employeeId = isset($currentEmployee['id']) ? (int)$currentEmployee['id'] : null;
 
     $batchNumber = generateRescreenBatchNumber($pdo);
@@ -276,6 +525,10 @@ function createRescreenBatchFromReturnOrder(PDO $pdo, int $returnOrderId, array 
             source_work_order_id,
             rescreen_type,
             request_reason_code,
+            second_screening_reason,
+            customer_approval_reference,
+            source_requirement_id,
+            source_defect_history_record_id,
             result_category,
             status,
             rescreen_round,
@@ -297,6 +550,10 @@ function createRescreenBatchFromReturnOrder(PDO $pdo, int $returnOrderId, array 
             :source_work_order_id,
             :rescreen_type,
             :request_reason_code,
+            :second_screening_reason,
+            :customer_approval_reference,
+            :source_requirement_id,
+            :source_defect_history_record_id,
             :result_category,
             :status,
             1,
@@ -312,14 +569,18 @@ function createRescreenBatchFromReturnOrder(PDO $pdo, int $returnOrderId, array 
     ");
     $insertBatchStmt->execute([
         'rescreen_batch_number' => $batchNumber,
-        'source_return_order_id' => $returnOrderId,
-        'source_shipping_order_id' => $returnOrder['original_shipping_order_id'] ?: null,
-        'customer_id' => (int)$returnOrder['customer_id'],
+        'source_return_order_id' => $sourceReturnOrderId,
+        'source_shipping_order_id' => $returnOrder['original_shipping_order_id'] ?? ($sourceProfile['primary_shipping_order_id'] ?? null),
+        'customer_id' => $customerId,
         'source_order_id' => $sourceProfile['primary_order_id'] ?: null,
         'source_order_item_id' => $sourceProfile['primary_order_item_id'] ?: null,
-        'source_work_order_id' => $sourceProfile['primary_work_order_id'] ?: null,
+        'source_work_order_id' => $sourceWorkOrderId ?: null,
         'rescreen_type' => $rescreenType,
-        'request_reason_code' => $data['request_reason_code'] ?? null,
+        'request_reason_code' => $data['request_reason_code'] ?? legacyRequestReasonCodeFromSecondReason($secondScreeningReason),
+        'second_screening_reason' => $secondScreeningReason,
+        'customer_approval_reference' => $data['customer_approval_reference'] ?? null,
+        'source_requirement_id' => $data['source_requirement_id'] ?? null,
+        'source_defect_history_record_id' => $data['source_defect_history_record_id'] ?? null,
         'result_category' => $data['result_category'] ?? null,
         'status' => $status,
         'source_item_count' => count($sourceProfile['items']),
@@ -367,7 +628,7 @@ function createRescreenBatchFromReturnOrder(PDO $pdo, int $returnOrderId, array 
     foreach ($sourceProfile['items'] as $item) {
         $insertItemStmt->execute([
             'rescreen_batch_id' => $batchId,
-            'return_order_item_id' => (int)$item['return_order_item_id'],
+            'return_order_item_id' => !empty($item['return_order_item_id']) ? (int)$item['return_order_item_id'] : null,
             'shipping_order_item_id' => isset($item['shipping_order_item_id']) ? (int)$item['shipping_order_item_id'] : null,
             'source_shipping_order_id' => isset($item['shipping_order_id']) ? (int)$item['shipping_order_id'] : null,
             'source_inventory_item_id' => isset($item['inventory_item_id']) ? (int)$item['inventory_item_id'] : null,
@@ -377,7 +638,7 @@ function createRescreenBatchFromReturnOrder(PDO $pdo, int $returnOrderId, array 
             'returned_quantity' => round((float)($item['returned_quantity'] ?? 0), 2),
             'returned_unit' => $item['returned_unit'] ?: ($item['shipped_unit'] ?: null),
             'estimated_weight_kg' => round((float)($item['estimated_weight_kg'] ?? 0), 3),
-            'source_notes' => $item['reason'] ?: null,
+            'source_notes' => $item['reason'] ?: ($item['source_notes'] ?? null),
         ]);
     }
 
@@ -560,9 +821,9 @@ function maybeCreateRescreenExecutionWorkOrder(PDO $pdo, int $batchId, array $so
         'total_weight_kg' => $totalWeightKg,
         'weight_per_unit_g' => $weightPerUnitG > 0 ? $weightPerUnitG : (float)($orderItemDetails['weight_per_unit_g'] ?? 0),
         'total_units' => $totalUnits,
-        'tool_statistics' => '二次重篩退回批',
+        'tool_statistics' => '二次篩選批',
         'customer_instructions' => null,
-        'other_notes' => '系統自動建立之二次重篩執行工單；來源案件 #' . $batchId,
+        'other_notes' => '系統自動建立之二次篩選執行工單；來源案件 #' . $batchId,
         'status' => 'pending',
         'status_lookup_id' => $pendingStatusId > 0 ? $pendingStatusId : null,
     ]);
@@ -577,6 +838,385 @@ function maybeCreateRescreenExecutionWorkOrder(PDO $pdo, int $batchId, array $so
     ]);
 
     return $workOrderId;
+}
+
+function findRescreenBatchContextByWorkOrder(PDO $pdo, int $workOrderId): ?array
+{
+    if ($workOrderId <= 0) {
+        return null;
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT
+            wo.id AS work_order_id,
+            wo.work_order_type,
+            wo.order_item_id,
+            wo.source_rescreen_batch_id,
+            wo.actual_start_date,
+            wo.completed_at,
+            wo.shortage_units,
+            wo.weight_per_unit_g,
+            lv.value_key AS status_key,
+            rb.id AS rescreen_batch_id,
+            rb.source_return_order_id,
+            rb.rescreen_round,
+            rb.status AS batch_status,
+            rb.started_at AS batch_started_at,
+            rb.completed_at AS batch_completed_at
+        FROM work_orders wo
+        LEFT JOIN lookup_values lv ON lv.id = wo.status_lookup_id
+        LEFT JOIN rescreen_batches rb
+            ON rb.id = NULLIF(wo.source_rescreen_batch_id, 0)
+           AND rb.deleted_at IS NULL
+        WHERE wo.id = :work_order_id
+          AND wo.deleted_at IS NULL
+        LIMIT 1
+    ");
+    $stmt->execute(['work_order_id' => $workOrderId]);
+    $context = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$context || (int)($context['rescreen_batch_id'] ?? 0) <= 0) {
+        return null;
+    }
+
+    return $context;
+}
+
+function fetchRescreenBatchItemsForSync(PDO $pdo, int $batchId): array
+{
+    if ($batchId <= 0) {
+        return [];
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            return_order_item_id,
+            shipping_order_item_id,
+            source_shipping_order_id,
+            source_order_id,
+            source_order_item_id,
+            source_work_order_id,
+            source_notes
+        FROM rescreen_batch_items
+        WHERE rescreen_batch_id = :rescreen_batch_id
+        ORDER BY id ASC
+    ");
+    $stmt->execute(['rescreen_batch_id' => $batchId]);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+function resolveRescreenBatchStatusFromWorkOrder(array $context): string
+{
+    $statusKey = strtolower(trim((string)($context['status_key'] ?? '')));
+    if (!empty($context['completed_at']) || $statusKey === 'completed') {
+        return 'completed';
+    }
+
+    if ($statusKey === 'cancelled') {
+        return 'cancelled';
+    }
+
+    if (!empty($context['actual_start_date']) || in_array($statusKey, ['in_progress', 'paused'], true)) {
+        return 'in_progress';
+    }
+
+    return 'planned';
+}
+
+function determineRescreenResultCategory(float $goodUnits, float $defectUnits, float $scrapUnits, string $status): ?string
+{
+    if ($status !== 'completed') {
+        return null;
+    }
+
+    $hasGood = $goodUnits > 0.0001;
+    $hasDefect = $defectUnits > 0.0001;
+    $hasScrap = $scrapUnits > 0.0001;
+
+    if ($hasGood && !$hasDefect && !$hasScrap) {
+        return 'good_only';
+    }
+    if (!$hasGood && $hasDefect && !$hasScrap) {
+        return 'defect_only';
+    }
+    if (!$hasGood && !$hasDefect && $hasScrap) {
+        return 'scrap_only';
+    }
+    if ($hasGood && $hasDefect && !$hasScrap) {
+        return 'good_and_defect';
+    }
+    if ($hasGood && !$hasDefect && $hasScrap) {
+        return 'good_and_scrap';
+    }
+    if (!$hasGood && $hasDefect && $hasScrap) {
+        return 'defect_and_scrap';
+    }
+    if ($hasGood || $hasDefect || $hasScrap) {
+        return 'mixed';
+    }
+
+    return 'no_output';
+}
+
+function syncRescreenInventoryItemSources(PDO $pdo, array $context, array $batchItems): void
+{
+    $workOrderId = (int)($context['work_order_id'] ?? 0);
+    $batchId = (int)($context['rescreen_batch_id'] ?? 0);
+    if ($workOrderId <= 0 || $batchId <= 0) {
+        return;
+    }
+
+    $deleteStmt = $pdo->prepare("
+        DELETE iis
+        FROM inventory_item_sources iis
+        INNER JOIN inventory_items ii ON ii.id = iis.inventory_item_id
+        WHERE ii.work_order_id = :work_order_id
+    ");
+    $deleteStmt->execute(['work_order_id' => $workOrderId]);
+
+    if ($batchItems === []) {
+        return;
+    }
+
+    $inventoryStmt = $pdo->prepare("
+        SELECT id
+        FROM inventory_items
+        WHERE work_order_id = :work_order_id
+          AND deleted_at IS NULL
+        ORDER BY id ASC
+    ");
+    $inventoryStmt->execute(['work_order_id' => $workOrderId]);
+    $inventoryIds = array_map('intval', $inventoryStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
+    if ($inventoryIds === []) {
+        return;
+    }
+
+    $insertStmt = $pdo->prepare("
+        INSERT INTO inventory_item_sources (
+            inventory_item_id,
+            source_type,
+            source_id,
+            source_order_id,
+            source_order_item_id,
+            source_work_order_id,
+            source_shipping_order_id,
+            source_shipping_order_item_id,
+            source_return_order_id,
+            source_return_order_item_id,
+            source_rescreen_batch_id,
+            source_rescreen_batch_item_id,
+            source_defect_history_record_id,
+            notes
+        ) VALUES (
+            :inventory_item_id,
+            'rescreen_batch_item',
+            :source_id,
+            :source_order_id,
+            :source_order_item_id,
+            :source_work_order_id,
+            :source_shipping_order_id,
+            :source_shipping_order_item_id,
+            :source_return_order_id,
+            :source_return_order_item_id,
+            :source_rescreen_batch_id,
+            :source_rescreen_batch_item_id,
+            NULL,
+            :notes
+        )
+    ");
+
+    foreach ($inventoryIds as $inventoryItemId) {
+        foreach ($batchItems as $batchItem) {
+            $batchItemId = (int)($batchItem['id'] ?? 0);
+            if ($batchItemId <= 0) {
+                continue;
+            }
+
+            $insertStmt->execute([
+                'inventory_item_id' => $inventoryItemId,
+                'source_id' => $batchItemId,
+                'source_order_id' => !empty($batchItem['source_order_id']) ? (int)$batchItem['source_order_id'] : null,
+                'source_order_item_id' => !empty($batchItem['source_order_item_id']) ? (int)$batchItem['source_order_item_id'] : null,
+                'source_work_order_id' => !empty($batchItem['source_work_order_id']) ? (int)$batchItem['source_work_order_id'] : null,
+                'source_shipping_order_id' => !empty($batchItem['source_shipping_order_id']) ? (int)$batchItem['source_shipping_order_id'] : null,
+                'source_shipping_order_item_id' => !empty($batchItem['shipping_order_item_id']) ? (int)$batchItem['shipping_order_item_id'] : null,
+                'source_return_order_id' => !empty($context['source_return_order_id']) ? (int)$context['source_return_order_id'] : null,
+                'source_return_order_item_id' => !empty($batchItem['return_order_item_id']) ? (int)$batchItem['return_order_item_id'] : null,
+                'source_rescreen_batch_id' => $batchId,
+                'source_rescreen_batch_item_id' => $batchItemId,
+                'notes' => trim((string)($batchItem['source_notes'] ?? '')) ?: null,
+            ]);
+        }
+    }
+}
+
+function resolveRescreenDefectBatchItem(array $batchItems, int $orderItemId): ?array
+{
+    if (count($batchItems) === 1) {
+        return $batchItems[0];
+    }
+
+    $matches = [];
+    foreach ($batchItems as $batchItem) {
+        if ((int)($batchItem['source_order_item_id'] ?? 0) === $orderItemId) {
+            $matches[] = $batchItem;
+        }
+    }
+
+    return count($matches) === 1 ? $matches[0] : null;
+}
+
+function syncRescreenBatchDefects(PDO $pdo, array $context, array $batchItems): float
+{
+    $batchId = (int)($context['rescreen_batch_id'] ?? 0);
+    $workOrderId = (int)($context['work_order_id'] ?? 0);
+    if ($batchId <= 0 || $workOrderId <= 0) {
+        return 0.0;
+    }
+
+    $deleteStmt = $pdo->prepare("
+        DELETE FROM rescreen_batch_defects
+        WHERE rescreen_batch_id = :rescreen_batch_id
+    ");
+    $deleteStmt->execute(['rescreen_batch_id' => $batchId]);
+
+    $screeningStmt = $pdo->prepare("
+        SELECT
+            wosd.id,
+            wosd.screening_service_id,
+            COALESCE(NULLIF(wosd.service_name, ''), ss.name, CONCAT('服務#', wosd.screening_service_id)) AS service_name,
+            CAST(wosd.defect_quantity AS DECIMAL(14,2)) AS defect_quantity,
+            wosd.notes
+        FROM work_order_screening_defects wosd
+        LEFT JOIN screening_services ss ON ss.id = wosd.screening_service_id
+        WHERE wosd.work_order_id = :work_order_id
+        ORDER BY wosd.id ASC
+    ");
+    $screeningStmt->execute(['work_order_id' => $workOrderId]);
+    $screeningRows = $screeningStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($screeningRows === []) {
+        return 0.0;
+    }
+
+    $batchItem = resolveRescreenDefectBatchItem($batchItems, (int)($context['order_item_id'] ?? 0));
+    $weightPerUnitG = round((float)($context['weight_per_unit_g'] ?? 0), 3);
+    $rescreenRound = max(1, (int)($context['rescreen_round'] ?? 1));
+    $insertStmt = $pdo->prepare("
+        INSERT INTO rescreen_batch_defects (
+            rescreen_batch_id,
+            rescreen_batch_item_id,
+            screening_service_id,
+            service_name,
+            defect_quantity,
+            defect_weight_kg,
+            defect_units,
+            source_return_order_item_id,
+            source_defect_history_record_id,
+            rescreen_round,
+            notes
+        ) VALUES (
+            :rescreen_batch_id,
+            :rescreen_batch_item_id,
+            :screening_service_id,
+            :service_name,
+            :defect_quantity,
+            :defect_weight_kg,
+            :defect_units,
+            :source_return_order_item_id,
+            :source_defect_history_record_id,
+            :rescreen_round,
+            :notes
+        )
+    ");
+
+    $totalDefectUnits = 0.0;
+    foreach ($screeningRows as $screeningRow) {
+        $defectUnits = round((float)($screeningRow['defect_quantity'] ?? 0), 2);
+        if ($defectUnits <= 0) {
+            continue;
+        }
+
+        $defectWeightKg = $weightPerUnitG > 0
+            ? round(($defectUnits * $weightPerUnitG) / 1000, 3)
+            : 0.0;
+        $totalDefectUnits += $defectUnits;
+
+        $insertStmt->execute([
+            'rescreen_batch_id' => $batchId,
+            'rescreen_batch_item_id' => $batchItem ? (int)($batchItem['id'] ?? 0) : null,
+            'screening_service_id' => !empty($screeningRow['screening_service_id']) ? (int)$screeningRow['screening_service_id'] : null,
+            'service_name' => trim((string)($screeningRow['service_name'] ?? '')) ?: '未命名服務',
+            'defect_quantity' => $defectUnits,
+            'defect_weight_kg' => $defectWeightKg,
+            'defect_units' => $defectUnits,
+            'source_return_order_item_id' => $batchItem && !empty($batchItem['return_order_item_id']) ? (int)$batchItem['return_order_item_id'] : null,
+            'source_defect_history_record_id' => (int)($screeningRow['id'] ?? 0),
+            'rescreen_round' => $rescreenRound,
+            'notes' => trim((string)($screeningRow['notes'] ?? '')) ?: null,
+        ]);
+    }
+
+    return round($totalDefectUnits, 2);
+}
+
+function syncRescreenBatchFromWorkOrder(PDO $pdo, int $workOrderId): void
+{
+    $context = findRescreenBatchContextByWorkOrder($pdo, $workOrderId);
+    if ($context === null) {
+        return;
+    }
+
+    $batchId = (int)($context['rescreen_batch_id'] ?? 0);
+    $batchItems = fetchRescreenBatchItemsForSync($pdo, $batchId);
+
+    syncRescreenInventoryItemSources($pdo, $context, $batchItems);
+    $defectUnits = syncRescreenBatchDefects($pdo, $context, $batchItems);
+
+    $inventorySummaryStmt = $pdo->prepare("
+        SELECT
+            COALESCE(SUM(total_good_units), 0) AS total_good_units
+        FROM inventory_items
+        WHERE work_order_id = :work_order_id
+          AND deleted_at IS NULL
+    ");
+    $inventorySummaryStmt->execute(['work_order_id' => $workOrderId]);
+    $inventorySummary = $inventorySummaryStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $goodUnits = round((float)($inventorySummary['total_good_units'] ?? 0), 2);
+    $scrapUnits = round(max((float)($context['shortage_units'] ?? 0), 0), 2);
+    $status = resolveRescreenBatchStatusFromWorkOrder($context);
+    $startedAt = $status === 'planned'
+        ? null
+        : ($context['actual_start_date'] ?: $context['batch_started_at'] ?: date('Y-m-d H:i:s'));
+    $completedAt = $status === 'completed'
+        ? ($context['completed_at'] ?: $context['batch_completed_at'] ?: date('Y-m-d H:i:s'))
+        : null;
+    $resultCategory = determineRescreenResultCategory($goodUnits, $defectUnits, $scrapUnits, $status);
+
+    $updateStmt = $pdo->prepare("
+        UPDATE rescreen_batches
+        SET
+            status = :status,
+            started_at = :started_at,
+            completed_at = :completed_at,
+            rescreen_output_good_units = :rescreen_output_good_units,
+            rescreen_output_defect_units = :rescreen_output_defect_units,
+            rescreen_output_scrap_units = :rescreen_output_scrap_units,
+            result_category = :result_category
+        WHERE id = :id
+    ");
+    $updateStmt->execute([
+        'status' => $status,
+        'started_at' => $startedAt,
+        'completed_at' => $completedAt,
+        'rescreen_output_good_units' => $goodUnits,
+        'rescreen_output_defect_units' => $defectUnits,
+        'rescreen_output_scrap_units' => $scrapUnits,
+        'result_category' => $resultCategory,
+        'id' => $batchId,
+    ]);
 }
 
 function getRescreenBatchDetails(PDO $pdo, int $id): ?array
@@ -728,6 +1368,12 @@ function listRescreenBatches(PDO $pdo, array $filters): array
         $params['source_return_order_id'] = (int)$sourceReturnOrderId;
     }
 
+    $sourceWorkOrderId = filter_var($filters['source_work_order_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if ($sourceWorkOrderId !== false) {
+        $where[] = 'rb.source_work_order_id = :source_work_order_id';
+        $params['source_work_order_id'] = (int)$sourceWorkOrderId;
+    }
+
     $whereSql = implode(' AND ', $where);
 
     $baseFrom = "
@@ -749,6 +1395,10 @@ function listRescreenBatches(PDO $pdo, array $filters): array
             rb.id,
             rb.rescreen_batch_number,
             rb.rescreen_type,
+            rb.second_screening_reason,
+            rb.customer_approval_reference,
+            rb.source_requirement_id,
+            rb.source_defect_history_record_id,
             rb.status,
             rb.source_item_count,
             rb.received_total_quantity,
@@ -781,4 +1431,3 @@ function listRescreenBatches(PDO $pdo, array $filters): array
         ],
     ];
 }
-

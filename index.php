@@ -177,7 +177,7 @@ $ver = $cacheVersion['version'];
                             <ul class="submenu">
                                 <li><a href="#" data-page="production_quality_records" data-title="生產品質檢驗"><i class="fas fa-microscope"></i> 生產品質檢驗</a></li>
                                 <li><a href="#" data-page="defect_history_records" data-title="不良品歷史紀錄"><i class="fas fa-history"></i> 不良品歷史紀錄</a></li>
-                                <li><a href="#" data-page="rescreen_batches" data-title="二次重篩歷史紀錄"><i class="fas fa-redo"></i> 二次重篩歷史紀錄</a></li>
+                                <li><a href="#" data-page="rescreen_batches" data-title="二次篩選紀錄"><i class="fas fa-redo"></i> 二次篩選紀錄</a></li>
                                 <li><a href="#" data-page="shipping_quality_inspections" data-title="出貨品質檢驗"><i class="fas fa-search"></i> 出貨品質檢驗</a></li>
                                 <li><a href="#" data-page="quality_issue_reports" data-title="品質異常報告"><i class="fas fa-exclamation-triangle"></i> 品質異常報告</a></li>
                             </ul>

@@ -198,6 +198,12 @@ function handleListWorkOrders(PDO $pdo): void
             c.is_active AS customer_is_active,
             si.name AS screening_item_name,
             rb.rescreen_batch_number,
+            rb.second_screening_reason AS execution_second_screening_reason,
+            COALESCE(ss_summary.second_screening_count, 0) AS second_screening_count,
+            ss_summary.second_screening_batch_id,
+            ss_summary.second_screening_batch_numbers,
+            ss_summary.second_screening_reasons,
+            ss_summary.second_screening_statuses,
             m.name AS machine_name,
             e1.name AS assigned_employee_name,
             e2.name AS calibration_employee_name,
@@ -224,6 +230,19 @@ function handleListWorkOrders(PDO $pdo): void
         LEFT JOIN customers c ON o.customer_id = c.id
         LEFT JOIN screening_items si ON oi.screening_item_id = si.id
         LEFT JOIN rescreen_batches rb ON rb.id = NULLIF(wo.source_rescreen_batch_id, 0)
+        LEFT JOIN (
+            SELECT
+                source_work_order_id,
+                COUNT(*) AS second_screening_count,
+                MAX(id) AS second_screening_batch_id,
+                GROUP_CONCAT(rescreen_batch_number ORDER BY id DESC SEPARATOR ', ') AS second_screening_batch_numbers,
+                GROUP_CONCAT(DISTINCT second_screening_reason ORDER BY second_screening_reason SEPARATOR ', ') AS second_screening_reasons,
+                GROUP_CONCAT(DISTINCT status ORDER BY status SEPARATOR ', ') AS second_screening_statuses
+            FROM rescreen_batches
+            WHERE deleted_at IS NULL
+              AND source_work_order_id IS NOT NULL
+            GROUP BY source_work_order_id
+        ) ss_summary ON ss_summary.source_work_order_id = wo.id
         LEFT JOIN machines m ON wo.machine_id = m.id
         LEFT JOIN employees e1 ON wo.assigned_employee_id = e1.id
         LEFT JOIN employees e2 ON wo.calibration_employee_id = e2.id

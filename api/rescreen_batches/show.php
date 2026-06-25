@@ -14,7 +14,7 @@ if ($id <= 0) {
 
 $batch = getRescreenBatchDetails(db(), $id);
 if ($batch === null) {
-    jsonResponse(['success' => false, 'message' => '找不到指定的二次重篩案件。'], 404);
+    jsonResponse(['success' => false, 'message' => '找不到指定的二次篩選案件。'], 404);
 }
 
 jsonResponse([

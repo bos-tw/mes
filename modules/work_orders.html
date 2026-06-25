@@ -195,7 +195,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="11" class="text-center">資料載入中...</td>
+                        <td colspan="12" class="text-center">資料載入中...</td>
                     </tr>
                 </tbody>
             </table>
@@ -313,9 +313,15 @@
                             </label>
                             <label class="inline-label" data-primary-machine-field>
                                 <span>指派機台</span>
-                                <select name="machine_id">
-                                    <option value="">-- 請選擇 --</option>
-                                </select>
+                                <div class="machine-picker-combobox">
+                                    <select name="machine_id" class="machine-picker-native">
+                                        <option value="">-- 請選擇 --</option>
+                                    </select>
+                                    <button type="button" class="machine-picker-trigger" data-action="open-machine-picker">
+                                        <span data-machine-picker-label>-- 請選擇 --</span>
+                                        <i class="fas fa-th-large" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                             </label>
                         </div>
                     </section>
@@ -801,6 +807,15 @@
                         </div>
                     </section>
 
+                    <section class="form-section info-section work-order-second-screening-section" data-work-order-second-screening-section>
+                        <header class="subsection-header">
+                            <h4>二次篩選追蹤</h4>
+                        </header>
+                        <div class="subsection-body" data-work-order-second-screening-summary>
+                            <p class="text-muted">尚未載入二次篩選資訊。</p>
+                        </div>
+                    </section>
+
                     <section class="form-section info-section work-order-collapsible-section work-order-edit-detail-section" data-collapsible-section>
                         <header class="subsection-header">
                             <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-detail-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
@@ -865,7 +880,7 @@
                                 <label class="inline-label"><span>預定開始日期</span><input type="datetime-local" name="scheduled_start_date"><span class="weekday-badge" data-weekday-for="edit_scheduled_start_date"></span></label>
                                 <label class="inline-label"><span>預定結束日期</span><input type="datetime-local" name="scheduled_end_date"><span class="weekday-badge" data-weekday-for="edit_scheduled_end_date"></span></label>
                                 <label class="inline-label"><span>指派員工</span><select name="assigned_employee_id" data-field="assigned-employee"><option value="">-- 請選擇 --</option></select></label>
-                                <label class="inline-label"><span>指定機台</span><select name="machine_id" data-field="machine"><option value="">-- 請選擇 --</option></select></label>
+                                <label class="inline-label" data-primary-machine-field><span>指定機台</span><div class="machine-picker-combobox"><select name="machine_id" data-field="machine" class="machine-picker-native"><option value="">-- 請選擇 --</option></select><button type="button" class="machine-picker-trigger" data-action="open-machine-picker"><span data-machine-picker-label>-- 請選擇 --</span><i class="fas fa-th-large" aria-hidden="true"></i></button></div></label>
                                 <label class="inline-label"><span>實際開始日期</span><input type="datetime-local" name="actual_start_date"><span class="weekday-badge" data-weekday-for="edit_actual_start_date"></span></label>
                                 <label class="inline-label"><span>實際結束日期</span><input type="datetime-local" name="actual_end_date"><span class="weekday-badge" data-weekday-for="edit_actual_end_date"></span></label>
                                 <label class="inline-label"><span>校機人員</span><select name="calibration_employee_id" data-field="calibration-employee"><option value="">-- 請選擇 --</option></select></label>
@@ -951,17 +966,17 @@
                                     </header>
                                     <div class="subsection-body" data-edit-first-piece-section>
                                         <div class="form-grid work-order-first-piece-grid">
-                                            <label class="inline-label"><span>頭高</span><input type="number" name="fp_head_height" step="0.0001"></label>
-                                            <label class="inline-label"><span>頭寬</span><input type="number" name="fp_head_width" step="0.0001"></label>
-                                            <label class="inline-label"><span>長度</span><input type="number" name="fp_length" step="0.0001"></label>
-                                            <label class="inline-label"><span>牙外徑</span><input type="number" name="fp_thread_outer_diameter" step="0.0001"></label>
-                                            <label class="inline-label"><span>華司徑</span><input type="number" name="fp_washer_diameter" step="0.0001"></label>
-                                            <label class="inline-label"><span>外徑</span><input type="number" name="fp_outer_diameter" step="0.0001"></label>
-                                            <label class="inline-label"><span>孔徑</span><input type="number" name="fp_hole_diameter" step="0.0001"></label>
-                                            <label class="inline-label"><span>厚度</span><input type="number" name="fp_thickness" step="0.0001"></label>
-                                            <label class="inline-label" data-span-two><span>測量時間</span><input type="datetime-local" name="fp_measured_at"></label>
-                                            <label class="inline-label" data-span-two><span>測量人員</span><select name="fp_measured_by_employee_id"><option value="">-- 請選擇 --</option></select></label>
-                                            <label class="inline-label full-width"><span>備註</span><textarea name="fp_notes" maxlength="255" rows="2"></textarea></label>
+                                            <label class="inline-label work-order-first-piece-span-4"><span>頭高</span><input type="number" name="fp_head_height" step="0.0001"></label>
+                                            <label class="inline-label work-order-first-piece-span-4"><span>頭寬</span><input type="number" name="fp_head_width" step="0.0001"></label>
+                                            <label class="inline-label work-order-first-piece-span-4"><span>長度</span><input type="number" name="fp_length" step="0.0001"></label>
+                                            <label class="inline-label work-order-first-piece-span-4"><span>牙外徑</span><input type="number" name="fp_thread_outer_diameter" step="0.0001"></label>
+                                            <label class="inline-label work-order-first-piece-span-4"><span>華司徑</span><input type="number" name="fp_washer_diameter" step="0.0001"></label>
+                                            <label class="inline-label work-order-first-piece-span-4"><span>外徑</span><input type="number" name="fp_outer_diameter" step="0.0001"></label>
+                                            <label class="inline-label work-order-first-piece-span-4"><span>孔徑</span><input type="number" name="fp_hole_diameter" step="0.0001"></label>
+                                            <label class="inline-label work-order-first-piece-span-4"><span>厚度</span><input type="number" name="fp_thickness" step="0.0001"></label>
+                                            <label class="inline-label work-order-first-piece-span-4"><span>測量人員</span><select name="fp_measured_by_employee_id"><option value="">-- 請選擇 --</option></select></label>
+                                            <label class="inline-label work-order-first-piece-span-6"><span>測量時間</span><input type="datetime-local" name="fp_measured_at"></label>
+                                            <label class="inline-label work-order-first-piece-span-6 work-order-first-piece-notes-half"><span>備註</span><textarea name="fp_notes" maxlength="255" rows="2"></textarea></label>
                                         </div>
                                     </div>
                                 </section>

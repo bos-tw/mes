@@ -1,6 +1,6 @@
 ModuleConfig.register('rescreen_batches', {
-    title: '二次重篩歷史紀錄',
-    subtitle: '查詢退貨後重篩來源、執行工單、標準變更與處置結果',
+    title: '二次篩選歷史紀錄',
+    subtitle: '查詢放寬後二篩、客戶每批要求二篩、執行工單與追溯結果',
 
     requiresHtmlModal: true,
     hasColumnSelector: true,
@@ -10,11 +10,11 @@ ModuleConfig.register('rescreen_batches', {
     useGenericFilterDrawer: true,
 
     actions: [
-        { label: '新增重篩紀錄', icon: 'fa-plus', action: 'create', style: 'primary' }
+        { label: '新增二篩紀錄', icon: 'fa-plus', action: 'create', style: 'primary' }
     ],
 
     filters: [
-        { name: 'keyword', label: '關鍵字', type: 'text', placeholder: '搜尋重篩編號 / 退貨單 / 出貨單 / 工單 / 客戶' },
+        { name: 'keyword', label: '關鍵字', type: 'text', placeholder: '搜尋二篩編號 / 退貨單 / 出貨單 / 工單 / 客戶' },
         {
             name: 'customer_id',
             label: '客戶',
@@ -23,12 +23,12 @@ ModuleConfig.register('rescreen_batches', {
         },
         {
             name: 'rescreen_type',
-            label: '重篩類型',
+            label: '二篩類型',
             type: 'select',
             options: [
                 { value: '', label: '-- 所有類型 --' },
-                { value: 'strict_rescreen', label: '嚴格重篩' },
-                { value: 'relaxed_rescreen', label: '放寬重篩' }
+                { value: 'strict_rescreen', label: '嚴格二篩' },
+                { value: 'relaxed_rescreen', label: '放寬二篩' }
             ]
         },
         {
@@ -57,21 +57,22 @@ ModuleConfig.register('rescreen_batches', {
     ],
 
     columns: [
-        { key: 'rescreen_batch_number', label: '重篩編號', sortable: true, selectable: true },
-        { key: 'rescreen_type', label: '重篩方式', sortable: false, selectable: true },
+        { key: 'rescreen_batch_number', label: '二篩編號', sortable: true, selectable: true },
+        { key: 'rescreen_type', label: '二篩方式', sortable: false, selectable: true },
+        { key: 'second_screening_reason', label: '二篩原因', sortable: false, selectable: true },
         { key: 'customer_name', label: '客戶', sortable: true, selectable: true },
         { key: 'return_order_number', label: '退貨單', sortable: false, selectable: true },
         { key: 'shipping_order_number', label: '原出貨單', sortable: false, selectable: true },
         { key: 'source_work_order_number', label: '原始工單', sortable: false, selectable: true },
-        { key: 'rescreen_work_order_number', label: '重篩工單', sortable: false, selectable: true },
-        { key: 'received_total_quantity', label: '退回數量', sortable: false, selectable: true },
+        { key: 'rescreen_work_order_number', label: '二篩工單', sortable: false, selectable: true },
+        { key: 'received_total_quantity', label: '來源數量', sortable: false, selectable: true },
         { key: 'status', label: '狀態', sortable: true, selectable: true },
         { key: 'created_at', label: '建立時間', sortable: true, selectable: true },
         { key: 'actions', label: '操作', sortable: false, selectable: false }
     ],
 
     detailModal: {
-        title: '二次重篩歷史詳情',
+        title: '二次篩選歷史詳情',
         icon: 'fa-redo',
         hasEdit: true
     }

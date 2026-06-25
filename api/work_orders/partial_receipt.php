@@ -10,6 +10,7 @@ require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/../inventory_items/helpers.php';
 require_once __DIR__ . '/../number_sequences/helpers.php';
+require_once __DIR__ . '/../rescreen_batches/helpers.php';
 require_once __DIR__ . '/../work_order_operation_logs_helper.php';
 
 requireAuth();
@@ -401,6 +402,8 @@ try {
             'shipping_tools' => $shippingToolItems,
         ],
     ]);
+
+    syncRescreenBatchFromWorkOrder($pdo, $workOrderId);
 
     $pdo->commit();
 

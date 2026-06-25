@@ -33,7 +33,7 @@ try {
 
     jsonResponse([
         'success' => true,
-        'message' => '已由退貨單建立二次重篩案件。',
+        'message' => '已由退貨單建立二次篩選案件。',
         'data' => $batch,
     ], 201);
 } catch (Exception $exception) {
@@ -44,6 +44,6 @@ try {
     $statusCode = $exception instanceof InvalidArgumentException ? 400 : 500;
     jsonResponse([
         'success' => false,
-        'message' => safeErrorMessage($exception, '建立二次重篩案件失敗，請稍後重試。'),
+        'message' => safeErrorMessage($exception, '建立二次篩選案件失敗，請稍後重試。'),
     ], $statusCode);
 }

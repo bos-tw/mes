@@ -5691,6 +5691,7 @@ td.actions-col {
 [data-work-orders-edit-modal] .work-order-edit-detail-section,
 [data-work-orders-edit-modal] .work-order-edit-drawing-card,
 [data-work-orders-edit-modal] .work-order-edit-schedule-section,
+[data-work-orders-edit-modal] .work-order-edit-execution-images,
 [data-work-orders-edit-modal] .work-order-edit-middle-row,
 [data-work-orders-edit-modal] .split-work-order-panel,
 [data-work-orders-edit-modal] .work-order-edit-production-records {
@@ -5701,6 +5702,7 @@ td.actions-col {
 [data-work-orders-edit-modal] .work-order-edit-detail-section,
 [data-work-orders-edit-modal] .work-order-edit-schedule-section,
 [data-work-orders-edit-modal] .work-order-edit-inspection-section,
+[data-work-orders-edit-modal] .work-order-edit-execution-images,
 [data-work-orders-edit-modal] .work-order-edit-production-records {
     padding: 10px 12px;
 }
@@ -5740,6 +5742,38 @@ td.actions-col {
 
 [data-work-orders-edit-modal] .work-order-edit-schedule-section {
     padding: 8px 10px;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-execution-images {
+    padding: 8px 10px;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-execution-images > .subsection-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    margin: 0 0 8px;
+    padding: 0 0 6px;
+    padding-left: 2px;
+    border-bottom: 1px solid #dfe5ec;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-execution-images > .subsection-header h4 {
+    margin: 0;
+    flex: 0 1 auto;
+    font-size: var(--font-lg) !important;
+    font-weight: 600;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-execution-images .subsection-actions {
+    margin-bottom: 0;
+    align-items: center;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-execution-images > .subsection-body {
+    padding-left: 2px;
+    padding-right: 2px;
 }
 
 [data-work-orders-edit-modal] .work-order-partial-history-section {
@@ -5788,6 +5822,202 @@ td.actions-col {
     white-space: nowrap;
 }
 
+[data-primary-machine-field] .machine-picker-combobox {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+
+[data-primary-machine-field] .machine-picker-native {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+}
+
+[data-primary-machine-field] .machine-picker-trigger {
+    width: 100%;
+    min-height: 32px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 0;
+    background: #fff;
+    color: #1f2937;
+    text-align: left;
+    font-size: var(--font-base);
+    cursor: pointer;
+}
+
+[data-primary-machine-field] .machine-picker-trigger:hover {
+    background: #f8fafc;
+}
+
+[data-primary-machine-field] .machine-picker-trigger:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: -2px;
+}
+
+[data-primary-machine-field].hidden .machine-picker-trigger,
+[data-primary-machine-field] .machine-picker-native:disabled + .machine-picker-trigger {
+    background: #f3f4f6;
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
+[data-primary-machine-field] [data-machine-picker-label] {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+[data-machine-picker-modal] .modal-window {
+    width: min(760px, 92vw);
+    max-width: 760px;
+}
+
+[data-machine-picker-modal] .machine-picker-layout {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+[data-machine-picker-modal] .machine-picker-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: min(52vh, 420px);
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+[data-machine-picker-modal] .machine-picker-group-btn {
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    color: #334155;
+    text-align: left;
+    cursor: pointer;
+}
+
+[data-machine-picker-modal] .machine-picker-group-btn:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+}
+
+[data-machine-picker-modal] .machine-picker-group-btn.is-active {
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+[data-machine-picker-modal] .machine-picker-panel {
+    min-width: 0;
+}
+
+[data-machine-picker-modal] .machine-picker-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 2px;
+    margin-bottom: 8px;
+}
+
+[data-machine-picker-modal] .machine-picker-panel-header strong {
+    font-size: 13px;
+    color: #0f172a;
+}
+
+[data-machine-picker-modal] .machine-picker-panel-count {
+    font-size: 11px;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+[data-machine-picker-modal] .machine-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    max-height: min(46vh, 360px);
+    overflow-y: auto;
+}
+
+[data-machine-picker-modal] .machine-picker-option {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 10px;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+[data-machine-picker-modal] .machine-picker-option:hover {
+    border-color: #60a5fa;
+    background: #f8fbff;
+}
+
+[data-machine-picker-modal] .machine-picker-option.is-selected {
+    border-color: #2563eb;
+    background: #eff6ff;
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.08);
+}
+
+[data-machine-picker-modal] .machine-picker-option-name {
+    font-weight: 600;
+    color: #111827;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+[data-machine-picker-modal] .machine-picker-option-meta {
+    font-size: 11px;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    [data-machine-picker-modal] .machine-picker-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    [data-machine-picker-modal] .machine-picker-groups {
+        max-height: none;
+        flex-direction: row;
+        flex-wrap: wrap;
+        padding-right: 0;
+    }
+
+    [data-machine-picker-modal] .machine-picker-group-btn {
+        width: auto;
+    }
+
+    [data-machine-picker-modal] .machine-picker-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 [data-work-orders-edit-modal] .work-order-edit-schedule-grid input,
 [data-work-orders-edit-modal] .work-order-edit-schedule-grid select {
     height: 29px;
@@ -5814,7 +6044,7 @@ td.actions-col {
 
 [data-work-orders-edit-modal] .work-order-edit-middle-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     gap: 10px;
 }
 
@@ -6202,17 +6432,32 @@ td.actions-col {
 }
 
 [data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 8px 10px;
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+    gap: 6px 8px;
 }
 
 [data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.inline-label {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr);
+    min-width: 0;
 }
 
-[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label[data-span-two] {
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid .work-order-first-piece-span-4 {
+    grid-column: span 4;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid .work-order-first-piece-span-6 {
+    grid-column: span 6;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid .work-order-first-piece-span-8 {
+    grid-column: span 8;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid .work-order-first-piece-notes-half {
     display: grid;
-    grid-column: span 2;
+    grid-template-columns: 74px minmax(0, 1fr);
+    grid-column: span 6;
 }
 
 [data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.full-width {
@@ -6309,8 +6554,16 @@ td.actions-col {
     resize: vertical;
 }
 
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid .work-order-first-piece-notes-half textarea {
+    height: 38px;
+    min-height: 38px;
+    resize: vertical;
+}
+
 [data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.full-width > span:first-child,
-[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.full-width textarea {
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid label.full-width textarea,
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid .work-order-first-piece-notes-half > span:first-child,
+[data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid .work-order-first-piece-notes-half textarea {
     height: 34px;
     min-height: 34px;
 }
@@ -10333,6 +10586,37 @@ select option:disabled {
     background: #ecfeff;
     border-color: #67e8f9;
     color: #0e7490;
+}
+
+.work-order-type-badge.rescreen {
+    background: #e0f2fe;
+    border-color: #7dd3fc;
+    color: #0369a1;
+}
+
+.work-order-second-screening-section {
+    border-left: 3px solid #0ea5e9;
+}
+
+.work-order-second-screening-empty {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+}
+
+.work-order-second-screening-cards {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.work-order-second-screening-card {
+    border: 1px solid #dbeafe;
+    border-radius: 8px;
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.75rem;
 }
 
 .production-schedule-table tbody tr.schedule-row.dragging {

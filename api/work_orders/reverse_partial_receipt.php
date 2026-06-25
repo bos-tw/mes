@@ -6,6 +6,7 @@ require_once __DIR__ . '/../common/workflow_guard.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/../inventory_items/helpers.php';
 require_once __DIR__ . '/../number_sequences/helpers.php';
+require_once __DIR__ . '/../rescreen_batches/helpers.php';
 require_once __DIR__ . '/../work_order_operation_logs_helper.php';
 
 requireAuth();
@@ -162,6 +163,8 @@ try {
         'inventory_number' => $receipt['inventory_number'] ?? null,
         'reverse_reason' => $reverseReason,
     ]);
+
+    syncRescreenBatchFromWorkOrder($pdo, (int)$receipt['work_order_id']);
 
     $pdo->commit();
 

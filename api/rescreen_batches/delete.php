@@ -15,7 +15,7 @@ if ($id <= 0) {
 $pdo = db();
 $batch = getRescreenBatchDetails($pdo, $id);
 if ($batch === null) {
-    jsonResponse(['success' => false, 'message' => '找不到指定的二次重篩案件。'], 404);
+    jsonResponse(['success' => false, 'message' => '找不到指定的二次篩選案件。'], 404);
 }
 
 $blockingImpacts = [];
@@ -23,7 +23,7 @@ if (!empty($batch['rescreen_work_order_id'])) {
     $blockingImpacts[] = '已建立執行工單，請先處理工單追溯。';
 }
 if (!empty($batch['defects']) && count((array)$batch['defects']) > 0) {
-    $blockingImpacts[] = '已有二次重篩再次不良紀錄。';
+    $blockingImpacts[] = '已有二次篩選再次不良紀錄。';
 }
 
 $inventorySourceStmt = $pdo->prepare("
@@ -40,7 +40,7 @@ if ($inventorySourceCount > 0) {
 if ($blockingImpacts !== []) {
     jsonResponse([
         'success' => false,
-        'message' => '此二次重篩案件已有下游追溯資料，無法直接刪除。',
+        'message' => '此二次篩選案件已有下游追溯資料，無法直接刪除。',
         'impacts' => $blockingImpacts,
     ], 409);
 }
@@ -62,5 +62,5 @@ logAuditAction('Delete rescreen batch', 'rescreen_batches', $id, [
 
 jsonResponse([
     'success' => true,
-    'message' => '二次重篩案件已刪除。',
+    'message' => '二次篩選案件已刪除。',
 ]);

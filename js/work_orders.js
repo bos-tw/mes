@@ -335,6 +335,7 @@
         attachEventListeners();
         setupMirroredFormFields(elements.createModalForm, ['machine_id', 'assigned_employee_id', 'calibration_employee_id']);
         setupMirroredFormFields(elements.editModalForm, ['machine_id', 'assigned_employee_id', 'calibration_employee_id']);
+        syncMachinePickerFields();
     }
 
     function setupMirroredFormFields(form, fieldNames) {
@@ -354,11 +355,32 @@
                     fields.forEach((target) => {
                         if (target !== field && target.value !== value) {
                             target.value = value;
+                            syncMachinePickerField(target.closest('[data-primary-machine-field]'));
                         }
                     });
+                    syncMachinePickerField(field.closest('[data-primary-machine-field]'));
                 });
             });
         });
+    }
+
+    function syncMachinePickerField(field) {
+        if (!field) {
+            return;
+        }
+        const select = field.querySelector('select[name="machine_id"]');
+        const label = field.querySelector('[data-machine-picker-label]');
+        if (!select || !label) {
+            return;
+        }
+        const selectedOption = select.options[select.selectedIndex];
+        label.textContent = select.value
+            ? (selectedOption?.textContent || getMachineDisplayName(select.value) || '-- 請選擇 --')
+            : '-- 請選擇 --';
+    }
+
+    function syncMachinePickerFields(scope = moduleRoot) {
+        scope.querySelectorAll('[data-primary-machine-field]').forEach(syncMachinePickerField);
     }
 
     // 輔助函數: 星期顯示
@@ -1135,6 +1157,13 @@
         return [machine.machine_number || '', machine.name || ''].filter(Boolean).join(' - ') || id;
     }
 
+    function getMachineGroupLabel(machine) {
+        if (!machine) {
+            return '未分類';
+        }
+        return machine.machine_capability_name || machine.capability_names || machine.machine_capability_code || '未分類';
+    }
+
     function syncProductionRecordMachineCapability(select) {
         if (!select) {
             return;
@@ -1236,6 +1265,7 @@
                 if (isSplit) {
                     select.value = '';
                 }
+                syncMachinePickerField(field);
             }
         });
 
@@ -1582,7 +1612,7 @@
         set('remaining', remaining);
     }
 
-    async function askMachineSelectionDialog({ title = '選擇機台', message = '請先選擇要加入拆分流程的機台。' } = {}) {
+    async function askMachineSelectionDialog({ title = '選擇機台', message = '請先選擇要加入拆分流程的機台。', selectedMachineId = '' } = {}) {
         return new Promise((resolve) => {
             document.querySelector('[data-machine-picker-modal]')?.remove();
 
@@ -1593,9 +1623,18 @@
                 return;
             }
 
-            const machineOptions = availableMachines
-                .map((machine) => `<option value="${escapeHtml(String(machine.id))}">${escapeHtml(getMachineDisplayName(machine.id))}</option>`)
-                .join('');
+            let currentSelection = String(selectedMachineId || '');
+            const machineGroupsMap = new Map();
+            availableMachines.forEach((machine) => {
+                const groupLabel = getMachineGroupLabel(machine);
+                if (!machineGroupsMap.has(groupLabel)) {
+                    machineGroupsMap.set(groupLabel, []);
+                }
+                machineGroupsMap.get(groupLabel).push(machine);
+            });
+            const groupLabels = Array.from(machineGroupsMap.keys());
+            const selectedMachine = availableMachines.find((machine) => String(machine.id) === currentSelection);
+            let activeGroup = selectedMachine ? getMachineGroupLabel(selectedMachine) : (groupLabels[0] || '');
 
             const overlay = document.createElement('div');
             overlay.className = 'modal-overlay';
@@ -1605,13 +1644,16 @@
                 <div class="modal-window small" role="dialog" aria-modal="true" aria-labelledby="machine-picker-title">
                     <h3 id="machine-picker-title">${escapeHtml(title)}</h3>
                     <p class="text-muted" style="margin-bottom: 12px;">${escapeHtml(message)}</p>
-                    <label class="inline-label">
-                        <span>機台設備</span>
-                        <select data-machine-picker-select>
-                            <option value="">-- 請選擇機台 --</option>
-                            ${machineOptions}
-                        </select>
-                    </label>
+                    <div class="machine-picker-layout">
+                        <div class="machine-picker-groups" data-machine-picker-groups></div>
+                        <div class="machine-picker-panel">
+                            <div class="machine-picker-panel-header">
+                                <strong data-machine-picker-group-title></strong>
+                                <span class="machine-picker-panel-count" data-machine-picker-group-count></span>
+                            </div>
+                            <div class="machine-picker-grid" data-machine-picker-grid></div>
+                        </div>
+                    </div>
                     <div class="form-actions align-right" style="margin-top: 14px;">
                         <button type="button" class="btn outline" data-choice="cancel">取消</button>
                         <button type="button" class="btn primary" data-choice="confirm">確認新增</button>
@@ -1619,7 +1661,64 @@
                 </div>
             `;
 
-            const select = overlay.querySelector('[data-machine-picker-select]');
+            const groupsContainer = overlay.querySelector('[data-machine-picker-groups]');
+            const groupTitle = overlay.querySelector('[data-machine-picker-group-title]');
+            const groupCount = overlay.querySelector('[data-machine-picker-group-count]');
+            const grid = overlay.querySelector('[data-machine-picker-grid]');
+
+            groupLabels.forEach((groupLabel) => {
+                const groupButton = document.createElement('button');
+                groupButton.type = 'button';
+                groupButton.className = `machine-picker-group-btn${groupLabel === activeGroup ? ' is-active' : ''}`;
+                groupButton.dataset.machineGroup = groupLabel;
+                groupButton.textContent = groupLabel;
+                groupsContainer?.appendChild(groupButton);
+            });
+
+            const renderMachineOptions = () => {
+                if (!grid) {
+                    return [];
+                }
+                grid.innerHTML = '';
+                const machines = machineGroupsMap.get(activeGroup) || [];
+                if (groupTitle) {
+                    groupTitle.textContent = activeGroup || '未分類';
+                }
+                if (groupCount) {
+                    groupCount.textContent = `${machines.length} 台`;
+                }
+
+                machines.forEach((machine) => {
+                    const machineId = String(machine.id);
+                    const capability = getMachineGroupLabel(machine);
+                    const optionButton = document.createElement('button');
+                    optionButton.type = 'button';
+                    optionButton.className = `machine-picker-option${currentSelection === machineId ? ' is-selected' : ''}`;
+                    optionButton.dataset.machineOption = machineId;
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'machine-picker-option-name';
+                    nameSpan.textContent = getMachineDisplayName(machine.id);
+
+                    const metaSpan = document.createElement('span');
+                    metaSpan.className = 'machine-picker-option-meta';
+                    metaSpan.textContent = capability || `機台 ID: ${machineId}`;
+
+                    optionButton.appendChild(nameSpan);
+                    optionButton.appendChild(metaSpan);
+                    grid.appendChild(optionButton);
+                });
+
+                return Array.from(grid.querySelectorAll('[data-machine-option]'));
+            };
+
+            const syncGroupState = () => {
+                groupsContainer?.querySelectorAll('[data-machine-group]').forEach((button) => {
+                    button.classList.toggle('is-active', button.dataset.machineGroup === activeGroup);
+                });
+            };
+
+            let options = renderMachineOptions();
 
             const cleanup = (value) => {
                 document.removeEventListener('keydown', handleKeydown);
@@ -1642,18 +1741,62 @@
                     cleanup('');
                     return;
                 }
-                const selectedId = select ? String(select.value || '') : '';
-                if (!selectedId) {
+                if (!currentSelection) {
                     showAlert('請先選擇機台設備。', 'warning');
                     return;
                 }
-                cleanup(selectedId);
+                cleanup(currentSelection);
+                return;
+            });
+
+            overlay.addEventListener('click', (event) => {
+                const groupButton = event.target.closest('[data-machine-group]');
+                if (groupButton) {
+                    activeGroup = String(groupButton.dataset.machineGroup || '');
+                    syncGroupState();
+                    options = renderMachineOptions();
+                    return;
+                }
+
+                const option = event.target.closest('[data-machine-option]');
+                if (!option) {
+                    return;
+                }
+                currentSelection = String(option.dataset.machineOption || '');
+                options = renderMachineOptions();
             });
 
             document.addEventListener('keydown', handleKeydown);
             document.body.appendChild(overlay);
-            select?.focus();
+            syncGroupState();
+            options[0]?.focus();
         });
+    }
+
+    async function openPrimaryMachinePicker(form) {
+        if (!form) {
+            return;
+        }
+        const activeField = document.activeElement?.closest('[data-primary-machine-field]')
+            || form.querySelector('[data-primary-machine-field]:not(.hidden)');
+        const select = activeField?.querySelector('select[name="machine_id"]');
+        if (!select || select.disabled) {
+            return;
+        }
+
+        const selectedMachineId = await askMachineSelectionDialog({
+            title: '選擇指定機台',
+            message: '請從機台設備清單中選擇要指派的機台，清單以二欄顯示方便快速挑選。',
+            selectedMachineId: select.value || ''
+        });
+
+        if (!selectedMachineId || String(select.value || '') === String(selectedMachineId)) {
+            return;
+        }
+
+        select.value = String(selectedMachineId);
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        syncMachinePickerFields(form);
     }
 
     async function handleSplitMachineAction(event, isEditMode) {
@@ -1664,11 +1807,12 @@
         if (!panel || !panel.contains(actionEl)) return;
 
         const runs = getSplitRuns(isEditMode);
-        if (actionEl.dataset.action === 'add-machine-run') {
-            const selectedMachineId = await askMachineSelectionDialog({
-                title: '新增拆分機台',
-                message: '請從機台設備管理清單選擇要加入的機台。',
-            });
+            if (actionEl.dataset.action === 'add-machine-run') {
+                const selectedMachineId = await askMachineSelectionDialog({
+                    title: '新增拆分機台',
+                    message: '請從機台設備管理清單選擇要加入的機台。',
+                    selectedMachineId: ''
+                });
             if (!selectedMachineId) {
                 return;
             }
@@ -1680,14 +1824,15 @@
             return;
         }
 
-        if (actionEl.dataset.action === 'change-machine-run') {
+            if (actionEl.dataset.action === 'change-machine-run') {
             const activeIndex = parseInt(panel.dataset.activeRunIndex || '0', 10) || 0;
             const run = runs[activeIndex];
             if (!run) return;
-            const selectedMachineId = await askMachineSelectionDialog({
-                title: '更換拆分機台',
-                message: '請從機台設備管理清單選擇此頁籤要對應的機台。',
-            });
+                const selectedMachineId = await askMachineSelectionDialog({
+                    title: '更換拆分機台',
+                    message: '請從機台設備管理清單選擇此頁籤要對應的機台。',
+                    selectedMachineId: run.machine_id || ''
+                });
             if (!selectedMachineId) {
                 return;
             }
@@ -2152,10 +2297,16 @@
                 if (e.target.matches('[name="pr_machine_id[]"], [data-field="pr-machine"]')) {
                     syncProductionRecordMachineCapability(e.target);
                 }
+                syncMachinePickerField(e.target.closest('[data-primary-machine-field]'));
                 handleSplitMachineInput(e, false);
             });
 
             elements.createModalForm.addEventListener('click', async (e) => {
+                const machinePickerButton = e.target.closest('[data-action="open-machine-picker"]');
+                if (machinePickerButton) {
+                    await openPrimaryMachinePicker(elements.createModalForm);
+                    return;
+                }
                 const typeSwitchButton = e.target.closest('[data-action="set-work-order-type"]');
                 if (typeSwitchButton) {
                     setWorkOrderType(elements.createModalForm, typeSwitchButton.dataset.value || 'normal');
@@ -2273,10 +2424,16 @@
                         row.children[4].innerHTML = '<button type="button" class="btn ghost icon-only" data-action="preview-order-drawing" title="預覽"><i class="fas fa-eye"></i></button>';
                     }
                 }
+                syncMachinePickerField(e.target.closest('[data-primary-machine-field]'));
                 handleSplitMachineInput(e, true);
             });
 
             elements.editModalForm.addEventListener('click', async (e) => {
+                const machinePickerButton = e.target.closest('[data-action="open-machine-picker"]');
+                if (machinePickerButton) {
+                    await openPrimaryMachinePicker(elements.editModalForm);
+                    return;
+                }
                 const typeSwitchButton = e.target.closest('[data-action="set-work-order-type"]');
                 if (typeSwitchButton) {
                     setWorkOrderType(elements.editModalForm, typeSwitchButton.dataset.value || 'normal');
@@ -2394,6 +2551,11 @@
                     await createPartialReceiptForWorkOrder();
                     return;
                 }
+                const secondScreeningSummaryButton = e.target.closest('[data-action="open-second-screening-summary"]');
+                if (secondScreeningSummaryButton) {
+                    openSecondScreeningFromEditSummary(secondScreeningSummaryButton);
+                    return;
+                }
                 if (e.target.closest('[data-action="view-partial-receipt-inventory"]')) {
                     openInventoryItemDetail(e.target.closest('[data-action="view-partial-receipt-inventory"]')?.dataset.inventoryId);
                     return;
@@ -2413,6 +2575,7 @@
                 if (e.target.matches('[name="pr_machine_id[]"], [data-field="pr-machine"]')) {
                     syncProductionRecordMachineCapability(e.target);
                 }
+                syncMachinePickerField(e.target.closest('[data-primary-machine-field]'));
             });
 
             // 排程日期星期顯示
@@ -2700,6 +2863,7 @@
                 populateSelect('[name="machine_id"]', result.data, 'id', 'name');
                 populateSelect('[data-field="pr-machine"]', result.data, 'id', 'name');
                 moduleRoot.querySelectorAll('[name="pr_machine_id[]"], [data-field="pr-machine"]').forEach(syncProductionRecordMachineCapability);
+                syncMachinePickerFields();
                 updateFilterSummary();
             }
         } catch (error) {
@@ -4203,9 +4367,75 @@
         }
     }
 
+    function openSecondScreeningFromWorkOrder(workOrderId) {
+        const normalizedId = Number.parseInt(workOrderId, 10);
+        if (!Number.isInteger(normalizedId) || normalizedId <= 0) {
+            showAlert('缺少工單 ID，無法開啟二次篩選。', 'warning');
+            return;
+        }
+        if (typeof window.openTab !== 'function') {
+            showAlert('無法開啟二次篩選模組。', 'warning');
+            return;
+        }
+
+        const item = workOrdersCache.get(normalizedId) || {};
+        const isExecutionWorkOrder = item.work_order_type === 'rescreen';
+        const existingBatchId = Number.parseInt(item.second_screening_batch_id || item.source_rescreen_batch_id || '', 10);
+        const hasExistingBatch = Number.isInteger(existingBatchId) && existingBatchId > 0;
+
+        window.openTab('rescreen_batches', '二次篩選歷史紀錄', 'modules/rescreen_batches.html', {
+            context: hasExistingBatch
+                ? {
+                    action: 'view',
+                    rescreenBatchId: existingBatchId,
+                    sourceWorkOrderId: isExecutionWorkOrder ? '' : normalizedId,
+                }
+                : {
+                    action: 'create',
+                    sourceWorkOrderId: normalizedId,
+                    workOrderId: normalizedId,
+                },
+        });
+    }
+
+    function openSecondScreeningFromEditSummary(button) {
+        if (typeof window.openTab !== 'function') {
+            showAlert('無法開啟二次篩選模組。', 'warning');
+            return;
+        }
+
+        const mode = button?.dataset.mode || 'create';
+        const batchId = Number.parseInt(button?.dataset.batchId || '', 10);
+        const workOrderId = Number.parseInt(String(state.editingId || state.currentWorkOrder?.id || ''), 10);
+        if (mode === 'view' && Number.isInteger(batchId) && batchId > 0) {
+            window.openTab('rescreen_batches', '二次篩選紀錄', 'modules/rescreen_batches.html', {
+                context: {
+                    action: 'view',
+                    rescreenBatchId: batchId,
+                    sourceWorkOrderId: workOrderId,
+                },
+            });
+            return;
+        }
+
+        if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
+            showAlert('缺少工單 ID，無法建立二次篩選。', 'warning');
+            return;
+        }
+
+        window.openTab('rescreen_batches', '二次篩選紀錄', 'modules/rescreen_batches.html', {
+            context: {
+                action: 'create',
+                sourceWorkOrderId: workOrderId,
+                workOrderId,
+            },
+        });
+    }
+
     function handleTableAction(e) {
         const selectCheckbox = e.target.closest('[data-action="select-row"]');
         const customerButton = e.target.closest('[data-action="open-customer"]');
+        const secondScreeningButton = e.target.closest('[data-action="open-second-screening"]');
         const printButton = e.target.closest('[data-action="print-work-order"]');
         const printScreeningReportButton = e.target.closest('[data-action="print-screening-report"]');
         const editButton = e.target.closest('[data-action="edit-work-order"]');
@@ -4222,6 +4452,9 @@
                     context: { customerId }
                 });
             }
+        } else if (secondScreeningButton) {
+            const row = secondScreeningButton.closest('tr');
+            openSecondScreeningFromWorkOrder(row?.dataset.id);
         } else if (printButton) {
             const row = printButton.closest('tr');
             const id = row.dataset.id;
@@ -4823,9 +5056,91 @@
             return `拆分工單${machineRunCount > 0 ? ` (${machineRunCount} 台)` : ''}`;
         }
         if (normalizedType === 'rescreen') {
-            return rescreenBatchNumber ? `二次重篩工單 (${rescreenBatchNumber})` : '二次重篩工單';
+            return rescreenBatchNumber ? `二次篩選工單 (${rescreenBatchNumber})` : '二次篩選工單';
         }
         return '一般工單';
+    }
+
+    function getSecondScreeningReasonLabel(reason) {
+        const map = {
+            relaxed_after_high_defect: '放寬後二篩',
+            customer_required_second_pass: '每批二篩',
+        };
+        return map[String(reason || '').trim()] || '';
+    }
+
+    function getSecondScreeningSummary(item) {
+        if (item.work_order_type === 'rescreen') {
+            const reasonLabel = getSecondScreeningReasonLabel(item.execution_second_screening_reason || item.second_screening_reasons);
+            return {
+                label: item.rescreen_batch_number || '二篩執行',
+                reasonLabel,
+                title: '檢視此二次篩選案件',
+            };
+        }
+
+        const count = Number.parseInt(item.second_screening_count, 10) || 0;
+        if (count <= 0) {
+            return {
+                label: '建立二篩',
+                reasonLabel: '',
+                title: '從此工單建立二次篩選',
+            };
+        }
+
+        const reasonLabels = String(item.second_screening_reasons || '')
+            .split(',')
+            .map((reason) => getSecondScreeningReasonLabel(reason.trim()))
+            .filter(Boolean)
+            .join('、');
+        const batchNumbers = item.second_screening_batch_numbers || `${count} 筆`;
+        return {
+            label: batchNumbers,
+            reasonLabel: reasonLabels,
+            title: '檢視二次篩選案件',
+        };
+    }
+
+    function renderEditSecondScreeningSummary(data) {
+        const container = elements.editModalForm?.querySelector('[data-work-order-second-screening-summary]');
+        if (!container) {
+            return;
+        }
+
+        const batches = Array.isArray(data.second_screening_batches) ? data.second_screening_batches : [];
+        if (batches.length === 0) {
+            container.innerHTML = `
+                <div class="work-order-second-screening-empty">
+                    <span class="text-muted">此工單尚未建立二次篩選。</span>
+                    <button type="button" class="btn outline small" data-action="open-second-screening-summary" data-mode="create">建立二次篩選</button>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="work-order-second-screening-cards">
+                ${batches.map((batch) => {
+                    const reasonLabel = getSecondScreeningReasonLabel(batch.second_screening_reason) || '-';
+                    const resultText = [
+                        `良品 ${escapeHtml(String(batch.rescreen_output_good_units ?? '-'))}`,
+                        `再次不良 ${escapeHtml(String(batch.rescreen_output_defect_units ?? '-'))}`,
+                        `報廢 ${escapeHtml(String(batch.rescreen_output_scrap_units ?? '-'))}`,
+                    ].join(' / ');
+                    return `
+                        <article class="work-order-second-screening-card">
+                            <div>
+                                <strong>${escapeHtml(batch.rescreen_batch_number || '-')}</strong>
+                                <span class="text-muted">${escapeHtml(reasonLabel)}</span>
+                            </div>
+                            <div class="text-muted small">執行工單：${escapeHtml(batch.rescreen_work_order_number || '尚未建立')}</div>
+                            <div class="text-muted small">結果：${resultText}</div>
+                            <button type="button" class="btn outline small" data-action="open-second-screening-summary" data-mode="view" data-batch-id="${escapeHtml(String(batch.id || ''))}">檢視二次篩選</button>
+                        </article>
+                    `;
+                }).join('')}
+            </div>
+        `;
     }
 
     // Render Functions
@@ -4836,7 +5151,7 @@
         workOrdersCache.clear();
 
         if (!data || data.length === 0) {
-            elements.tbody.innerHTML = '<tr><td colspan="11" class="text-center">無資料</td></tr>';
+            elements.tbody.innerHTML = '<tr><td colspan="12" class="text-center">無資料</td></tr>';
             updateSelectionUI();
             return;
         }
@@ -4896,12 +5211,14 @@
             const machineRunCount = Math.max(0, Number.parseInt(item.machine_run_count, 10) || 0);
             const workOrderTypeLabel = getWorkOrderTypeLabel(item.work_order_type, machineRunCount, item.rescreen_batch_number || '');
             const workOrderTypeClass = isSplitWorkOrder ? 'split' : (isRescreenWorkOrder ? 'rescreen' : 'normal');
+            const secondScreeningSummary = getSecondScreeningSummary(item);
 
             return `
             <tr data-id="${item.id}" data-status-key="${statusKeyAttr}" data-status-label="${statusLabelAttr}"${completedRowClass}>
                 <td class="checkbox-col"><input type="checkbox" data-action="select-row" ${isChecked}></td>
                 <td>${escapeHtml(item.work_order_number)}</td>
                 <td><span class="work-order-type-badge ${workOrderTypeClass}">${escapeHtml(workOrderTypeLabel)}</span></td>
+                <td><button type="button" class="record-link-button" data-action="open-second-screening" title="${escapeHtml(secondScreeningSummary.title)}">${escapeHtml(secondScreeningSummary.label)}</button>${secondScreeningSummary.reasonLabel ? `<span class="text-muted"> ${escapeHtml(secondScreeningSummary.reasonLabel)}</span>` : ''}</td>
                 <td>${escapeHtml(item.order_number || '')}</td>
                 <td>${customerDisplay}</td>
                 <td>${escapeHtml(item.screening_item_name || '')}</td>
@@ -5282,7 +5599,9 @@
         setWorkOrderType(form, form.querySelector('[name="work_order_type"]')?.value || 'normal');
         if (isEditMode) {
             syncEditStatusDisplay();
+            renderEditSecondScreeningSummary(data);
         }
+        syncMachinePickerFields(form);
 
         // Populate first piece dimensions
         if (data.first_piece_dimensions) {
@@ -5943,6 +6262,9 @@
         });
         if (selector === '[name="status_lookup_id"]') {
             syncEditStatusDisplay();
+        }
+        if (selector === '[name="machine_id"]') {
+            syncMachinePickerFields();
         }
     }
 

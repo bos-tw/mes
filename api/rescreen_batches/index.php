@@ -27,22 +27,34 @@ $returnOrderId = filter_var(
     FILTER_VALIDATE_INT,
     ['options' => ['min_range' => 1]]
 );
-if ($returnOrderId === false) {
-    jsonResponse(['success' => false, 'message' => '來源退貨單為必填。'], 400);
+$workOrderId = filter_var(
+    $payload['source_work_order_id'] ?? null,
+    FILTER_VALIDATE_INT,
+    ['options' => ['min_range' => 1]]
+);
+if ($returnOrderId === false && $workOrderId === false) {
+    jsonResponse(['success' => false, 'message' => '請選擇來源退貨單或來源生產工單。'], 400);
 }
 
 try {
     $pdo->beginTransaction();
-    $batch = createRescreenBatchFromReturnOrder($pdo, (int)$returnOrderId, $payload, $currentEmployee);
+    if ($returnOrderId !== false) {
+        $batch = createRescreenBatchFromReturnOrder($pdo, (int)$returnOrderId, $payload, $currentEmployee);
+        $sourceAudit = ['source_return_order_id' => (int)$returnOrderId];
+    } else {
+        $batch = createRescreenBatchFromWorkOrder($pdo, (int)$workOrderId, $payload, $currentEmployee);
+        $sourceAudit = ['source_work_order_id' => (int)$workOrderId];
+    }
     logAuditAction('Create rescreen batch', 'rescreen_batches', (int)($batch['id'] ?? 0), [
-        'source_return_order_id' => (int)$returnOrderId,
+        ...$sourceAudit,
         'rescreen_type' => $payload['rescreen_type'] ?? 'strict_rescreen',
+        'second_screening_reason' => $payload['second_screening_reason'] ?? null,
     ]);
     $pdo->commit();
 
     jsonResponse([
         'success' => true,
-        'message' => '二次重篩案件已建立。',
+        'message' => '二次篩選案件已建立。',
         'data' => $batch,
     ], 201);
 } catch (Throwable $throwable) {
@@ -54,7 +66,7 @@ try {
         'success' => false,
         'message' => safeErrorMessage(
             $throwable instanceof Exception ? $throwable : new RuntimeException($throwable->getMessage()),
-            '建立二次重篩案件失敗，請稍後重試。'
+            '建立二次篩選案件失敗，請稍後重試。'
         ),
     ], $throwable instanceof InvalidArgumentException ? 400 : 500);
 }

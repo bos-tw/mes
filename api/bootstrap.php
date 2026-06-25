@@ -755,7 +755,7 @@ function getPermissionAliasMap(): array
         'manage_production_records' => '生產紀錄',
         'manage_shipping_orders' => '出貨單',
         'manage_return_orders' => '退貨單',
-        'manage_rescreen_batches' => '二次重篩歷史紀錄',
+        'manage_rescreen_batches' => '二次篩選紀錄',
         'manage_daily_inspections' => '每日機台檢驗',
         'manage_production_quality' => '生產品質檢驗',
         'manage_shipping_quality' => '出貨品質檢驗',

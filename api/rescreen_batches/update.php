@@ -20,7 +20,7 @@ if (!is_array($payload) || $payload === []) {
 $pdo = db();
 $existing = getRescreenBatchDetails($pdo, $id);
 if ($existing === null) {
-    jsonResponse(['success' => false, 'message' => '找不到指定的二次重篩案件。'], 404);
+    jsonResponse(['success' => false, 'message' => '找不到指定的二次篩選案件。'], 404);
 }
 
 $validation = validateRescreenBatchPayload($payload, true);
@@ -101,7 +101,7 @@ try {
 
     jsonResponse([
         'success' => true,
-        'message' => '二次重篩案件已更新。',
+        'message' => '二次篩選案件已更新。',
         'data' => $updated,
     ]);
 } catch (Exception $exception) {
@@ -111,6 +111,6 @@ try {
     error_log('Update rescreen batch failed: ' . $exception->getMessage());
     jsonResponse([
         'success' => false,
-        'message' => safeErrorMessage($exception, '更新二次重篩案件失敗，請稍後重試。'),
+        'message' => safeErrorMessage($exception, '更新二次篩選案件失敗，請稍後重試。'),
     ], 500);
 }

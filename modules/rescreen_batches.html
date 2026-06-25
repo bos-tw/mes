@@ -3,35 +3,35 @@
         <button type="button" class="modal-close" data-action="close-modal" aria-label="關閉">
             <i class="fas fa-times"></i>
         </button>
-        <h3 data-modal-title>新增二次重篩紀錄</h3>
+        <h3 data-modal-title>新增二次篩選紀錄</h3>
         <div class="modal-alert hidden" data-rescreen-batches-modal-alert role="alert"></div>
 
         <form data-rescreen-batches-form novalidate>
             <input type="hidden" name="id">
+            <input type="hidden" name="source_work_order_id">
+            <input type="hidden" name="source_defect_history_record_id">
             <div class="form-row">
                 <section class="form-section">
                     <h4>來源與類型</h4>
                     <div class="form-grid">
                         <label class="inline-label">
-                            <span>來源退貨單 <abbr title="必填">*</abbr></span>
-                            <select name="source_return_order_id" required>
+                            <span>來源退貨單</span>
+                            <select name="source_return_order_id">
                                 <option value="">-- 請選擇退貨單 --</option>
                             </select>
                         </label>
                         <label class="inline-label">
                             <span>案件類型 <abbr title="必填">*</abbr></span>
                             <select name="rescreen_type" required>
-                                <option value="strict_rescreen">嚴格重篩</option>
-                                <option value="relaxed_rescreen">放寬重篩</option>
+                                <option value="strict_rescreen">嚴格二篩</option>
+                                <option value="relaxed_rescreen">放寬二篩</option>
                             </select>
                         </label>
                         <label class="inline-label">
-                            <span>建立原因</span>
-                            <select name="request_reason_code">
-                                <option value="">-- 請選擇 --</option>
-                                <option value="customer_strict_request">客戶要求更嚴格</option>
-                                <option value="high_defect_relax">不良率高，客戶同意放寬後再篩</option>
-                                <option value="other">其他</option>
+                            <span>二次篩選原因 <abbr title="必填">*</abbr></span>
+                            <select name="second_screening_reason" required>
+                                <option value="customer_required_second_pass">客戶每批要求二次篩選</option>
+                                <option value="relaxed_after_high_defect">不良過多，客戶放寬後再篩</option>
                             </select>
                         </label>
                         <label class="inline-label">
@@ -48,11 +48,15 @@
                 </section>
 
                 <section class="form-section">
-                    <h4>案件備註</h4>
+                    <h4>佐證與備註</h4>
                     <div class="form-grid">
                         <label class="inline-label full-width">
+                            <span>客戶通知 / 標準佐證</span>
+                            <textarea name="customer_approval_reference" rows="2" placeholder="例如：客戶 Email、LINE 通知、放寬後標準或每批二篩要求"></textarea>
+                        </label>
+                        <label class="inline-label full-width">
                             <span>備註</span>
-                            <textarea name="notes" rows="3" placeholder="補充這次二次重篩的背景、交辦事項或追蹤重點"></textarea>
+                            <textarea name="notes" rows="3" placeholder="補充這次二次篩選的背景、交辦事項或追蹤重點"></textarea>
                         </label>
                     </div>
                 </section>
@@ -61,7 +65,7 @@
             <section class="form-section">
                 <h4>來源摘要</h4>
                 <div class="detail-grid" data-rescreen-source-summary>
-                    <p class="text-muted">請先選擇退貨單。</p>
+                    <p class="text-muted">請先選擇退貨單，或從生產工單建立二次篩選。</p>
                 </div>
             </section>
 
@@ -78,7 +82,7 @@
         <button type="button" class="modal-close" data-action="close-detail-modal" aria-label="關閉">
             <i class="fas fa-times"></i>
         </button>
-        <h3><i class="fas fa-redo"></i> 二次重篩歷史詳情</h3>
+        <h3><i class="fas fa-redo"></i> 二次篩選歷史詳情</h3>
         <div class="detail-content" data-rescreen-batches-detail></div>
         <div class="form-actions align-right">
             <button type="button" class="btn outline" data-action="close-detail-modal">關閉</button>

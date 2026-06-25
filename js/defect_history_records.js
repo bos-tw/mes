@@ -264,6 +264,8 @@
                             ${row.work_order_id ? '<button type="button" class="btn text" data-action="open-work-order" title="開啟工單"><i class="fas fa-clipboard"></i></button>' : ''}
                             ${row.shipping_order_id ? '<button type="button" class="btn text" data-action="open-shipping-order" title="開啟出貨單"><i class="fas fa-shipping-fast"></i></button>' : ''}
                             ${(row.shipping_annotation_shipping_order_id || row.shipping_order_id) ? '<button type="button" class="btn text" data-action="open-return-orders" title="開啟退貨單"><i class="fas fa-undo"></i></button>' : ''}
+                            ${row.source_type !== 'rescreen_batch_defect' && row.work_order_id ? '<button type="button" class="btn text" data-action="create-second-screening" title="建立二次篩選"><i class="fas fa-redo"></i></button>' : ''}
+                            ${row.rescreen_batch_id ? '<button type="button" class="btn text" data-action="open-second-screening" title="檢視二次篩選"><i class="fas fa-redo"></i></button>' : ''}
                             ${row.customer_id ? '<button type="button" class="btn text" data-action="open-customer" title="開啟客戶"><i class="fas fa-handshake"></i></button>' : ''}
                         </td>
                     </tr>
@@ -333,6 +335,8 @@
                     ${record.work_order_id ? '<button type="button" class="btn outline small" data-action="open-work-order"><i class="fas fa-clipboard"></i> 開啟工單</button>' : ''}
                     ${record.shipping_order_id ? '<button type="button" class="btn outline small" data-action="open-shipping-order"><i class="fas fa-shipping-fast"></i> 開啟出貨單</button>' : ''}
                     ${(record.shipping_annotation_shipping_order_id || record.shipping_order_id) ? '<button type="button" class="btn outline small" data-action="open-return-orders"><i class="fas fa-undo"></i> 開啟退貨單</button>' : ''}
+                    ${record.source_type !== 'rescreen_batch_defect' && record.work_order_id ? '<button type="button" class="btn outline small" data-action="create-second-screening"><i class="fas fa-redo"></i> 建立二次篩選</button>' : ''}
+                    ${record.rescreen_batch_id ? '<button type="button" class="btn outline small" data-action="open-second-screening"><i class="fas fa-redo"></i> 檢視二次篩選</button>' : ''}
                     ${record.customer_id ? '<button type="button" class="btn outline small" data-action="open-customer"><i class="fas fa-handshake"></i> 開啟客戶</button>' : ''}
                 </div>
             `;
@@ -420,6 +424,32 @@
                     }
                     break;
                 }
+                case 'create-second-screening':
+                    if (record.work_order_id && typeof window.openTab === 'function') {
+                        window.openTab('rescreen_batches', '二次篩選紀錄', 'modules/rescreen_batches.html', {
+                            context: {
+                                action: 'create',
+                                sourceWorkOrderId: record.work_order_id,
+                                workOrderId: record.work_order_id,
+                                secondScreeningReason: 'relaxed_after_high_defect',
+                                rescreenType: 'relaxed_rescreen',
+                                sourceDefectHistoryRecordId: record.source_record_id,
+                                customerApprovalReference: '由不良品歷史紀錄建立，請補客戶放寬標準通知或核准依據。',
+                                notes: `來源不良紀錄：${record.source_type_label || ''} / ${record.defect_item_name || ''}`,
+                            }
+                        });
+                    }
+                    break;
+                case 'open-second-screening':
+                    if (record.rescreen_batch_id && typeof window.openTab === 'function') {
+                        window.openTab('rescreen_batches', '二次篩選紀錄', 'modules/rescreen_batches.html', {
+                            context: {
+                                action: 'view',
+                                rescreenBatchId: record.rescreen_batch_id,
+                            }
+                        });
+                    }
+                    break;
             }
         }
 

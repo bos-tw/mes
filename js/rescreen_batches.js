@@ -17,6 +17,7 @@
             sortDirection: 'DESC',
             customerId: '',
             sourceReturnOrderId: '',
+            sourceWorkOrderId: '',
             editingId: null,
             viewingId: null,
             currentContext: initialContext || null,
@@ -65,7 +66,7 @@
         }
 
         function getTypeLabel(type) {
-            return type === 'relaxed_rescreen' ? '放寬重篩' : '嚴格重篩';
+            return type === 'relaxed_rescreen' ? '放寬二篩' : '嚴格二篩';
         }
 
         function getStatusBadge(status) {
@@ -97,6 +98,17 @@
                 other: '其他原因',
             };
             return map[code] || '-';
+        }
+
+        function getSecondScreeningReasonLabel(reason, legacyCode = '') {
+            const map = {
+                relaxed_after_high_defect: '不良過多，客戶放寬後再篩',
+                customer_required_second_pass: '客戶每批要求二次篩選',
+            };
+            if (map[reason]) {
+                return map[reason];
+            }
+            return getRequestReasonLabel(legacyCode);
         }
 
         function getDispositionLabel(disposition) {
@@ -161,9 +173,16 @@
                 context.sourceReturnOrderId ?? context.returnOrderId ?? context.highlightReturnOrderId ?? context.highlightId ?? '',
                 10
             );
+            const sourceWorkOrderId = Number.parseInt(
+                context.sourceWorkOrderId ?? context.workOrderId ?? '',
+                10
+            );
             const rescreenBatchId = Number.parseInt(context.rescreenBatchId ?? context.id ?? '', 10);
             if (Number.isInteger(sourceReturnOrderId) && sourceReturnOrderId > 0) {
                 patch.sourceReturnOrderId = String(sourceReturnOrderId);
+            }
+            if (Number.isInteger(sourceWorkOrderId) && sourceWorkOrderId > 0) {
+                patch.sourceWorkOrderId = String(sourceWorkOrderId);
             }
             if (Number.isInteger(rescreenBatchId) && rescreenBatchId > 0) {
                 patch.rescreenBatchId = rescreenBatchId;
@@ -182,6 +201,7 @@
             }
             state.page = 1;
             state.sourceReturnOrderId = patch.sourceReturnOrderId || '';
+            state.sourceWorkOrderId = patch.sourceWorkOrderId || '';
             await loadData();
             if (context?.action === 'create') {
                 await openCreateModal(context);
@@ -189,6 +209,34 @@
             }
             if (patch.rescreenBatchId) {
                 await viewDetail(patch.rescreenBatchId);
+            }
+        }
+
+        async function loadWorkOrderSourceSummary(workOrderId) {
+            const normalizedId = Number.parseInt(workOrderId, 10);
+            if (!elements.sourceSummary || !Number.isInteger(normalizedId) || normalizedId <= 0) {
+                return;
+            }
+            elements.sourceSummary.innerHTML = '<p class="text-muted">正在載入來源工單...</p>';
+            try {
+                const response = await fetch(`api/work_orders/show.php?id=${normalizedId}`);
+                const result = await response.json();
+                if (!result.success) {
+                    elements.sourceSummary.innerHTML = `<p class="text-danger">${escapeHtml(result.message || '載入來源工單失敗')}</p>`;
+                    return;
+                }
+                const data = result.data || {};
+                elements.sourceSummary.innerHTML = `
+                    <div class="detail-item"><span class="detail-label">來源工單</span><span class="detail-value">${escapeHtml(data.work_order_number || '-')}</span></div>
+                    <div class="detail-item"><span class="detail-label">客戶</span><span class="detail-value">${escapeHtml(data.customer_name || '-')}</span></div>
+                    <div class="detail-item"><span class="detail-label">訂單</span><span class="detail-value">${escapeHtml(data.order_number || '-')}</span></div>
+                    <div class="detail-item"><span class="detail-label">客戶批號</span><span class="detail-value">${escapeHtml(data.customer_batch_number || '-')}</span></div>
+                    <div class="detail-item"><span class="detail-label">預估數量</span><span class="detail-value">${formatQuantity(data.total_units || 0, '支')}</span></div>
+                    <div class="detail-item"><span class="detail-label">預估重量</span><span class="detail-value">${formatQuantity(data.total_weight_kg || 0, 'kg')}</span></div>
+                `;
+            } catch (error) {
+                console.error('loadWorkOrderSourceSummary failed:', error);
+                elements.sourceSummary.innerHTML = '<p class="text-danger">載入來源工單失敗。</p>';
             }
         }
 
@@ -238,7 +286,7 @@
                 return;
             }
             if (!returnOrderId) {
-                elements.sourceSummary.innerHTML = '<p class="text-muted">請先選擇退貨單。</p>';
+                elements.sourceSummary.innerHTML = '<p class="text-muted">請先選擇退貨單，或從生產工單建立二次篩選。</p>';
                 return;
             }
             try {
@@ -280,6 +328,7 @@
                 if (filters.rescreen_type) params.set('rescreen_type', filters.rescreen_type);
                 if (filters.status) params.set('status', filters.status);
                 if (state.sourceReturnOrderId) params.set('source_return_order_id', state.sourceReturnOrderId);
+                if (state.sourceWorkOrderId) params.set('source_work_order_id', state.sourceWorkOrderId);
 
                 const response = await fetch(`${API_BASE}/index.php?${params.toString()}`);
                 const result = await response.json();
@@ -292,20 +341,21 @@
                 renderPagination(result.pagination || {});
             } catch (error) {
                 console.error('loadData failed:', error);
-                showAlert('載入二次重篩紀錄失敗。', 'danger');
+                showAlert('載入二次篩選紀錄失敗。', 'danger');
             }
         }
 
         function renderTable() {
             if (!tbody) return;
             if (state.data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">暫無資料</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-4">暫無資料</td></tr>';
                 return;
             }
             const fragment = document.createDocumentFragment();
             const columns = [
                 (item) => item.rescreen_batch_number || '',
                 (item) => getTypeLabel(item.rescreen_type),
+                (item) => getSecondScreeningReasonLabel(item.second_screening_reason, item.request_reason_code),
                 (item) => item.customer_name || '',
                 (item) => item.return_order_number || '',
                 (item) => item.shipping_order_number || '-',
@@ -364,6 +414,11 @@
             elements.modal?.classList.add('hidden');
             elements.modalForm?.reset();
             state.editingId = null;
+            setFormValue('source_work_order_id', '');
+            const returnSelect = elements.modalForm?.querySelector('[name="source_return_order_id"]');
+            if (returnSelect) {
+                returnSelect.disabled = false;
+            }
             hideAlert(true);
             loadReturnOrderSummary('');
         }
@@ -379,13 +434,37 @@
         async function openCreateModal(prefillContext = null) {
             state.editingId = null;
             if (elements.modalTitle) {
-                elements.modalTitle.textContent = '新增二次重篩紀錄';
+                elements.modalTitle.textContent = '新增二次篩選紀錄';
             }
             elements.modalForm?.reset();
             hideAlert(true);
-            await loadReturnOrdersForSelect(prefillContext?.sourceReturnOrderId || prefillContext?.returnOrderId || '');
-            const selectedId = prefillContext?.sourceReturnOrderId || prefillContext?.returnOrderId || '';
-            await loadReturnOrderSummary(selectedId);
+            const selectedWorkOrderId = prefillContext?.sourceWorkOrderId || prefillContext?.workOrderId || '';
+            const selectedReturnOrderId = prefillContext?.sourceReturnOrderId || prefillContext?.returnOrderId || '';
+            await loadReturnOrdersForSelect(selectedReturnOrderId);
+            setFormValue('source_work_order_id', selectedWorkOrderId);
+            const returnSelect = elements.modalForm?.querySelector('[name="source_return_order_id"]');
+            if (selectedWorkOrderId) {
+                if (returnSelect) {
+                    returnSelect.value = '';
+                    returnSelect.disabled = true;
+                }
+                setFormValue('rescreen_type', prefillContext?.rescreenType || 'strict_rescreen');
+                setFormValue('second_screening_reason', prefillContext?.secondScreeningReason || 'customer_required_second_pass');
+                setFormValue('source_defect_history_record_id', prefillContext?.sourceDefectHistoryRecordId || '');
+                setFormValue('customer_approval_reference', prefillContext?.customerApprovalReference || '');
+                setFormValue('notes', prefillContext?.notes || '');
+                await loadWorkOrderSourceSummary(selectedWorkOrderId);
+            } else {
+                if (returnSelect) {
+                    returnSelect.disabled = false;
+                }
+                setFormValue('rescreen_type', prefillContext?.rescreenType || 'relaxed_rescreen');
+                setFormValue('second_screening_reason', prefillContext?.secondScreeningReason || 'relaxed_after_high_defect');
+                setFormValue('source_defect_history_record_id', prefillContext?.sourceDefectHistoryRecordId || '');
+                setFormValue('customer_approval_reference', prefillContext?.customerApprovalReference || '');
+                setFormValue('notes', prefillContext?.notes || '');
+                await loadReturnOrderSummary(selectedReturnOrderId);
+            }
             openModal();
         }
 
@@ -400,15 +479,26 @@
                 const data = result.data || {};
                 state.editingId = id;
                 if (elements.modalTitle) {
-                    elements.modalTitle.textContent = '編輯二次重篩紀錄';
+                    elements.modalTitle.textContent = '編輯二次篩選紀錄';
                 }
                 await loadReturnOrdersForSelect(data.source_return_order_id || '');
+                setFormValue('source_work_order_id', data.source_return_order_id ? '' : (data.source_work_order_id || ''));
                 setFormValue('source_return_order_id', data.source_return_order_id);
                 setFormValue('rescreen_type', data.rescreen_type || 'strict_rescreen');
+                setFormValue('second_screening_reason', data.second_screening_reason || '');
                 setFormValue('request_reason_code', data.request_reason_code || '');
+                setFormValue('customer_approval_reference', data.customer_approval_reference || '');
                 setFormValue('status', data.status || 'draft');
                 setFormValue('notes', data.notes || '');
-                await loadReturnOrderSummary(data.source_return_order_id || '');
+                const returnSelect = elements.modalForm?.querySelector('[name="source_return_order_id"]');
+                if (returnSelect) {
+                    returnSelect.disabled = !data.source_return_order_id && !!data.source_work_order_id;
+                }
+                if (data.source_return_order_id) {
+                    await loadReturnOrderSummary(data.source_return_order_id || '');
+                } else {
+                    await loadWorkOrderSourceSummary(data.source_work_order_id || '');
+                }
                 openModal();
             } catch (error) {
                 console.error('openEditModal failed:', error);
@@ -443,14 +533,14 @@
                 }
                 closeModal();
                 await loadData();
-                showAlert(state.editingId ? '二次重篩紀錄已更新。' : '二次重篩紀錄已建立。', 'success');
+                showAlert(state.editingId ? '二次篩選紀錄已更新。' : '二次篩選紀錄已建立。', 'success');
                 if (dataSyncHelper) {
                     if (method === 'POST') dataSyncHelper.notifyCreated(result.data);
                     else dataSyncHelper.notifyUpdated(result.data);
                 }
             } catch (error) {
                 console.error('saveData failed:', error);
-                showAlert('儲存二次重篩紀錄失敗。', 'danger', true);
+                showAlert('儲存二次篩選紀錄失敗。', 'danger', true);
             }
         }
 
@@ -467,7 +557,7 @@
                 openDetailModal();
             } catch (error) {
                 console.error('viewDetail failed:', error);
-                showAlert('載入二次重篩紀錄失敗。', 'danger');
+                showAlert('載入二次篩選紀錄失敗。', 'danger');
             }
         }
 
@@ -517,16 +607,17 @@
             const primaryItem = items[0] || {};
             elements.detailContent.innerHTML = `
                 <div class="detail-section">
-                    <h4>重篩結果一眼看</h4>
+                    <h4>二篩結果一眼看</h4>
                     <div class="detail-grid">
-                        <div class="detail-item"><span class="detail-label">重篩編號</span><span class="detail-value">${escapeHtml(data.rescreen_batch_number || '-')}</span></div>
+                        <div class="detail-item"><span class="detail-label">二篩編號</span><span class="detail-value">${escapeHtml(data.rescreen_batch_number || '-')}</span></div>
                         <div class="detail-item"><span class="detail-label">目前狀態</span><span class="detail-value">${escapeHtml(getStatusLabel(data.status))}</span></div>
-                        <div class="detail-item"><span class="detail-label">重篩方式</span><span class="detail-value">${escapeHtml(getTypeLabel(data.rescreen_type))}</span></div>
+                        <div class="detail-item"><span class="detail-label">二篩方式</span><span class="detail-value">${escapeHtml(getTypeLabel(data.rescreen_type))}</span></div>
+                        <div class="detail-item"><span class="detail-label">二篩原因</span><span class="detail-value">${escapeHtml(getSecondScreeningReasonLabel(data.second_screening_reason, data.request_reason_code))}</span></div>
                         <div class="detail-item"><span class="detail-label">目前結果</span><span class="detail-value">${escapeHtml(resultLabel)}</span></div>
                         <div class="detail-item"><span class="detail-label">客戶</span><span class="detail-value">${escapeHtml(data.customer_name || '-')}</span></div>
                         <div class="detail-item"><span class="detail-label">主批號 / 產品</span><span class="detail-value">${escapeHtml(data.customer_batch_number || primaryItem.customer_batch_number || '-')} / ${escapeHtml(data.screening_item_name || primaryItem.screening_item_name || data.part_number || '-')}</span></div>
-                        <div class="detail-item"><span class="detail-label">退回數量</span><span class="detail-value">${escapeHtml(formatQuantity(data.received_total_quantity, primaryItem.returned_unit || ''))}</span></div>
-                        <div class="detail-item"><span class="detail-label">退回重量</span><span class="detail-value">${escapeHtml(data.received_total_weight_kg || 0)} kg</span></div>
+                        <div class="detail-item"><span class="detail-label">來源數量</span><span class="detail-value">${escapeHtml(formatQuantity(data.received_total_quantity, primaryItem.returned_unit || ''))}</span></div>
+                        <div class="detail-item"><span class="detail-label">來源重量</span><span class="detail-value">${escapeHtml(data.received_total_weight_kg || 0)} kg</span></div>
                     </div>
                 </div>
                 <div class="detail-section">
@@ -557,27 +648,28 @@
                                 <td>3</td>
                                 <td>退貨單</td>
                                 <td>${escapeHtml(data.return_order_number || '-')}</td>
-                                <td>客戶退回後，由這張退貨單進入重篩流程。</td>
+                                <td>${data.return_order_number ? '客戶退回後，由這張退貨單進入放寬後二篩流程。' : '此案件由原生產工單直接建立，沒有退貨單來源。'}</td>
                             </tr>
                             <tr>
                                 <td>4</td>
-                                <td>二次重篩</td>
+                                <td>二次篩選</td>
                                 <td>${escapeHtml(data.rescreen_batch_number || '-')} / ${escapeHtml(data.rescreen_work_order_number || '-')}</td>
-                                <td>${escapeHtml(getRequestReasonLabel(data.request_reason_code))}；目前${escapeHtml(resultLabel)}。</td>
+                                <td>${escapeHtml(getSecondScreeningReasonLabel(data.second_screening_reason, data.request_reason_code))}；目前${escapeHtml(resultLabel)}。</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
                 <div class="detail-section">
-                    <h4>這次為什麼重篩</h4>
+                    <h4>這次為什麼二篩</h4>
                     <dl class="detail-list">
-                        <dt>原因</dt><dd>${escapeHtml(getRequestReasonLabel(data.request_reason_code))}</dd>
+                        <dt>原因</dt><dd>${escapeHtml(getSecondScreeningReasonLabel(data.second_screening_reason, data.request_reason_code))}</dd>
+                        <dt>客戶通知 / 標準佐證</dt><dd>${escapeHtml(data.customer_approval_reference || '-')}</dd>
                         <dt>說明</dt><dd>${escapeHtml(data.decision_notes || data.notes || '-')}</dd>
                         <dt>執行工單</dt><dd>${escapeHtml(data.rescreen_work_order_number || '尚未建立')}</dd>
                     </dl>
                 </div>
                 <div class="detail-section">
-                    <h4>退回來源明細</h4>
+                    <h4>來源明細</h4>
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -585,9 +677,9 @@
                                 <th>客批</th>
                                 <th>原始工單</th>
                                 <th>原庫存</th>
-                                <th>退回數量</th>
+                                <th>來源數量</th>
                                 <th>估重(kg)</th>
-                                <th>退回原因</th>
+                                <th>來源說明</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -606,10 +698,10 @@
                     </table>
                 </div>
                 ${renderRuleTable('原始標準快照', data.rules?.original || [])}
-                ${renderRuleTable('二次重篩標準快照', data.rules?.rescreen || [])}
+                ${renderRuleTable('二次篩選標準快照', data.rules?.rescreen || [])}
                 <div class="detail-section">
-                    <h4>重篩後再次不良</h4>
-                    ${defects.length === 0 ? '<p class="text-muted">目前尚無二次重篩再次不良紀錄。</p>' : `
+                    <h4>二篩後再次不良</h4>
+                    ${defects.length === 0 ? '<p class="text-muted">目前尚無二次篩選再次不良紀錄。</p>' : `
                         <table class="data-table compact">
                             <thead><tr><th>服務</th><th>不良數量</th><th>重量(kg)</th><th>支數</th><th>處置</th><th>備註</th></tr></thead>
                             <tbody>
