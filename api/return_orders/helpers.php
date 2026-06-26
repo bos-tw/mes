@@ -114,11 +114,15 @@ function getReturnOrderItems(PDO $pdo, int $returnOrderId): array
             oi.sub_item_number,
             oi.customer_batch_number,
             oi.part_number,
-            si.name AS screening_item_name
+            si.name AS screening_item_name,
+            inv.work_order_id AS source_work_order_id,
+            wo.work_order_number AS source_work_order_number
         FROM return_order_items roi
         LEFT JOIN shipping_order_items soi ON roi.shipping_order_item_id = soi.id
         LEFT JOIN order_items oi ON soi.order_item_id = oi.id
         LEFT JOIN screening_items si ON oi.screening_item_id = si.id
+        LEFT JOIN inventory_items inv ON inv.id = soi.inventory_item_id
+        LEFT JOIN work_orders wo ON wo.id = inv.work_order_id
         WHERE roi.return_order_id = :return_order_id
         ORDER BY roi.id
     ");

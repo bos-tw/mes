@@ -135,6 +135,14 @@ function validateRescreenBatchPayload(array $payload, bool $isUpdate = false): a
         $data['source_defect_history_record_id'] = $sourceDefectHistoryRecordId !== false ? (int)$sourceDefectHistoryRecordId : null;
     }
 
+    if (($data['rescreen_type'] ?? null) === 'relaxed_rescreen') {
+        $hasDefectSource = !empty($data['source_defect_history_record_id']);
+        $hasApprovalReference = trim((string)($data['customer_approval_reference'] ?? '')) !== '';
+        if (!$hasDefectSource && !$hasApprovalReference) {
+            $errors['customer_approval_reference'] = '放寬二篩必須提供來源不良紀錄或客戶同意放寬標準佐證。';
+        }
+    }
+
     if (array_key_exists('result_category', $payload)) {
         $resultCategory = trim((string)($payload['result_category'] ?? ''));
         $data['result_category'] = $resultCategory !== '' ? mb_substr($resultCategory, 0, 30) : null;
@@ -149,10 +157,36 @@ function validateRescreenBatchPayload(array $payload, bool $isUpdate = false): a
         }
     }
 
+    foreach (['assigned_employee_id', 'calibration_employee_id', 'machine_id', 'first_piece_measured_by_employee_id'] as $field) {
+        if (!array_key_exists($field, $payload)) {
+            continue;
+        }
+        $value = $payload[$field] ?? null;
+        if ($value === null || $value === '') {
+            $data[$field] = null;
+            continue;
+        }
+        $idValue = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($idValue === false) {
+            $errors[$field] = '關聯資料 ID 必須為正整數。';
+        } else {
+            $data[$field] = (int)$idValue;
+        }
+    }
+
     $numericFields = [
         'rescreen_output_good_units',
         'rescreen_output_defect_units',
         'rescreen_output_scrap_units',
+        'quantity_to_produce',
+        'first_piece_head_height',
+        'first_piece_head_width',
+        'first_piece_length',
+        'first_piece_thread_outer_diameter',
+        'first_piece_washer_diameter',
+        'first_piece_outer_diameter',
+        'first_piece_hole_diameter',
+        'first_piece_thickness',
     ];
     foreach ($numericFields as $field) {
         if (!array_key_exists($field, $payload)) {
@@ -168,7 +202,12 @@ function validateRescreenBatchPayload(array $payload, bool $isUpdate = false): a
             $errors[$field] = '數值必須為非負數。';
             continue;
         }
-        $data[$field] = round((float)$numericValue, 2);
+        $data[$field] = round((float)$numericValue, str_starts_with($field, 'first_piece_') ? 3 : 2);
+    }
+
+    if (array_key_exists('screening_speed', $payload)) {
+        $screeningSpeed = trim((string)($payload['screening_speed'] ?? ''));
+        $data['screening_speed'] = $screeningSpeed !== '' ? mb_substr($screeningSpeed, 0, 50) : null;
     }
 
     if (array_key_exists('notes', $payload)) {
@@ -176,12 +215,23 @@ function validateRescreenBatchPayload(array $payload, bool $isUpdate = false): a
         $data['notes'] = $notes !== '' ? $notes : null;
     }
 
-    if (array_key_exists('started_at', $payload)) {
-        $data['started_at'] = normalizeRescreenDateTime($payload['started_at']);
+    if (array_key_exists('first_piece_notes', $payload)) {
+        $firstPieceNotes = trim((string)($payload['first_piece_notes'] ?? ''));
+        $data['first_piece_notes'] = $firstPieceNotes !== '' ? $firstPieceNotes : null;
     }
 
-    if (array_key_exists('completed_at', $payload)) {
-        $data['completed_at'] = normalizeRescreenDateTime($payload['completed_at']);
+    foreach ([
+        'scheduled_start_date',
+        'scheduled_end_date',
+        'actual_start_date',
+        'actual_end_date',
+        'started_at',
+        'completed_at',
+        'first_piece_measured_at',
+    ] as $field) {
+        if (array_key_exists($field, $payload)) {
+            $data[$field] = normalizeRescreenDateTime($payload[$field]);
+        }
     }
 
     return ['data' => $data, 'errors' => $errors];
@@ -553,6 +603,9 @@ function createRescreenBatchFromReturnOrder(PDO $pdo, int $returnOrderId, array 
     if ($sourceProfile === null) {
         throw new RuntimeException('找不到指定的退貨單。');
     }
+    if (empty($sourceProfile['primary_work_order_id'])) {
+        throw new RuntimeException('此退貨單無法回推原始工單，不能建立二次篩選案件。');
+    }
 
     $existingStmt = $pdo->prepare("
         SELECT id, rescreen_batch_number
@@ -689,6 +742,26 @@ function createSecondScreeningBatchFromSourceProfile(PDO $pdo, array $sourceProf
             received_total_weight_kg,
             notes,
             created_by_employee_id,
+            scheduled_start_date,
+            scheduled_end_date,
+            actual_start_date,
+            actual_end_date,
+            assigned_employee_id,
+            calibration_employee_id,
+            machine_id,
+            quantity_to_produce,
+            screening_speed,
+            first_piece_measured_at,
+            first_piece_measured_by_employee_id,
+            first_piece_head_height,
+            first_piece_head_width,
+            first_piece_length,
+            first_piece_thread_outer_diameter,
+            first_piece_washer_diameter,
+            first_piece_outer_diameter,
+            first_piece_hole_diameter,
+            first_piece_thickness,
+            first_piece_notes,
             started_at,
             completed_at
         ) VALUES (
@@ -714,6 +787,26 @@ function createSecondScreeningBatchFromSourceProfile(PDO $pdo, array $sourceProf
             :received_total_weight_kg,
             :notes,
             :created_by_employee_id,
+            :scheduled_start_date,
+            :scheduled_end_date,
+            :actual_start_date,
+            :actual_end_date,
+            :assigned_employee_id,
+            :calibration_employee_id,
+            :machine_id,
+            :quantity_to_produce,
+            :screening_speed,
+            :first_piece_measured_at,
+            :first_piece_measured_by_employee_id,
+            :first_piece_head_height,
+            :first_piece_head_width,
+            :first_piece_length,
+            :first_piece_thread_outer_diameter,
+            :first_piece_washer_diameter,
+            :first_piece_outer_diameter,
+            :first_piece_hole_diameter,
+            :first_piece_thickness,
+            :first_piece_notes,
             :started_at,
             :completed_at
         )
@@ -740,6 +833,26 @@ function createSecondScreeningBatchFromSourceProfile(PDO $pdo, array $sourceProf
         'received_total_weight_kg' => $sourceProfile['received_total_weight_kg'],
         'notes' => $data['notes'] ?? null,
         'created_by_employee_id' => $employeeId,
+        'scheduled_start_date' => $data['scheduled_start_date'] ?? null,
+        'scheduled_end_date' => $data['scheduled_end_date'] ?? null,
+        'actual_start_date' => $data['actual_start_date'] ?? null,
+        'actual_end_date' => $data['actual_end_date'] ?? null,
+        'assigned_employee_id' => $data['assigned_employee_id'] ?? null,
+        'calibration_employee_id' => $data['calibration_employee_id'] ?? null,
+        'machine_id' => $data['machine_id'] ?? null,
+        'quantity_to_produce' => $data['quantity_to_produce'] ?? null,
+        'screening_speed' => $data['screening_speed'] ?? null,
+        'first_piece_measured_at' => $data['first_piece_measured_at'] ?? null,
+        'first_piece_measured_by_employee_id' => $data['first_piece_measured_by_employee_id'] ?? null,
+        'first_piece_head_height' => $data['first_piece_head_height'] ?? null,
+        'first_piece_head_width' => $data['first_piece_head_width'] ?? null,
+        'first_piece_length' => $data['first_piece_length'] ?? null,
+        'first_piece_thread_outer_diameter' => $data['first_piece_thread_outer_diameter'] ?? null,
+        'first_piece_washer_diameter' => $data['first_piece_washer_diameter'] ?? null,
+        'first_piece_outer_diameter' => $data['first_piece_outer_diameter'] ?? null,
+        'first_piece_hole_diameter' => $data['first_piece_hole_diameter'] ?? null,
+        'first_piece_thickness' => $data['first_piece_thickness'] ?? null,
+        'first_piece_notes' => $data['first_piece_notes'] ?? null,
         'started_at' => $data['started_at'] ?? null,
         'completed_at' => $data['completed_at'] ?? null,
     ]);
@@ -1796,7 +1909,11 @@ function getRescreenBatchDetails(PDO $pdo, int $id): ?array
             exec_wo.actual_end_date AS rescreen_work_order_ended_at,
             exec_wo.completed_at AS rescreen_work_order_completed_at,
             exec_assigned.name AS rescreen_assigned_employee_name,
-            exec_calibration.name AS rescreen_calibration_employee_name
+            exec_calibration.name AS rescreen_calibration_employee_name,
+            assigned_employee.name AS assigned_employee_name,
+            calibration_employee.name AS calibration_employee_name,
+            first_piece_employee.name AS first_piece_measured_by_name,
+            machine.name AS machine_name
         FROM rescreen_batches rb
         LEFT JOIN customers c ON c.id = rb.customer_id
         LEFT JOIN return_orders ro ON ro.id = rb.source_return_order_id
@@ -1808,6 +1925,10 @@ function getRescreenBatchDetails(PDO $pdo, int $id): ?array
         LEFT JOIN work_orders exec_wo ON exec_wo.id = rb.rescreen_work_order_id
         LEFT JOIN employees exec_assigned ON exec_assigned.id = exec_wo.assigned_employee_id
         LEFT JOIN employees exec_calibration ON exec_calibration.id = exec_wo.calibration_employee_id
+        LEFT JOIN employees assigned_employee ON assigned_employee.id = rb.assigned_employee_id
+        LEFT JOIN employees calibration_employee ON calibration_employee.id = rb.calibration_employee_id
+        LEFT JOIN employees first_piece_employee ON first_piece_employee.id = rb.first_piece_measured_by_employee_id
+        LEFT JOIN machines machine ON machine.id = rb.machine_id
         WHERE rb.id = :id
           AND rb.deleted_at IS NULL
         LIMIT 1
@@ -1890,6 +2011,19 @@ function getRescreenBatchDetails(PDO $pdo, int $id): ?array
     ");
     $productionStmt->execute(['rescreen_batch_id' => $id]);
     $batch['production_records'] = $productionStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $imagesStmt = $pdo->prepare("
+        SELECT
+            rbi.*,
+            e.name AS uploaded_by_name
+        FROM rescreen_batch_images rbi
+        LEFT JOIN employees e ON e.id = rbi.uploaded_by_employee_id
+        WHERE rbi.rescreen_batch_id = :rescreen_batch_id
+          AND rbi.deleted_at IS NULL
+        ORDER BY rbi.sort_order ASC, rbi.id ASC
+    ");
+    $imagesStmt->execute(['rescreen_batch_id' => $id]);
+    $batch['images'] = $imagesStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     return $batch;
 }

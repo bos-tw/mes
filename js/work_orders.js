@@ -5220,6 +5220,21 @@
                     ].join(' / ');
                     const serviceResults = Array.isArray(batch.defects) ? batch.defects : [];
                     const productionRecords = Array.isArray(batch.production_records) ? batch.production_records : [];
+                    const images = Array.isArray(batch.images) ? batch.images : [];
+                    const scheduleText = [
+                        `預定 ${formatDateTime(batch.scheduled_start_date || '') || '-'} ~ ${formatDateTime(batch.scheduled_end_date || '') || '-'}`,
+                        `實際 ${formatDateTime(batch.actual_start_date || batch.started_at || '') || '-'} ~ ${formatDateTime(batch.actual_end_date || batch.completed_at || '') || '-'}`,
+                        `機台 ${batch.machine_name || '-'}`,
+                        `指派 ${batch.assigned_employee_name || '-'}`,
+                        `校機 ${batch.calibration_employee_name || '-'}`,
+                    ].join(' / ');
+                    const firstPieceText = [
+                        `量測 ${formatDateTime(batch.first_piece_measured_at || '') || '-'}`,
+                        `人員 ${batch.first_piece_measured_by_name || '-'}`,
+                        `長度 ${batch.first_piece_length ?? '-'}`,
+                        `外徑 ${batch.first_piece_outer_diameter ?? '-'}`,
+                        `厚度 ${batch.first_piece_thickness ?? '-'}`,
+                    ].join(' / ');
                     return `
                         <article class="work-order-second-screening-card">
                             <div>
@@ -5227,6 +5242,8 @@
                                 <span class="text-muted">${escapeHtml(reasonLabel)}</span>
                             </div>
                             <div class="text-muted small">案件狀態：${escapeHtml(getSecondScreeningStatusLabel(batch.status))}</div>
+                            <div class="text-muted small">排程：${escapeHtml(scheduleText)}</div>
+                            <div class="text-muted small">首件：${escapeHtml(firstPieceText)}</div>
                             <div class="text-muted small">結果：${resultText}</div>
                             <div class="work-order-second-screening-detail-block">
                                 <div class="text-muted small">服務明細：${serviceResults.length > 0 ? `${serviceResults.length} 項` : '尚未記錄'}</div>
@@ -5235,6 +5252,9 @@
                             <div class="work-order-second-screening-detail-block">
                                 <div class="text-muted small">生產記錄：${productionRecords.length > 0 ? `${productionRecords.length} 筆` : '尚未記錄'}</div>
                                 ${renderSecondScreeningProductionDetails(productionRecords)}
+                            </div>
+                            <div class="work-order-second-screening-detail-block">
+                                <div class="text-muted small">現場圖片：${images.length > 0 ? `${images.length} 張` : '尚未上傳'}</div>
                             </div>
                             <button type="button" class="btn outline small" data-action="open-second-screening-summary" data-mode="view" data-batch-id="${escapeHtml(String(batch.id || ''))}">檢視二次篩選</button>
                         </article>

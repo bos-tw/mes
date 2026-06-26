@@ -504,6 +504,7 @@ $ver = $cacheVersion['version'];
     <script defer src="js/shipping_order_items.js?v=<?= $ver ?>"></script>
     <script defer src="js/return_orders.js?v=<?= $ver ?>"></script>
     <script defer src="js/rescreen_batches.js?v=<?= $ver ?>"></script>
+    <script defer src="js/rescreen_batches_execution.js?v=<?= $ver ?>"></script>
     <script defer src="js/production_quality_records.js?v=<?= $ver ?>"></script>
     <script defer src="js/defect_history_records.js?v=<?= $ver ?>"></script>
     <script defer src="js/dashboard.js?v=<?= $ver ?>"></script>

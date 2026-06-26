@@ -285,6 +285,14 @@ $migrationChecks = [ordered]@{
         CheckSql = "SELECT IF(NOT EXISTS(SELECT cleanup.work_order_id FROM (SELECT wo.id AS work_order_id FROM work_orders wo LEFT JOIN inventory_items ii ON ii.work_order_id = wo.id AND ii.deleted_at IS NULL LEFT JOIN work_order_machine_runs womr ON womr.work_order_id = wo.id LEFT JOIN work_order_screening_defects wosd ON wosd.work_order_id = wo.id LEFT JOIN production_records pr ON pr.work_order_id = wo.id LEFT JOIN work_order_images woi ON woi.work_order_id = wo.id AND woi.deleted_at IS NULL LEFT JOIN work_order_completion_images woci ON woci.work_order_id = wo.id AND woci.deleted_at IS NULL LEFT JOIN work_order_defect_images wodi ON wodi.work_order_id = wo.id AND wodi.deleted_at IS NULL LEFT JOIN work_order_tool_condition_images wotci ON wotci.work_order_id = wo.id AND wotci.deleted_at IS NULL WHERE wo.deleted_at IS NULL AND wo.work_order_type = 'rescreen' AND COALESCE(wo.source_rescreen_batch_id, 0) > 0 GROUP BY wo.id HAVING COUNT(ii.id) = 0 AND COUNT(womr.id) = 0 AND COUNT(wosd.id) = 0 AND COUNT(pr.id) = 0 AND COUNT(woi.id) = 0 AND COUNT(woci.id) = 0 AND COUNT(wodi.id) = 0 AND COUNT(wotci.id) = 0) AS cleanup), 1, 0);"
         Description = 'archive empty-shell rescreen execution work orders and detach them from batches'
     }
+    '2026_06_26_add_rescreen_work_order_execution_model.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'rescreen_batches' AND column_name = 'scheduled_start_date') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'rescreen_batches' AND column_name = 'machine_id') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'rescreen_batches' AND column_name = 'first_piece_length') AND EXISTS(SELECT 1 FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'rescreen_batches' AND constraint_name = 'fk_rescreen_batches_machine'), 1, 0);"
+        Description = 'rescreen work-order-level execution schedule and first-piece fields'
+    }
+    '2026_06_26_add_rescreen_batch_images.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'rescreen_batch_images') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'rescreen_batch_images' AND column_name = 'rescreen_batch_id') AND EXISTS(SELECT 1 FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'rescreen_batch_images' AND constraint_name = 'fk_rescreen_batch_images_batch'), 1, 0);"
+        Description = 'rescreen batch site image uploads'
+    }
 }
 
 $migrationFiles = Get-ChildItem -LiteralPath $migrationsDir -File | Sort-Object Name

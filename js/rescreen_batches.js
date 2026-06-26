@@ -24,9 +24,7 @@
             data: [],
             sourceWorkOrderDetails: null,
         };
-
         let dataSyncHelper = null;
-
         const elements = {
             alert: moduleRoot.querySelector('[data-rescreen-batches-alert]'),
             table: moduleRoot.querySelector('[data-rescreen-batches-table]'),
@@ -42,10 +40,9 @@
             sourceSummary: document.querySelector('[data-rescreen-source-summary]'),
             defectEditor: document.querySelector('[data-rescreen-defect-editor]'),
             productionEditor: document.querySelector('[data-rescreen-production-editor]'),
+            sourceContextLabel: document.querySelector('[data-source-context-label]'),
         };
-
         const tbody = elements.table?.querySelector('tbody');
-
         function escapeHtml(value) {
             const div = document.createElement('div');
             div.textContent = value == null ? '' : String(value);
@@ -81,17 +78,6 @@
                 cancelled: '<span class="status-badge cancelled">已取消</span>',
             };
             return map[status] || `<span class="status-badge secondary">${escapeHtml(status || '-')}</span>`;
-        }
-
-        function getStatusLabel(status) {
-            const map = {
-                draft: '草稿',
-                planned: '已排程',
-                in_progress: '進行中',
-                completed: '已完成',
-                cancelled: '已取消',
-            };
-            return map[status] || (status || '-');
         }
 
         function getRequestReasonLabel(code) {
@@ -150,55 +136,48 @@
                 minute: '2-digit',
             });
         }
-
-        function buildStatusBadgeElement(status) {
-            const span = document.createElement('span');
-            span.className = 'status-badge secondary';
-            span.textContent = status || '-';
-            if (status === 'draft') {
-                span.className = 'status-badge pending';
-                span.textContent = '草稿';
-            } else if (status === 'planned') {
-                span.className = 'status-badge scheduled';
-                span.textContent = '已排程';
-            } else if (status === 'in_progress') {
-                span.className = 'status-badge in-progress';
-                span.textContent = '進行中';
-            } else if (status === 'completed') {
-                span.className = 'status-badge completed';
-                span.textContent = '已完成';
-            } else if (status === 'cancelled') {
-                span.className = 'status-badge cancelled';
-                span.textContent = '已取消';
-            }
-            return span;
+        function renderSourceSummaryState(message, type = 'empty') {
+            if (!elements.sourceSummary) return;
+            const label = type === 'error' ? '來源摘要' : (type === 'loading' ? '載入中' : '尚未選定來源');
+            elements.sourceSummary.innerHTML = `<div class="rescreen-source-state is-${escapeHtml(type)}"><span class="rescreen-source-state-label">${label}</span><p>${escapeHtml(message)}</p></div>`;
+        }
+        function renderSourceSummaryCard({ sourceLabel = '來源資料', sourceNumber = '-', sourceType = 'generic', description = '', items = [] }) {
+            const safeType = sourceType === 'return-order' ? 'return-order' : (sourceType === 'work-order' ? 'work-order' : 'generic');
+            const badge = sourceType === 'return-order' ? '退貨來源' : '工單來源';
+            const descriptionHtml = String(description || '').trim() !== '' ? `<p>${escapeHtml(description)}</p>` : '';
+            return `<article class="rescreen-source-card is-${safeType}"><div class="rescreen-source-card-header"><div class="rescreen-source-card-title-group"><span class="rescreen-source-card-kicker">${escapeHtml(sourceLabel)}</span><strong>${escapeHtml(sourceNumber || '-')}</strong>${descriptionHtml}</div><span class="rescreen-source-card-badge">${escapeHtml(badge)}</span></div><div class="rescreen-source-card-body">${(Array.isArray(items) ? items : []).map((item) => `<div class="rescreen-source-fact${item?.fullWidth ? ' is-full-width' : ''}${item?.emphasis ? ' is-emphasis' : ''}"><span class="rescreen-source-fact-label">${escapeHtml(item?.label || '-')}</span><strong class="rescreen-source-fact-value">${escapeHtml(item?.value || '-')}</strong></div>`).join('')}</div></article>`;
+        }
+        function toggleSectionBody(button, body) {
+            if (!button || !body) return;
+            body.classList.toggle('hidden');
+            const icon = button.querySelector('i');
+            if (icon) icon.classList.toggle('fa-chevron-down');
+            if (icon) icon.classList.toggle('fa-chevron-up');
+        }
+        function resetModalCollapsibleSections() {
+            if (!elements.modal) return;
+            elements.modal.querySelectorAll('[data-rescreen-section-body]').forEach((body) => body.classList.remove('hidden'));
+            elements.modal.querySelectorAll('[data-action="toggle-rescreen-section"] i').forEach((icon) => { icon.classList.add('fa-chevron-down'); icon.classList.remove('fa-chevron-up'); });
+        }
+        function setCreateSourceContext(mode) {
+            const labels = { defect: '不良紀錄來源', return: '退貨追溯來源', work_order: '工單來源' }, approval = elements.modalForm?.querySelector('[name="customer_approval_reference"]');
+            if (elements.sourceContextLabel) elements.sourceContextLabel.value = labels[mode] || labels.work_order;
+            if (approval) approval.required = mode !== 'work_order';
         }
         function buildDefectEditorRows(rows = []) {
             if (!elements.defectEditor) return;
             const helper = window.RescreenBatchEditorHelper;
-            elements.defectEditor.innerHTML = helper
-                ? helper.buildDefectEditorHtml(rows, escapeHtml)
-                : '<p class="text-muted">二次篩分服務明細編輯器載入失敗。</p>';
+            elements.defectEditor.innerHTML = helper ? helper.buildDefectEditorHtml(rows, escapeHtml) : '<p class="text-muted">二次篩分服務明細編輯器載入失敗。</p>';
         }
 
         function buildDefaultDefectRowsFromWorkOrder(workOrder) { return window.RescreenBatchEditorHelper?.buildDefaultDefectRowsFromWorkOrder(workOrder) || []; }
-
         function buildProductionEditorRows(rows = []) {
             if (!elements.productionEditor) return;
             const helper = window.RescreenBatchEditorHelper;
-            elements.productionEditor.innerHTML = helper
-                ? helper.buildProductionEditorHtml(rows, escapeHtml)
-                : '<p class="text-muted">二次篩選生產記錄編輯器載入失敗。</p>';
+            elements.productionEditor.innerHTML = helper ? helper.buildProductionEditorHtml(rows, escapeHtml) : '<p class="text-muted">二次篩選生產記錄編輯器載入失敗。</p>';
         }
-
-        function collectDefectRows() {
-            return window.RescreenBatchEditorHelper?.collectDefectRows(elements.defectEditor) || [];
-        }
-
-        function collectProductionRecordRows() {
-            return window.RescreenBatchEditorHelper?.collectProductionRecordRows(elements.productionEditor) || [];
-        }
-
+        function collectDefectRows() { return window.RescreenBatchEditorHelper?.collectDefectRows(elements.defectEditor) || []; }
+        function collectProductionRecordRows() { return window.RescreenBatchEditorHelper?.collectProductionRecordRows(elements.productionEditor) || []; }
         function setExecutionResultFormDefaults(values = {}) {
             [['started_at', values.started_at || ''], ['completed_at', values.completed_at || ''], ['rescreen_output_good_units', values.rescreen_output_good_units ?? ''], ['rescreen_output_defect_units', values.rescreen_output_defect_units ?? ''], ['rescreen_output_scrap_units', values.rescreen_output_scrap_units ?? '']].forEach(([name, value]) => setFormValue(name, value));
         }
@@ -206,12 +185,8 @@
         function appendProductionRecordRow(initialRow = {}) {
             if (!elements.productionEditor) return;
             const tbody = elements.productionEditor.querySelector('tbody');
-            if (!tbody) {
-                buildProductionEditorRows([initialRow]);
-                return;
-            }
             const helper = window.RescreenBatchEditorHelper;
-            if (!helper) return;
+            if (!tbody || !helper) { buildProductionEditorRows([initialRow]); return; }
             tbody.insertAdjacentHTML('beforeend', helper.buildProductionEditorRowHtml(initialRow, escapeHtml));
             const emptyHint = elements.productionEditor.querySelector('.text-muted.mt-2');
             if (emptyHint) emptyHint.remove();
@@ -285,28 +260,27 @@
             if (!elements.sourceSummary || !Number.isInteger(normalizedId) || normalizedId <= 0) {
                 return null;
             }
-            elements.sourceSummary.innerHTML = '<p class="text-muted">正在載入來源工單...</p>';
+            renderSourceSummaryState('正在載入來源工單...', 'loading');
             try {
                 const response = await fetch(`api/work_orders/show.php?id=${normalizedId}`);
                 const result = await response.json();
                 if (!result.success) {
-                    elements.sourceSummary.innerHTML = `<p class="text-danger">${escapeHtml(result.message || '載入來源工單失敗')}</p>`;
+                    renderSourceSummaryState(result.message || '載入來源工單失敗', 'error');
                     return null;
                 }
                 const data = result.data || {};
                 state.sourceWorkOrderDetails = data;
-                elements.sourceSummary.innerHTML = `
-                    <div class="detail-item"><span class="detail-label">來源工單</span><span class="detail-value">${escapeHtml(data.work_order_number || '-')}</span></div>
-                    <div class="detail-item"><span class="detail-label">客戶</span><span class="detail-value">${escapeHtml(data.customer_name || '-')}</span></div>
-                    <div class="detail-item"><span class="detail-label">訂單</span><span class="detail-value">${escapeHtml(data.order_number || '-')}</span></div>
-                    <div class="detail-item"><span class="detail-label">客戶批號</span><span class="detail-value">${escapeHtml(data.customer_batch_number || '-')}</span></div>
-                    <div class="detail-item"><span class="detail-label">預估數量</span><span class="detail-value">${formatQuantity(data.total_units || 0, '支')}</span></div>
-                    <div class="detail-item"><span class="detail-label">預估重量</span><span class="detail-value">${formatQuantity(data.total_weight_kg || 0, 'kg')}</span></div>
-                `;
+                elements.sourceSummary.innerHTML = renderSourceSummaryCard({
+                    sourceLabel: '來源工單',
+                    sourceNumber: data.work_order_number || '-',
+                    sourceType: 'work-order',
+                    description: '由生產工單直接建立的二次篩選案件。',
+                    items: [{ label: '客戶', value: data.customer_name || '-' }, { label: '訂單', value: data.order_number || '-' }, { label: '客戶批號', value: data.customer_batch_number || '-' }, { label: '受篩產品', value: data.screening_item_name || '-' }, { label: '預估數量', value: formatQuantity(data.total_units || 0, '支'), emphasis: true }, { label: '預估重量', value: formatQuantity(data.total_weight_kg || 0, 'kg'), emphasis: true }],
+                });
                 return data;
             } catch (error) {
                 console.error('loadWorkOrderSourceSummary failed:', error);
-                elements.sourceSummary.innerHTML = '<p class="text-danger">載入來源工單失敗。</p>';
+                renderSourceSummaryState('載入來源工單失敗。', 'error');
                 return null;
             }
         }
@@ -330,6 +304,18 @@
             }
         }
 
+        async function loadWorkOrdersForSelect(selectedId = '') {
+            try {
+                const response = await fetch('api/work_orders/index.php?perPage=500');
+                const result = await response.json();
+                const select = elements.modalForm?.querySelector('[name="source_work_order_id"]');
+                if (!select) return;
+                if (!result.success) { select.innerHTML = '<option value="">載入失敗</option>'; return; }
+                select.innerHTML = '<option value="">-- 請選擇原始工單 --</option>' + result.data.map((item) => `<option value="${escapeHtml(String(item.id || ''))}">${escapeHtml(`${item.work_order_number || '-'} / ${item.customer_name || '-'} / ${item.screening_item_name || '-'}`)}</option>`).join('');
+                if (selectedId) select.value = String(selectedId);
+            } catch (error) { console.error('loadWorkOrdersForSelect failed:', error); }
+        }
+
         async function loadReturnOrdersForSelect(selectedId = '') {
             try {
                 const response = await fetch('api/return_orders/index.php?perPage=500');
@@ -340,7 +326,7 @@
                     select.innerHTML = '<option value="">載入失敗</option>';
                     return;
                 }
-                select.innerHTML = '<option value="">-- 請選擇退貨單 --</option>' + result.data.map((item) => {
+                select.innerHTML = '<option value="">-- 無退貨追溯來源 --</option>' + result.data.map((item) => {
                     const label = `${item.return_order_number} / ${item.customer_name || '-'} / ${item.return_date || '-'}`;
                     return `<option value="${item.id}">${escapeHtml(label)}</option>`;
                 }).join('');
@@ -357,30 +343,38 @@
                 return;
             }
             if (!returnOrderId) {
-                elements.sourceSummary.innerHTML = '<p class="text-muted">請先選擇退貨單，或從生產工單建立二次篩選。</p>';
+                renderSourceSummaryState('請先選擇退貨單，或從生產工單建立二次篩選。');
                 return;
             }
+            renderSourceSummaryState('正在載入退貨單摘要...', 'loading');
             try {
                 const response = await fetch(`api/return_orders/show.php?id=${returnOrderId}`);
                 const result = await response.json();
                 if (!result.success) {
-                    elements.sourceSummary.innerHTML = `<p class="text-danger">${escapeHtml(result.message || '載入退貨單摘要失敗')}</p>`;
+                    renderSourceSummaryState(result.message || '載入退貨單摘要失敗', 'error');
                     return;
                 }
                 const data = result.data || {};
+                state.sourceWorkOrderDetails = null;
                 const items = Array.isArray(data.items) ? data.items : [];
                 const totalQuantity = items.reduce((sum, item) => sum + (Number.parseFloat(item.returned_quantity || 0) || 0), 0);
-                elements.sourceSummary.innerHTML = `
-                    <div class="detail-item"><span class="detail-label">退貨單號</span><span class="detail-value">${escapeHtml(data.return_order_number || '-')}</span></div>
-                    <div class="detail-item"><span class="detail-label">客戶</span><span class="detail-value">${escapeHtml(data.customer_name || '-')}</span></div>
-                    <div class="detail-item"><span class="detail-label">來源出貨單</span><span class="detail-value">${escapeHtml(data.shipping_order_number || '-')}</span></div>
-                    <div class="detail-item"><span class="detail-label">退貨品項數</span><span class="detail-value">${escapeHtml(String(items.length))}</span></div>
-                    <div class="detail-item"><span class="detail-label">退回總數量</span><span class="detail-value">${escapeHtml(String(totalQuantity))}</span></div>
-                    <div class="detail-item" style="grid-column: 1 / -1;"><span class="detail-label">備註</span><span class="detail-value">${escapeHtml(data.notes || data.return_reason || '-')}</span></div>
-                `;
+                const sourceIds = Array.from(new Set(items.map((item) => Number.parseInt(item.source_work_order_id || '', 10)).filter((id) => Number.isInteger(id) && id > 0)));
+                const workOrderSelect = elements.modalForm?.querySelector('[name="source_work_order_id"]');
+                if (sourceIds.length === 1 && workOrderSelect && !workOrderSelect.value) {
+                    workOrderSelect.value = String(sourceIds[0]);
+                    await loadWorkOrderSourceSummary(sourceIds[0]);
+                }
+                const workOrders = Array.from(new Set(items.map((item) => String(item.source_work_order_number || '').trim()).filter(Boolean))).join('、') || '-';
+                elements.sourceSummary.innerHTML = renderSourceSummaryCard({
+                    sourceLabel: '退貨追溯來源',
+                    sourceNumber: data.return_order_number || '-',
+                    sourceType: 'return-order',
+                    description: '退貨單僅作為追溯來源，二次篩選案件仍需回掛原始工單。',
+                    items: [{ label: '原始工單', value: workOrders, emphasis: true }, { label: '客戶', value: data.customer_name || '-' }, { label: '來源出貨單', value: data.shipping_order_number || '-' }, { label: '退貨日期', value: data.return_date || '-' }, { label: '退回總數量', value: formatQuantity(totalQuantity, '支'), emphasis: true }, { label: '備註', value: data.notes || data.return_reason || '-', fullWidth: true }],
+                });
             } catch (error) {
                 console.error('loadReturnOrderSummary failed:', error);
-                elements.sourceSummary.innerHTML = '<p class="text-danger">載入退貨單摘要失敗。</p>';
+                renderSourceSummaryState('載入退貨單摘要失敗。', 'error');
             }
         }
 
@@ -447,7 +441,7 @@
                 });
 
                 const statusCell = document.createElement('td');
-                statusCell.appendChild(buildStatusBadgeElement(String(item.status || '')));
+                statusCell.innerHTML = getStatusBadge(String(item.status || ''));
                 row.appendChild(statusCell);
 
                 const actionCell = document.createElement('td');
@@ -512,22 +506,18 @@
                 elements.modalTitle.textContent = '新增二次篩選紀錄';
             }
             elements.modalForm?.reset();
+            resetModalCollapsibleSections();
             hideAlert(true);
             const selectedWorkOrderId = prefillContext?.sourceWorkOrderId || prefillContext?.workOrderId || '';
             const selectedReturnOrderId = prefillContext?.sourceReturnOrderId || prefillContext?.returnOrderId || '';
+            const sourceMode = selectedWorkOrderId ? (prefillContext?.sourceDefectHistoryRecordId ? 'defect' : 'work_order') : 'return';
+            await loadWorkOrdersForSelect(selectedWorkOrderId);
             await loadReturnOrdersForSelect(selectedReturnOrderId);
+            setCreateSourceContext(sourceMode);
             setFormValue('source_work_order_id', selectedWorkOrderId);
-            const returnSelect = elements.modalForm?.querySelector('[name="source_return_order_id"]');
             if (selectedWorkOrderId) {
-                if (returnSelect) {
-                    returnSelect.value = '';
-                    returnSelect.disabled = true;
-                }
                 setFormValue('rescreen_type', prefillContext?.rescreenType || 'strict_rescreen');
-                setFormValue(
-                    'second_screening_reason',
-                    getSecondScreeningReasonLabel(prefillContext?.secondScreeningReason) || '客戶每批要求二次篩選'
-                );
+                setFormValue('second_screening_reason', getSecondScreeningReasonLabel(prefillContext?.secondScreeningReason) || '客戶要求固定二次篩選');
                 setFormValue('source_defect_history_record_id', prefillContext?.sourceDefectHistoryRecordId || '');
                 setFormValue('customer_approval_reference', prefillContext?.customerApprovalReference || '');
                 setFormValue('notes', prefillContext?.notes || '');
@@ -536,19 +526,14 @@
                 buildDefectEditorRows(buildDefaultDefectRowsFromWorkOrder(workOrderData));
                 buildProductionEditorRows([]);
             } else {
-                if (returnSelect) {
-                    returnSelect.disabled = false;
-                }
                 setFormValue('rescreen_type', prefillContext?.rescreenType || 'relaxed_rescreen');
-                setFormValue(
-                    'second_screening_reason',
-                    getSecondScreeningReasonLabel(prefillContext?.secondScreeningReason) || '不良過多，客戶放寬後再篩'
-                );
+                setFormValue('second_screening_reason', getSecondScreeningReasonLabel(prefillContext?.secondScreeningReason) || '不良過多，客戶同意放寬標準');
                 setFormValue('source_defect_history_record_id', prefillContext?.sourceDefectHistoryRecordId || '');
                 setFormValue('customer_approval_reference', prefillContext?.customerApprovalReference || '');
                 setFormValue('notes', prefillContext?.notes || '');
                 setExecutionResultFormDefaults();
-                await loadReturnOrderSummary(selectedReturnOrderId);
+                if (selectedReturnOrderId) await loadReturnOrderSummary(selectedReturnOrderId);
+                else renderSourceSummaryState('請先選擇原始工單；退貨追溯來源可依實際情況選填。');
                 buildDefectEditorRows([]);
                 buildProductionEditorRows([]);
             }
@@ -568,8 +553,11 @@
                 if (elements.modalTitle) {
                     elements.modalTitle.textContent = '編輯二次篩選紀錄';
                 }
+                resetModalCollapsibleSections();
+                await loadWorkOrdersForSelect(data.source_work_order_id || '');
                 await loadReturnOrdersForSelect(data.source_return_order_id || '');
-                setFormValue('source_work_order_id', data.source_return_order_id ? '' : (data.source_work_order_id || ''));
+                setCreateSourceContext(data.source_return_order_id ? 'return' : (data.source_defect_history_record_id ? 'defect' : 'work_order'));
+                setFormValue('source_work_order_id', data.source_work_order_id || '');
                 setFormValue('source_return_order_id', data.source_return_order_id);
                 setFormValue('rescreen_type', data.rescreen_type || 'strict_rescreen');
                 setFormValue('second_screening_reason', data.second_screening_reason || '');
@@ -586,10 +574,6 @@
                 });
                 buildDefectEditorRows(Array.isArray(data.defects) ? data.defects : []);
                 buildProductionEditorRows(Array.isArray(data.production_records) ? data.production_records : []);
-                const returnSelect = elements.modalForm?.querySelector('[name="source_return_order_id"]');
-                if (returnSelect) {
-                    returnSelect.disabled = !data.source_return_order_id && !!data.source_work_order_id;
-                }
                 if (data.source_return_order_id) {
                     await loadReturnOrderSummary(data.source_return_order_id || '');
                 } else {
@@ -613,6 +597,8 @@
             if (!elements.modalForm) return;
             const formData = new FormData(elements.modalForm);
             const data = Object.fromEntries(formData.entries());
+            if (!data.source_work_order_id) { showAlert('請選擇原始工單。', 'danger', true); return; }
+            if (!data.source_return_order_id) delete data.source_return_order_id;
             const defectRows = collectDefectRows();
             const productionRecordRows = collectProductionRecordRows();
             if (defectRows.length > 0 || state.editingId) {
@@ -702,10 +688,10 @@
 
         function renderDetail(data) {
             if (!elements.detailContent) return;
+            elements.detailContent.dataset.rescreenBatchId = data.id || '';
             const items = Array.isArray(data.items) ? data.items : [];
             const defects = Array.isArray(data.defects) ? data.defects : [];
             const productionRecords = Array.isArray(data.production_records) ? data.production_records : [];
-            const hasDefects = defects.length > 0;
             const defectRecorderNames = Array.from(new Set(
                 defects
                     .map((defect) => String(defect.defect_recorded_by_name || '').trim())
@@ -727,158 +713,162 @@
                 || '-';
             const screeningStartAt = data.started_at || '';
             const screeningCompletedAt = data.completed_at || '';
-            const resultLabel = data.status === 'completed'
-                ? (hasDefects ? '已完成，有再次不良需處置' : '已完成，未記錄再次不良')
-                : '尚未完成，結果待確認';
             const primaryItem = items[0] || {};
+            const sourceProductLabel = `${data.customer_batch_number || primaryItem.customer_batch_number || '-'} / ${data.screening_item_name || primaryItem.screening_item_name || data.part_number || '-'}`;
+            const renderDetailItems = (fields) => fields.map((field) => `
+                <div class="detail-item${field.fullWidth ? ' full-width' : ''}">
+                    <span class="detail-label">${escapeHtml(field.label)}</span>
+                    <span class="detail-value">${field.html ?? escapeHtml(field.value || '-')}</span>
+                </div>
+            `).join('');
+            const basicFields = [
+                { label: '二篩編號', value: data.rescreen_batch_number || '-' },
+                { label: '案件狀態', html: getStatusBadge(data.status) },
+                { label: '二次篩選標準型態', value: getTypeLabel(data.rescreen_type) },
+                { label: '二篩原因', value: data.second_screening_reason || '-' },
+                { label: '客戶', value: data.customer_name || '-' },
+                { label: '主批號 / 產品', value: sourceProductLabel, fullWidth: true },
+            ];
+            const sourceFields = [
+                { label: '原始訂單', value: data.order_number || '-' },
+                { label: '原始工單', value: data.source_work_order_number || '-' },
+                { label: '原出貨單', value: data.shipping_order_number || '-' },
+                { label: '退貨追溯來源', value: data.return_order_number || '-' },
+                { label: '來源數量', value: formatQuantity(data.received_total_quantity, primaryItem.returned_unit || '') },
+                { label: '來源重量', value: `${data.received_total_weight_kg || 0} kg` },
+            ];
+            const executionFields = [
+                ['預定開始日期', formatDateTime(data.scheduled_start_date || '')], ['預定完成日期', formatDateTime(data.scheduled_end_date || '')],
+                ['實際開始日期', formatDateTime(data.actual_start_date || screeningStartAt)], ['實際完成日期', formatDateTime(data.actual_end_date || screeningCompletedAt)],
+                ['指派員工', data.assigned_employee_name || screeningOperatorLabel], ['校機人員', data.calibration_employee_name || data.rescreen_calibration_employee_name || '-'],
+                ['機台', data.machine_name || '-'], ['預計處理數量', formatQuantity(data.quantity_to_produce || 0, '支')], ['篩選速度', data.screening_speed || '-'],
+                ['良品數', formatQuantity(data.rescreen_output_good_units || 0, '支')], ['再次不良數', formatQuantity(data.rescreen_output_defect_units || 0, '支')],
+                ['報廢 / 其他處置數', formatQuantity(data.rescreen_output_scrap_units || 0, '支')], ['最後記錄人員', latestDefectRecord?.defect_recorded_by_name || '-'],
+                ['最後記錄時間', formatDateTime(latestDefectRecord?.defect_recorded_at || '')],
+            ].map(([label, value]) => ({ label, value }));
+            const firstPieceFields = [
+                ['量測時間', formatDateTime(data.first_piece_measured_at || '')], ['量測人員', data.first_piece_measured_by_name || '-'],
+                ['頭高', data.first_piece_head_height || '-'], ['頭寬', data.first_piece_head_width || '-'], ['長度', data.first_piece_length || '-'],
+                ['牙外徑', data.first_piece_thread_outer_diameter || '-'], ['華司徑', data.first_piece_washer_diameter || '-'], ['外徑', data.first_piece_outer_diameter || '-'],
+                ['孔徑', data.first_piece_hole_diameter || '-'], ['厚度', data.first_piece_thickness || '-'], ['首件備註', data.first_piece_notes || '-', true],
+            ].map(([label, value, fullWidth]) => ({ label, value, fullWidth }));
+            const noteFields = [
+                { label: '客戶通知 / 標準佐證', value: data.customer_approval_reference || '-', fullWidth: true },
+                { label: '案件備註', value: data.decision_notes || data.notes || '-', fullWidth: true },
+            ];
             elements.detailContent.innerHTML = `
                 <div class="detail-section">
-                    <h4>二篩結果一眼看</h4>
-                    <div class="detail-grid">
-                        <div class="detail-item"><span class="detail-label">二篩編號</span><span class="detail-value">${escapeHtml(data.rescreen_batch_number || '-')}</span></div>
-                        <div class="detail-item"><span class="detail-label">目前狀態</span><span class="detail-value">${escapeHtml(getStatusLabel(data.status))}</span></div>
-                        <div class="detail-item"><span class="detail-label">二篩方式</span><span class="detail-value">${escapeHtml(getTypeLabel(data.rescreen_type))}</span></div>
-                        <div class="detail-item"><span class="detail-label">二篩原因</span><span class="detail-value">${escapeHtml(getSecondScreeningReasonLabel(data.second_screening_reason, data.request_reason_code))}</span></div>
-                        <div class="detail-item"><span class="detail-label">目前結果</span><span class="detail-value">${escapeHtml(resultLabel)}</span></div>
-                        <div class="detail-item"><span class="detail-label">客戶</span><span class="detail-value">${escapeHtml(data.customer_name || '-')}</span></div>
-                        <div class="detail-item"><span class="detail-label">主批號 / 產品</span><span class="detail-value">${escapeHtml(data.customer_batch_number || primaryItem.customer_batch_number || '-')} / ${escapeHtml(data.screening_item_name || primaryItem.screening_item_name || data.part_number || '-')}</span></div>
-                        <div class="detail-item"><span class="detail-label">來源數量</span><span class="detail-value">${escapeHtml(formatQuantity(data.received_total_quantity, primaryItem.returned_unit || ''))}</span></div>
-                        <div class="detail-item"><span class="detail-label">來源重量</span><span class="detail-value">${escapeHtml(data.received_total_weight_kg || 0)} kg</span></div>
+                    <h4>案件資訊</h4>
+                    <div class="detail-grid rescreen-detail-grid">
+                        ${renderDetailItems(basicFields)}
                     </div>
                 </div>
                 <div class="detail-section">
-                    <h4>追溯時間線</h4>
-                    <table class="data-table compact">
-                        <thead>
-                            <tr>
-                                <th>順序</th>
-                                <th>流程節點</th>
-                                <th>單號 / 紀錄</th>
-                                <th>使用者要確認的事</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>1</td>
-                                <td>原始訂單 / 工單</td>
-                                <td>${escapeHtml(data.order_number || '-')} / ${escapeHtml(data.source_work_order_number || '-')}</td>
-                                <td>這批貨原本從哪張訂單與哪張工單產生。</td>
-                            </tr>
-                            <tr>
-                                <td>2</td>
-                                <td>原出貨單</td>
-                                <td>${escapeHtml(data.shipping_order_number || '-')}</td>
-                                <td>這批貨曾經用哪張出貨單交給客戶。</td>
-                            </tr>
-                            <tr>
-                                <td>3</td>
-                                <td>退貨單</td>
-                                <td>${escapeHtml(data.return_order_number || '-')}</td>
-                                <td>${data.return_order_number ? '客戶退回後，由這張退貨單進入放寬後二篩流程。' : '此案件由原生產工單直接建立，沒有退貨單來源。'}</td>
-                            </tr>
-                            <tr>
-                                <td>4</td>
-                                <td>二次篩選案件</td>
-                                <td>${escapeHtml(data.rescreen_batch_number || '-')}</td>
-                                <td>${escapeHtml(getSecondScreeningReasonLabel(data.second_screening_reason, data.request_reason_code))}；目前${escapeHtml(resultLabel)}。</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <h4>來源追溯</h4>
+                    <div class="detail-grid rescreen-detail-grid">
+                        ${renderDetailItems(sourceFields)}
+                    </div>
                 </div>
                 <div class="detail-section">
-                    <h4>這次為什麼二篩</h4>
-                    <dl class="detail-list">
-                        <dt>原因</dt><dd>${escapeHtml(getSecondScreeningReasonLabel(data.second_screening_reason, data.request_reason_code))}</dd>
-                        <dt>客戶通知 / 標準佐證</dt><dd>${escapeHtml(data.customer_approval_reference || '-')}</dd>
-                        <dt>說明</dt><dd>${escapeHtml(data.decision_notes || data.notes || '-')}</dd>
-                        <dt>關聯原始工單</dt><dd>${escapeHtml(data.source_work_order_number || '-')}</dd>
-                    </dl>
+                    <h4>執行資訊</h4>
+                    <div class="detail-grid rescreen-detail-grid">
+                        ${renderDetailItems(executionFields)}
+                    </div>
                 </div>
                 <div class="detail-section">
-                    <h4>執行人員與時間</h4>
-                    <div class="detail-grid">
-                        <div class="detail-item"><span class="detail-label">主要篩選人員</span><span class="detail-value">${escapeHtml(screeningOperatorLabel)}</span></div>
-                        <div class="detail-item"><span class="detail-label">校機 / 協助人員</span><span class="detail-value">${escapeHtml(data.rescreen_calibration_employee_name || '-')}</span></div>
-                        <div class="detail-item"><span class="detail-label">二篩開始時間</span><span class="detail-value">${escapeHtml(formatDateTime(screeningStartAt))}</span></div>
-                        <div class="detail-item"><span class="detail-label">二篩完成時間</span><span class="detail-value">${escapeHtml(formatDateTime(screeningCompletedAt))}</span></div>
-                        <div class="detail-item"><span class="detail-label">再次不良最後記錄人員</span><span class="detail-value">${escapeHtml(latestDefectRecord?.defect_recorded_by_name || '-')}</span></div>
-                        <div class="detail-item"><span class="detail-label">再次不良最後記錄時間</span><span class="detail-value">${escapeHtml(formatDateTime(latestDefectRecord?.defect_recorded_at || ''))}</span></div>
+                    <h4>首件尺寸檢驗 (mm)</h4>
+                    <div class="detail-grid rescreen-detail-grid">
+                        ${renderDetailItems(firstPieceFields)}
+                    </div>
+                </div>
+                <div class="detail-section">
+                    <h4>佐證與備註</h4>
+                    <div class="detail-grid rescreen-detail-grid">
+                        ${renderDetailItems(noteFields)}
                     </div>
                 </div>
                 <div class="detail-section">
                     <h4>來源明細</h4>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>產品</th>
-                                <th>客批</th>
-                                <th>原始工單</th>
-                                <th>原庫存</th>
-                                <th>來源數量</th>
-                                <th>估重(kg)</th>
-                                <th>來源說明</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${items.map((item) => `
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
                                 <tr>
-                                    <td>${escapeHtml(item.screening_item_name || item.part_number || item.sub_item_number || '-')}</td>
-                                    <td>${escapeHtml(item.customer_batch_number || '-')}</td>
-                                    <td>${escapeHtml(item.source_work_order_number || '-')}</td>
-                                    <td>${escapeHtml(item.inventory_number || '-')}</td>
-                                    <td>${escapeHtml(item.returned_quantity || 0)} ${escapeHtml(item.returned_unit || '')}</td>
-                                    <td>${escapeHtml(item.estimated_weight_kg || 0)}</td>
-                                    <td>${escapeHtml(item.source_notes || item.return_reason || '-')}</td>
+                                    <th>產品</th>
+                                    <th>客批</th>
+                                    <th>原始工單</th>
+                                    <th>原庫存</th>
+                                    <th>來源數量</th>
+                                    <th>估重(kg)</th>
+                                    <th>來源說明</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                ${items.length === 0 ? '<tr><td colspan="7" class="text-center text-muted">無來源明細</td></tr>' : items.map((item) => `
+                                    <tr>
+                                        <td>${escapeHtml(item.screening_item_name || item.part_number || item.sub_item_number || '-')}</td>
+                                        <td>${escapeHtml(item.customer_batch_number || '-')}</td>
+                                        <td>${escapeHtml(item.source_work_order_number || '-')}</td>
+                                        <td>${escapeHtml(item.inventory_number || '-')}</td>
+                                        <td>${escapeHtml(item.returned_quantity || 0)} ${escapeHtml(item.returned_unit || '')}</td>
+                                        <td>${escapeHtml(item.estimated_weight_kg || 0)}</td>
+                                        <td>${escapeHtml(item.source_notes || item.return_reason || '-')}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
                 ${renderRuleTable('原始標準快照', data.rules?.original || [])}
                 ${renderRuleTable('二次篩選標準快照', data.rules?.rescreen || [])}
+
                 <div class="detail-section">
                     <h4>二次篩分服務明細</h4>
                     ${defects.length === 0 ? '<p class="text-muted">目前尚無二次篩選再次不良紀錄。</p>' : `
-                        <table class="data-table compact">
-                            <thead><tr><th>服務</th><th>不良數量</th><th>重量(kg)</th><th>支數</th><th>處置</th><th>記錄人員</th><th>記錄時間</th><th>備註</th></tr></thead>
-                            <tbody>
-                                ${defects.map((defect) => `
-                                    <tr>
-                                        <td>${escapeHtml(defect.service_name || '-')}</td>
-                                        <td>${escapeHtml(defect.defect_quantity || 0)}</td>
-                                        <td>${escapeHtml(defect.defect_weight_kg || 0)}</td>
-                                        <td>${escapeHtml(defect.defect_units || 0)}</td>
-                                        <td>${escapeHtml(getDispositionLabel(defect.disposition))}</td>
-                                        <td>${escapeHtml(defect.defect_recorded_by_name || '-')}</td>
-                                        <td>${escapeHtml(formatDateTime(defect.defect_recorded_at || ''))}</td>
-                                        <td>${escapeHtml(defect.notes || '-')}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                        <div class="table-responsive">
+                            <table class="data-table compact">
+                                <thead><tr><th>服務</th><th>不良數量</th><th>重量(kg)</th><th>支數</th><th>處置</th><th>記錄人員</th><th>記錄時間</th><th>備註</th></tr></thead>
+                                <tbody>
+                                    ${defects.map((defect) => `
+                                        <tr>
+                                            <td>${escapeHtml(defect.service_name || '-')}</td>
+                                            <td>${escapeHtml(defect.defect_quantity || 0)}</td>
+                                            <td>${escapeHtml(defect.defect_weight_kg || 0)}</td>
+                                            <td>${escapeHtml(defect.defect_units || 0)}</td>
+                                            <td>${escapeHtml(getDispositionLabel(defect.disposition))}</td>
+                                            <td>${escapeHtml(defect.defect_recorded_by_name || '-')}</td>
+                                            <td>${escapeHtml(formatDateTime(defect.defect_recorded_at || ''))}</td>
+                                            <td>${escapeHtml(defect.notes || '-')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     `}
                 </div>
+
                 <div class="detail-section">
                     <h4>二次篩選生產記錄</h4>
                     ${productionRecords.length === 0 ? '<p class="text-muted">目前尚無二次篩選生產記錄。</p>' : `
-                        <table class="data-table compact">
-                            <thead><tr><th>卡號/桶號</th><th>重量(kg)</th><th>日期</th><th>時間</th><th>機台</th><th>載具</th><th>載具重(kg)</th><th>記錄人員</th><th>備註</th></tr></thead>
-                            <tbody>
-                                ${productionRecords.map((record) => `
-                                    <tr>
-                                        <td>${escapeHtml(record.card_number || '-')}</td>
-                                        <td>${escapeHtml(record.weight_kg ?? '-')}</td>
-                                        <td>${escapeHtml(record.production_date || '-')}</td>
-                                        <td>${escapeHtml(record.production_time || '-')}</td>
-                                        <td>${escapeHtml(record.machine_name || record.machine_type || '-')}</td>
-                                        <td>${escapeHtml(record.tool_name || '-')}</td>
-                                        <td>${escapeHtml(record.tool_weight_kg ?? '-')}</td>
-                                        <td>${escapeHtml(record.employee_name || '-')}</td>
-                                        <td>${escapeHtml(record.notes || '-')}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                        <div class="table-responsive">
+                            <table class="data-table compact">
+                                <thead><tr><th>卡號/桶號</th><th>重量(kg)</th><th>日期</th><th>時間</th><th>機台</th><th>載具</th><th>載具重(kg)</th><th>記錄人員</th><th>備註</th></tr></thead>
+                                <tbody>
+                                    ${productionRecords.map((record) => `
+                                        <tr>
+                                            <td>${escapeHtml(record.card_number || '-')}</td>
+                                            <td>${escapeHtml(record.weight_kg ?? '-')}</td>
+                                            <td>${escapeHtml(record.production_date || '-')}</td>
+                                            <td>${escapeHtml(record.production_time || '-')}</td>
+                                            <td>${escapeHtml(record.machine_name || record.machine_type || '-')}</td>
+                                            <td>${escapeHtml(record.tool_name || '-')}</td>
+                                            <td>${escapeHtml(record.tool_weight_kg ?? '-')}</td>
+                                            <td>${escapeHtml(record.employee_name || '-')}</td>
+                                            <td>${escapeHtml(record.notes || '-')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     `}
                 </div>
             `;
@@ -908,6 +898,15 @@
             const action = button.dataset.action;
             if (action === 'close-modal' || action === 'cancel') {
                 closeModal();
+            } else if (action === 'toggle-rescreen-section') {
+                const target = String(button.dataset.target || '').trim();
+                if (!target) {
+                    return;
+                }
+                toggleSectionBody(
+                    button,
+                    elements.modal?.querySelector(`[data-rescreen-section-body="${target}"]`)
+                );
             } else if (action === 'close-detail-modal') {
                 closeDetailModal();
             } else if (action === 'edit-from-detail' && state.viewingId) {
@@ -946,6 +945,7 @@
             elements.modalForm?.querySelector('[name="source_return_order_id"]')?.addEventListener('change', (event) => {
                 loadReturnOrderSummary(event.target.value);
             });
+            elements.modalForm?.querySelector('[name="source_work_order_id"]')?.addEventListener('change', async (event) => buildDefectEditorRows(buildDefaultDefectRowsFromWorkOrder(await loadWorkOrderSourceSummary(event.target.value))));
             container.addEventListener('module:context', (event) => {
                 applyContext(event.detail?.context || null).catch((error) => {
                     console.error('rescreen_batches: applyContext failed', error);
@@ -985,6 +985,7 @@
 
         attachEvents();
         loadCustomers();
+        loadWorkOrdersForSelect();
         loadReturnOrdersForSelect();
         applyContext(initialContext).then(() => {
             if (!getContextFilterPatch(initialContext)) {

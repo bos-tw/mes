@@ -1,5 +1,5 @@
 <div class="modal-overlay hidden" data-rescreen-batches-modal>
-    <div class="modal-window large">
+    <div class="modal-window large rescreen-batches-modal">
         <button type="button" class="modal-close" data-action="close-modal" aria-label="關閉">
             <i class="fas fa-times"></i>
         </button>
@@ -8,122 +8,309 @@
 
         <form data-rescreen-batches-form novalidate>
             <input type="hidden" name="id">
-            <input type="hidden" name="source_work_order_id">
             <input type="hidden" name="source_defect_history_record_id">
-            <div class="form-row">
-                <section class="form-section">
-                    <h4>來源與類型</h4>
-                    <div class="form-grid">
-                        <label class="inline-label">
-                            <span>來源退貨單</span>
-                            <select name="source_return_order_id">
-                                <option value="">-- 請選擇退貨單 --</option>
-                            </select>
-                        </label>
-                        <label class="inline-label">
-                            <span>案件類型 <abbr title="必填">*</abbr></span>
-                            <select name="rescreen_type" required>
-                                <option value="strict_rescreen">嚴格二篩</option>
-                                <option value="relaxed_rescreen">放寬二篩</option>
-                            </select>
-                        </label>
-                        <label class="inline-label">
-                            <span>二次篩選原因 <abbr title="必填">*</abbr></span>
-                            <input type="text" name="second_screening_reason" maxlength="255" required placeholder="請輸入本次二次篩選原因">
-                        </label>
-                        <label class="inline-label">
-                            <span>案件狀態</span>
-                            <select name="status">
-                                <option value="draft">草稿</option>
-                                <option value="planned">已排程</option>
-                                <option value="in_progress">進行中</option>
-                                <option value="completed">已完成</option>
-                                <option value="cancelled">已取消</option>
-                            </select>
-                        </label>
+            <section class="form-section rescreen-source-section rescreen-batches-collapsible-section" data-collapsible-section>
+                <header class="subsection-header">
+                    <div class="rescreen-section-title">
+                        <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-rescreen-section" data-target="source-summary" title="展開/收合">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <h4>來源追溯資料</h4>
+                    </div>
+                </header>
+                <div class="subsection-body" data-rescreen-section-body="source-summary">
+                    <p class="text-muted small rescreen-section-helper">建立二次篩選前，先確認原始工單與必要追溯來源。</p>
+                    <div class="rescreen-source-summary-grid" data-rescreen-source-summary>
+                        <p class="rescreen-source-empty-state">請先選擇退貨單，或從生產工單建立二次篩選。</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="rescreen-batches-modal-body">
+                <div class="form-row">
+                    <section class="form-section rescreen-batches-collapsible-section" data-collapsible-section>
+                        <header class="subsection-header">
+                            <div class="rescreen-section-title">
+                                <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-rescreen-section" data-target="source-type" title="展開/收合">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                                <h4>案件設定</h4>
+                            </div>
+                        </header>
+                        <div class="subsection-body" data-rescreen-section-body="source-type">
+                            <div class="form-grid">
+                            <label class="inline-label" data-source-context-field>
+                                <span>建立入口</span>
+                                <input type="text" data-source-context-label readonly class="readonly-field" value="工單來源">
+                            </label>
+                            <label class="inline-label">
+                                <span>原始工單 <abbr title="必填">*</abbr></span>
+                                <select name="source_work_order_id" required>
+                                    <option value="">-- 請選擇原始工單 --</option>
+                                </select>
+                            </label>
+                            <label class="inline-label">
+                                <span>退貨追溯來源</span>
+                                <select name="source_return_order_id">
+                                    <option value="">-- 無退貨追溯來源 --</option>
+                                </select>
+                            </label>
+                            <label class="inline-label">
+                                <span>二次篩選標準型態 <abbr title="必填">*</abbr></span>
+                                <select name="rescreen_type" required>
+                                    <option value="strict_rescreen">嚴格二篩</option>
+                                    <option value="relaxed_rescreen">放寬二篩</option>
+                                </select>
+                            </label>
+                            <label class="inline-label">
+                                <span>二次篩選原因 <abbr title="必填">*</abbr></span>
+                                <input type="text" name="second_screening_reason" maxlength="255" required placeholder="請輸入本次二次篩選原因">
+                            </label>
+                            <label class="inline-label">
+                                <span>案件狀態</span>
+                                <select name="status">
+                                    <option value="draft">草稿</option>
+                                    <option value="planned">已排程</option>
+                                    <option value="in_progress">進行中</option>
+                                    <option value="completed">已完成</option>
+                                    <option value="cancelled">已取消</option>
+                                </select>
+                            </label>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="form-section rescreen-batches-collapsible-section" data-collapsible-section>
+                        <header class="subsection-header">
+                            <div class="rescreen-section-title">
+                                <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-rescreen-section" data-target="evidence-notes" title="展開/收合">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                                <h4>佐證與備註</h4>
+                            </div>
+                        </header>
+                        <div class="subsection-body" data-rescreen-section-body="evidence-notes">
+                            <div class="form-grid">
+                            <label class="inline-label full-width">
+                                <span>客戶通知 / 標準佐證</span>
+                                <textarea name="customer_approval_reference" rows="2" placeholder="例如：客戶 Email、LINE 通知、放寬後標準或每批二篩要求"></textarea>
+                            </label>
+                            <label class="inline-label full-width">
+                                <span>備註</span>
+                                <textarea name="notes" rows="3" placeholder="補充這次二次篩選的背景、交辦事項或追蹤重點"></textarea>
+                            </label>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <section class="form-section rescreen-batches-collapsible-section" data-collapsible-section>
+                    <header class="subsection-header">
+                        <div class="rescreen-section-title">
+                            <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-rescreen-section" data-target="execution-schedule" title="展開/收合">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <h4>生產排程</h4>
+                        </div>
+                    </header>
+                    <div class="subsection-body" data-rescreen-section-body="execution-schedule">
+                        <div class="form-grid">
+                            <label class="inline-label">
+                                <span>預定開始日期</span>
+                                <input type="datetime-local" name="scheduled_start_date">
+                            </label>
+                            <label class="inline-label">
+                                <span>預定完成日期</span>
+                                <input type="datetime-local" name="scheduled_end_date">
+                            </label>
+                            <label class="inline-label">
+                                <span>實際開始日期</span>
+                                <input type="datetime-local" name="actual_start_date">
+                            </label>
+                            <label class="inline-label">
+                                <span>實際完成日期</span>
+                                <input type="datetime-local" name="actual_end_date">
+                            </label>
+                            <label class="inline-label">
+                                <span>指派員工</span>
+                                <select name="assigned_employee_id" data-rescreen-employee-select>
+                                    <option value="">-- 請選擇 --</option>
+                                </select>
+                            </label>
+                            <label class="inline-label">
+                                <span>校機人員</span>
+                                <select name="calibration_employee_id" data-rescreen-employee-select>
+                                    <option value="">-- 請選擇 --</option>
+                                </select>
+                            </label>
+                            <label class="inline-label">
+                                <span>機台</span>
+                                <select name="machine_id" data-rescreen-machine-select>
+                                    <option value="">-- 請選擇 --</option>
+                                </select>
+                            </label>
+                            <label class="inline-label">
+                                <span>預計處理數量</span>
+                                <input type="number" name="quantity_to_produce" min="0" step="0.01">
+                            </label>
+                            <label class="inline-label">
+                                <span>篩選速度</span>
+                                <input type="text" name="screening_speed" maxlength="50" placeholder="例如: 300支/分">
+                            </label>
+                        </div>
                     </div>
                 </section>
 
-                <section class="form-section">
-                    <h4>佐證與備註</h4>
-                    <div class="form-grid">
-                        <label class="inline-label full-width">
-                            <span>客戶通知 / 標準佐證</span>
-                            <textarea name="customer_approval_reference" rows="2" placeholder="例如：客戶 Email、LINE 通知、放寬後標準或每批二篩要求"></textarea>
+                <section class="form-section rescreen-batches-collapsible-section" data-collapsible-section>
+                    <header class="subsection-header">
+                        <div class="rescreen-section-title">
+                            <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-rescreen-section" data-target="first-piece" title="展開/收合">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <h4>首件尺寸檢驗 (mm)</h4>
+                        </div>
+                    </header>
+                    <div class="subsection-body" data-rescreen-section-body="first-piece">
+                        <div class="form-grid">
+                            <label class="inline-label">
+                                <span>量測時間</span>
+                                <input type="datetime-local" name="first_piece_measured_at">
+                            </label>
+                            <label class="inline-label">
+                                <span>量測人員</span>
+                                <select name="first_piece_measured_by_employee_id" data-rescreen-employee-select>
+                                    <option value="">-- 請選擇 --</option>
+                                </select>
+                            </label>
+                            <label class="inline-label"><span>頭高</span><input type="number" name="first_piece_head_height" min="0" step="0.001"></label>
+                            <label class="inline-label"><span>頭寬</span><input type="number" name="first_piece_head_width" min="0" step="0.001"></label>
+                            <label class="inline-label"><span>長度</span><input type="number" name="first_piece_length" min="0" step="0.001"></label>
+                            <label class="inline-label"><span>牙外徑</span><input type="number" name="first_piece_thread_outer_diameter" min="0" step="0.001"></label>
+                            <label class="inline-label"><span>華司徑</span><input type="number" name="first_piece_washer_diameter" min="0" step="0.001"></label>
+                            <label class="inline-label"><span>外徑</span><input type="number" name="first_piece_outer_diameter" min="0" step="0.001"></label>
+                            <label class="inline-label"><span>孔徑</span><input type="number" name="first_piece_hole_diameter" min="0" step="0.001"></label>
+                            <label class="inline-label"><span>厚度</span><input type="number" name="first_piece_thickness" min="0" step="0.001"></label>
+                            <label class="inline-label full-width">
+                                <span>首件備註</span>
+                                <textarea name="first_piece_notes" rows="2"></textarea>
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section rescreen-batches-collapsible-section" data-collapsible-section>
+                    <header class="subsection-header">
+                        <div class="rescreen-section-title">
+                            <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-rescreen-section" data-target="execution-result" title="展開/收合">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <h4>二篩執行結果</h4>
+                        </div>
+                    </header>
+                    <div class="subsection-body" data-rescreen-section-body="execution-result">
+                        <div class="form-grid">
+                        <label class="inline-label">
+                            <span>開始時間</span>
+                            <input type="datetime-local" name="started_at" readonly>
                         </label>
-                        <label class="inline-label full-width">
-                            <span>備註</span>
-                            <textarea name="notes" rows="3" placeholder="補充這次二次篩選的背景、交辦事項或追蹤重點"></textarea>
+                        <label class="inline-label">
+                            <span>完成時間</span>
+                            <input type="datetime-local" name="completed_at" readonly>
                         </label>
+                        <label class="inline-label">
+                            <span>良品數</span>
+                            <input type="number" name="rescreen_output_good_units" min="0" step="0.01" placeholder="0" readonly>
+                        </label>
+                        <label class="inline-label">
+                            <span>再次不良數</span>
+                            <input type="number" name="rescreen_output_defect_units" min="0" step="0.01" placeholder="0" readonly>
+                        </label>
+                        <label class="inline-label">
+                            <span>報廢 / 其他處置數</span>
+                            <input type="number" name="rescreen_output_scrap_units" min="0" step="0.01" placeholder="0" readonly>
+                        </label>
+                        </div>
+                        <p class="text-muted">以上摘要會依二次篩分服務明細與生產記錄自動計算，儲存後同步更新。</p>
+                    </div>
+                </section>
+
+                <section class="form-section rescreen-batches-collapsible-section" data-collapsible-section>
+                    <header class="subsection-header">
+                        <div class="rescreen-section-title">
+                            <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-rescreen-section" data-target="defect-detail" title="展開/收合">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <h4>二次篩分服務不良明細</h4>
+                        </div>
+                    </header>
+                    <div class="subsection-body" data-rescreen-section-body="defect-detail">
+                        <div data-rescreen-defect-editor></div>
+                    </div>
+                </section>
+
+                <section class="form-section rescreen-batches-collapsible-section" data-collapsible-section>
+                    <header class="subsection-header">
+                        <div class="rescreen-section-title">
+                            <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-rescreen-section" data-target="production-records" title="展開/收合">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <h4>二次篩選生產記錄</h4>
+                        </div>
+                        <div class="subsection-actions">
+                            <button type="button" class="btn outline small" data-action="add-production-record">新增一筆</button>
+                        </div>
+                    </header>
+                    <div class="subsection-body" data-rescreen-section-body="production-records">
+                        <div data-rescreen-production-editor></div>
+                    </div>
+                </section>
+
+                <section class="form-section rescreen-batches-collapsible-section" data-collapsible-section>
+                    <header class="subsection-header">
+                        <div class="rescreen-section-title">
+                            <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-rescreen-section" data-target="site-images" title="展開/收合">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <h4>現場圖片回傳</h4>
+                        </div>
+                    </header>
+                    <div class="subsection-body" data-rescreen-section-body="site-images">
+                        <div class="rescreen-image-upload-panel" data-rescreen-image-panel>
+                            <p class="text-muted small" data-rescreen-image-hint>儲存案件後即可上傳現場圖片。</p>
+                            <div class="form-grid">
+                                <label class="inline-label">
+                                    <span>圖片類型</span>
+                                    <select data-rescreen-image-type>
+                                        <option value="site">現場照片</option>
+                                        <option value="completion">完工照片</option>
+                                        <option value="defect">不良照片</option>
+                                        <option value="tool_condition">載具 / 模具狀態</option>
+                                    </select>
+                                </label>
+                                <label class="inline-label">
+                                    <span>圖片說明</span>
+                                    <input type="text" data-rescreen-image-description maxlength="255">
+                                </label>
+                                <label class="inline-label full-width">
+                                    <span>選擇圖片</span>
+                                    <input type="file" accept="image/*" data-rescreen-image-file>
+                                </label>
+                            </div>
+                            <div class="form-actions align-right">
+                                <button type="button" class="btn outline small" data-action="upload-rescreen-image">上傳圖片</button>
+                            </div>
+                            <div data-rescreen-image-list></div>
+                        </div>
                     </div>
                 </section>
             </div>
 
-            <section class="form-section">
-                <h4>來源摘要</h4>
-                <div class="detail-grid" data-rescreen-source-summary>
-                    <p class="text-muted">請先選擇退貨單，或從生產工單建立二次篩選。</p>
+            <div class="rescreen-batches-modal-footer">
+                <div class="form-actions align-right">
+                    <button type="button" class="btn outline" data-action="cancel">取消</button>
+                    <button type="submit" class="btn primary">儲存</button>
                 </div>
-            </section>
-
-            <section class="form-section">
-                <h4>二篩執行結果</h4>
-                <div class="form-grid">
-                    <label class="inline-label">
-                        <span>開始時間</span>
-                        <input type="datetime-local" name="started_at" readonly>
-                    </label>
-                    <label class="inline-label">
-                        <span>完成時間</span>
-                        <input type="datetime-local" name="completed_at" readonly>
-                    </label>
-                    <label class="inline-label">
-                        <span>良品數</span>
-                        <input type="number" name="rescreen_output_good_units" min="0" step="0.01" placeholder="0" readonly>
-                    </label>
-                    <label class="inline-label">
-                        <span>再次不良數</span>
-                        <input type="number" name="rescreen_output_defect_units" min="0" step="0.01" placeholder="0" readonly>
-                    </label>
-                    <label class="inline-label">
-                        <span>報廢 / 其他處置數</span>
-                        <input type="number" name="rescreen_output_scrap_units" min="0" step="0.01" placeholder="0" readonly>
-                    </label>
-                </div>
-                <p class="text-muted">以上摘要會依二次篩分服務明細與生產記錄自動計算，儲存後同步更新。</p>
-            </section>
-
-            <section class="form-section">
-                <h4>二次篩分服務不良明細</h4>
-                <div data-rescreen-defect-editor></div>
-            </section>
-
-            <section class="form-section">
-                <div class="form-section-heading">
-                    <h4>二次篩選生產記錄</h4>
-                    <button type="button" class="btn outline small" data-action="add-production-record">新增一筆</button>
-                </div>
-                <div data-rescreen-production-editor></div>
-            </section>
-
-            <div class="form-actions align-right">
-                <button type="button" class="btn outline" data-action="cancel">取消</button>
-                <button type="submit" class="btn primary">儲存</button>
             </div>
         </form>
-    </div>
-</div>
-
-<div class="modal-overlay hidden" data-rescreen-batches-detail-modal>
-    <div class="modal-window xlarge">
-        <button type="button" class="modal-close" data-action="close-detail-modal" aria-label="關閉">
-            <i class="fas fa-times"></i>
-        </button>
-        <h3><i class="fas fa-redo"></i> 二次篩選歷史詳情</h3>
-        <div class="detail-content" data-rescreen-batches-detail></div>
-        <div class="form-actions align-right">
-            <button type="button" class="btn outline" data-action="close-detail-modal">關閉</button>
-            <button type="button" class="btn primary" data-action="edit-from-detail">編輯</button>
-        </div>
     </div>
 </div>

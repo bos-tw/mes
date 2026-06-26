@@ -32,18 +32,16 @@ $workOrderId = filter_var(
     FILTER_VALIDATE_INT,
     ['options' => ['min_range' => 1]]
 );
-if ($returnOrderId === false && $workOrderId === false) {
-    jsonResponse(['success' => false, 'message' => '請選擇來源退貨單或來源生產工單。'], 400);
+if ($workOrderId === false) {
+    jsonResponse(['success' => false, 'message' => '請選擇原始工單；退貨單僅可作為選填追溯來源。'], 400);
 }
 
 try {
     $pdo->beginTransaction();
+    $batch = createRescreenBatchFromWorkOrder($pdo, (int)$workOrderId, $payload, $currentEmployee);
+    $sourceAudit = ['source_work_order_id' => (int)$workOrderId];
     if ($returnOrderId !== false) {
-        $batch = createRescreenBatchFromReturnOrder($pdo, (int)$returnOrderId, $payload, $currentEmployee);
-        $sourceAudit = ['source_return_order_id' => (int)$returnOrderId];
-    } else {
-        $batch = createRescreenBatchFromWorkOrder($pdo, (int)$workOrderId, $payload, $currentEmployee);
-        $sourceAudit = ['source_work_order_id' => (int)$workOrderId];
+        $sourceAudit['source_return_order_id'] = (int)$returnOrderId;
     }
     logAuditAction('Create rescreen batch', 'rescreen_batches', (int)($batch['id'] ?? 0), [
         ...$sourceAudit,

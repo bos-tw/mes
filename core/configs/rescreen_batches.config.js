@@ -77,8 +77,10 @@ ModuleConfig.register('rescreen_batches', {
     ],
 
     detailModal: {
-        title: '二次篩選詳情',
+        title: '二次篩選歷史詳情',
         icon: 'fa-redo',
-        hasEdit: true
+        hasEdit: true,
+        size: 'xlarge',
+        contentDataAttr: 'data-rescreen-batches-detail'
     }
 });

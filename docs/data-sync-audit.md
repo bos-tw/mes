@@ -1,13 +1,13 @@
 # DataSync 稽核報告
 
-產生時間：2026-06-25T05:37:09.634Z
+產生時間：2026-06-26T16:08:14.054Z
 
 ## 摘要
 
 - P0: 0
 - P1: 0
 - P2: 10
-- 通過：38
+- 通過：40
 - 相依來源數：39
 - 狀態型介面刷新檢查數：36
 
@@ -36,6 +36,7 @@
 | OK | employee_roles | employee_roles | POST, DELETE | (helper) | employees, roles | employees, roles | - |
 | OK | employees | employees | DELETE | (helper) | work_orders, orders, calendar_event_participants, calendar_event_reminders, work_order_first_piece_dimensions, messages, notifications, employee_roles, daily_machine_inspections, daily_machine_inspection_items, machine_maintenance_tasks, production_records, quality_issue_reports, shipping_quality_inspections | companies, departments, employee_roles, lookup_values | - |
 | OK | inventory_items | inventory_items | POST, PUT, DELETE | inventory_items, shipping_orders, work_orders | work_orders, inventory_transactions, shipping_orders, shipping_order_items | order_items, rescreen_batches, return_orders, screening_items, shipping_order_items, shipping_orders, suppliers, work_orders | - |
+| OK | inventory_items_source_chain | - | - | - | - | - | - |
 | OK | inventory_transactions | inventory_transactions | - | - | - | inventory_items, return_orders, shipping_order_items, shipping_orders, work_orders | - |
 | OK | lookup_domains | lookup_domains | DELETE | (helper) | lookup_values | - | - |
 | OK | lookup_values | lookup_values | - | - | orders, customers, suppliers, employees, work_orders, screening_items | lookup_domains | - |
@@ -50,6 +51,7 @@
 | OK | production_records | production_records | - | - | defect_history_records | employees, machines, work_orders | - |
 | OK | quality_issue_reports | quality_issue_reports | DELETE | (helper) | dashboard | departments, employees | - |
 | OK | rescreen_batches | rescreen_batches | - | (helper) | return_orders, work_orders, inventory_items, defect_history_records | customers, return_orders, work_orders | - |
+| OK | rescreen_batches_execution | - | - | rescreen_batches | - | - | - |
 | OK | return_orders | return_orders | DELETE | (helper) | inventory_items, inventory_transactions, shipping_orders, shipping_order_items, rescreen_batches | customers, rescreen_batches, shipping_order_items, shipping_orders | - |
 | OK | role_permissions | role_permissions | PUT | (helper) | roles, permissions | permissions, roles | - |
 | OK | roles | roles | DELETE | (helper) | notifications, employee_roles, role_permissions | employee_roles, role_permissions | - |
