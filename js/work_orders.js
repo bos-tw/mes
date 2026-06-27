@@ -335,6 +335,7 @@
         attachEventListeners();
         setupMirroredFormFields(elements.createModalForm, ['machine_id', 'assigned_employee_id', 'calibration_employee_id']);
         setupMirroredFormFields(elements.editModalForm, ['machine_id', 'assigned_employee_id', 'calibration_employee_id']);
+        enhanceScheduleSearchableSelects();
         syncMachinePickerFields();
     }
 
@@ -355,9 +356,11 @@
                     fields.forEach((target) => {
                         if (target !== field && target.value !== value) {
                             target.value = value;
+                            refreshSearchableSelect(target);
                             syncMachinePickerField(target.closest('[data-primary-machine-field]'));
                         }
                     });
+                    refreshSearchableSelect(field);
                     syncMachinePickerField(field.closest('[data-primary-machine-field]'));
                 });
             });
@@ -381,6 +384,129 @@
 
     function syncMachinePickerFields(scope = moduleRoot) {
         scope.querySelectorAll('[data-primary-machine-field]').forEach(syncMachinePickerField);
+    }
+
+    function getSearchableSelectLabel(select) {
+        if (!select || !select.value) {
+            return '';
+        }
+        return select.options[select.selectedIndex]?.textContent?.trim() || '';
+    }
+
+    function refreshSearchableSelect(select) {
+        const widget = select?.nextElementSibling?.classList?.contains('searchable-select')
+            ? select.nextElementSibling
+            : select?.parentElement?.querySelector(`.searchable-select[data-select-name="${select.name}"]`);
+        if (!widget) {
+            return;
+        }
+        const input = widget.querySelector('[data-searchable-select-input]');
+        if (input) {
+            input.value = getSearchableSelectLabel(select);
+            input.placeholder = '-- 請選擇 --';
+        }
+    }
+
+    function renderSearchableSelectOptions(select, widget, keyword = '') {
+        const list = widget.querySelector('[data-searchable-select-list]');
+        if (!list) {
+            return;
+        }
+        const normalizedKeyword = keyword.trim().toLowerCase();
+        const options = Array.from(select.options).filter((option) => {
+            const label = option.textContent.trim();
+            if (option.value === '') {
+                return normalizedKeyword === '';
+            }
+            return label.toLowerCase().includes(normalizedKeyword);
+        });
+
+        if (options.length === 0) {
+            list.innerHTML = '<button type="button" class="searchable-select-option empty" disabled>查無選項</button>';
+            return;
+        }
+
+        list.innerHTML = options.map((option) => `
+            <button type="button"
+                    class="searchable-select-option${option.value === select.value ? ' selected' : ''}"
+                    data-value="${escapeHtml(option.value)}">
+                ${escapeHtml(option.textContent.trim() || '-- 請選擇 --')}
+            </button>
+        `).join('');
+    }
+
+    function closeSearchableSelects(exceptWidget = null) {
+        moduleRoot.querySelectorAll('.searchable-select.open').forEach((widget) => {
+            if (widget !== exceptWidget) {
+                widget.classList.remove('open');
+            }
+        });
+    }
+
+    function openSearchableSelect(select, widget, keyword = '') {
+        closeSearchableSelects(widget);
+        renderSearchableSelectOptions(select, widget, keyword);
+        widget.classList.add('open');
+    }
+
+    function enhanceSearchableSelect(select) {
+        if (!select || select.dataset.searchableEnhanced === 'true') {
+            return;
+        }
+        select.dataset.searchableEnhanced = 'true';
+        select.classList.add('searchable-select-native');
+
+        const widget = document.createElement('div');
+        widget.className = 'searchable-select';
+        widget.dataset.selectName = select.name;
+        widget.innerHTML = `
+            <div class="searchable-select-control">
+                <input type="text" data-searchable-select-input placeholder="-- 請選擇 --" autocomplete="off">
+                <button type="button" class="searchable-select-arrow" data-searchable-select-toggle aria-label="展開選單">
+                    <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="searchable-select-list" data-searchable-select-list></div>
+        `;
+        select.insertAdjacentElement('afterend', widget);
+
+        const input = widget.querySelector('[data-searchable-select-input]');
+        const toggle = widget.querySelector('[data-searchable-select-toggle]');
+        refreshSearchableSelect(select);
+
+        input.addEventListener('focus', () => openSearchableSelect(select, widget, input.value));
+        input.addEventListener('input', () => openSearchableSelect(select, widget, input.value));
+        toggle.addEventListener('click', () => {
+            if (widget.classList.contains('open')) {
+                widget.classList.remove('open');
+                return;
+            }
+            input.focus();
+            openSearchableSelect(select, widget, '');
+        });
+        widget.addEventListener('click', (event) => {
+            const optionButton = event.target.closest('[data-value]');
+            if (!optionButton) {
+                return;
+            }
+            select.value = optionButton.dataset.value || '';
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            refreshSearchableSelect(select);
+            widget.classList.remove('open');
+        });
+        select.addEventListener('change', () => refreshSearchableSelect(select));
+    }
+
+    function enhanceScheduleSearchableSelects(scope = moduleRoot) {
+        const selectors = [
+            '.work-order-edit-schedule-grid select[name="assigned_employee_id"]',
+            '.work-order-edit-schedule-grid select[name="calibration_employee_id"]',
+            '.work-order-edit-schedule-grid select[name="machine_id"]',
+            '[data-work-orders-create-form] select[name="assigned_employee_id"]',
+            '[data-work-orders-create-form] select[name="calibration_employee_id"]',
+            '[data-work-orders-create-form] [data-primary-machine-field] select[name="machine_id"]'
+        ];
+        scope.querySelectorAll(selectors.join(',')).forEach(enhanceSearchableSelect);
     }
 
     // 輔助函數: 星期顯示
@@ -934,6 +1060,44 @@
             const isActive = tab.getAttribute('data-mode') === activeMode;
             tab.classList.toggle('active', isActive);
             tab.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+    }
+
+    function switchExecutionImageTab(tabName = 'completion', scope = null) {
+        const section = scope?.closest('[data-edit-execution-images-section], [data-create-execution-images-section]')
+            || elements.editModalForm?.querySelector('[data-edit-execution-images-section]')
+            || elements.createModalForm?.querySelector('[data-create-execution-images-section]');
+        if (!section) {
+            return;
+        }
+
+        section.querySelectorAll('[data-action="switch-execution-image-tab"]').forEach((tab) => {
+            const isActive = tab.getAttribute('data-image-tab') === tabName;
+            tab.classList.toggle('active', isActive);
+            tab.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+
+        section.querySelectorAll('[data-execution-image-panel]').forEach((panel) => {
+            panel.classList.toggle('active', panel.getAttribute('data-execution-image-panel') === tabName);
+        });
+    }
+
+    function switchScreeningStage(stage = 'primary', scope = null) {
+        const form = scope?.closest('[data-work-orders-create-form], [data-work-orders-edit-form]')
+            || elements.editModalForm
+            || elements.createModalForm;
+        if (!form) {
+            return;
+        }
+
+        form.querySelectorAll('[data-action="switch-screening-stage"]').forEach((tab) => {
+            const isActive = tab.getAttribute('data-screening-stage') === stage;
+            tab.classList.toggle('active', isActive);
+            tab.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+
+        form.querySelectorAll('[data-screening-stage-panel]').forEach((panel) => {
+            panel.classList.toggle('active', panel.getAttribute('data-screening-stage-panel') === stage);
         });
     }
 
@@ -2307,6 +2471,21 @@
                     await openPrimaryMachinePicker(elements.createModalForm);
                     return;
                 }
+                const executionImagesToggleButton = e.target.closest('[data-action="toggle-execution-images-section"]');
+                if (executionImagesToggleButton) {
+                    toggleSectionBody(executionImagesToggleButton, elements.createModalForm.querySelector('[data-create-execution-images-section]'));
+                    return;
+                }
+                const scheduleToggleButton = e.target.closest('[data-action="toggle-schedule-section"]');
+                if (scheduleToggleButton) {
+                    toggleSectionBody(scheduleToggleButton, elements.createModalForm.querySelector('[data-create-schedule-section]'));
+                    return;
+                }
+                const productionRecordsToggleButton = e.target.closest('[data-action="toggle-production-records-section"]');
+                if (productionRecordsToggleButton) {
+                    toggleSectionBody(productionRecordsToggleButton, elements.createModalForm.querySelector('[data-create-production-records-section]'));
+                    return;
+                }
                 const typeSwitchButton = e.target.closest('[data-action="set-work-order-type"]');
                 if (typeSwitchButton) {
                     setWorkOrderType(elements.createModalForm, typeSwitchButton.dataset.value || 'normal');
@@ -2556,6 +2735,15 @@
                     openSecondScreeningFromEditSummary(secondScreeningSummaryButton);
                     return;
                 }
+                if (e.target.closest('[data-action="cancel-inline-second-screening"]')) {
+                    renderEditSecondScreeningSummary(state.currentWorkOrder || {});
+                    return;
+                }
+                const submitInlineSecondScreeningButton = e.target.closest('[data-action="submit-inline-second-screening"]');
+                if (submitInlineSecondScreeningButton) {
+                    await submitInlineSecondScreening(submitInlineSecondScreeningButton);
+                    return;
+                }
                 if (e.target.closest('[data-action="view-partial-receipt-inventory"]')) {
                     openInventoryItemDetail(e.target.closest('[data-action="view-partial-receipt-inventory"]')?.dataset.inventoryId);
                     return;
@@ -2664,6 +2852,16 @@
         if (elements.editToolConditionImagesRows) {
             elements.editToolConditionImagesRows.addEventListener('click', handleImageAction);
         }
+        moduleRoot.querySelectorAll('[data-action="switch-execution-image-tab"]').forEach((button) => {
+            button.addEventListener('click', () => {
+                switchExecutionImageTab(button.getAttribute('data-image-tab') || 'completion', button);
+            });
+        });
+        moduleRoot.querySelectorAll('[data-action="switch-screening-stage"]').forEach((button) => {
+            button.addEventListener('click', () => {
+                switchScreeningStage(button.getAttribute('data-screening-stage') || 'primary', button);
+            });
+        });
         if (elements.mobileQuickEntryOpenButton) {
             elements.mobileQuickEntryOpenButton.addEventListener('click', openMobileQuickEntry);
         }
@@ -2672,6 +2870,11 @@
                 copyMobileQuickEntry();
             });
         }
+        document.addEventListener('click', (event) => {
+            if (!moduleRoot.contains(event.target) || !event.target.closest('.searchable-select')) {
+                closeSearchableSelects();
+            }
+        });
 
         // Table row actions
         if (elements.tbody) {
@@ -4399,15 +4602,14 @@
     }
 
     function openSecondScreeningFromEditSummary(button) {
-        if (typeof window.openTab !== 'function') {
-            showAlert('無法開啟二次篩選模組。', 'warning');
-            return;
-        }
-
         const mode = button?.dataset.mode || 'create';
         const batchId = Number.parseInt(button?.dataset.batchId || '', 10);
         const workOrderId = Number.parseInt(String(state.editingId || state.currentWorkOrder?.id || ''), 10);
         if (mode === 'view' && Number.isInteger(batchId) && batchId > 0) {
+            if (typeof window.openTab !== 'function') {
+                showAlert('無法開啟二次篩選模組。', 'warning');
+                return;
+            }
             window.openTab('rescreen_batches', '二次篩選紀錄', 'modules/rescreen_batches.html', {
                 context: {
                     action: 'view',
@@ -4418,18 +4620,181 @@
             return;
         }
 
-        if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
+        showInlineSecondScreeningCreateForm();
+    }
+
+    function showInlineSecondScreeningCreateForm() {
+        const container = elements.editModalForm?.querySelector('[data-work-order-second-screening-summary]');
+        const workOrderId = Number.parseInt(String(state.editingId || state.currentWorkOrder?.id || ''), 10);
+        if (!container || !Number.isInteger(workOrderId) || workOrderId <= 0) {
             showAlert('缺少工單 ID，無法建立二次篩選。', 'warning');
             return;
         }
 
-        window.openTab('rescreen_batches', '二次篩選紀錄', 'modules/rescreen_batches.html', {
-            context: {
-                action: 'create',
-                sourceWorkOrderId: workOrderId,
-                workOrderId,
-            },
+        container.innerHTML = renderInlineSecondScreeningCreateForm();
+        container.querySelectorAll('select[data-rescreen-field]').forEach(enhanceSearchableSelect);
+    }
+
+    function getInlineSecondScreeningSelectOptions(selector) {
+        const source = elements.editModalForm?.querySelector(selector);
+        if (!source) {
+            return '<option value="">-- 請選擇 --</option>';
+        }
+        return Array.from(source.options)
+            .map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.textContent || '')}</option>`)
+            .join('');
+    }
+
+    function renderInlineSecondScreeningCreateForm() {
+        const currentWorkOrder = state.currentWorkOrder || {};
+        const defaultReason = currentWorkOrder.shortage_reason_code === 'defect_rescreen'
+            ? '一次篩分後不良品需二次篩分確認'
+            : '客戶每批要求二次篩選';
+        return `
+            <div class="work-order-inline-rescreen-card" data-inline-second-screening-form>
+                <div class="work-order-inline-rescreen-header">
+                    <div>
+                        <strong>建立二次篩分案件</strong>
+                        <p class="text-muted small">在原工單內建立追蹤案件，儲存後會立即刷新此區塊。</p>
+                    </div>
+                    <button type="button" class="btn ghost small" data-action="cancel-inline-second-screening">取消</button>
+                </div>
+                <div class="form-grid form-grid-three-columns">
+                    <label class="inline-label">
+                        <span>二次篩分類型</span>
+                        <select data-rescreen-field="rescreen_type">
+                            <option value="strict_rescreen">嚴格二篩</option>
+                            <option value="relaxed_rescreen">放寬二篩</option>
+                        </select>
+                    </label>
+                    <label class="inline-label">
+                        <span>預定開始日期</span>
+                        <input type="datetime-local" data-rescreen-field="scheduled_start_date">
+                    </label>
+                    <label class="inline-label">
+                        <span>預定結束日期</span>
+                        <input type="datetime-local" data-rescreen-field="scheduled_end_date">
+                    </label>
+                    <label class="inline-label">
+                        <span>實際開始日期</span>
+                        <input type="datetime-local" data-rescreen-field="actual_start_date">
+                    </label>
+                    <label class="inline-label">
+                        <span>實際結束日期</span>
+                        <input type="datetime-local" data-rescreen-field="actual_end_date">
+                    </label>
+                    <label class="inline-label">
+                        <span>生產數量</span>
+                        <input type="number" min="0" step="0.01" data-rescreen-field="quantity_to_produce">
+                    </label>
+                    <label class="inline-label">
+                        <span>指派員工</span>
+                        <select data-rescreen-field="assigned_employee_id">${getInlineSecondScreeningSelectOptions('[name="assigned_employee_id"]')}</select>
+                    </label>
+                    <label class="inline-label">
+                        <span>校機人員</span>
+                        <select data-rescreen-field="calibration_employee_id">${getInlineSecondScreeningSelectOptions('[name="calibration_employee_id"]')}</select>
+                    </label>
+                    <label class="inline-label">
+                        <span>指定機台</span>
+                        <select data-rescreen-field="machine_id">${getInlineSecondScreeningSelectOptions('[name="machine_id"]')}</select>
+                    </label>
+                    <label class="inline-label">
+                        <span>篩選速度</span>
+                        <input type="text" maxlength="50" placeholder="例如: 300支/分" data-rescreen-field="screening_speed">
+                    </label>
+                    <label class="inline-label full-width">
+                        <span>二次篩分原因 <abbr title="必填">*</abbr></span>
+                        <textarea rows="2" maxlength="500" data-rescreen-field="second_screening_reason">${escapeHtml(defaultReason)}</textarea>
+                    </label>
+                    <label class="inline-label full-width">
+                        <span>放寬佐證 / 客戶同意紀錄</span>
+                        <textarea rows="2" maxlength="500" placeholder="放寬二篩時請填寫客戶同意或佐證資料" data-rescreen-field="customer_approval_reference"></textarea>
+                    </label>
+                    <label class="inline-label full-width">
+                        <span>備註</span>
+                        <textarea rows="2" maxlength="500" data-rescreen-field="notes"></textarea>
+                    </label>
+                </div>
+                <div class="work-order-inline-rescreen-actions">
+                    <button type="button" class="btn outline small" data-action="cancel-inline-second-screening">取消</button>
+                    <button type="button" class="btn primary small" data-action="submit-inline-second-screening">建立二次篩分</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function collectInlineSecondScreeningPayload(container) {
+        const workOrderId = Number.parseInt(String(state.editingId || state.currentWorkOrder?.id || ''), 10);
+        if (!Number.isInteger(workOrderId) || workOrderId <= 0) {
+            throw new Error('缺少工單 ID，無法建立二次篩選。');
+        }
+
+        const payload = {
+            source_work_order_id: workOrderId,
+            status: 'draft',
+        };
+        container.querySelectorAll('[data-rescreen-field]').forEach((field) => {
+            const key = field.getAttribute('data-rescreen-field');
+            if (!key) {
+                return;
+            }
+            const value = String(field.value || '').trim();
+            if (value !== '') {
+                payload[key] = value;
+            }
         });
+
+        if (!payload.second_screening_reason) {
+            throw new Error('請輸入二次篩分原因。');
+        }
+        if (payload.rescreen_type === 'relaxed_rescreen' && !payload.customer_approval_reference) {
+            throw new Error('放寬二篩需填寫客戶同意或佐證資料。');
+        }
+
+        return payload;
+    }
+
+    async function submitInlineSecondScreening(button) {
+        const container = button?.closest('[data-inline-second-screening-form]');
+        if (!container) {
+            return;
+        }
+
+        let payload;
+        try {
+            payload = collectInlineSecondScreeningPayload(container);
+        } catch (error) {
+            showModalAlert('error', error.message || '二次篩分資料不完整。', false, true);
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = '建立中...';
+        try {
+            const response = await fetch('api/rescreen_batches/index.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || '建立二次篩分案件失敗。');
+            }
+
+            showModalAlert('success', result.message || '二次篩分案件已建立。', false, true);
+            if (typeof DataSync !== 'undefined') {
+                DataSync.notifyWithDependencies('rescreen_batches', DataSync.EVENT_TYPES.CREATED, result.data || {});
+            }
+            await loadWorkOrderData(payload.source_work_order_id);
+            loadWorkOrders();
+            switchScreeningStage('secondary', elements.editModalForm);
+        } catch (error) {
+            console.error('Create inline second screening failed:', error);
+            showModalAlert('error', error.message || '建立二次篩分案件時發生錯誤。', false, true);
+            button.disabled = false;
+            button.textContent = '建立二次篩分';
+        }
     }
 
     function handleTableAction(e) {
@@ -5172,11 +5537,7 @@
 
         const count = Number.parseInt(item.second_screening_count, 10) || 0;
         if (count <= 0) {
-            return {
-                label: '建立二篩',
-                reasonLabel: '',
-                title: '從此工單建立二次篩選',
-            };
+            return null;
         }
 
         const reasonLabels = String(item.second_screening_reasons || '')
@@ -5339,7 +5700,7 @@
                 <td class="checkbox-col"><input type="checkbox" data-action="select-row" ${isChecked}></td>
                 <td>${escapeHtml(item.work_order_number)}</td>
                 <td><span class="work-order-type-badge ${workOrderTypeClass}">${escapeHtml(workOrderTypeLabel)}</span></td>
-                <td><button type="button" class="record-link-button" data-action="open-second-screening" title="${escapeHtml(secondScreeningSummary.title)}">${escapeHtml(secondScreeningSummary.label)}</button>${secondScreeningSummary.reasonLabel ? `<span class="text-muted"> ${escapeHtml(secondScreeningSummary.reasonLabel)}</span>` : ''}</td>
+                <td>${secondScreeningSummary ? `<button type="button" class="record-link-button" data-action="open-second-screening" title="${escapeHtml(secondScreeningSummary.title)}">${escapeHtml(secondScreeningSummary.label)}</button>${secondScreeningSummary.reasonLabel ? `<span class="text-muted"> ${escapeHtml(secondScreeningSummary.reasonLabel)}</span>` : ''}` : ''}</td>
                 <td>${escapeHtml(item.order_number || '')}</td>
                 <td>${customerDisplay}</td>
                 <td>${escapeHtml(item.screening_item_name || '')}</td>
@@ -6206,7 +6567,7 @@
         // 訂單預期數據
         const orderTotalWeight = parseFloat(state.orderItemDetails.total_weight_kg) || 0;
         const orderToolQty = parseInt(state.orderItemDetails.tool_quantity) || 0;
-        const orderUnits = parseFloat(state.orderItemDetails.total_units) || 0;
+        const orderUnits = Math.max(Math.round(parseFloat(state.orderItemDetails.total_units) || 0), 0);
         const totalToolWeight = parseFloat(state.orderItemDetails.total_tool_weight) || 0;
         const weightPerUnit = parseFloat(state.orderItemDetails.weight_per_unit_g) || 0; // 產品單重(g)
         const toolStatistics = String(state.orderItemDetails.tool_statistics || '').trim() || '--';
@@ -6249,8 +6610,9 @@
             actualToolWeight = totalToolWeight;
         }
 
+        const hasProductionWeight = totalProductionWeight > 0;
         // 計算實際淨重 = SUM(使用者輸入重量) - 載具總重量（最低為 0）
-        const actualNetWeight = Math.max(totalProductionWeight - actualToolWeight, 0);
+        const actualNetWeightFromRecords = Math.max(totalProductionWeight - actualToolWeight, 0);
 
         // 計算不良品分布支數（人工輸入）
         let totalDefectsDistribution = 0;
@@ -6267,15 +6629,16 @@
             });
         }
 
-        // 重量優先口徑：不良品重量 = 訂單淨重 - 篩分後淨重
-        const defectWeightKg = Math.max(orderNetWeight - actualNetWeight, 0);
-
-        // 良品支數 = (篩分後淨重 * 1000) / 產品單重(g)
-        const goodUnits = weightPerUnit > 0 ? Math.max(Math.floor((actualNetWeight * 1000) / weightPerUnit), 0) : 0;
-
-        // 不良品支數（重量換算）
-        const defectUnits = weightPerUnit > 0 ? Math.max(Math.round((defectWeightKg * 1000) / weightPerUnit), 0) : 0;
-        // 總支數 = 良品支數 + 不良品支數（重量換算）
+        const defectUnits = totalDefectsDistribution;
+        const defectWeightKg = weightPerUnit > 0
+            ? (defectUnits * weightPerUnit) / 1000
+            : Math.max(orderNetWeight - actualNetWeightFromRecords, 0);
+        const displayActualNetWeight = hasProductionWeight
+            ? actualNetWeightFromRecords
+            : Math.max(orderNetWeight - defectWeightKg, 0);
+        const goodUnits = hasProductionWeight && weightPerUnit > 0
+            ? Math.max(Math.floor((displayActualNetWeight * 1000) / weightPerUnit), 0)
+            : Math.max(orderUnits - defectUnits, 0);
         const actualTotalUnits = goodUnits + defectUnits;
 
         // 更新訂單預期
@@ -6286,7 +6649,7 @@
         setMetricValue(`${prefix}order-total-units`, formatNumber(orderUnits));
 
         // 更新實際篩分後
-        setMetricValue(`${prefix}actual-net-weight`, actualNetWeight.toFixed(2)); // 實際淨重 = 輸入重量總和 - 載具總重
+        setMetricValue(`${prefix}actual-net-weight`, displayActualNetWeight.toFixed(2));
         setMetricValue(`${prefix}actual-tool-quantity`, actualToolQty);
         setMetricValue(`${prefix}actual-tool-weight`, actualToolWeight.toFixed(2)); // 載具重量合計
         setMetricValue(`${prefix}good-units`, formatNumber(goodUnits));
@@ -6296,7 +6659,7 @@
 
         const defectMetric = document.querySelector(`[data-metric="${prefix}defect-units"]`);
         if (defectMetric) {
-            defectMetric.title = `分布合計：${formatNumber(totalDefectsDistribution)} 支`;
+            defectMetric.title = '';
         }
 
         if (isEditMode && state.currentWorkOrder) {
@@ -6387,6 +6750,8 @@
         if (selector === '[name="machine_id"]') {
             syncMachinePickerFields();
         }
+        enhanceScheduleSearchableSelects();
+        selects.forEach(refreshSearchableSelect);
     }
 
     function showAlert(message, type = 'info') {

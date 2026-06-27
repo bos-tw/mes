@@ -812,6 +812,9 @@
                 screening_results, summary, chart_data, company, qrcode_url, generated_at,
                 report_description, machine_runs = [] } = data;
         const defectDistributionUnits = Number(summary.defect_units_distribution ?? summary.defect_units ?? 0);
+        const displayTotalUnits = Number(summary.total_units ?? 0);
+        const displayGoodUnits = Math.max(displayTotalUnits - defectDistributionUnits, 0);
+        const displayDefectRate = displayTotalUnits > 0 ? (defectDistributionUnits / displayTotalUnits) * 100 : 0;
 
         let qrUrl = '';
         if (!isPreviewMode && work_order.id > 0) {
@@ -901,19 +904,19 @@
             <!-- 結果摘要 -->
             <div class="summary-section">
                 <div class="summary-card highlight">
-                    <span class="summary-number">${formatNumber(summary.total_units)}</span>
+                    <span class="summary-number">${formatNumber(displayTotalUnits)}</span>
                     <span class="summary-label">總數量<br><small>Total Qty</small></span>
                 </div>
                 <div class="summary-card good">
-                    <span class="summary-number">${formatNumber(summary.good_units)}</span>
+                    <span class="summary-number">${formatNumber(displayGoodUnits)}</span>
                     <span class="summary-label">良品數量<br><small>Good Qty</small></span>
                 </div>
                 <div class="summary-card defect">
-                    <span class="summary-number">${formatNumber(summary.defect_units)}</span>
+                    <span class="summary-number">${formatNumber(defectDistributionUnits)}</span>
                     <span class="summary-label">不良品數量<br><small>Defect Qty</small></span>
                 </div>
                 <div class="summary-card rate">
-                    <span class="summary-number">${summary.defect_rate_percent.toFixed(4)}%</span>
+                    <span class="summary-number">${displayDefectRate.toFixed(4)}%</span>
                     <span class="summary-label">不良率<br><small>Defect Rate</small></span>
                 </div>
             </div>

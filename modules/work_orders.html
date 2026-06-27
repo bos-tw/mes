@@ -311,18 +311,6 @@
                                     <option value="">-- 請選擇 --</option>
                                 </select>
                             </label>
-                            <label class="inline-label" data-primary-machine-field>
-                                <span>指派機台</span>
-                                <div class="machine-picker-combobox">
-                                    <select name="machine_id" class="machine-picker-native">
-                                        <option value="">-- 請選擇 --</option>
-                                    </select>
-                                    <button type="button" class="machine-picker-trigger" data-action="open-machine-picker">
-                                        <span data-machine-picker-label>-- 請選擇 --</span>
-                                        <i class="fas fa-th-large" aria-hidden="true"></i>
-                                    </button>
-                                </div>
-                            </label>
                         </div>
                     </section>
 
@@ -387,6 +375,14 @@
                         </details>
                     </section>
 
+                    <section class="form-section work-order-screening-tabs-section">
+                        <div class="work-order-production-mode-tabs work-order-screening-stage-tabs" role="tablist" aria-label="篩分階段">
+                            <button type="button" class="tab-btn active" data-action="switch-screening-stage" data-screening-stage="primary" aria-pressed="true">一次篩分</button>
+                            <button type="button" class="tab-btn" data-action="switch-screening-stage" data-screening-stage="secondary" aria-pressed="false">二次篩分</button>
+                        </div>
+                    </section>
+
+                    <div class="work-order-screening-stage-panel active" data-screening-stage-panel="primary">
                     <div class="work-orders-section-layout">
                         <div class="work-orders-section-left">
                             <!-- 工單生產資訊 -->
@@ -414,42 +410,25 @@
                                 </details>
                             </section>
 
-                            <!-- 生產排程資訊 -->
-                            <section class="form-section work-order-schedule-section" data-split-mode-hidden>
-                                <h4>生產排程資訊</h4>
-                                <div class="form-grid form-grid-four-columns work-orders-force-vertical">
-                                    <label class="inline-label">
-                                        <span>預定開始日期</span>
-                                        <input type="datetime-local" name="scheduled_start_date">
-                                        <span class="weekday-badge" data-weekday-for="create_scheduled_start_date"></span>
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>預定結束日期</span>
-                                        <input type="datetime-local" name="scheduled_end_date">
-                                        <span class="weekday-badge" data-weekday-for="create_scheduled_end_date"></span>
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>實際開始日期</span>
-                                        <input type="datetime-local" name="actual_start_date">
-                                        <span class="weekday-badge" data-weekday-for="create_actual_start_date"></span>
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>實際結束日期</span>
-                                        <input type="datetime-local" name="actual_end_date">
-                                        <span class="weekday-badge" data-weekday-for="create_actual_end_date"></span>
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>指派員工</span>
-                                        <select name="assigned_employee_id">
-                                            <option value="">-- 請選擇 --</option>
-                                        </select>
-                                    </label>
-                                    <label class="inline-label">
-                                        <span>校機人員</span>
-                                        <select name="calibration_employee_id">
-                                            <option value="">-- 請選擇 --</option>
-                                        </select>
-                                    </label>
+                            <section class="form-section work-order-edit-schedule-section" data-split-mode-hidden data-collapsible-section>
+                                <header class="subsection-header">
+                                    <div class="subsection-actions">
+                                        <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-schedule-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                                    </div>
+                                    <h4>生產排程</h4>
+                                </header>
+                                <div class="subsection-body" data-create-schedule-section>
+                                    <div class="form-grid work-order-edit-schedule-grid">
+                                        <label class="inline-label"><span>預定開始日期</span><input type="datetime-local" name="scheduled_start_date"><span class="weekday-badge" data-weekday-for="create_scheduled_start_date"></span></label>
+                                        <label class="inline-label"><span>預定結束日期</span><input type="datetime-local" name="scheduled_end_date"><span class="weekday-badge" data-weekday-for="create_scheduled_end_date"></span></label>
+                                        <label class="inline-label"><span>指派員工</span><select name="assigned_employee_id" data-field="assigned-employee"><option value="">-- 請選擇 --</option></select></label>
+                                        <label class="inline-label" data-primary-machine-field><span>指定機台</span><div class="machine-picker-combobox"><select name="machine_id" data-field="machine" class="machine-picker-native"><option value="">-- 請選擇 --</option></select><button type="button" class="machine-picker-trigger" data-action="open-machine-picker"><span data-machine-picker-label>-- 請選擇 --</span><i class="fas fa-th-large" aria-hidden="true"></i></button></div></label>
+                                        <label class="inline-label"><span>實際開始日期</span><input type="datetime-local" name="actual_start_date"><span class="weekday-badge" data-weekday-for="create_actual_start_date"></span></label>
+                                        <label class="inline-label"><span>實際結束日期</span><input type="datetime-local" name="actual_end_date"><span class="weekday-badge" data-weekday-for="create_actual_end_date"></span></label>
+                                        <label class="inline-label"><span>校機人員</span><select name="calibration_employee_id" data-field="calibration-employee"><option value="">-- 請選擇 --</option></select></label>
+                                        <label class="inline-label"><span>生產數量</span><input type="number" name="quantity_to_produce" min="0" step="0.01" placeholder="請輸入生產數量"></label>
+                                        <label class="inline-label"><span>篩選速度</span><input type="text" name="screening_speed" maxlength="50" placeholder="例如: 300支/分"></label>
+                                    </div>
                                 </div>
                             </section>
                         </div>
@@ -494,39 +473,6 @@
                             </div>
                         </section>
                     </div>
-
-                    <!-- 生產設定 -->
-                    <section class="form-section">
-                        <h4>生產設定</h4>
-                        <div class="form-grid form-grid-three-columns">
-                            <label class="inline-label" data-primary-machine-field>
-                                <span>指定機台</span>
-                                <select name="machine_id" data-field="machine">
-                                    <option value="">-- 請選擇 --</option>
-                                </select>
-                            </label>
-                            <label class="inline-label">
-                                <span>指定員工</span>
-                                <select name="assigned_employee_id" data-field="assigned-employee">
-                                    <option value="">-- 請選擇 --</option>
-                                </select>
-                            </label>
-                            <label class="inline-label">
-                                <span>校機人員</span>
-                                <select name="calibration_employee_id" data-field="calibration-employee">
-                                    <option value="">-- 請選擇 --</option>
-                                </select>
-                            </label>
-                            <label class="inline-label">
-                                <span>生產數量</span>
-                                <input type="number" name="quantity_to_produce" min="0" step="0.01" placeholder="請輸入生產數量">
-                            </label>
-                            <label class="inline-label">
-                                <span>篩選速度</span>
-                                <input type="text" name="screening_speed" maxlength="50" placeholder="例如: 300支/分">
-                            </label>
-                        </div>
-                    </section>
 
                     <!-- 首件尺寸檢驗與工單圖片 (並排兩欄) -->
                     <div class="form-row">
@@ -598,42 +544,40 @@
                         </div>
                         </section>
 
-                        <!-- 工單圖片 -->
-                        <section class="subsection">
-                            <header class="subsection-header">
-                                <h4>工單圖片</h4>
-                                <div class="subsection-actions">
-                                    <button type="button" class="btn ghost small" data-action="open-images-tab" title="在專用頁籤管理圖片">
-                                        <i class="fas fa-external-link-alt"></i>
-                                        <span>開啟專用頁</span>
-                                    </button>
-                                    <button type="button" class="btn ghost small" data-action="add-image">
-                                        <i class="fas fa-plus"></i>
-                                        <span>新增圖片</span>
-                                    </button>
-                                </div>
-                            </header>
-                            <div class="table-responsive">
-                                <table class="data-table compact">
-                                    <thead>
-                                        <tr>
-                                            <th class="col-80">縮圖</th>
-                                            <th class="col-120">圖片類型</th>
-                                            <th>描述</th>
-                                            <th class="col-150">上傳時間</th>
-                                            <th class="col-80">預覽</th>
-                                            <th class="col-80">操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody data-images-rows>
-                                        <tr class="empty-row">
-                                            <td colspan="6" class="text-center">尚未上傳圖片</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                        <section class="subsection work-order-edit-images-card hidden">
+                            <div class="subsection-body hidden">
+                                <table><tbody data-images-rows></tbody></table>
                             </div>
                         </section>
                     </div>
+
+                    <section class="form-section work-order-edit-execution-images" data-collapsible-section>
+                        <header class="subsection-header">
+                            <div class="subsection-actions">
+                                <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-execution-images-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                            </div>
+                            <h4>現場圖片回傳</h4>
+                        </header>
+                        <div class="subsection-body" data-create-execution-images-section>
+                            <div class="work-order-production-mode-tabs work-order-execution-image-tabs" role="tablist" aria-label="現場圖片分類">
+                                <button type="button" class="tab-btn active" data-action="switch-execution-image-tab" data-image-tab="completion" aria-pressed="true">完工圖片</button>
+                                <button type="button" class="tab-btn" data-action="switch-execution-image-tab" data-image-tab="defect" aria-pressed="false">不良品圖片</button>
+                                <button type="button" class="tab-btn" data-action="switch-execution-image-tab" data-image-tab="tool_condition" aria-pressed="false">載具狀況圖片</button>
+                            </div>
+                            <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel active" data-execution-image-panel="completion">
+                                <header class="subsection-header"><h4>完工圖片</h4></header>
+                                <div class="table-responsive"><table class="data-table compact"><tbody><tr class="empty-row"><td class="text-center">請先儲存工單，建立後即可上傳完工圖片。</td></tr></tbody></table></div>
+                            </section>
+                            <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel" data-execution-image-panel="defect">
+                                <header class="subsection-header"><h4>不良品圖片</h4></header>
+                                <div class="table-responsive"><table class="data-table compact"><tbody><tr class="empty-row"><td class="text-center">請先儲存工單，建立後即可上傳不良品圖片。</td></tr></tbody></table></div>
+                            </section>
+                            <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel" data-execution-image-panel="tool_condition">
+                                <header class="subsection-header"><h4>載具狀況圖片</h4></header>
+                                <div class="table-responsive"><table class="data-table compact"><tbody><tr class="empty-row"><td class="text-center">請先儲存工單，建立後即可上傳載具狀況圖片。</td></tr></tbody></table></div>
+                            </section>
+                        </div>
+                    </section>
 
                     <!-- 交辦事項與備註 -->
                     <section class="form-section">
@@ -650,38 +594,45 @@
                         </div>
                     </section>
 
-                    <!-- 生產記錄 (僅編輯時顯示) -->
-                    <section class="subsection hidden" data-production-records-section>
+                    <section class="subsection work-order-edit-production-records" data-split-mode-hidden data-collapsible-section>
                         <header class="subsection-header">
+                            <div class="subsection-actions">
+                                <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-production-records-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                            </div>
                             <h4>生產記錄</h4>
-                            <button type="button" class="btn ghost small" data-action="add-production-record">
-                                <i class="fas fa-plus"></i>
-                                <span>新增生產記錄</span>
-                            </button>
                         </header>
-                        <div class="table-responsive">
-                            <table class="data-table compact">
-                                <thead>
-                                    <tr>
-                                        <th>卡號</th>
-                                        <th>重量(kg)</th>
-                                        <th>日期</th>
-                                        <th>時間</th>
-                                        <th>機台編號</th>
-                                        <th>機台能力</th>
-                                        <th>登錄者</th>
-                                        <th>備註</th>
-                                        <th>操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody data-production-records-rows>
-                                    <tr class="empty-row">
-                                        <td colspan="9" class="text-center">尚無生產記錄</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <div class="subsection-body" data-create-production-records-section>
+                            <input type="hidden" name="production_record_mode" value="preset">
+                            <div class="work-order-production-mode-tabs" role="tablist" aria-label="生產記錄模式">
+                                <button type="button" class="tab-btn active" data-action="switch-production-record-mode" data-mode="preset" aria-pressed="true" disabled>預設</button>
+                                <button type="button" class="tab-btn" data-action="switch-production-record-mode" data-mode="manual" aria-pressed="false" disabled>自行輸入</button>
+                            </div>
+                            <div class="work-order-production-mode-panel active">
+                                <div class="table-responsive">
+                                    <table class="data-table compact production-records-table">
+                                        <tbody data-production-records-rows>
+                                            <tr class="empty-row">
+                                                <td class="text-center">請先儲存工單，建立後即可登錄生產記錄。</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </section>
+
+                    </div>
+
+                    <div class="work-order-screening-stage-panel" data-screening-stage-panel="secondary">
+                        <section class="form-section info-section work-order-secondary-screening-placeholder">
+                            <header class="subsection-header">
+                                <h4>二次篩分追蹤</h4>
+                            </header>
+                            <div class="subsection-body">
+                                <p class="text-muted">請先儲存一次篩分工單，建立後即可在原工單追蹤或建立二次篩分。</p>
+                            </div>
+                        </section>
+                    </div>
 
                 </div><!-- end .work-orders-modal-body -->
 
@@ -732,7 +683,7 @@
                                         <strong data-metric="good-units" class="text-success">--</strong>
                                     </div>
                                     <div class="metric">
-                                        <span class="metric-label">不良品支數 (參考值)</span>
+                                        <span class="metric-label">不良品支數</span>
                                         <strong data-metric="defect-units" class="text-danger">--</strong>
                                     </div>
                                     <div class="metric">
@@ -807,15 +758,6 @@
                         </div>
                     </section>
 
-                    <section class="form-section info-section work-order-second-screening-section" data-work-order-second-screening-section>
-                        <header class="subsection-header">
-                            <h4>二次篩選追蹤</h4>
-                        </header>
-                        <div class="subsection-body" data-work-order-second-screening-summary>
-                            <p class="text-muted">尚未載入二次篩選資訊。</p>
-                        </div>
-                    </section>
-
                     <section class="form-section info-section work-order-collapsible-section work-order-edit-detail-section" data-collapsible-section>
                         <header class="subsection-header">
                             <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-detail-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
@@ -868,6 +810,14 @@
                         </div>
                     </section>
 
+                    <section class="form-section work-order-screening-tabs-section">
+                        <div class="work-order-production-mode-tabs work-order-screening-stage-tabs" role="tablist" aria-label="篩分階段">
+                            <button type="button" class="tab-btn active" data-action="switch-screening-stage" data-screening-stage="primary" aria-pressed="true">一次篩分</button>
+                            <button type="button" class="tab-btn" data-action="switch-screening-stage" data-screening-stage="secondary" aria-pressed="false">二次篩分</button>
+                        </div>
+                    </section>
+
+                    <div class="work-order-screening-stage-panel active" data-screening-stage-panel="primary">
                     <section class="form-section work-order-edit-schedule-section" data-split-mode-hidden data-collapsible-section>
                         <header class="subsection-header">
                             <div class="subsection-actions">
@@ -1000,55 +950,59 @@
                             <h4>現場圖片回傳</h4>
                         </header>
                         <div class="subsection-body" data-edit-execution-images-section>
-                            <div class="work-order-edit-middle-row">
-                                <section class="subsection work-order-edit-drawing-card">
-                                    <header class="subsection-header">
-                                        <h4>完工圖片</h4>
-                                    </header>
-                                    <div class="table-responsive">
-                                        <table class="data-table compact">
-                                            <thead>
-                                                <tr>
-                                                    <th class="col-100">縮圖</th>
-                                                    <th>說明</th>
-                                                    <th class="col-150">上傳時間</th>
-                                                    <th class="col-120">上傳者</th>
-                                                    <th class="col-80">預覽</th>
-                                                    <th class="col-80">操作</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody data-edit-completion-images-rows>
-                                                <tr class="empty-row"><td colspan="6" class="text-center">尚未上傳完工圖片</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </section>
-
-                                <section class="subsection work-order-edit-drawing-card">
-                                    <header class="subsection-header">
-                                        <h4>不良品圖片</h4>
-                                    </header>
-                                    <div class="table-responsive">
-                                        <table class="data-table compact">
-                                            <thead>
-                                                <tr>
-                                                    <th class="col-100">縮圖</th>
-                                                    <th>說明</th>
-                                                    <th class="col-150">上傳時間</th>
-                                                    <th class="col-120">上傳者</th>
-                                                    <th class="col-80">預覽</th>
-                                                    <th class="col-80">操作</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody data-edit-defect-images-rows>
-                                                <tr class="empty-row"><td colspan="6" class="text-center">尚未上傳不良品圖片</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </section>
+                            <div class="work-order-production-mode-tabs work-order-execution-image-tabs" role="tablist" aria-label="現場圖片分類">
+                                <button type="button" class="tab-btn active" data-action="switch-execution-image-tab" data-image-tab="completion" aria-pressed="true">完工圖片</button>
+                                <button type="button" class="tab-btn" data-action="switch-execution-image-tab" data-image-tab="defect" aria-pressed="false">不良品圖片</button>
+                                <button type="button" class="tab-btn" data-action="switch-execution-image-tab" data-image-tab="tool_condition" aria-pressed="false">載具狀況圖片</button>
                             </div>
 
-                            <section class="subsection work-order-edit-drawing-card">
+                            <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel active" data-execution-image-panel="completion">
+                                <header class="subsection-header">
+                                    <h4>完工圖片</h4>
+                                </header>
+                                <div class="table-responsive">
+                                    <table class="data-table compact">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-100">縮圖</th>
+                                                <th>說明</th>
+                                                <th class="col-150">上傳時間</th>
+                                                <th class="col-120">上傳者</th>
+                                                <th class="col-80">預覽</th>
+                                                <th class="col-80">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody data-edit-completion-images-rows>
+                                            <tr class="empty-row"><td colspan="6" class="text-center">尚未上傳完工圖片</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel" data-execution-image-panel="defect">
+                                <header class="subsection-header">
+                                    <h4>不良品圖片</h4>
+                                </header>
+                                <div class="table-responsive">
+                                    <table class="data-table compact">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-100">縮圖</th>
+                                                <th>說明</th>
+                                                <th class="col-150">上傳時間</th>
+                                                <th class="col-120">上傳者</th>
+                                                <th class="col-80">預覽</th>
+                                                <th class="col-80">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody data-edit-defect-images-rows>
+                                            <tr class="empty-row"><td colspan="6" class="text-center">尚未上傳不良品圖片</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel" data-execution-image-panel="tool_condition">
                                 <header class="subsection-header">
                                     <h4>載具狀況圖片</h4>
                                 </header>
@@ -1156,6 +1110,19 @@
                         </div>
                     </section>
 
+                    </div>
+
+                    <div class="work-order-screening-stage-panel" data-screening-stage-panel="secondary">
+                        <section class="form-section info-section work-order-second-screening-section" data-work-order-second-screening-section>
+                            <header class="subsection-header">
+                                <h4>二次篩分追蹤</h4>
+                            </header>
+                            <div class="subsection-body" data-work-order-second-screening-summary>
+                                <p class="text-muted">尚未載入二次篩分資訊。</p>
+                            </div>
+                        </section>
+                    </div>
+
                 </div><!-- end .work-orders-modal-body -->
 
                 <aside class="work-orders-metrics-sidebar">
@@ -1209,7 +1176,7 @@
                                         <strong data-metric="edit-good-units" class="text-success">--</strong>
                                     </div>
                                     <div class="metric">
-                                        <span class="metric-label">不良品支數 (參考值)</span>
+                                        <span class="metric-label">不良品支數</span>
                                         <strong data-metric="edit-defect-units" class="text-danger">--</strong>
                                     </div>
                                     <div class="metric">

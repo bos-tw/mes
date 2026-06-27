@@ -75,6 +75,10 @@ try {
     $summary = $data['summary'];
     $chartData = $data['chart_data'];
     $company = $data['company'];
+    $displayTotalUnits = (int)($summary['total_units'] ?? 0);
+    $displayDefectUnits = (int)($summary['defect_units_distribution'] ?? $summary['defect_units'] ?? 0);
+    $displayGoodUnits = max($displayTotalUnits - $displayDefectUnits, 0);
+    $displayDefectRate = $displayTotalUnits > 0 ? ($displayDefectUnits / $displayTotalUnits) * 100 : 0;
 
     // 生成篩分結果表格行
     $resultRows = '';
@@ -100,7 +104,7 @@ try {
             <td></td>
             <td class="text-center"><span class="defect-count has-defect">%s</span></td>
         </tr>',
-        number_format($summary['defect_units'])
+        number_format($displayDefectUnits)
     );
 
     // 準備圓餅圖區段
@@ -178,10 +182,10 @@ try {
         '{{CUSTOMER_BATCH_NUMBER}}' => htmlspecialchars($orderItem['customer_batch_number'] ?: '-'),
         '{{SCREENING_ITEM_NAME}}' => htmlspecialchars($screeningItem['name'] ?: '-'),
         '{{ACTUAL_END_DATE}}' => $workOrder['actual_end_date'] ? date('Y-m-d', strtotime($workOrder['actual_end_date'])) : '-',
-        '{{TOTAL_UNITS}}' => number_format($summary['total_units']),
-        '{{GOOD_UNITS}}' => number_format($summary['good_units']),
-        '{{DEFECT_UNITS}}' => number_format($summary['defect_units']),
-        '{{DEFECT_RATE_PERCENT}}' => number_format($summary['defect_rate_percent'], 4),
+        '{{TOTAL_UNITS}}' => number_format($displayTotalUnits),
+        '{{GOOD_UNITS}}' => number_format($displayGoodUnits),
+        '{{DEFECT_UNITS}}' => number_format($displayDefectUnits),
+        '{{DEFECT_RATE_PERCENT}}' => number_format($displayDefectRate, 4),
         '{{SCREENING_RESULTS_ROWS}}' => $resultRows,
         '{{CHART_SECTION}}' => $chartSection,
         '{{CHART_SCRIPT}}' => $chartScript,

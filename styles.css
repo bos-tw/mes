@@ -5251,6 +5251,35 @@ td.actions-col {
     border-color: #d6c27d;
 }
 
+.work-order-screening-tabs-section {
+    grid-column: 1 / -1;
+    padding: 10px 14px;
+    border: 1px solid #d7e4f2;
+    background: linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%);
+}
+
+.work-order-screening-stage-tabs {
+    margin: 0;
+}
+
+.work-order-screening-stage-tabs .tab-btn.active {
+    color: #1d4ed8;
+    border-color: #93c5fd;
+    box-shadow: 0 2px 10px rgba(29, 78, 216, 0.18);
+}
+
+.work-order-screening-stage-panel {
+    display: none;
+}
+
+.work-order-screening-stage-panel.active {
+    display: contents;
+}
+
+.work-order-secondary-screening-placeholder {
+    grid-column: 1 / -1;
+}
+
 .work-order-production-mode-panel {
     display: none;
     flex-direction: column;
@@ -5259,6 +5288,18 @@ td.actions-col {
 }
 
 .work-order-production-mode-panel.active {
+    display: flex;
+}
+
+.work-order-execution-image-tabs {
+    margin-bottom: 10px;
+}
+
+.work-order-edit-execution-images [data-execution-image-panel] {
+    display: none;
+}
+
+.work-order-edit-execution-images [data-execution-image-panel].active {
     display: flex;
 }
 
@@ -5433,11 +5474,15 @@ td.actions-col {
     min-width: 0;
     padding: 5px 8px;
     overflow: hidden;
-    color: #374151;
+    color: #1d4ed8;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-summary-status strong {
+    color: inherit;
 }
 
 [data-work-orders-edit-modal] .work-order-edit-summary-machine {
@@ -6231,6 +6276,9 @@ td.actions-col {
     position: relative;
     width: 100%;
     min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 34px;
+    gap: 4px;
 }
 
 [data-primary-machine-field] .machine-picker-native {
@@ -6248,9 +6296,8 @@ td.actions-col {
     height: 100%;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 4px 10px;
+    justify-content: center;
+    padding: 4px;
     border: 1px solid #ced4da;
     border-radius: 0;
     background: #fff;
@@ -6260,8 +6307,91 @@ td.actions-col {
     cursor: pointer;
 }
 
+[data-primary-machine-field] .machine-picker-trigger [data-machine-picker-label] {
+    display: none;
+}
+
 [data-primary-machine-field] .machine-picker-trigger:hover {
     background: #f8fafc;
+}
+
+.searchable-select-native {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.searchable-select {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+
+.searchable-select-control {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 32px;
+    min-height: 32px;
+    border: 1px solid #ced4da;
+    background: #fff;
+}
+
+.searchable-select-control input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    padding: 4px 8px;
+    background: transparent;
+    font-size: var(--font-base);
+    outline: none;
+}
+
+.searchable-select-arrow {
+    border: 0;
+    border-left: 1px solid #ced4da;
+    background: #f8fafc;
+    color: #1f2937;
+    cursor: pointer;
+}
+
+.searchable-select-list {
+    display: none;
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid #b8c2cc;
+    background: #fff;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+}
+
+.searchable-select.open .searchable-select-list {
+    display: block;
+}
+
+.searchable-select-option {
+    display: block;
+    width: 100%;
+    border: 0;
+    padding: 7px 10px;
+    background: #fff;
+    color: #1f2937;
+    text-align: left;
+    cursor: pointer;
+}
+
+.searchable-select-option:hover,
+.searchable-select-option.selected {
+    background: #e8f4fb;
+}
+
+.searchable-select-option.empty {
+    color: #6b7280;
+    cursor: default;
 }
 
 [data-primary-machine-field] .machine-picker-trigger:focus-visible {
@@ -6609,9 +6739,13 @@ td.actions-col {
 [data-work-orders-edit-modal] .work-order-edit-summary-value strong {
     width: 100%;
     padding: 0;
-    color: #222;
+    color: #1d4ed8;
     font-size: var(--font-xl);
-    font-weight: 500;
+    font-weight: 700;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-summary-status strong {
+    color: inherit;
 }
 
 [data-work-orders-edit-modal] .work-order-edit-detail-section summary,
@@ -11022,6 +11156,33 @@ select option:disabled {
     display: grid;
     gap: 0.4rem;
     padding: 0.75rem;
+}
+
+.work-order-inline-rescreen-card {
+    background: linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%);
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    display: grid;
+    gap: 0.85rem;
+    padding: 1rem;
+}
+
+.work-order-inline-rescreen-header,
+.work-order-inline-rescreen-actions {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+}
+
+.work-order-inline-rescreen-header p {
+    margin: 0.2rem 0 0;
+}
+
+.work-order-inline-rescreen-actions {
+    border-top: 1px solid #dbeafe;
+    justify-content: flex-end;
+    padding-top: 0.75rem;
 }
 
 .work-order-second-screening-detail-block {
