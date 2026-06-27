@@ -53,6 +53,7 @@
         productionRecordsSection: moduleRoot.querySelector('[data-production-records-section]'),
         imagesRows: moduleRoot.querySelector('[data-images-rows]'),
         editImagesRows: moduleRoot.querySelector('[data-edit-images-rows]'),
+        editPreProductionImagesRows: moduleRoot.querySelector('[data-edit-pre-production-images-rows]'),
         editCompletionImagesRows: moduleRoot.querySelector('[data-edit-completion-images-rows]'),
         editDefectImagesRows: moduleRoot.querySelector('[data-edit-defect-images-rows]'),
         editToolConditionImagesRows: moduleRoot.querySelector('[data-edit-tool-condition-images-rows]'),
@@ -2648,6 +2649,11 @@
                     toggleSectionBody(executionImagesToggleButton, elements.editModalForm.querySelector('[data-edit-execution-images-section]'));
                     return;
                 }
+                const preProductionImageButton = e.target.closest('[data-action="add-pre-production-image"]');
+                if (preProductionImageButton) {
+                    await handleAddPreProductionImage();
+                    return;
+                }
                 const productionRecordsToggleButton = e.target.closest('[data-action="toggle-production-records-section"]');
                 if (productionRecordsToggleButton) {
                     toggleSectionBody(productionRecordsToggleButton, elements.editModalForm.querySelector('[data-edit-production-records-section]'));
@@ -2845,6 +2851,9 @@
         }
         if (elements.editCompletionImagesRows) {
             elements.editCompletionImagesRows.addEventListener('click', handleImageAction);
+        }
+        if (elements.editPreProductionImagesRows) {
+            elements.editPreProductionImagesRows.addEventListener('click', handleImageAction);
         }
         if (elements.editDefectImagesRows) {
             elements.editDefectImagesRows.addEventListener('click', handleImageAction);
@@ -5149,6 +5158,85 @@
         }
     }
 
+    async function handleAddPreProductionImage() {
+        if (!state.editingId) {
+            showModalAlert('warning', '請先儲存工單後再上傳工單圖片附件。', false, true);
+            return;
+        }
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.multiple = true;
+
+        input.addEventListener('change', async (event) => {
+            const files = Array.from(event.target.files || []);
+            if (files.length === 0) {
+                return;
+            }
+
+            for (const file of files) {
+                await uploadPreProductionImage(file);
+            }
+        });
+
+        input.click();
+    }
+
+    async function uploadPreProductionImage(file) {
+        try {
+            const formData = new FormData();
+            formData.append('work_order_id', state.editingId);
+            formData.append('image', file);
+
+            const response = await fetch('api/work_order_pre_production_images/index.php', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                await loadPreProductionImages(state.editingId);
+
+                if (typeof DataSync !== 'undefined') {
+                    DataSync.notifyWithDependencies('work_order_pre_production_images', DataSync.EVENT_TYPES.CREATED, {
+                        id: result.data?.id || 0,
+                        work_order_id: state.editingId || 0
+                    });
+                }
+
+                showModalAlert('success', result.message || '工單圖片附件上傳成功。', true, true);
+            } else {
+                showModalAlert('danger', result.message || '工單圖片附件上傳失敗。', false, true);
+            }
+        } catch (error) {
+            console.error('Upload pre-production image error:', error);
+            showModalAlert('danger', '工單圖片附件上傳時發生錯誤。', false, true);
+        }
+    }
+
+    async function loadPreProductionImages(workOrderId) {
+        if (!workOrderId || !elements.editPreProductionImagesRows) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`api/work_order_pre_production_images/index.php?work_order_id=${encodeURIComponent(workOrderId)}&limit=100`);
+            const result = await response.json();
+            if (!result.success) {
+                console.error('Load pre-production images failed:', result.message);
+                return;
+            }
+            renderExecutionImageRows(
+                elements.editPreProductionImagesRows,
+                result.data || [],
+                '尚未上傳工單圖片附件'
+            );
+        } catch (error) {
+            console.error('Load pre-production images error:', error);
+        }
+    }
+
     function openDedicatedModule(tabId, title, url) {
         if (!state.editingId) {
             showAlert('請先儲存工單後再使用此功能。', 'warning');
@@ -5964,6 +6052,11 @@
                 state.images = result.data.images || [];
                 renderImages(true);
                 renderOrderDrawings(result.data.drawings || []);
+                renderExecutionImageRows(
+                    elements.editPreProductionImagesRows,
+                    result.data.pre_production_images || [],
+                    '尚未上傳工單圖片附件'
+                );
                 renderExecutionImageRows(
                     elements.editCompletionImagesRows,
                     result.data.completion_images || [],
@@ -7080,6 +7173,14 @@
     }
 
     function getExecutionImageTableConfig(tbody) {
+        if (tbody === elements.editPreProductionImagesRows) {
+            return {
+                endpoint: 'work_order_pre_production_images',
+                label: '工單圖片附件',
+                emptyMessage: '尚未上傳工單圖片附件'
+            };
+        }
+
         if (tbody === elements.editCompletionImagesRows) {
             return {
                 endpoint: 'work_order_completion_images',

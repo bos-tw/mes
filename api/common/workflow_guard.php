@@ -200,7 +200,11 @@ function assessWorkOrderDelete(PDO $pdo, int $id): array
         );
     }
 
-    $imageStmt = $pdo->prepare('SELECT COUNT(*) FROM work_order_images WHERE work_order_id = :id AND deleted_at IS NULL');
+    $imageStmt = $pdo->prepare('
+        SELECT
+            (SELECT COUNT(*) FROM work_order_images WHERE work_order_id = :id AND deleted_at IS NULL)
+            + (SELECT COUNT(*) FROM work_order_pre_production_images WHERE work_order_id = :id AND deleted_at IS NULL)
+    ');
     $imageStmt->execute(['id' => $id]);
     $imageCount = (int)$imageStmt->fetchColumn();
     if ($imageCount > 0) {

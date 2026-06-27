@@ -2,22 +2,21 @@
 
 更新時間：2026-06-27  
 目前分支：`main`  
-本輪交付版本：`v3.0.15`
+本輪交付版本：`v3.0.16`
 
 ## 1. 專案架構
 
 ### 目錄結構
 
 - `index.php`：正式 SPA 入口；`index.html` 僅作相容轉址。
-- `modules/`：模組 HTML 畫面。
-- `js/`：原生 JavaScript 模組、DataSync、跨模組互動。
-- `api/`：PHP API；`api/bootstrap.php` 與 `api/common/*` 提供登入、權限、回應與流程守門。
-- `print/`：列印與報表前端範本。
-- `migrations/`：MySQL / MariaDB migration。
-- `tools/`：健康審計、DataSync 稽核、schema 同步、更新包建置。
-- `release-notes/`：版本更新說明。
-- `docs/`：交接、稽核、待辦與設計紀錄。
-- `dist/`：一鍵更新包輸出；更新包通常不納入 git。
+- `modules/`：模組 HTML 畫面，本輪修改 `modules/work_orders.html`。
+- `js/`：原生 JavaScript 模組與 DataSync，本輪修改 `js/work_orders.js`、`js/data-sync.js`。
+- `api/`：PHP API，本輪新增 `api/work_order_pre_production_images/`，並修改工單 API 與 workflow guard。
+- `migrations/`：MySQL / MariaDB migration，本輪新增 `2026_06_27_add_work_order_pre_production_images.sql`。
+- `tools/`：健康審計、DataSync 稽核、schema 同步、更新包建置，本輪修改 `tools/sync-local-schema.ps1`。
+- `print/`：列印範本，本輪修改 `print/order_confirmation_print.html`。
+- `release-notes/`：版本更新說明，本輪新增 `2026-06-27-v3.0.16.txt`。
+- `dist/`：一鍵更新包輸出；本輪產出 `update_v3.0.16_20260627_224754.zip`。
 
 ### 技術棧
 
@@ -32,126 +31,135 @@
   - `modules/work_orders.html`
   - `js/work_orders.js`
   - `styles.css`
-  - `print/screening_inspection_print.html`
+  - `print/order_confirmation_print.html`
 - API：
-  - `api/reports/generate_static.php`
-  - 既有 `api/rescreen_batches/index.php` 被前端內嵌建立流程呼叫，API 本輪未修改。
-- 文件 / 交付：
-  - `docs/data-sync-audit.md`
-  - `docs/work-order-screening-modal-todo-2026-06-27.md`
-  - `release-notes/2026-06-27-v3.0.15.txt`
+  - `api/work_order_pre_production_images/index.php`
+  - `api/work_order_pre_production_images/update.php`
+  - `api/work_order_pre_production_images/delete.php`
+  - `api/work_orders/index.php`
+  - `api/work_orders/show.php`
+  - `api/work_orders/delete.php`
+  - `api/common/workflow_guard.php`
 - 資料表：
-  - 本輪未新增或修改資料表。
-  - 前端仍使用既有 `work_orders`、`rescreen_batches`、`rescreen_batch_*`、`production_records`、`work_order_execution_images` 等資料流。
+  - 新增 `work_order_pre_production_images`
+  - 既有 `work_order_completion_images`
+  - 既有 `work_order_defect_images`
+  - 既有 `work_order_tool_condition_images`
+  - 既有 `work_orders`
 
 ## 2. 已完成功能
 
 ### 本次新增或修改項目
 
-- 修正篩分檢驗報表與列印範本統計：
-  - 不良品數量改以篩分服務明細的不良品分布加總呈現。
-  - 良品數量改為 `總數量 - 不良品數量`。
-  - 不良率改以實際不良品數量 / 總數量計算。
-  - 修正先前不良品明細有值但摘要顯示 0、或把總數誤判為不良品的問題。
-- 修正生產工單右側統計：
-  - 不良品支數改以現場輸入的篩分服務不良數量為準。
-  - 良品支數改以總支數扣除不良品支數。
-  - 避免由重量推估造成百萬級錯誤支數。
-- 重構生產工單新增 / 編輯 modal：
-  - 上方保留共同資訊：工單摘要、訂單詳細資訊、圖面附件、客戶載具紀錄與遺留分析。
-  - 下方改以「一次篩分 / 二次篩分」頁籤分流。
-  - 一次篩分保留原排程、篩分明細、首件尺寸、現場圖片、生產記錄、部分入庫歷程。
-  - 二次篩分整合原本二次篩選追蹤摘要。
-- 二次篩分建立流程改善：
-  - 在原工單 modal 的二次篩分頁籤按「建立二次篩選」時，直接展開內嵌建立欄位。
-  - 不再跳轉到「新增二次篩選紀錄」頁籤。
-  - 內嵌表單可填二篩類型、原因、排程、人員、機台、生產數量、佐證與備註。
-  - 送出後呼叫既有 `api/rescreen_batches/index.php`，成功後即時刷新原 modal 的二次篩分追蹤。
-- 現場圖片回傳區改為頁籤：
-  - 完工圖片
-  - 不良品圖片
-  - 載具狀況圖片
-- 排程欄位的員工 / 機台選擇支援搜尋與下拉選單。
-- 生產工單列表的二次篩選欄位：
-  - 未建立二篩時留白。
-  - 已有二篩案件才顯示連結。
-- 工單編輯摘要區重要文字改用 UI 規定藍色提高辨識。
-- 新增待辦追蹤文件：
-  - `docs/work-order-screening-modal-todo-2026-06-27.md`
-- 新增 release note：
-  - `release-notes/2026-06-27-v3.0.15.txt`
+- 新增「工單圖片附件」資料流，用於生產前隨工單提供現場人員檢視的參考圖片。
+- 新增 `work_order_pre_production_images` API：
+  - `GET/POST api/work_order_pre_production_images/index.php`
+  - `PUT api/work_order_pre_production_images/update.php`
+  - `DELETE api/work_order_pre_production_images/delete.php`
+  - 欄位與行為參考現場圖片 API，並限制每張工單最多 3 張。
+- 生產工單編輯 modal 新增「工單圖片附件」，並與「現場圖片回傳」以 6/6 並排。
+- 工單編輯載入時回傳並渲染 `pre_production_images`。
+- 工單列表圖片總數納入 `work_order_pre_production_images`。
+- 工單刪除守門納入 `work_order_pre_production_images`，避免已有生產前圖片附件時誤刪。
+- DataSync 新增 `work_order_pre_production_images -> work_orders`。
+- 客戶光篩代工委託確認單列印範本完成：
+  - 自動 A4 分頁與頁碼。
+  - 修正列印越界。
+  - 兩個細項可維持單頁，四個細項可分頁。
+  - 移除總價列，單價上移。
+  - 低於 2000 元時顯示 `單批不足量以2000元計`。
+  - 修正 `總重量(含載具kg)` 標題擠壓。
 
 ### 重要資料庫異動
 
-- 本輪沒有新增 migration。
-- 本輪沒有修改資料表 schema。
-- 本輪沒有更新 `tools/sync-local-schema.ps1` 的 `$migrationChecks`，因為沒有新增 migration。
+- 新增 migration：
+  - `migrations/2026_06_27_add_work_order_pre_production_images.sql`
+- 新增資料表：
+  - `work_order_pre_production_images`
+- 欄位：
+  - `id`
+  - `work_order_id`
+  - `file_name`
+  - `file_path`
+  - `file_size`
+  - `mime_type`
+  - `sort_order`
+  - `description`
+  - `uploaded_at`
+  - `deleted_at`
+  - `uploaded_by_employee_id`
+- FK：
+  - `fk_woppi_work_order` -> `work_orders(id)`，`ON DELETE CASCADE`
+  - `fk_woppi_uploaded_by_employee` -> `employees(id)`，`ON DELETE SET NULL`
+- 已同步更新 `tools/sync-local-schema.ps1` 的 `$migrationChecks`。
 
 ### 版本與更新包資訊
 
-- Release note：`release-notes/2026-06-27-v3.0.15.txt`
-- 一鍵更新包：`dist/update_v3.0.15_20260627_165231.zip`
+- Release note：`release-notes/2026-06-27-v3.0.16.txt`
+- 一鍵更新包：`dist/update_v3.0.16_20260627_224754.zip`
 - 打包工具：`tools/build-update-package.ps1`
-- 打包參數重點：
-  - `VersionNumber = v3.0.15`
-  - `FileVersion = 3.0.15`
+- 打包參數：
+  - `VersionNumber = v3.0.16`
+  - `FileVersion = 3.0.16`
   - `ReleaseDate = 2026-06-27`
-  - `ChangeSummaryFile = release-notes/2026-06-27-v3.0.15.txt`
-  - `Migrations = @()`
+  - `ChangeSummaryFile = release-notes/2026-06-27-v3.0.16.txt`
+  - `Migrations = @('migrations/2026_06_27_add_work_order_pre_production_images.sql')`
 - 更新包已確認：
   - 包含 `manifest.json`
-  - 包含本輪 8 個 `-Files`
-  - 不包含 migration
+  - 包含本輪 16 個 `-Files`
+  - 包含本輪 1 個 migration
 
 ## 3. 待修 Bug
 
 ### 已知問題
 
-- 尚未在瀏覽器實際操作本輪 UI 流程。
+- 尚未用已登入瀏覽器實機操作工單 modal 的「工單圖片附件」上傳 / 預覽 / 刪除流程。
+- 尚未將 `work_order_pre_production_images` 實際渲染到 `print/work_order_print.html` 的「附件及相片」區塊。
 - 完整 `node tools/audit-system-health.js` 仍有 17 個既有 warning。
 
 ### 重現條件
 
 - 執行 `node tools/audit-system-health.js` 可重現既有 warning：
   - `api/status_board/update.php`、`api/status_board/delete.php` 允許 POST 方法偽裝。
-  - 多個既有前端模組行數偏大或超過建議上限。
-  - `modules/order_items.html` 仍有既有 inline style warning。
+  - 多個 JS 模組行數偏大或超過建議上限。
+  - `modules/order_items.html` 有既有 inline style warning。
   - 部分模組仍同時存在 `status` 與 `status_lookup_id`。
 
 ### 目前推測原因
 
-- 舊 API 為相容保留 POST fallback，尚未全部收斂為標準 HTTP method。
-- 多個前端模組長期累積功能，尚未拆分。
-- 既有資料模型仍有歷史狀態欄位並存。
-- 本輪 UI 主要以靜態與語法 / 稽核工具驗證，尚未做人工瀏覽器回歸。
+- 舊 API 為相容保留 POST fallback。
+- 多個前端模組長期累積功能尚未拆分。
+- 部分資料模型保留歷史狀態欄位。
+- headless Chrome 沒有登入 session，無法完成 modal 實機回歸。
 
 ## 4. 下一步任務
 
 ### P0
 
-- 以瀏覽器實機回歸生產工單 modal：
-  - 新增工單與編輯工單皆能正常開啟。
-  - 一次篩分 / 二次篩分頁籤切換正常。
-  - 二次篩分內嵌建立表單可成功建立 `rescreen_batches` 案件並即時刷新。
-  - 一次篩分欄位儲存不受二次篩分內嵌表單影響。
-- 套用 `dist/update_v3.0.15_20260627_165231.zip` 至測試或正式前環境，確認更新包安裝與主要頁面載入。
+- 使用已登入瀏覽器實機回歸生產工單 modal：
+  - 「工單圖片附件」與「現場圖片回傳」6/6 版面正常。
+  - 工單圖片附件可上傳最多 3 張。
+  - 預覽與刪除正常。
+  - 刪除後 DataSync / 工單圖片總數刷新正常。
+- 將 `work_order_pre_production_images` 接到 `print/work_order_print.html` 的「附件及相片」區塊，顯示最多 3 張生產前參考圖片。
 
 ### P1
 
-- 回歸報表與列印：
-  - `api/reports/generate_static.php`
-  - `print/screening_inspection_print.html`
-  - 確認總數量、良品、不良品、不良率與明細合計一致。
-- 回歸工單統計側欄：
-  - 有不良品輸入時良品 / 不良品 / 總支數一致。
-  - 無不良品時不良品為 0 且良品等於總支數。
-- 評估是否將二次篩分完整編輯表單抽成共用元件，避免 `work_orders` 與 `rescreen_batches` 維護兩套 UI。
+- 補強工單圖片附件 UI：
+  - 上傳時輸入圖片說明。
+  - 排序欄位或拖曳排序。
+  - 圖片數量達 3 張時停用新增按鈕或顯示明確提示。
+- 回歸客戶光篩代工委託確認單：
+  - 2 細項單頁。
+  - 4 細項分頁。
+  - 低於 2000 元提示。
+  - Chrome 列印預覽無橫向越界。
 
 ### P2
 
-- 清理 `node tools/audit-system-health.js` 既有 17 項 warning。
+- 清理完整健康審計既有 17 項 warning。
 - 拆分大型前端模組，優先評估 `js/work_orders.js`。
-- 將本輪 `docs/work-order-screening-modal-todo-2026-06-27.md` 的後續觀察事項轉成正式 issue 或後續任務清單。
+- 評估舊 `work_order_images` 與新圖片資料流的長期定位與是否需資料遷移。
 
 ## 5. 驗證狀態
 
@@ -160,24 +168,33 @@
 - `node tools/audit-system-health.js`
   - 結果：錯誤 0，warning 17。
 - `node tools/audit-system-health.js --changed --base origin/main`
-  - 結果：本次變更未新增審計問題。
-- DataSync：
-  - `node --check js/data-sync.js`
-  - `node --check tools/audit-data-sync.js`
-  - `node tools/audit-data-sync.js --write docs/data-sync-audit.md`
-  - 結果：P0 = 0，P1 = 0，P2 = 10。
+  - 結果：新增 0，阻擋 0。
 - JS syntax：
   - `node --check js/work_orders.js`
+  - `node --check js/data-sync.js`
+  - `node --check tools/audit-data-sync.js`
+- DataSync：
+  - `node tools/audit-data-sync.js --write docs/data-sync-audit.md`
+  - 結果：P0 = 0，P1 = 0，P2 = 10。
 - PHP syntax：
-  - `php -l api/reports/generate_static.php`
+  - `php -l api/work_order_pre_production_images/index.php`
+  - `php -l api/work_order_pre_production_images/update.php`
+  - `php -l api/work_order_pre_production_images/delete.php`
+  - `php -l api/work_orders/show.php`
+  - `php -l api/work_orders/index.php`
+  - `php -l api/work_orders/delete.php`
+  - `php -l api/common/workflow_guard.php`
+- Schema：
+  - `powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1`
+  - 結果：Applied 29，Pending 0。
+  - migration 重複執行 smoke test 成功。
 - 更新包：
-  - 使用 `tools/build-update-package.ps1` 產出 `dist/update_v3.0.15_20260627_165231.zip`
-  - 已確認 zip 內含 `manifest.json`。
+  - 使用 `tools/build-update-package.ps1` 產出 `dist/update_v3.0.16_20260627_224754.zip`
+  - 已確認 zip 內含 `manifest.json` 與本輪 migration。
 
 ### 尚未驗證的風險
 
-- 尚未完成瀏覽器實機點擊回歸。
-- 尚未在遠端或正式前環境實際套用 `v3.0.15` 更新包。
-- 尚未用實際資料建立二次篩分案件驗證內嵌表單送出後的 UI 刷新。
-- 尚未用真實報表資料逐筆比對列印與靜態報表數字。
-- 完整健康審計的 17 個 warning 仍存在，非本輪新增但仍需後續清理。
+- 未用已登入瀏覽器實機操作「工單圖片附件」上傳 / 預覽 / 刪除。
+- 未在正式前或正式環境套用 `v3.0.16` 更新包。
+- 未將新圖片附件實際印到生產命令單紙本「附件及相片」區。
+- 完整健康審計的 17 個 warning 仍存在，非本輪新增。

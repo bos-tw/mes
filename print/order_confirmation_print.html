@@ -9,7 +9,13 @@
     <style>
         @page {
             size: A4;
-            margin: 12mm;
+            margin: 0;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
         }
 
         body {
@@ -25,6 +31,7 @@
         .page-container {
             background-color: white;
             width: 210mm;
+            height: 297mm;
             min-height: 297mm;
             margin: 20px auto;
             padding: 12mm;
@@ -32,11 +39,16 @@
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+            break-after: page;
+            break-inside: avoid;
         }
 
         /* 主要內容區 */
         .main-content {
             flex: 1;
+            min-width: 0;
+            width: 100%;
         }
 
         /* 頂部標題區 */
@@ -130,6 +142,9 @@
 
         .content-section {
             margin-top: 10px;
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
         }
 
         /* 表格共用設定 */
@@ -152,6 +167,8 @@
             font-size: 9pt;
             word-wrap: break-word;
             overflow-wrap: break-word;
+            word-break: break-word;
+            max-width: 0;
         }
 
         th:first-child, td:first-child { border-left: none; }
@@ -196,12 +213,27 @@
             padding: 2px 4px;
         }
 
+        .batch-info-table th.weight-total-label {
+            font-size: 7.2pt;
+            padding-left: 2px;
+            padding-right: 2px;
+            white-space: nowrap;
+        }
+
+        .minimum-charge-notice {
+            font-size: 8pt;
+            font-weight: 400;
+        }
+
         /* 特殊表格高度控制 */
         .row-large { height: 50px; }
 
         /* 備註區塊 */
         .notes-container {
             margin-top: 18px;
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
         }
 
         .order-main-notes {
@@ -213,6 +245,12 @@
             line-height: 1.35;
             min-height: 26px;
             white-space: pre-wrap;
+            width: 100%;
+            max-width: 100%;
+            display: block;
+            clear: both;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .notes-header {
@@ -221,6 +259,7 @@
             font-weight: bold;
             font-size: 11pt;
             letter-spacing: 1px;
+            width: 100%;
         }
 
         .notes-box {
@@ -231,11 +270,22 @@
             font-size: 8pt;
             line-height: 1.4;
             background-color: #fff;
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .notes-list {
             margin: 0;
             padding-left: 18px;
+            width: 100%;
+        }
+
+        .notes-list li {
+            margin-bottom: 2px;
+            padding-left: 2px;
         }
 
         .blessing {
@@ -250,6 +300,9 @@
             grid-template-columns: auto 1fr;
             border: 2px solid #000;
             margin-bottom: 15px;
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
         }
 
         .confirm-stamp {
@@ -276,6 +329,9 @@
             grid-row: 2;
             padding: 8px 15px;
             font-size: 9pt;
+            min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         /* 簽署線 */
@@ -307,12 +363,41 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        .footer-content {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .footer-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 12px;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .page-note {
+            margin-top: 6px;
+            text-align: right;
+            font-size: 8pt;
+            font-weight: bold;
         }
 
         .footer-brand {
             display: flex;
             align-items: center;
             gap: 10px;
+            min-width: 0;
+        }
+
+        .footer-brand-text {
+            min-width: 0;
         }
 
         .footer-brand-text .zh {
@@ -344,6 +429,98 @@
             text-align: right;
             font-size: 8pt;
             line-height: 1.4;
+            min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .page-container.compact-page {
+            padding-top: 7mm;
+            padding-bottom: 7mm;
+            font-size: 8.3pt;
+        }
+
+        .page-container.compact-page .header-section,
+        .page-container.compact-page .info-grid,
+        .page-container.compact-page .customer-po-row,
+        .page-container.compact-page table {
+            margin-bottom: 4px;
+        }
+
+        .page-container.compact-page .main-title {
+            font-size: 18pt;
+        }
+
+        .page-container.compact-page .customer-info .name {
+            font-size: 12pt;
+        }
+
+        .page-container.compact-page th,
+        .page-container.compact-page td {
+            padding: 2px 4px;
+            font-size: 8pt;
+            line-height: 1.12;
+        }
+
+        .page-container.compact-page .batch-subtitle {
+            font-size: 8.5pt;
+        }
+
+        .page-container.compact-page .notes-container {
+            margin-top: 8px;
+        }
+
+        .page-container.compact-page .order-main-notes {
+            margin-top: 8px;
+            min-height: 20px;
+            font-size: 8pt;
+            line-height: 1.2;
+            padding: 3px 5px;
+        }
+
+        .page-container.compact-page .notes-header,
+        .page-container.compact-page .notes-box {
+            padding-top: 3px;
+            padding-bottom: 3px;
+        }
+
+        .page-container.compact-page .blessing {
+            margin: 5px 0;
+        }
+
+        .page-container.compact-page .confirmation-area {
+            margin-bottom: 8px;
+        }
+
+        .page-container.compact-page .confirm-stamp {
+            padding: 6px 22px;
+            font-size: 10pt;
+        }
+
+        .page-container.compact-page .confirm-signature {
+            min-height: 34px;
+        }
+
+        .page-container.compact-page .confirm-msg {
+            padding: 4px 10px;
+            font-size: 8pt;
+        }
+
+        .page-container.compact-page .sign-area {
+            margin-top: 8px;
+            padding-top: 4px;
+        }
+
+        .page-container.compact-page footer {
+            padding-top: 8px;
+        }
+
+        .page-container.compact-page .footer-brand-text .zh {
+            font-size: 16pt;
+        }
+
+        .page-container.compact-page .footer-logo {
+            height: 30px;
         }
 
         @media print {
@@ -356,13 +533,27 @@
             }
             .page-container {
                 margin: 0;
-                width: 100%;
-                min-height: 100vh;
-                height: 100vh;
+                width: 210mm;
+                max-width: 210mm;
+                min-height: 0;
+                height: 297mm;
                 box-shadow: none;
                 padding: 5mm;
                 display: flex;
                 flex-direction: column;
+                overflow: hidden;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                break-after: page;
+            }
+            .content-section,
+            table,
+            .order-main-notes,
+            .notes-container,
+            .confirmation-area,
+            footer {
+                max-width: 100% !important;
+                overflow: hidden;
             }
             .main-content {
                 flex: 1;
@@ -390,6 +581,14 @@
             /* 頁尾保持在底部 */
             footer {
                 page-break-inside: avoid;
+            }
+
+            .page-container {
+                page-break-after: always;
+            }
+
+            .page-container:last-of-type {
+                page-break-after: auto;
             }
         }
 
@@ -524,15 +723,20 @@
     </div><!-- end main-content -->
 
     <footer>
-        <div class="footer-brand">
-            <img src="" alt="公司LOGO" class="footer-logo hidden" id="footerLogo">
-            <div class="footer-brand-text">
-                <div class="zh" id="footerCompanyName">載入中...</div>
-                <div class="en" id="footerCompanyNameEn"></div>
+        <div class="footer-content">
+            <div class="footer-main">
+                <div class="footer-brand">
+                    <img src="" alt="公司LOGO" class="footer-logo hidden" id="footerLogo">
+                    <div class="footer-brand-text">
+                        <div class="zh" id="footerCompanyName">載入中...</div>
+                        <div class="en" id="footerCompanyNameEn"></div>
+                    </div>
+                </div>
+                <div class="footer-contacts" id="footerContacts">
+                    載入中...
+                </div>
             </div>
-        </div>
-        <div class="footer-contacts" id="footerContacts">
-            載入中...
+            <div class="page-note">第 1 頁 / 共 1 頁</div>
         </div>
     </footer>
 </div>
@@ -548,6 +752,7 @@
     'use strict';
     let currentFinalQuotePerM = null;
     let currentSinglePpm = null;
+    let currentOrderTotalAmount = null;
     let currentOrderMainNotes = '';
 
     /**
@@ -724,6 +929,7 @@
             if (customerPoNumberEl) customerPoNumberEl.textContent = '';
             currentFinalQuotePerM = null;
             currentSinglePpm = null;
+            currentOrderTotalAmount = null;
             currentOrderMainNotes = '';
             renderOrderMainNotes();
             return null;
@@ -772,6 +978,9 @@
                 currentSinglePpm = Number.isFinite(Number(order.single_ppm))
                     ? Number(order.single_ppm)
                     : null;
+                currentOrderTotalAmount = Number.isFinite(Number(order.total_amount))
+                    ? Number(order.total_amount)
+                    : null;
                 currentOrderMainNotes = order.notes || '';
                 renderOrderMainNotes();
 
@@ -782,6 +991,7 @@
                 if (customerPoNumberEl) customerPoNumberEl.textContent = '';
                 currentFinalQuotePerM = null;
                 currentSinglePpm = null;
+                currentOrderTotalAmount = null;
                 currentOrderMainNotes = '';
                 renderOrderMainNotes();
                 return null;
@@ -792,6 +1002,7 @@
             if (customerPoNumberEl) customerPoNumberEl.textContent = '';
             currentFinalQuotePerM = null;
             currentSinglePpm = null;
+            currentOrderTotalAmount = null;
             currentOrderMainNotes = '';
             renderOrderMainNotes();
             return null;
@@ -885,6 +1096,79 @@
 
         const content = (currentOrderMainNotes || '').trim();
         notesEl.textContent = content === '' ? '訂單備註：' : `訂單備註：${content}`;
+    }
+
+    function renderOrderConfirmationPages(pageSize, useCompactLayout) {
+        const firstPage = document.querySelector('.page-container');
+        if (!firstPage) return [];
+
+        const firstBatchContainer = firstPage.querySelector('#batchSectionsContainer');
+        if (!firstBatchContainer) return [];
+
+        const batchSections = Array.from(firstBatchContainer.querySelectorAll('.batch-section'));
+        const pageCount = Math.max(1, Math.ceil(batchSections.length / pageSize));
+
+        document.querySelectorAll('.page-container').forEach((page, index) => {
+            if (index > 0) page.remove();
+        });
+
+        const pageTemplate = firstPage.cloneNode(true);
+        const pages = [firstPage];
+        for (let index = 1; index < pageCount; index += 1) {
+            const page = pageTemplate.cloneNode(true);
+            firstPage.parentNode.appendChild(page);
+            pages.push(page);
+        }
+
+        pages.forEach((page, pageIndex) => {
+            page.classList.toggle('compact-page', useCompactLayout);
+            const batchContainer = page.querySelector('#batchSectionsContainer');
+            const start = pageIndex * pageSize;
+            const pageBatchHtml = batchSections
+                .slice(start, start + pageSize)
+                .map(section => section.outerHTML)
+                .join('');
+
+            if (batchContainer) {
+                batchContainer.innerHTML = pageBatchHtml || '<table><tbody><tr><td class="text-center">此頁無品項資料</td></tr></tbody></table>';
+            }
+
+            page.querySelectorAll('[id]').forEach((element) => {
+                if (pageIndex > 0) {
+                    element.removeAttribute('id');
+                }
+            });
+
+            const pageNote = page.querySelector('.page-note');
+            if (pageNote) {
+                pageNote.textContent = `第 ${pageIndex + 1} 頁 / 共 ${pageCount} 頁`;
+            }
+        });
+
+        return pages;
+    }
+
+    function hasOverflowingPrintPage(pages) {
+        return pages.some((page) => {
+            const overflowAllowance = 4;
+            return page.scrollHeight > page.clientHeight + overflowAllowance;
+        });
+    }
+
+    function paginateOrderConfirmation() {
+        const firstPage = document.querySelector('.page-container');
+        const batchCount = firstPage ? firstPage.querySelectorAll('#batchSectionsContainer .batch-section').length : 0;
+        let pages = renderOrderConfirmationPages(2, false);
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                if (hasOverflowingPrintPage(pages)) {
+                    pages = renderOrderConfirmationPages(2, true);
+                }
+                if (batchCount > 2 && hasOverflowingPrintPage(pages)) {
+                    pages = renderOrderConfirmationPages(1, true);
+                }
+            });
+        });
     }
 
     /**
@@ -991,7 +1275,7 @@
                                             <td colspan="3">${drawingNumbers ? escapeHtml(drawingNumbers) : '&nbsp;'}</td>
                                         </tr>
                                         <tr>
-                                            <th>總重量(含載具kg)</th>
+                                            <th class="weight-total-label">總重量(含載具kg)</th>
                                             <td class="text-right">${Number.isFinite(totalWeightWithTool) ? formatNumber(totalWeightWithTool, 2) : '&nbsp;'}</td>
                                             <th>載具數</th>
                                             <td>${toolsDisplay ? escapeHtml(toolsDisplay) : '&nbsp;'}</td>
@@ -1099,39 +1383,37 @@
                             </tr>`;
                         }).join('');
 
-                        const totalUnitPrice = mergedList.reduce((sum, detail) => {
-                            const price = Number(detail.actual_price_per_unit);
-                            if (!Number.isFinite(price)) return sum;
-                            return sum + price;
-                        }, 0);
-
                         const ppmText = currentSinglePpm !== null ? `PPM：${formatNumber(currentSinglePpm, 0)}` : 'PPM：--';
-                        const totalRowHtml = `
-                            <tr>
-                                <td colspan="2"><strong>${ppmText}</strong></td>
-                                <td colspan="3" class="text-right"><strong>總價：${formatNumber(totalUnitPrice, 2)} 元</strong></td>
-                            </tr>
-                        `;
                         const finalQuoteText = currentFinalQuotePerM !== null
                             ? `單價：${formatNumber(currentFinalQuotePerM, 2)} 元/M`
                             : '單價：-- 元/M';
-                        const finalQuoteRowHtml = `
+                        const totalRowHtml = `
                             <tr>
-                                <td colspan="5" class="text-right text-emphasis">${finalQuoteText}</td>
+                                <td colspan="2"><strong>${ppmText}</strong></td>
+                                <td colspan="3" class="text-right text-emphasis">${finalQuoteText}</td>
                             </tr>
                         `;
+                        const minimumChargeNoticeRowHtml = currentOrderTotalAmount !== null && currentOrderTotalAmount < 2000
+                            ? `
+                            <tr>
+                                <td colspan="5" class="text-right minimum-charge-notice">單批不足量以2000元計</td>
+                            </tr>
+                        `
+                            : '';
 
-                        screeningDetailsBody.innerHTML = rowsHtml + totalRowHtml + finalQuoteRowHtml;
+                        screeningDetailsBody.innerHTML = rowsHtml + totalRowHtml + minimumChargeNoticeRowHtml;
                     } else {
                         screeningDetailsBody.innerHTML = '<tr><td colspan="5" class="text-center">無篩選細項</td></tr>';
                     }
                 }
+                paginateOrderConfirmation();
             } else {
                 // 無資料
                 if (batchSectionsContainer) {
                     batchSectionsContainer.innerHTML = '<table><tbody><tr><td class="text-center">此訂單無品項資料</td></tr></tbody></table>';
                 }
                 if (screeningDetailsBody) screeningDetailsBody.innerHTML = '<tr><td colspan="5" class="text-center">此訂單無品項資料</td></tr>';
+                paginateOrderConfirmation();
             }
         } catch (error) {
             console.error('載入訂單品項失敗:', error);
@@ -1139,6 +1421,7 @@
                 batchSectionsContainer.innerHTML = '<table><tbody><tr><td class="text-center">載入失敗</td></tr></tbody></table>';
             }
             if (screeningDetailsBody) screeningDetailsBody.innerHTML = '<tr><td colspan="5" class="text-center">載入失敗</td></tr>';
+            paginateOrderConfirmation();
         }
     }
 
@@ -1189,22 +1472,22 @@
         const orderId = parseInt(urlParams.get('order_id'), 10) || null;
 
         // 載入底部 LOGO（頁尾）
-        loadCompanyLogo('footerLogo', companyId);
+        await loadCompanyLogo('footerLogo', companyId);
 
         // 載入公司基本資訊（頁尾）
-        loadCompanyInfo(companyId);
+        await loadCompanyInfo(companyId);
 
         // 載入報表備註說明
-        loadReportDescription('order_confirmation');
+        await loadReportDescription('order_confirmation');
 
         // 載入訂單資訊，並從訂單取得客戶 ID 後載入客戶資訊
         if (orderId) {
             const customerId = await loadOrderInfo(orderId);
             if (customerId) {
-                loadCustomerInfo(customerId);
+                await loadCustomerInfo(customerId);
             }
             // 載入訂單品項
-            loadOrderItems(orderId);
+            await loadOrderItems(orderId);
         }
     });
 })();

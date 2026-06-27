@@ -216,11 +216,13 @@ function handleListWorkOrders(PDO $pdo): void
             CASE WHEN ii_check.id IS NOT NULL THEN 1 ELSE 0 END AS has_inventory,
             (
                 COALESCE(woi_summary.legacy_image_count, 0)
+                + COALESCE(woppi_summary.pre_production_image_count, 0)
                 + COALESCE(woci_summary.completion_image_count, 0)
                 + COALESCE(wodi_summary.defect_image_count, 0)
                 + COALESCE(wotci_summary.tool_condition_image_count, 0)
             ) AS total_image_count,
             COALESCE(woi_summary.legacy_image_count, 0) AS legacy_image_count,
+            COALESCE(woppi_summary.pre_production_image_count, 0) AS pre_production_image_count,
             COALESCE(woci_summary.completion_image_count, 0) AS completion_image_count,
             COALESCE(wodi_summary.defect_image_count, 0) AS defect_image_count,
             COALESCE(wotci_summary.tool_condition_image_count, 0) AS tool_condition_image_count,
@@ -257,6 +259,12 @@ function handleListWorkOrders(PDO $pdo): void
             WHERE deleted_at IS NULL
             GROUP BY work_order_id
         ) woi_summary ON woi_summary.work_order_id = wo.id
+        LEFT JOIN (
+            SELECT work_order_id, COUNT(*) AS pre_production_image_count
+            FROM work_order_pre_production_images
+            WHERE deleted_at IS NULL
+            GROUP BY work_order_id
+        ) woppi_summary ON woppi_summary.work_order_id = wo.id
         LEFT JOIN (
             SELECT work_order_id, COUNT(*) AS completion_image_count
             FROM work_order_completion_images

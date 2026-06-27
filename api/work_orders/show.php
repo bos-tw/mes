@@ -216,6 +216,7 @@ try {
     $workOrder['completion_images'] = fetchWorkOrderExecutionImages($pdo, 'work_order_completion_images', $id);
     $workOrder['defect_images'] = fetchWorkOrderExecutionImages($pdo, 'work_order_defect_images', $id);
     $workOrder['tool_condition_images'] = fetchWorkOrderExecutionImages($pdo, 'work_order_tool_condition_images', $id);
+    $workOrder['pre_production_images'] = fetchWorkOrderExecutionImages($pdo, 'work_order_pre_production_images', $id);
     $workOrder['operation_logs'] = fetchWorkOrderOperationLogs($pdo, $id, 50);
     $workOrder['customer_tool_analysis'] = fetchCustomerToolAnalysis($pdo, (int)($workOrder['customer_id'] ?? 0));
 

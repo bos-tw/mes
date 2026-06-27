@@ -158,6 +158,10 @@ try {
             'sql' => 'SELECT COUNT(*) FROM work_order_images WHERE work_order_id = ? AND deleted_at IS NULL',
         ],
         [
+            'label' => '工單圖片附件',
+            'sql' => 'SELECT COUNT(*) FROM work_order_pre_production_images WHERE work_order_id = ? AND deleted_at IS NULL',
+        ],
+        [
             'label' => '首件尺寸',
             'sql' => "SELECT COUNT(*) FROM work_order_first_piece_dimensions WHERE work_order_id = ? AND ({$meaningfulFirstPieceSql})",
         ],

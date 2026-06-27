@@ -1,6 +1,6 @@
 # DataSync 稽核報告
 
-產生時間：2026-06-27T08:46:50.797Z
+產生時間：2026-06-27T14:43:16.397Z
 
 ## 摘要
 
@@ -8,7 +8,7 @@
 - P1: 0
 - P2: 10
 - 通過：40
-- 相依來源數：39
+- 相依來源數：40
 - 狀態型介面刷新檢查數：36
 
 ## 模組矩陣
@@ -64,7 +64,7 @@
 | OK | tools | tools | DELETE | tools | work_orders, order_items, defect_history_records | - | - |
 | OK | work_order_first_piece_dimensions | work_order_first_piece_dimensions | POST, DELETE | (helper) | work_orders | employees, work_orders | - |
 | OK | work_order_images | work_order_images | - | - | work_orders | work_orders | - |
-| OK | work_orders | work_orders | POST, DELETE | inventory_items, rescreen_batches, work_orders | order_items, orders, work_order_images, work_order_first_piece_dimensions, inventory_items, inventory_transactions, dashboard, production_records, production_work_order_schedule, defect_history_records, rescreen_batches | employees, inventory_items, lookup_values, machine_capabilities, machines, order_items, orders, production_quality_records, rescreen_batches, tools, work_order_completion_images, work_order_defect_images, work_order_first_piece_dimensions, work_order_images, work_order_tool_condition_images | - |
+| OK | work_orders | work_orders | POST, DELETE | inventory_items, rescreen_batches, work_order_pre_production_images, work_orders | order_items, orders, work_order_images, work_order_first_piece_dimensions, inventory_items, inventory_transactions, dashboard, production_records, production_work_order_schedule, defect_history_records, rescreen_batches | employees, inventory_items, lookup_values, machine_capabilities, machines, order_items, orders, production_quality_records, rescreen_batches, tools, work_order_completion_images, work_order_defect_images, work_order_first_piece_dimensions, work_order_images, work_order_pre_production_images, work_order_tool_condition_images | - |
 
 ## 建議處理順序
 
@@ -120,4 +120,4 @@
 | suppliers | 快取, 編輯視窗, 按鈕狀態 | companies, lookup_values | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | work_order_first_piece_dimensions | 明細視窗, 編輯視窗, 按鈕狀態 | employees, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | work_order_images | 編輯視窗, 按鈕狀態 | work_orders | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
-| work_orders | 快取, 編輯視窗, 按鈕狀態 | employees, inventory_items, lookup_values, machine_capabilities, machines, order_items, orders, production_quality_records, rescreen_batches, tools, work_order_completion_images, work_order_defect_images, work_order_first_piece_dimensions, work_order_images, work_order_tool_condition_images | 是 | 請確認目前開啟狀態的刷新路徑 |
+| work_orders | 快取, 編輯視窗, 按鈕狀態 | employees, inventory_items, lookup_values, machine_capabilities, machines, order_items, orders, production_quality_records, rescreen_batches, tools, work_order_completion_images, work_order_defect_images, work_order_first_piece_dimensions, work_order_images, work_order_pre_production_images, work_order_tool_condition_images | 是 | 請確認目前開啟狀態的刷新路徑 |

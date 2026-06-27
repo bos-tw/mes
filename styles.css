@@ -5303,6 +5303,28 @@ td.actions-col {
     display: flex;
 }
 
+.work-order-image-sections-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.work-order-image-sections-grid > .form-section {
+    min-width: 0;
+}
+
+.work-order-image-sections-grid .table-responsive {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+@media (max-width: 1100px) {
+    .work-order-image-sections-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 .work-order-production-mode-header {
     display: flex;
     align-items: center;

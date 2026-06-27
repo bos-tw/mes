@@ -301,6 +301,7 @@ const DataSync = (function() {
         // 工單圖片變更（會影響工單列表顯示/附件操作狀態）
         'work_order_images': ['work_orders'],
         // 工單現場圖片變更（手機上傳後，工單相關畫面需刷新）
+        'work_order_pre_production_images': ['work_orders'],
         'work_order_completion_images': ['work_orders'],
         'work_order_defect_images': ['work_orders'],
         'work_order_tool_condition_images': ['work_orders'],

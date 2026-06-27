@@ -2142,6 +2142,7 @@ A 分頁執行 CRUD
 | `orders` | `order_items`, `work_orders`, `dashboard` | 訂單影響項目/工單/儀表板 |
 | `order_items` | `orders`, `work_orders`, `inventory_items` | 訂單項目影響訂單合計/工單/庫存 |
 | `work_orders` | `order_items`, `orders`, `work_order_images`, `work_order_first_piece_dimensions`, `inventory_items`, `inventory_transactions`, `dashboard`, `production_records`, `production_work_order_schedule` | 工單影響訂單主表細項、訂單項目按鈕/圖片/首件/庫存/儀表板/生產/排程看板 |
+| `work_order_pre_production_images` | `work_orders` | 工單生產前圖片附件影響工單附件狀態與列印參考圖 |
 | `shipping_orders` | `shipping_order_items`, `inventory_items`, `order_items`, `inventory_transactions`, `return_orders`, `dashboard`, `shipping_quality_inspections` | 出貨單影響出貨項目/庫存/退貨/儀表板/品質 |
 | `shipping_order_items` | `shipping_orders`, `order_items`, `inventory_items`, `inventory_transactions`, `return_orders` | 出貨明細影響出貨單狀態/訂單項目/庫存/異動紀錄/退貨可選品項 |
 | `return_orders` | `inventory_items`, `inventory_transactions`, `shipping_orders`, `shipping_order_items` | 退貨影響庫存、異動紀錄與出貨/明細退貨狀態 |

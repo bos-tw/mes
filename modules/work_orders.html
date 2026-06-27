@@ -551,33 +551,50 @@
                         </section>
                     </div>
 
-                    <section class="form-section work-order-edit-execution-images" data-collapsible-section>
-                        <header class="subsection-header">
-                            <div class="subsection-actions">
-                                <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-execution-images-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                    <div class="work-order-image-sections-grid">
+                        <section class="form-section work-order-edit-pre-production-images">
+                            <header class="subsection-header">
+                                <h4>工單圖片附件</h4>
+                            </header>
+                            <div class="subsection-body">
+                                <div class="table-responsive">
+                                    <table class="data-table compact">
+                                        <tbody>
+                                            <tr class="empty-row"><td class="text-center">請先儲存工單，建立後即可上傳工單圖片附件。</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                            <h4>現場圖片回傳</h4>
-                        </header>
-                        <div class="subsection-body" data-create-execution-images-section>
-                            <div class="work-order-production-mode-tabs work-order-execution-image-tabs" role="tablist" aria-label="現場圖片分類">
-                                <button type="button" class="tab-btn active" data-action="switch-execution-image-tab" data-image-tab="completion" aria-pressed="true">完工圖片</button>
-                                <button type="button" class="tab-btn" data-action="switch-execution-image-tab" data-image-tab="defect" aria-pressed="false">不良品圖片</button>
-                                <button type="button" class="tab-btn" data-action="switch-execution-image-tab" data-image-tab="tool_condition" aria-pressed="false">載具狀況圖片</button>
+                        </section>
+
+                        <section class="form-section work-order-edit-execution-images" data-collapsible-section>
+                            <header class="subsection-header">
+                                <div class="subsection-actions">
+                                    <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-execution-images-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                                </div>
+                                <h4>現場圖片回傳</h4>
+                            </header>
+                            <div class="subsection-body" data-create-execution-images-section>
+                                <div class="work-order-production-mode-tabs work-order-execution-image-tabs" role="tablist" aria-label="現場圖片分類">
+                                    <button type="button" class="tab-btn active" data-action="switch-execution-image-tab" data-image-tab="completion" aria-pressed="true">完工圖片</button>
+                                    <button type="button" class="tab-btn" data-action="switch-execution-image-tab" data-image-tab="defect" aria-pressed="false">不良品圖片</button>
+                                    <button type="button" class="tab-btn" data-action="switch-execution-image-tab" data-image-tab="tool_condition" aria-pressed="false">載具狀況圖片</button>
+                                </div>
+                                <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel active" data-execution-image-panel="completion">
+                                    <header class="subsection-header"><h4>完工圖片</h4></header>
+                                    <div class="table-responsive"><table class="data-table compact"><tbody><tr class="empty-row"><td class="text-center">請先儲存工單，建立後即可上傳完工圖片。</td></tr></tbody></table></div>
+                                </section>
+                                <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel" data-execution-image-panel="defect">
+                                    <header class="subsection-header"><h4>不良品圖片</h4></header>
+                                    <div class="table-responsive"><table class="data-table compact"><tbody><tr class="empty-row"><td class="text-center">請先儲存工單，建立後即可上傳不良品圖片。</td></tr></tbody></table></div>
+                                </section>
+                                <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel" data-execution-image-panel="tool_condition">
+                                    <header class="subsection-header"><h4>載具狀況圖片</h4></header>
+                                    <div class="table-responsive"><table class="data-table compact"><tbody><tr class="empty-row"><td class="text-center">請先儲存工單，建立後即可上傳載具狀況圖片。</td></tr></tbody></table></div>
+                                </section>
                             </div>
-                            <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel active" data-execution-image-panel="completion">
-                                <header class="subsection-header"><h4>完工圖片</h4></header>
-                                <div class="table-responsive"><table class="data-table compact"><tbody><tr class="empty-row"><td class="text-center">請先儲存工單，建立後即可上傳完工圖片。</td></tr></tbody></table></div>
-                            </section>
-                            <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel" data-execution-image-panel="defect">
-                                <header class="subsection-header"><h4>不良品圖片</h4></header>
-                                <div class="table-responsive"><table class="data-table compact"><tbody><tr class="empty-row"><td class="text-center">請先儲存工單，建立後即可上傳不良品圖片。</td></tr></tbody></table></div>
-                            </section>
-                            <section class="subsection work-order-edit-drawing-card work-order-production-mode-panel" data-execution-image-panel="tool_condition">
-                                <header class="subsection-header"><h4>載具狀況圖片</h4></header>
-                                <div class="table-responsive"><table class="data-table compact"><tbody><tr class="empty-row"><td class="text-center">請先儲存工單，建立後即可上傳載具狀況圖片。</td></tr></tbody></table></div>
-                            </section>
-                        </div>
-                    </section>
+                        </section>
+                    </div>
 
                     <!-- 交辦事項與備註 -->
                     <section class="form-section">
@@ -942,14 +959,43 @@
                         </div>
                     </section>
 
-                    <section class="form-section work-order-edit-execution-images" data-collapsible-section>
-                        <header class="subsection-header">
-                            <div class="subsection-actions">
-                                <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-execution-images-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                    <div class="work-order-image-sections-grid">
+                        <section class="form-section work-order-edit-pre-production-images">
+                            <header class="subsection-header">
+                                <div class="subsection-actions">
+                                    <button type="button" class="btn ghost small" data-action="add-pre-production-image"><i class="fas fa-plus"></i><span>新增圖片</span></button>
+                                </div>
+                                <h4>工單圖片附件</h4>
+                            </header>
+                            <div class="subsection-body">
+                                <div class="table-responsive">
+                                    <table class="data-table compact">
+                                        <thead>
+                                            <tr>
+                                                <th class="col-100">縮圖</th>
+                                                <th>說明</th>
+                                                <th class="col-150">上傳時間</th>
+                                                <th class="col-120">上傳者</th>
+                                                <th class="col-80">預覽</th>
+                                                <th class="col-80">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody data-edit-pre-production-images-rows>
+                                            <tr class="empty-row"><td colspan="6" class="text-center">尚未上傳工單圖片附件</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                            <h4>現場圖片回傳</h4>
-                        </header>
-                        <div class="subsection-body" data-edit-execution-images-section>
+                        </section>
+
+                        <section class="form-section work-order-edit-execution-images" data-collapsible-section>
+                            <header class="subsection-header">
+                                <div class="subsection-actions">
+                                    <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-execution-images-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                                </div>
+                                <h4>現場圖片回傳</h4>
+                            </header>
+                            <div class="subsection-body" data-edit-execution-images-section>
                             <div class="work-order-production-mode-tabs work-order-execution-image-tabs" role="tablist" aria-label="現場圖片分類">
                                 <button type="button" class="tab-btn active" data-action="switch-execution-image-tab" data-image-tab="completion" aria-pressed="true">完工圖片</button>
                                 <button type="button" class="tab-btn" data-action="switch-execution-image-tab" data-image-tab="defect" aria-pressed="false">不良品圖片</button>
@@ -1024,8 +1070,9 @@
                                     </table>
                                 </div>
                             </section>
-                        </div>
-                    </section>
+                            </div>
+                        </section>
+                    </div>
 
                     <section class="subsection work-order-edit-production-records" data-split-mode-hidden data-collapsible-section>
                         <header class="subsection-header">
