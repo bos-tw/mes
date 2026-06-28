@@ -11,6 +11,7 @@
 
 # ── 上傳檔案 ────────────────────────────────
 # 目前開發需求：uploads 全面納入版控以支援跨機測試上傳功能
+uploads/work_order_pre_production_images/**
 export/**
 db_backups/**
 db_exports/**

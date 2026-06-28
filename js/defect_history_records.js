@@ -288,16 +288,16 @@
                         <td class="text-right">${escapeHtml(estimatedUnits)}</td>
                         <td class="text-right">${escapeHtml(defectWeight)}</td>
                         <td class="actions-cell">
-                            <button type="button" class="btn text" data-action="view" data-id="${rowId}" title="檢視詳情">
+                            <button type="button" class="btn text op-action-btn op-role-view" data-action="view" data-id="${rowId}" title="檢視詳情">
                                 <i class="fas fa-eye"></i>
                             </button>
-                            ${row.order_id ? '<button type="button" class="btn text" data-action="open-order" title="開啟訂單"><i class="fas fa-file-invoice"></i></button>' : ''}
-                            ${row.work_order_id ? '<button type="button" class="btn text" data-action="open-work-order" title="開啟工單"><i class="fas fa-clipboard"></i></button>' : ''}
-                            ${row.shipping_order_id ? '<button type="button" class="btn text" data-action="open-shipping-order" title="開啟出貨單"><i class="fas fa-shipping-fast"></i></button>' : ''}
-                            ${(row.shipping_annotation_shipping_order_id || row.shipping_order_id) ? '<button type="button" class="btn text" data-action="open-return-orders" title="開啟退貨單"><i class="fas fa-undo"></i></button>' : ''}
-                            ${row.source_type !== 'rescreen_batch_defect' && row.work_order_id ? '<button type="button" class="btn text" data-action="create-second-screening" title="建立二次篩選"><i class="fas fa-redo"></i></button>' : ''}
-                            ${row.rescreen_batch_id ? '<button type="button" class="btn text" data-action="open-second-screening" title="檢視二次篩選"><i class="fas fa-redo"></i></button>' : ''}
-                            ${row.customer_id ? '<button type="button" class="btn text" data-action="open-customer" title="開啟客戶"><i class="fas fa-handshake"></i></button>' : ''}
+                            ${row.order_id ? '<button type="button" class="btn text op-action-btn op-role-order" data-action="open-order" title="開啟訂單"><i class="fas fa-file-invoice"></i></button>' : ''}
+                            ${row.work_order_id ? '<button type="button" class="btn text op-action-btn op-role-work-order" data-action="open-work-order" title="開啟工單"><i class="fas fa-clipboard"></i></button>' : ''}
+                            ${row.shipping_order_id ? '<button type="button" class="btn text op-action-btn op-role-shipping" data-action="open-shipping-order" title="開啟出貨單"><i class="fas fa-shipping-fast"></i></button>' : ''}
+                            ${(row.shipping_annotation_shipping_order_id || row.shipping_order_id) ? '<button type="button" class="btn text op-action-btn op-role-return" data-action="open-return-orders" title="開啟退貨單"><i class="fas fa-undo"></i></button>' : ''}
+                            ${row.source_type !== 'rescreen_batch_defect' && row.work_order_id ? '<button type="button" class="btn text op-action-btn op-role-rescreen" data-action="create-second-screening" title="建立二次篩選"><i class="fas fa-redo"></i></button>' : ''}
+                            ${row.rescreen_batch_id ? '<button type="button" class="btn text op-action-btn op-role-rescreen" data-action="open-second-screening" title="檢視二次篩選"><i class="fas fa-redo"></i></button>' : ''}
+                            ${row.customer_id ? '<button type="button" class="btn text op-action-btn op-role-customer" data-action="open-customer" title="開啟客戶"><i class="fas fa-handshake"></i></button>' : ''}
                         </td>
                     </tr>
                 `;

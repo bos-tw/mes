@@ -2477,6 +2477,11 @@
                     toggleSectionBody(executionImagesToggleButton, elements.createModalForm.querySelector('[data-create-execution-images-section]'));
                     return;
                 }
+                const preProductionImagesToggleButton = e.target.closest('[data-action="toggle-pre-production-images-section"]');
+                if (preProductionImagesToggleButton) {
+                    toggleSectionBody(preProductionImagesToggleButton, elements.createModalForm.querySelector('[data-create-pre-production-images-section]'));
+                    return;
+                }
                 const scheduleToggleButton = e.target.closest('[data-action="toggle-schedule-section"]');
                 if (scheduleToggleButton) {
                     toggleSectionBody(scheduleToggleButton, elements.createModalForm.querySelector('[data-create-schedule-section]'));
@@ -2647,6 +2652,11 @@
                 const executionImagesToggleButton = e.target.closest('[data-action="toggle-execution-images-section"]');
                 if (executionImagesToggleButton) {
                     toggleSectionBody(executionImagesToggleButton, elements.editModalForm.querySelector('[data-edit-execution-images-section]'));
+                    return;
+                }
+                const preProductionImagesToggleButton = e.target.closest('[data-action="toggle-pre-production-images-section"]');
+                if (preProductionImagesToggleButton) {
+                    toggleSectionBody(preProductionImagesToggleButton, elements.editModalForm.querySelector('[data-edit-pre-production-images-section]'));
                     return;
                 }
                 const preProductionImageButton = e.target.closest('[data-action="add-pre-production-image"]');

@@ -1694,9 +1694,68 @@ ${pagesHtml}
 
         // 產生批次列印內容（多頁）
         function generateBatchPrintContent(orders) {
+            const creatorName = window.currentUser && (window.currentUser.name || window.currentUser.account)
+                ? String(window.currentUser.name || window.currentUser.account)
+                : '';
             const pages = orders.map(order => {
                 const customer = order.customer || {};
                 const items = order.items || order.order_items || [];
+                const batchSectionsHtml = items.length > 0 ? items.map(item => {
+                    const si = item.screening_item || {};
+                    const toolsSummary = item.tools_summary || {};
+                    const itemName = [si.item_number, si.name].filter(Boolean).join(' - ') || '-';
+                    const toolWeight = Number((toolsSummary && toolsSummary.total_weight_kg) || (item.totals && item.totals.tool_weight_kg) || 0);
+                    const productWeight = Number(item.total_weight_kg || 0);
+                    const totalWeightWithTool = productWeight + toolWeight;
+                    const netWeight = item.totals && item.totals.net_weight_kg != null
+                        ? Number(item.totals.net_weight_kg)
+                        : Math.max(0, productWeight - toolWeight);
+                    const toolsDisplay = item.tools && item.tools.length > 0
+                        ? item.tools.map(t => `${t.quantity} ${t.tool_name || ''}`.trim()).join(', ')
+                        : (toolsSummary.total_quantity > 0 ? String(toolsSummary.total_quantity) : '');
+                    const sampleStatus = item.customer_sample_status_label || mapSampleStatusToZh(item.customer_sample_status) || '';
+
+                    return `
+    <div class="batch-section">
+        <div class="batch-subtitle">批號：${escapeHtml(item.customer_batch_number || '-')}</div>
+        <table class="batch-info-table">
+            <tbody>
+                <tr>
+                    <th>受篩品項</th>
+                    <td colspan="3">${escapeHtml(itemName)}</td>
+                    <th>圖面編號</th>
+                    <td colspan="3">${item.drawing_number ? escapeHtml(item.drawing_number) : '&nbsp;'}</td>
+                </tr>
+                <tr>
+                    <th class="weight-total-label">總重量(含載具kg)</th>
+                    <td class="text-right">${Number.isFinite(totalWeightWithTool) ? formatNumber(totalWeightWithTool, 2) : '&nbsp;'}</td>
+                    <th>載具數</th>
+                    <td>${toolsDisplay ? escapeHtml(toolsDisplay) : '&nbsp;'}</td>
+                    <th>載具重(kg)</th>
+                    <td class="text-right">${toolWeight ? formatNumber(toolWeight, 2) : '&nbsp;'}</td>
+                    <th>單重(g)</th>
+                    <td class="text-right">${si.weight_per_unit_g ? formatNumber(si.weight_per_unit_g, 2) : '&nbsp;'}</td>
+                </tr>
+                <tr>
+                    <th>支數</th>
+                    <td class="text-right">${item.total_units ? formatNumber(Math.round(item.total_units)) : '&nbsp;'}</td>
+                    <th>樣品狀態</th>
+                    <td>${sampleStatus ? escapeHtml(sampleStatus) : '&nbsp;'}</td>
+                    <th>料號</th>
+                    <td>${item.part_number ? escapeHtml(item.part_number) : '&nbsp;'}</td>
+                    <th>淨重(kg)</th>
+                    <td class="text-right">${Number.isFinite(netWeight) ? formatNumber(netWeight, 2) : '&nbsp;'}</td>
+                </tr>
+                <tr>
+                    <th>指送地點</th>
+                    <td colspan="3">${item.delivery_location ? escapeHtml(item.delivery_location) : '&nbsp;'}</td>
+                    <th>備註</th>
+                    <td colspan="3">${item.notes ? escapeHtml(item.notes) : '&nbsp;'}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>`;
+                }).join('') : '<p style="color: #999; font-size: 10pt;">（無批號明細）</p>';
 
                 return `
 <div class="page-container">
@@ -1716,57 +1775,12 @@ ${pagesHtml}
         </div>
     </div>
 
-    <table>
-        <colgroup>
-            <col style="width: 25%;"><col style="width: 25%;"><col style="width: 25%;"><col style="width: 25%;">
-        </colgroup>
-        <thead>
-            <tr><th>訂單編號</th><th>客戶PO號</th><th>預計交期</th><th>狀態</th></tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>${escapeHtml(order.order_number)}</td>
-                <td>${escapeHtml(displayNullableText(order.customer_po_number))}</td>
-                <td>${formatTaiwanDate(order.expected_delivery_date) || '-'}</td>
-                <td>${escapeHtml(order.status_label || order.status || '-')}</td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="customer-po-row">
+        <span class="label">客戶訂單編號</span>
+        <span>${escapeHtml(displayNullableText(order.customer_po_number))}</span>
+    </div>
 
-    ${items.length > 0 ? `
-    <table>
-        <colgroup>
-            <col style="width: 16%;"><col style="width: 30%;"><col style="width: 11%;"><col style="width: 14%;">
-            <col style="width: 11%;"><col style="width: 18%;">
-        </colgroup>
-        <thead>
-            <tr>
-                <th>批號</th><th>品名</th><th class="text-right">總重(kg)</th>
-                <th class="text-right">載具重(kg)</th><th class="text-right">單重(g)</th><th class="text-right">支數</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${items.map(item => {
-                const itemName = item.screening_item ? (item.screening_item.name || '-') : '-';
-                const unitWeightG = item.screening_item && item.screening_item.weight_per_unit_g
-                    ? formatNumber(item.screening_item.weight_per_unit_g, 4) : '-';
-                const toolWeight = item.totals ? (item.totals.tool_weight_kg || 0) : 0;
-                const totalUnits = item.total_units ? Number(item.total_units).toLocaleString() : '-';
-
-                return `
-            <tr>
-                <td>${escapeHtml(item.customer_batch_number || item.part_number || '-')}</td>
-                <td>${escapeHtml(itemName)}</td>
-                <td class="text-right">${item.total_weight_kg != null && item.total_weight_kg !== '' ? formatNumber(item.total_weight_kg, 2) : '-'}</td>
-                <td class="text-right">${formatNumber(toolWeight, 2)}</td>
-                <td class="text-right">${unitWeightG}</td>
-                <td class="text-right">${totalUnits}</td>
-            </tr>
-            `;
-            }).join('')}
-        </tbody>
-    </table>
-    ` : '<p style="color: #999; font-size: 10pt;">（無批號明細）</p>'}
+    ${batchSectionsHtml}
 
     <div class="notes-container">
         <div class="notes-header">備註</div>
@@ -1791,7 +1805,7 @@ ${pagesHtml}
     <div class="sign-area">
         <div class="sign-box">承認</div>
         <div class="sign-box">審核</div>
-        <div class="sign-box">作成</div>
+        <div class="sign-box"><span class="sign-title">作成</span><span class="sign-name">${escapeHtml(creatorName)}</span></div>
     </div>
 
     <footer>
@@ -1834,7 +1848,7 @@ ${pagesHtml}
         }
         .page-container:last-child { page-break-after: auto; }
         .header-section {
-            display: flex; justify-content: flex-end; align-items: center;
+            display: flex; justify-content: flex-start; align-items: center;
             border-bottom: 2px solid #000;
             margin-bottom: 6px; padding-bottom: 4px;
         }
@@ -1849,6 +1863,20 @@ ${pagesHtml}
         .order-info { text-align: right; line-height: 1.4; }
         .order-info .order-no { font-size: 12pt; }
         .order-info .order-date { font-size: 10pt; }
+        .customer-po-row {
+            display: grid;
+            grid-template-columns: 24mm 1fr;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+            margin-bottom: 4px;
+            font-size: 8.8pt;
+        }
+        .customer-po-row .label {
+            background-color: #e6e6e6;
+            font-weight: bold;
+            padding: 2px 4px;
+        }
+        .customer-po-row span:last-child { padding: 2px 4px; }
         table {
             width: 100%; border-collapse: collapse; table-layout: fixed;
             margin-bottom: 8px;
@@ -1864,6 +1892,27 @@ ${pagesHtml}
         th { background-color: #e6e6e6; font-weight: bold; }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
+        .batch-section { margin-bottom: 4px; }
+        .batch-subtitle {
+            font-size: 9.5pt;
+            font-weight: bold;
+            margin: 1px 0;
+        }
+        .batch-info-table { margin-bottom: 2px; }
+        .batch-info-table th {
+            width: 12%;
+            white-space: nowrap;
+            font-size: 8.5pt;
+        }
+        .batch-info-table td { font-size: 8.8pt; }
+        .batch-info-table th,
+        .batch-info-table td { padding: 2px 4px; }
+        .batch-info-table th.weight-total-label {
+            font-size: 7.2pt;
+            padding-left: 2px;
+            padding-right: 2px;
+            white-space: nowrap;
+        }
         .notes-container { margin-top: 10px; }
         .notes-header {
             background-color: #e6e6e6; border: 1px solid #000; border-bottom: none;
@@ -1898,17 +1947,31 @@ ${pagesHtml}
             padding: 6px 15px; font-size: 9pt;
         }
         .sign-area {
-            display: flex; justify-content: flex-end; margin-top: 20px;
+            display: flex; justify-content: flex-start; margin-top: 12px;
+            margin-bottom: 2mm;
             border-top: 1px solid #ccc; padding-top: 6px;
         }
-        .sign-box { width: 120px; text-align: center; margin-left: 30px; font-size: 10pt; }
-        footer {
-            margin-top: 25px; border-top: 2px solid #000; padding-top: 8px;
-            display: flex; justify-content: space-between; align-items: flex-end;
+        .sign-box { width: 120px; text-align: center; margin-left: 30px; font-size: 10pt; line-height: 1; }
+        .sign-box:first-child { margin-left: 0; }
+        .sign-box .sign-title { display: inline-block; vertical-align: top; line-height: 11pt; }
+        .sign-box .sign-name {
+            display: inline-block;
+            min-height: 0;
+            margin-left: 6px;
+            font-size: 11pt;
+            font-weight: 700;
+            vertical-align: top;
+            line-height: 11pt;
         }
-        .footer-brand .zh { font-size: 20pt; font-weight: bold; line-height: 1; }
-        .footer-brand .en { font-size: 10pt; letter-spacing: 1px; margin-top: 2px; }
-        .footer-contacts { text-align: right; font-size: 9pt; line-height: 1.4; }
+        footer {
+            margin-top: 6px; border-top: 2px solid #000; padding-top: 8px;
+            display: flex; justify-content: space-between; align-items: flex-end;
+            min-height: 18mm;
+            overflow: hidden;
+        }
+        .footer-brand .zh { font-size: 18pt; font-weight: bold; line-height: 1; }
+        .footer-brand .en { font-size: 9pt; letter-spacing: 1px; margin-top: 2px; }
+        .footer-contacts { text-align: right; font-size: 8pt; line-height: 1.25; }
         @media print {
             .no-print { display: none !important; }
             body { background-color: white; -webkit-print-color-adjust: exact; }

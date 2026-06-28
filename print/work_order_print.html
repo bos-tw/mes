@@ -81,9 +81,9 @@
         }
 
         .document-header {
-            min-height: 18mm;
+            min-height: 15mm;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 68mm 18mm;
+            grid-template-columns: minmax(0, 1fr) 68mm 15mm;
             align-items: center;
             gap: 1.5mm;
             padding: 0 .4mm .6mm 0;
@@ -130,15 +130,15 @@
         }
 
         .document-qr {
-            width: 18mm;
+            width: 15mm;
             display: flex;
             justify-content: flex-end;
             justify-self: end;
         }
 
         .document-qr-box {
-            width: 16mm;
-            height: 16mm;
+            width: 13mm;
+            height: 13mm;
             border: var(--outer-line) solid var(--line);
             display: flex;
             align-items: center;
@@ -297,14 +297,67 @@
         }
 
         .attachment-box {
-            min-height: 42.9mm;
+            height: 42.9mm;
             border: var(--outer-line) solid var(--line);
             padding: 1.5mm 2mm;
+            overflow: hidden;
         }
 
         .attachment-title {
             font-size: 9pt;
             margin-bottom: 1mm;
+        }
+
+        .attachment-image-grid {
+            display: grid;
+            gap: 1.6mm;
+            height: 35.2mm;
+        }
+
+        .attachment-image-grid[data-count="0"] {
+            display: block;
+        }
+
+        .attachment-image-grid[data-count="1"] {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .attachment-image-grid[data-count="2"] {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .attachment-image-grid[data-count="3"] {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .attachment-image-slot {
+            min-width: 0;
+            height: 35.2mm;
+            border: var(--inner-line) solid #bbb;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: flex-start;
+            overflow: hidden;
+            margin: 0;
+        }
+
+        .attachment-image-slot img {
+            width: 100%;
+            height: 30.4mm;
+            object-fit: contain;
+            display: block;
+        }
+
+        .attachment-image-caption {
+            min-height: 4.5mm;
+            padding: .6mm .8mm;
+            border-top: var(--inner-line) solid #ccc;
+            font-size: 6.5pt;
+            line-height: 1.2;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
         }
 
         .card-table th,
@@ -318,6 +371,43 @@
             padding-top: .25mm;
             padding-bottom: .25mm;
             font-size: 7.5pt;
+        }
+
+        .card-table-layout.is-split {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.5mm;
+        }
+
+        .card-table-layout.is-split .card-table th,
+        .card-table-layout.is-split .card-table td {
+            height: 4.25mm;
+            padding: .25mm .45mm;
+            font-size: 6.8pt;
+        }
+
+        .card-table-layout.is-split .card-table th:nth-child(1),
+        .card-table-layout.is-split .card-table td:nth-child(1) {
+            width: 8mm;
+        }
+
+        .card-table-layout.is-split .card-table th:nth-child(2),
+        .card-table-layout.is-split .card-table td:nth-child(2) {
+            width: 18mm;
+        }
+
+        .card-table-layout.is-split .card-table th:nth-child(3),
+        .card-table-layout.is-split .card-table td:nth-child(3),
+        .card-table-layout.is-split .card-table th:nth-child(4),
+        .card-table-layout.is-split .card-table td:nth-child(4),
+        .card-table-layout.is-split .card-table th:nth-child(5),
+        .card-table-layout.is-split .card-table td:nth-child(5) {
+            width: 18mm;
+        }
+
+        .card-table-layout.is-split .card-table th:nth-child(6),
+        .card-table-layout.is-split .card-table td:nth-child(6) {
+            width: auto;
         }
 
         .notes-box {
@@ -618,6 +708,27 @@
         `).join('');
     }
 
+    function buildAttachmentImages(wo) {
+        const images = Array.isArray(wo.pre_production_images)
+            ? wo.pre_production_images.slice(0, 3)
+            : [];
+        const slots = images
+            .filter((image) => image && image.file_path)
+            .slice(0, 3)
+            .map((image, index) => {
+                const imageUrl = resolveAssetUrl(image.file_path);
+                const caption = image.description || image.file_name || `附件圖片 ${index + 1}`;
+                return `
+                    <figure class="attachment-image-slot">
+                        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(caption)}">
+                        <figcaption class="attachment-image-caption">${escapeHtml(caption)}</figcaption>
+                    </figure>
+                `;
+            });
+
+        return `<div class="attachment-image-grid" data-count="${slots.length}">${slots.join('')}</div>`;
+    }
+
     function distributeCardTargets(totalUnits, rowCount) {
         const targets = [];
         if (rowCount <= 0) return targets;
@@ -636,27 +747,73 @@
         const rowCount = Math.max(4, cardCount);
         const targets = distributeCardTargets(targetUnits, cardCount);
 
+        const rows = Array.from({ length: rowCount }, (_, index) => {
+            const record = runRecords[index] || {};
+            const hasCard = index < cardCount;
+            const cardNumber = hasCard ? index + 1 : '';
+            const target = record.card_number || targets[index] || '';
+            return {
+                cardNumber,
+                target: hasCard && target ? formatInt(target) : ''
+            };
+        });
+
         return {
             compact: rowCount > 6,
+            split: rowCount > 10,
             rowCount,
             cardCount,
-            html: Array.from({ length: rowCount }, (_, index) => {
-                const record = runRecords[index] || {};
-                const hasCard = index < cardCount;
-                const cardNumber = hasCard ? index + 1 : '';
-                const target = record.card_number || targets[index] || '';
-                return `
-                    <tr>
-                        <td>${escapeHtml(cardNumber)}</td>
-                        <td>${hasCard && target ? formatInt(target) : ''}</td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                    </tr>
-                `;
-            }).join('')
+            rows
         };
+    }
+
+    function buildCardTableRows(rows) {
+        return rows.map((row) => `
+            <tr>
+                <td>${escapeHtml(row.cardNumber)}</td>
+                <td>${escapeHtml(row.target)}</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+        `).join('');
+    }
+
+    function buildCardTable(rows, compact) {
+        return `
+            <table class="card-table${compact ? ' compact' : ''}">
+                <thead>
+                    <tr>
+                        <th>卡號</th>
+                        <th>目標支數</th>
+                        <th>實際重量 (kg)</th>
+                        <th>日期時間</th>
+                        <th>裝載人員</th>
+                        <th>備註</th>
+                    </tr>
+                </thead>
+                <tbody>${buildCardTableRows(rows)}</tbody>
+            </table>
+        `;
+    }
+
+    function buildCardTableLayout(cardRows) {
+        if (!cardRows.split) {
+            return `<div class="card-table-layout">${buildCardTable(cardRows.rows, cardRows.compact)}</div>`;
+        }
+
+        const leftRows = cardRows.rows.slice(0, 10);
+        const rightRows = cardRows.rows.slice(10);
+        while (rightRows.length < leftRows.length) {
+            rightRows.push({ cardNumber: '', target: '' });
+        }
+        return `
+            <div class="card-table-layout is-split">
+                ${buildCardTable(leftRows, true)}
+                ${buildCardTable(rightRows, true)}
+            </div>
+        `;
     }
 
     function createPrintContext(wo, run, splitIndex, splitTotal, cardRowCount = null) {
@@ -843,24 +1000,13 @@
             </section>
             <section class="attachment-box">
                 <div class="attachment-title">附件及相片</div>
+                ${buildAttachmentImages(wo)}
             </section>
         </div>
 
         <section class="section">
             <div class="section-heading">卡號與重量記錄</div>
-            <table class="card-table${cardRows.compact ? ' compact' : ''}">
-                <thead>
-                    <tr>
-                        <th>卡號</th>
-                        <th>目標支數</th>
-                        <th>實際重量 (kg)</th>
-                        <th>日期時間</th>
-                        <th>裝載人員</th>
-                        <th>備註</th>
-                    </tr>
-                </thead>
-                <tbody>${cardRows.html}</tbody>
-            </table>
+            ${buildCardTableLayout(cardRows)}
         </section>
 
         <section class="section">
@@ -1039,8 +1185,8 @@
             container.innerHTML = '';
             new QRCode(container, {
                 text: targetUrl,
-                width: 96,
-                height: 96,
+                width: 78,
+                height: 78,
                 correctLevel: QRCode.CorrectLevel.H
             });
         });

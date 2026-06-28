@@ -338,7 +338,8 @@
         .sign-area {
             display: flex;
             justify-content: flex-start;
-            margin-top: 20px;
+            margin-top: 12px;
+            margin-bottom: 2mm;
             border-top: 1px solid #ccc;
             padding-top: 6px;
             margin-left: 0;
@@ -349,6 +350,23 @@
             text-align: center;
             margin-left: 30px;
             font-size: 10pt;
+            line-height: 1;
+        }
+
+        .sign-box .sign-title {
+            display: inline-block;
+            vertical-align: top;
+            line-height: 11pt;
+        }
+
+        .sign-box .sign-name {
+            display: inline-block;
+            min-height: 0;
+            margin-left: 6px;
+            font-size: 11pt;
+            font-weight: 700;
+            vertical-align: top;
+            line-height: 11pt;
         }
 
         .sign-box:first-child {
@@ -357,14 +375,15 @@
 
         /* 頁尾資訊 */
         footer {
-            margin-top: auto;
-            padding-top: 15px;
+            margin-top: 6px;
+            padding-top: 8px;
             border-top: 2px solid #000;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
             width: 100%;
             max-width: 100%;
+            min-height: 18mm;
             overflow: hidden;
         }
 
@@ -383,7 +402,7 @@
         }
 
         .page-note {
-            margin-top: 6px;
+            margin-top: 4px;
             text-align: right;
             font-size: 8pt;
             font-weight: bold;
@@ -401,20 +420,20 @@
         }
 
         .footer-brand-text .zh {
-            font-size: 20pt;
+            font-size: 18pt;
             font-weight: bold;
             line-height: 1;
         }
 
         .footer-brand-text .en {
-            font-size: 10pt;
+            font-size: 9pt;
             letter-spacing: 1px;
             margin-top: 2px;
         }
 
         .footer-logo {
-            height: 40px;
-            max-height: 50px;
+            height: 34px;
+            max-height: 38px;
             width: auto;
             object-fit: contain;
         }
@@ -428,7 +447,7 @@
         .footer-contacts {
             text-align: right;
             font-size: 8pt;
-            line-height: 1.4;
+            line-height: 1.25;
             min-width: 0;
             overflow-wrap: anywhere;
             word-break: break-word;
@@ -512,15 +531,16 @@
         }
 
         .page-container.compact-page footer {
-            padding-top: 8px;
+            padding-top: 6px;
+            min-height: 15mm;
         }
 
         .page-container.compact-page .footer-brand-text .zh {
-            font-size: 16pt;
+            font-size: 15pt;
         }
 
         .page-container.compact-page .footer-logo {
-            height: 30px;
+            height: 28px;
         }
 
         @media print {
@@ -556,15 +576,15 @@
                 overflow: hidden;
             }
             .main-content {
-                flex: 1;
+                flex: 0 0 auto;
             }
             footer {
-                margin-top: auto;
+                margin-top: 6px;
             }
             .company-logo,
             .footer-logo {
-                height: 1.2cm;
-                max-height: 1.5cm;
+                height: 34px;
+                max-height: 38px;
             }
             /* 防止表格跨頁分割 */
             table {
@@ -717,7 +737,7 @@
     <div class="sign-area">
         <div class="sign-box">承認</div>
         <div class="sign-box">審核</div>
-        <div class="sign-box">作成</div>
+        <div class="sign-box"><span class="sign-title">作成</span><span class="sign-name" id="creatorSignName"></span></div>
     </div>
     </div>
     </div><!-- end main-content -->
@@ -1006,6 +1026,29 @@
             currentOrderMainNotes = '';
             renderOrderMainNotes();
             return null;
+        }
+    }
+
+    async function loadCurrentUserName() {
+        try {
+            const response = await fetch('../api/session.php', {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'Accept': 'application/json' },
+            });
+            const result = await response.json();
+            if (!result.success || !result.data) return '';
+            return result.data.name || result.data.account || '';
+        } catch (error) {
+            console.warn('載入登入者失敗:', error);
+            return '';
+        }
+    }
+
+    function setCreatorSignName(name) {
+        const creatorEl = document.getElementById('creatorSignName');
+        if (creatorEl) {
+            creatorEl.textContent = name || '';
         }
     }
 
@@ -1476,6 +1519,8 @@
 
         // 載入公司基本資訊（頁尾）
         await loadCompanyInfo(companyId);
+
+        setCreatorSignName(await loadCurrentUserName());
 
         // 載入報表備註說明
         await loadReportDescription('order_confirmation');

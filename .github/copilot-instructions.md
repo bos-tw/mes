@@ -784,6 +784,11 @@ iconClass: 'fas fa-search'
 | 編輯 | `edit`, `edit-from-detail`, `edit-order-item`, `edit-order-item-inline`, `edit-screening-item`, `edit-work-order`, `edit-draft` | blue `#2563eb`，hover `#1d4ed8` |
 | 展開/收合細項 | `details` | cyan `#0891b2`，hover `#0e7490` |
 | 客戶批號/訂單細項入口 | `open-order-items` | sky `#0369a1`，hover `#075985` |
+| 開啟訂單 | `open-order` / `op-role-order` | sky `#0369a1`，hover `#075985` |
+| 開啟工單 / 工作流程文件 | `open-work-order` / `op-role-work-order` | brown-orange `#b45309`，hover `#92400e` |
+| 退貨單 / 退回流程入口 | `open-return-orders` / `op-role-return` | orange `#f97316`，hover `#ea580c` |
+| 二次篩選 / 重篩入口 | `create-second-screening`, `open-second-screening` / `op-role-rescreen` | cyan `#0891b2`，hover `#0e7490` |
+| 開啟客戶 | `open-customer` / `op-role-customer` | indigo `#4f46e5`，hover `#4338ca` |
 | 複製 | `copy-order-item` | fuchsia `#c026d3`，hover `#a21caf` |
 | 建工單/轉庫存 | `create-work-order`, `convert-to-inventory` | brown-orange `#b45309`，hover `#92400e` |
 | 跳轉/前往關聯資料 | `goto-work-order`, `go-to-*` | slate `#475569`，hover `#334155` |
@@ -839,6 +844,13 @@ iconClass: 'fas fa-search'
 | `view`, `view-detail`, `view-details`, `detail`, `show`, `preview`, `preview-logo` | `檢視` |
 | `details` | 依狀態使用 `展開細項` / `收合細項` |
 | `open-order-items` | `客戶批號` |
+| `open-order` | `開啟訂單` |
+| `open-work-order` | `開啟工單` |
+| `open-shipping-order` | `開啟出貨單` |
+| `open-return-orders` | `開啟退貨單` |
+| `create-second-screening` | `建立二次篩選` |
+| `open-second-screening` | `檢視二次篩選` |
+| `open-customer` | `開啟客戶` |
 | `edit`, `edit-draft`, `edit-from-detail`, `edit-order-item`, `edit-order-item-inline`, `edit-screening-item`, `edit-work-order` | `編輯` |
 | `delete`, `delete-*` | `刪除` |
 | `print`, `print-detail`, `print-single` | `列印` |
@@ -853,7 +865,9 @@ iconClass: 'fas fa-search'
 
 1. 先決定其語意角色（檢視 / 編輯 / 刪除 / 列印 / 流程 / 導向 / 中性）。
 2. 同步更新 `script.js`：
+   - `OPERATION_ACTION_ROLE_CLASSES`（若新增 `op-role-*` 角色 class）
    - `OPERATION_ACTION_ROLE_MAP`
+   - `OPERATION_ACTION_ICON_MAP`
    - `OPERATION_ACTION_LABEL_MAP`（若需統一名稱）
 3. 若需要新增角色色系，再更新 `styles.css` 的 `.op-role-*` 區塊。
 4. 修改後至少手動驗證兩個以上模組同時開啟時，操作欄顏色與 tooltip 命名一致。

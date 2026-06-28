@@ -888,6 +888,7 @@ function autoEnforcePermission(array $employee): void
         'production_work_order_schedule'=> 'manage_work_orders',
         'work_order_first_piece_dimensions' => 'manage_work_orders',
         'work_order_images'             => 'manage_work_orders',
+        'work_order_pre_production_images' => 'manage_work_orders',
         'work_order_completion_images'  => 'manage_work_orders',
         'work_order_defect_images'      => 'manage_work_orders',
         'work_order_tool_condition_images' => 'manage_work_orders',

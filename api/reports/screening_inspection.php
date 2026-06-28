@@ -188,11 +188,11 @@ try {
         $defectQty = isset($defectsMap[$serviceId]) ? (int)$defectsMap[$serviceId]['defect_quantity'] : 0;
         $totalDefectDistributionUnits += $defectQty;
 
-        // 格式化公差值
+        // 格式化公差值：列印報表顯示絕對值，固定 2 位小數，不顯示正負號。
         $toleranceDisplay = '';
-        if ($detail['tolerance_plus_value'] || $detail['tolerance_minus_value']) {
-            $plus = $detail['tolerance_plus_value'] ? '+' . $detail['tolerance_plus_value'] : '';
-            $minus = $detail['tolerance_minus_value'] ? '-' . $detail['tolerance_minus_value'] : '';
+        if ($detail['tolerance_plus_value'] !== null || $detail['tolerance_minus_value'] !== null) {
+            $plus = $detail['tolerance_plus_value'] !== null ? number_format(abs((float)$detail['tolerance_plus_value']), 2, '.', '') : '';
+            $minus = $detail['tolerance_minus_value'] !== null ? number_format(abs((float)$detail['tolerance_minus_value']), 2, '.', '') : '';
             $toleranceDisplay = trim($plus . ' / ' . $minus, ' /');
         }
 
@@ -412,6 +412,7 @@ try {
                 'id' => $workOrder['order_id'],
                 'order_number' => $workOrder['order_number'],
                 'order_date' => $workOrder['order_date'],
+                'incoming_date' => $workOrder['order_date'],
                 'customer_po_number' => $workOrder['customer_po_number'],
                 'expected_delivery_date' => $workOrder['expected_delivery_date']
             ],

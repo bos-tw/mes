@@ -890,6 +890,10 @@
                             <td>${escapeHtml(screening_item.name) || '-'}</td>
                         </tr>
                         <tr>
+                            <th><span class="field-title">進貨日期 <span class="title-en">Incoming Date</span></span></th>
+                            <td>${formatDate(order.incoming_date || order.order_date)}</td>
+                        </tr>
+                        <tr>
                             <th><span class="field-title">完工日期 <span class="title-en">Completion Date</span></span></th>
                             <td>${formatDate(work_order.actual_end_date)}</td>
                         </tr>

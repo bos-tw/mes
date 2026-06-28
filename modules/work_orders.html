@@ -552,11 +552,14 @@
                     </div>
 
                     <div class="work-order-image-sections-grid">
-                        <section class="form-section work-order-edit-pre-production-images">
+                        <section class="form-section work-order-edit-pre-production-images" data-collapsible-section>
                             <header class="subsection-header">
+                                <div class="subsection-actions">
+                                    <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-pre-production-images-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                                </div>
                                 <h4>工單圖片附件</h4>
                             </header>
-                            <div class="subsection-body">
+                            <div class="subsection-body" data-create-pre-production-images-section>
                                 <div class="table-responsive">
                                     <table class="data-table compact">
                                         <tbody>
@@ -960,14 +963,17 @@
                     </section>
 
                     <div class="work-order-image-sections-grid">
-                        <section class="form-section work-order-edit-pre-production-images">
+                        <section class="form-section work-order-edit-pre-production-images" data-collapsible-section>
                             <header class="subsection-header">
                                 <div class="subsection-actions">
-                                    <button type="button" class="btn ghost small" data-action="add-pre-production-image"><i class="fas fa-plus"></i><span>新增圖片</span></button>
+                                    <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-pre-production-images-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
                                 </div>
                                 <h4>工單圖片附件</h4>
+                                <div class="subsection-actions subsection-actions-right">
+                                    <button type="button" class="btn ghost small" data-action="add-pre-production-image"><i class="fas fa-plus"></i><span>新增圖片</span></button>
+                                </div>
                             </header>
-                            <div class="subsection-body">
+                            <div class="subsection-body" data-edit-pre-production-images-section>
                                 <div class="table-responsive">
                                     <table class="data-table compact">
                                         <thead>

@@ -2728,12 +2728,52 @@ td.actions-col {
     background: #075985;
 }
 
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-order {
+    background: #0369a1;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-order:hover {
+    background: #075985;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-work-order {
+    background: #b45309;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-work-order:hover {
+    background: #92400e;
+}
+
 :is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-shipping {
     background: #28a745;
 }
 
 :is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-shipping:hover {
     background: #1e7e34;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-return {
+    background: #f97316;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-return:hover {
+    background: #ea580c;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-rescreen {
+    background: #0891b2;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-rescreen:hover {
+    background: #0e7490;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-customer {
+    background: #4f46e5;
+}
+
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-customer:hover {
+    background: #4338ca;
 }
 
 :is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-add {
@@ -6163,6 +6203,7 @@ td.actions-col {
 [data-work-orders-edit-modal] .work-order-edit-detail-section,
 [data-work-orders-edit-modal] .work-order-edit-drawing-card,
 [data-work-orders-edit-modal] .work-order-edit-schedule-section,
+[data-work-orders-edit-modal] .work-order-edit-pre-production-images,
 [data-work-orders-edit-modal] .work-order-edit-execution-images,
 [data-work-orders-edit-modal] .work-order-edit-middle-row,
 [data-work-orders-edit-modal] .split-work-order-panel,
@@ -6174,6 +6215,7 @@ td.actions-col {
 [data-work-orders-edit-modal] .work-order-edit-detail-section,
 [data-work-orders-edit-modal] .work-order-edit-schedule-section,
 [data-work-orders-edit-modal] .work-order-edit-inspection-section,
+[data-work-orders-edit-modal] .work-order-edit-pre-production-images,
 [data-work-orders-edit-modal] .work-order-edit-execution-images,
 [data-work-orders-edit-modal] .work-order-edit-production-records {
     padding: 10px 12px;
@@ -6216,10 +6258,12 @@ td.actions-col {
     padding: 8px 10px;
 }
 
+[data-work-orders-edit-modal] .work-order-edit-pre-production-images,
 [data-work-orders-edit-modal] .work-order-edit-execution-images {
     padding: 8px 10px;
 }
 
+[data-work-orders-edit-modal] .work-order-edit-pre-production-images > .subsection-header,
 [data-work-orders-edit-modal] .work-order-edit-execution-images > .subsection-header {
     display: flex;
     align-items: center;
@@ -6231,6 +6275,7 @@ td.actions-col {
     border-bottom: 1px solid #dfe5ec;
 }
 
+[data-work-orders-edit-modal] .work-order-edit-pre-production-images > .subsection-header h4,
 [data-work-orders-edit-modal] .work-order-edit-execution-images > .subsection-header h4 {
     margin: 0;
     flex: 0 1 auto;
@@ -6238,11 +6283,17 @@ td.actions-col {
     font-weight: 600;
 }
 
+[data-work-orders-edit-modal] .work-order-edit-pre-production-images .subsection-actions,
 [data-work-orders-edit-modal] .work-order-edit-execution-images .subsection-actions {
     margin-bottom: 0;
     align-items: center;
 }
 
+[data-work-orders-edit-modal] .work-order-edit-pre-production-images .subsection-actions-right {
+    margin-left: auto;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-pre-production-images > .subsection-body,
 [data-work-orders-edit-modal] .work-order-edit-execution-images > .subsection-body {
     padding-left: 2px;
     padding-right: 2px;

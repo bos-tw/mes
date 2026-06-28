@@ -19,29 +19,56 @@ window.AppVersionChecker = (function () {
     let _enabled        = true;
     let _intervalId     = null;
     let _lastCheckedAt  = 0;
+    const AUTO_RELOAD_SESSION_KEY = 'mes_auto_reloaded_asset_version';
 
-    function buildReloadUrl() {
+    function buildReloadUrl(targetVersion = '') {
         const url = new URL(window.location.href);
         url.searchParams.set('_reload', Date.now().toString());
+        if (targetVersion) {
+            url.searchParams.set('_asset_version', targetVersion);
+        }
         return url.toString();
     }
 
     async function clearBrowserRuntimeCaches() {
-        if (!('caches' in window)) {
+        try {
+            if ('caches' in window) {
+                const names = await caches.keys();
+                await Promise.all(names.map(name => caches.delete(name)));
+            }
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(registrations.map(registration => registration.unregister()));
+            }
+        } catch (_e) {
+            // Runtime cache / Service Worker 不是必要條件，失敗時仍繼續重整。
+        }
+    }
+
+    async function reloadNow(targetVersion = '') {
+        await clearBrowserRuntimeCaches();
+        window.location.replace(buildReloadUrl(targetVersion));
+    }
+
+    async function autoReloadForVersion(targetVersion) {
+        const normalizedTarget = String(targetVersion || '').trim();
+        if (!normalizedTarget) {
+            showUpdateBanner();
             return;
         }
 
         try {
-            const names = await caches.keys();
-            await Promise.all(names.map(name => caches.delete(name)));
+            const reloadedVersion = sessionStorage.getItem(AUTO_RELOAD_SESSION_KEY);
+            if (reloadedVersion === normalizedTarget) {
+                showUpdateBanner();
+                return;
+            }
+            sessionStorage.setItem(AUTO_RELOAD_SESSION_KEY, normalizedTarget);
         } catch (_e) {
-            // Cache API 不是必要條件，失敗時仍繼續重整。
+            // sessionStorage 失效時仍嘗試自動刷新一次。
         }
-    }
 
-    async function reloadNow() {
-        await clearBrowserRuntimeCaches();
-        window.location.replace(buildReloadUrl());
+        await reloadNow(normalizedTarget);
     }
 
     function showUpdateBanner() {
@@ -84,7 +111,7 @@ window.AppVersionChecker = (function () {
             if (_currentVersion === null) {
                 _currentVersion = ver;
             } else if (ver !== _currentVersion) {
-                showUpdateBanner();
+                await autoReloadForVersion(ver);
             }
         } catch (_e) {
             // 網路錯誤靜默忽略
@@ -386,7 +413,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         'op-role-screening-report',
         'op-role-expand',
         'op-role-order-items',
+        'op-role-order',
+        'op-role-work-order',
         'op-role-shipping',
+        'op-role-return',
+        'op-role-rescreen',
+        'op-role-customer',
         'op-role-add',
         'op-role-copy',
         'op-role-state',
@@ -411,6 +443,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         'open-attachment': 'view',
         'open-invoice-stamp': 'view',
         'open-order-items': 'order-items',
+        'open-order': 'order',
+        'open-work-order': 'work-order',
+        'open-shipping-order': 'shipping',
+        'open-return-orders': 'return',
+        'create-second-screening': 'rescreen',
+        'open-second-screening': 'rescreen',
+        'open-customer': 'customer',
         edit: 'edit',
         'edit-draft': 'edit',
         'edit-from-detail': 'edit',
@@ -464,6 +503,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         'open-attachment': 'fa-external-link-alt',
         'open-invoice-stamp': 'fa-external-link-alt',
         'open-order-items': 'fa-list-ul',
+        'open-order': 'fa-file-invoice',
+        'open-work-order': 'fa-clipboard',
+        'open-shipping-order': 'fa-shipping-fast',
+        'open-return-orders': 'fa-undo',
+        'create-second-screening': 'fa-redo',
+        'open-second-screening': 'fa-redo',
+        'open-customer': 'fa-handshake',
         edit: 'fa-edit',
         'edit-draft': 'fa-edit',
         'edit-from-detail': 'fa-edit',
@@ -515,6 +561,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         'open-attachment': '開啟附件',
         'open-invoice-stamp': '開啟附件',
         'open-order-items': '客戶批號',
+        'open-order': '開啟訂單',
+        'open-work-order': '開啟工單',
+        'open-shipping-order': '開啟出貨單',
+        'open-return-orders': '開啟退貨單',
+        'create-second-screening': '建立二次篩選',
+        'open-second-screening': '檢視二次篩選',
+        'open-customer': '開啟客戶',
         edit: '編輯',
         'edit-draft': '編輯',
         'edit-from-detail': '編輯',
@@ -1296,6 +1349,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         production_work_order_schedule: 'manage_work_orders',
         work_order_first_piece_dimensions: 'manage_work_orders',
         work_order_images: 'manage_work_orders',
+        work_order_pre_production_images: 'manage_work_orders',
         work_order_completion_images: 'manage_work_orders',
         work_order_defect_images: 'manage_work_orders',
         work_order_tool_condition_images: 'manage_work_orders',
