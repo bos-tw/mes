@@ -591,7 +591,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         'print-detail': '列印',
         'print-single': '列印',
         'print-work-order': '列印工單',
-        'print-screening-report': '列印篩分檢驗結果報表',
+        'print-screening-report': '列印品質檢驗報表',
         'add-item': '新增項目',
         'copy-order-item': '複製',
         'remove-from-machine-schedule': '移回待排程',

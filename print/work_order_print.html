@@ -83,7 +83,7 @@
         .document-header {
             min-height: 15mm;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 68mm 15mm;
+            grid-template-columns: minmax(0, 1fr) 83mm;
             align-items: center;
             gap: 1.5mm;
             padding: 0 .4mm .6mm 0;
@@ -129,16 +129,9 @@
             font-weight: 700;
         }
 
-        .document-qr {
-            width: 15mm;
-            display: flex;
-            justify-content: flex-end;
-            justify-self: end;
-        }
-
         .document-qr-box {
-            width: 13mm;
-            height: 13mm;
+            width: 100%;
+            height: 100%;
             border: var(--outer-line) solid var(--line);
             display: flex;
             align-items: center;
@@ -417,6 +410,46 @@
             white-space: pre-wrap;
         }
 
+        .report-notes-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 3mm;
+            align-items: stretch;
+        }
+
+        .report-notes-layout .section {
+            margin-top: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .report-notes-box {
+            min-height: 14mm;
+            flex: 1;
+        }
+
+        .report-qr-panel {
+            display: flex;
+            align-items: stretch;
+            justify-content: stretch;
+        }
+
+        .report-qr-body {
+            width: 20mm;
+            height: 20mm;
+            border: var(--outer-line) solid var(--line);
+            padding: 1mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .report-qr-wrapper {
+            width: 100%;
+            height: 100%;
+            min-height: 100%;
+        }
+
         .document-footer {
             margin-top: 2mm;
             min-height: 10mm;
@@ -489,6 +522,10 @@
 
         .sheet.dense-sheet .notes-box {
             min-height: 8mm;
+        }
+
+        .sheet.dense-sheet .report-notes-box {
+            min-height: 11mm;
         }
 
         .loading,
@@ -882,9 +919,6 @@
                     <div class="document-due-date"><strong>預計交期：</strong>${formatDateWithWeekday(wo.expected_delivery_date)}</div>
                 </div>
             </div>
-            <div class="document-qr">
-                <div class="document-qr-box" data-mobile-qr-url="${escapeHtml(mobileQuickEntryUrl)}"></div>
-            </div>
         </header>
         <div class="document-info-bar${context.isSplit ? ' has-split' : ''}">
             ${splitMarker}
@@ -1014,11 +1048,18 @@
             <div class="notes-box">${escapeHtml(notes)}</div>
         </section>
 
-        ${reportNotes ? `
-        <section class="section">
-            <div class="section-heading">備註</div>
-            <div class="notes-box">${escapeHtml(reportNotes)}</div>
-        </section>
+        ${(reportNotes || mobileQuickEntryUrl) ? `
+        <div class="report-notes-layout section">
+            <section class="section">
+                <div class="section-heading">備註</div>
+                <div class="notes-box report-notes-box">${escapeHtml(reportNotes)}</div>
+            </section>
+            <section class="report-qr-panel">
+                <div class="report-qr-body">
+                    <div class="document-qr-box report-qr-wrapper" data-mobile-qr-url="${escapeHtml(mobileQuickEntryUrl)}"></div>
+                </div>
+            </section>
+        </div>
         ` : ''}
     </div>
 
@@ -1171,10 +1212,37 @@
         ));
     }
 
+    function syncReportQrPanelHeights() {
+        document.querySelectorAll('.report-notes-layout').forEach((layout) => {
+            const notesSection = layout.querySelector('.report-notes-box')?.closest('.section');
+            const qrSection = layout.querySelector('.report-qr-panel');
+            const qrBody = qrSection?.querySelector('.report-qr-body');
+
+            if (!notesSection || !qrSection || !qrBody) {
+                return;
+            }
+
+            qrSection.style.height = '';
+            qrSection.style.width = '';
+            qrBody.style.height = '';
+            qrBody.style.width = '';
+
+            const notesHeight = Math.ceil(notesSection.getBoundingClientRect().height);
+            const qrSize = Math.max(notesHeight, 48);
+
+            qrSection.style.width = `${qrSize}px`;
+            qrSection.style.height = `${qrSize}px`;
+            qrBody.style.width = `${qrSize}px`;
+            qrBody.style.height = `${qrSize}px`;
+        });
+    }
+
     function renderPrintedQrCodes() {
         if (typeof QRCode === 'undefined') {
             return;
         }
+
+        syncReportQrPanelHeights();
 
         document.querySelectorAll('[data-mobile-qr-url]').forEach((container) => {
             const targetUrl = String(container.getAttribute('data-mobile-qr-url') || '').trim();
@@ -1183,10 +1251,12 @@
                 return;
             }
             container.innerHTML = '';
+            const rect = container.getBoundingClientRect();
+            const size = Math.max(48, Math.floor(Math.min(rect.width || 0, rect.height || 0) || 78));
             new QRCode(container, {
                 text: targetUrl,
-                width: 78,
-                height: 78,
+                width: size,
+                height: size,
                 correctLevel: QRCode.CorrectLevel.H
             });
         });

@@ -238,7 +238,7 @@
                 // 根據 report_code 判斷使用報表
                 let usedInText = '-';
                 if (item.report_code === 'screening_inspection') {
-                    usedInText = '篩分檢驗結果報表';
+                    usedInText = '品質檢驗報表';
                 } else if (item.report_code === 'work_order') {
                     usedInText = '生產命令單';
                 } else if (item.report_code === 'shipping_order') {

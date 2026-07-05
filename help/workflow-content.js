@@ -98,7 +98,7 @@ const WORKFLOW_ARTICLES = {
                 <h4>工單完工入庫</h4>
                 <p>工單完成後建立庫存品項與入庫異動，保留來源工單與客戶批號追溯。</p>
                 <div class="node-output">模組：生產工單 / 庫存管理</div>
-                <div class="node-print">列印：篩分檢驗結果報表</div>
+                <div class="node-print">列印：品質檢驗報表</div>
             </article>
             <article class="process-node shipping">
                 <span class="node-step">10</span>
@@ -110,7 +110,7 @@ const WORKFLOW_ARTICLES = {
             <article class="process-node shipping">
                 <span class="node-step">11</span>
                 <h4>出貨品檢與列印</h4>
-                <p>需要時執行出貨品質檢驗，列印出貨單與篩分檢驗結果報表。</p>
+                <p>需要時執行出貨品質檢驗，列印出貨單與品質檢驗報表。</p>
                 <div class="node-output">輸出：出貨單、檢驗報表</div>
             </article>
         </div>
@@ -165,7 +165,7 @@ const WORKFLOW_ARTICLES = {
         </tr>
         <tr>
             <td>工單完工、品質資料完成後</td>
-            <td><strong>篩分檢驗結果報表</strong></td>
+            <td><strong>品質檢驗報表</strong></td>
             <td>生產工單列表 → 列印篩分檢驗報表</td>
             <td>彙整篩分結果、不良分類、品質統計與檢驗說明</td>
             <td>客戶 / 品管 / 業務</td>
@@ -188,7 +188,7 @@ const WORKFLOW_ARTICLES = {
 </table>
 
 <div class="warning">
-    <div><strong>列印原則：</strong>委託確認單在接單確認時列印；現場工作單在排程派工時列印；篩分檢驗結果報表在工單完工且品質資料完整後列印；出貨單在出貨確認後列印；退貨單在退貨資料建立後列印。</div>
+    <div><strong>列印原則：</strong>委託確認單在接單確認時列印；現場工作單在排程派工時列印；品質檢驗報表在工單完工且品質資料完整後列印；出貨單在出貨確認後列印；退貨單在退貨資料建立後列印。</div>
 </div>
 
 <h2>角色與主要操作</h2>
@@ -237,7 +237,7 @@ const WORKFLOW_ARTICLES = {
     <li><strong>接單時：</strong>先建訂單主表，再建立客戶批號；一張訂單可包含多個客戶批號，內容確認後列印客戶代工委託確認單。</li>
     <li><strong>排程時：</strong>由客戶批號建立工單，避免直接建立無來源工單，確保後續可追溯；派工前列印現場工作單。</li>
     <li><strong>生產中：</strong>首件檢驗與生產紀錄要跟工單綁定，不良類別要即時記錄。</li>
-    <li><strong>完工後：</strong>確認工單狀態與庫存入庫資料，避免已完工但未形成可出貨庫存；品質資料完成後列印篩分檢驗結果報表。</li>
+    <li><strong>完工後：</strong>確認工單狀態與庫存入庫資料，避免已完工但未形成可出貨庫存；品質資料完成後列印品質檢驗報表。</li>
     <li><strong>出貨前：</strong>確認可出貨數量、出貨品檢與出貨單列印需求。</li>
     <li><strong>異常時：</strong>從品質異常或退貨單回溯到出貨、庫存、工單、客戶批號與訂單；退貨成立時列印退貨單。</li>
 </ol>
@@ -344,7 +344,7 @@ const WORKFLOW_ARTICLES = {
         <ol class="steps-sub">
             <li>出貨確認 → 扣減庫存（inventory_transactions，direction = outbound）</li>
             <li>更新客戶批號的累計已出貨數量（total_shipped_quantity）</li>
-            <li>列印：出貨單、篩分檢驗結果報表</li>
+            <li>列印：出貨單、品質檢驗報表</li>
         </ol>
     </li>
     <li>
@@ -389,7 +389,7 @@ const WORKFLOW_ARTICLES = {
             <td>A4 一半（連續報表紙）</td>
         </tr>
         <tr>
-            <td><strong>篩分檢驗結果報表</strong></td>
+            <td><strong>品質檢驗報表</strong></td>
             <td>工單完工/出貨時</td>
             <td>提供客戶，顯示品質數據與不良率</td>
             <td>A4</td>
@@ -551,7 +551,7 @@ const WORKFLOW_ARTICLES = {
     <li>輸入出貨數量（可部分出貨）</li>
     <li>出貨確認 → 扣減庫存（建立 outbound 異動記錄）</li>
     <li>更新客戶批號的累計已出貨數量</li>
-    <li>列印出貨單、篩分檢驗結果報表</li>
+    <li>列印出貨單、品質檢驗報表</li>
 </ol>
 
 <h2>下一步</h2>
@@ -1005,7 +1005,7 @@ const WORKFLOW_ARTICLES = {
     </li>
 </ol>
 
-<h3>5.5 列印出貨單與篩分檢驗結果報表</h3>
+<h3>5.5 列印出貨單與品質檢驗報表</h3>
 
 <ol class="steps">
     <li>
@@ -1020,7 +1020,7 @@ const WORKFLOW_ARTICLES = {
         </ul>
     </li>
     <li>
-        <strong>列印篩分檢驗結果報表</strong><br>
+        <strong>列印品質檢驗報表</strong><br>
         在工單列表中，點擊工單的「列印報表」按鈕<br>
         系統開啟列印預覽頁面（A4），顯示：
         <ul>

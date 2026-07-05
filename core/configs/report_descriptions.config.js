@@ -32,8 +32,8 @@ ModuleConfig.register('report_descriptions', {
                 title: '基本資訊',
                 fields: [
                     { name: 'report_code', label: '報表代碼', type: 'text', required: true, placeholder: '例如: screening_inspection', fullWidth: true },
-                    { name: 'report_name', label: '報表名稱（中文）', type: 'text', required: true, placeholder: '例如: 篩分檢驗結果報表', fullWidth: true },
-                    { name: 'report_name_en', label: '報表名稱（英文）', type: 'text', placeholder: '例如: Screening Inspection Report', fullWidth: true },
+                    { name: 'report_name', label: '報表名稱（中文）', type: 'text', required: true, placeholder: '例如: 品質檢驗報表', fullWidth: true },
+                    { name: 'report_name_en', label: '報表名稱（英文）', type: 'text', placeholder: '例如: Quality Inspection Report', fullWidth: true },
                     { name: 'is_active', label: '是否啟用', type: 'select', fullWidth: true, options: [
                         { value: '1', label: '啟用' },
                         { value: '0', label: '停用' }

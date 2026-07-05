@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>篩分檢驗結果報表 - 列印</title>
+    <title>品質檢驗報表 - 列印</title>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- QR Code 生成套件 (使用 qrcodejs) -->
@@ -620,7 +620,7 @@
         return;
     }
 
-    document.title = isPreviewMode ? '篩分檢驗結果報表 - 空白預覽' : '篩分檢驗結果報表 - 列印';
+    document.title = isPreviewMode ? '品質檢驗報表 - 空白預覽' : '品質檢驗報表 - 列印';
 
     // 載入報表資料
     if (isPreviewMode) {
@@ -827,8 +827,8 @@
             <!-- 標題區 -->
             <div class="header-section">
                 <div class="header-left">
-                    <div class="main-title">篩分檢驗結果報表</div>
-                    <div class="sub-title">Screening Inspection Report</div>
+                    <div class="main-title">品質檢驗報表</div>
+                    <div class="sub-title">Quality Inspection Report</div>
                 </div>
                 <div class="header-right">
                     <div class="qrcode-wrapper">
@@ -898,7 +898,7 @@
                             <td>${formatDate(work_order.actual_end_date)}</td>
                         </tr>
                         <tr>
-                            <th><span class="field-title">操作人員 <span class="title-en">Assigned Operator</span></span></th>
+                            <th><span class="field-title">架機人員 <span class="title-en">Machine Setup Operator</span></span></th>
                             <td>${escapeHtml(work_order.assigned_employee_name) || '-'}</td>
                         </tr>
                     </table>

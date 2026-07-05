@@ -773,6 +773,7 @@
     let currentFinalQuotePerM = null;
     let currentSinglePpm = null;
     let currentOrderTotalAmount = null;
+    let currentCustomerMinimumOrderAmount = null;
     let currentOrderMainNotes = '';
 
     /**
@@ -950,6 +951,7 @@
             currentFinalQuotePerM = null;
             currentSinglePpm = null;
             currentOrderTotalAmount = null;
+            currentCustomerMinimumOrderAmount = null;
             currentOrderMainNotes = '';
             renderOrderMainNotes();
             return null;
@@ -1001,6 +1003,9 @@
                 currentOrderTotalAmount = Number.isFinite(Number(order.total_amount))
                     ? Number(order.total_amount)
                     : null;
+                currentCustomerMinimumOrderAmount = Number.isFinite(Number(order.customer_minimum_order_amount))
+                    ? Number(order.customer_minimum_order_amount)
+                    : null;
                 currentOrderMainNotes = order.notes || '';
                 renderOrderMainNotes();
 
@@ -1012,6 +1017,7 @@
                 currentFinalQuotePerM = null;
                 currentSinglePpm = null;
                 currentOrderTotalAmount = null;
+                currentCustomerMinimumOrderAmount = null;
                 currentOrderMainNotes = '';
                 renderOrderMainNotes();
                 return null;
@@ -1023,6 +1029,7 @@
             currentFinalQuotePerM = null;
             currentSinglePpm = null;
             currentOrderTotalAmount = null;
+            currentCustomerMinimumOrderAmount = null;
             currentOrderMainNotes = '';
             renderOrderMainNotes();
             return null;
@@ -1074,6 +1081,14 @@
             minimumFractionDigits: decimals,
             maximumFractionDigits: decimals
         });
+    }
+
+    function formatMinimumChargeAmount(amount) {
+        const value = Number(amount);
+        if (!Number.isFinite(value)) return '';
+        return Number.isInteger(value)
+            ? String(value)
+            : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
     }
 
     /**
@@ -1436,10 +1451,14 @@
                                 <td colspan="3" class="text-right text-emphasis">${finalQuoteText}</td>
                             </tr>
                         `;
-                        const minimumChargeNoticeRowHtml = currentOrderTotalAmount !== null && currentOrderTotalAmount < 2000
+                        const minimumChargeAmountText = formatMinimumChargeAmount(currentCustomerMinimumOrderAmount);
+                        const minimumChargeNoticeRowHtml = currentOrderTotalAmount !== null
+                            && currentCustomerMinimumOrderAmount !== null
+                            && currentCustomerMinimumOrderAmount > 0
+                            && currentOrderTotalAmount < currentCustomerMinimumOrderAmount
                             ? `
                             <tr>
-                                <td colspan="5" class="text-right minimum-charge-notice">單批不足量以2000元計</td>
+                                <td colspan="5" class="text-right minimum-charge-notice">單批不足量以${minimumChargeAmountText}元計</td>
                             </tr>
                         `
                             : '';

@@ -54,7 +54,7 @@ jsonResponse(['success' => true, 'data' => $data]);
 function ensureDefaultReportDescriptions(PDO $pdo): void
 {
     $defaults = [
-        ['screening_inspection', '篩分檢驗結果報表', 'Screening Inspection Report'],
+        ['screening_inspection', '品質檢驗報表', 'Quality Inspection Report'],
         ['shipping_order', '出貨單', 'Shipping Order'],
         ['return_order', '退貨單', 'Return Order'],
         ['work_order', '生產命令單', 'Production Work Order'],

@@ -5499,7 +5499,7 @@
     }
 
     /**
-     * 列印篩分檢驗結果報表
+     * 列印品質檢驗報表
      * @param {number|string} workOrderId - 工單 ID
      */
     function printScreeningInspectionReport(workOrderId) {
@@ -5810,7 +5810,7 @@
                     <button type="button" class="btn text op-action-btn op-role-print" data-action="print-work-order" title="${item.is_printed ? '再次列印（已列印過）' : '列印工單'}" aria-label="${item.is_printed ? '再次列印（已列印過）' : '列印工單'}">
                         <i class="fas fa-print"></i>
                     </button>
-                    <button type="button" class="btn text op-action-btn op-role-screening-report" data-action="print-screening-report" title="列印篩分檢驗結果報表" aria-label="列印篩分檢驗結果報表">
+                    <button type="button" class="btn text op-action-btn op-role-screening-report" data-action="print-screening-report" title="列印品質檢驗報表" aria-label="列印品質檢驗報表">
                         <i class="fas fa-file-medical-alt"></i>
                     </button>
                     <button type="button" class="btn text" data-action="edit-work-order" title="編輯" aria-label="編輯工單">
