@@ -111,9 +111,6 @@
         }
 
         .document-dates {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1mm;
             padding-top: .8mm;
             font-size: 6.5pt;
             line-height: 1.2;
@@ -121,11 +118,6 @@
         }
 
         .document-dates strong {
-            font-weight: 700;
-        }
-
-        .document-due-date {
-            font-size: 7.2pt;
             font-weight: 700;
         }
 
@@ -161,19 +153,36 @@
         }
 
         .document-info-bar {
-            min-height: 2mm;
+            min-height: 5mm;
             border-top: var(--thick-line) solid var(--heading-line);
-            border-bottom: var(--outer-line) solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: .5mm .8mm .2mm;
         }
 
         .document-info-bar.has-split {
             min-height: 7mm;
+            justify-content: space-between;
+            gap: 2mm;
         }
 
         .document-info-bar .split-marker {
             display: flex;
             align-items: center;
-            padding: 1mm .8mm;
+            padding: 0;
+        }
+
+        .document-due-date {
+            font-size: 11pt;
+            font-weight: 800;
+            letter-spacing: .2mm;
+            white-space: nowrap;
+        }
+
+        .document-info-bar.has-split .document-due-date {
+            font-size: 9.5pt;
+            letter-spacing: .1mm;
         }
 
         .section {
@@ -916,12 +925,12 @@
                 <div class="document-number">${escapeHtml(context.displayNumber)}</div>
                 <div class="document-dates">
                     <div><strong>製單日期：</strong>${formatDateWithWeekday(wo.created_at)}</div>
-                    <div class="document-due-date"><strong>預計交期：</strong>${formatDateWithWeekday(wo.expected_delivery_date)}</div>
                 </div>
             </div>
         </header>
         <div class="document-info-bar${context.isSplit ? ' has-split' : ''}">
             ${splitMarker}
+            <div class="document-due-date">預計交期：${formatDateWithWeekday(wo.expected_delivery_date)}</div>
         </div>
 
         <section class="section">

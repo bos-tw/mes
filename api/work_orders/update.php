@@ -373,6 +373,7 @@ try {
     // ===== 工單完工 → 依使用者選擇建立庫存品項 =====
     $isCompletingNow = ($newIsCompleted && !$oldIsCompleted);
     $isReopeningCompleted = ($oldIsCompleted && !$newIsCompleted);
+    $completionGuard = null;
 
     if ($isReopeningCompleted && $deleteInventoryOnReopen) {
         require_once __DIR__ . '/../inventory_items/helpers.php';
@@ -428,23 +429,7 @@ try {
         $clearShortageStmt->execute(['id' => $id]);
     }
 
-    if ($isCompletingNow) {
-        $orderItemStmt = $pdo->prepare("
-            SELECT oi.id AS order_item_id, oi.order_id, oi.screening_item_id,
-                   oi.customer_batch_number, o.customer_id
-            FROM order_items oi
-            JOIN orders o ON oi.order_id = o.id
-            WHERE oi.id = :oiid
-        ");
-        $orderItemStmt->execute(['oiid' => $existingWorkOrder['order_item_id']]);
-        $orderItemInfo = $orderItemStmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$orderItemInfo) {
-            $pdo->rollBack();
-            jsonResponse(['success' => false, 'message' => '找不到工單對應的訂單品項，無法完成工單。'], 409);
-            return;
-        }
-
+    if ($newIsCompleted) {
         $orderItemMetrics = fetchOrderItemDetailsForWorkOrder($pdo, (int)$existingWorkOrder['order_item_id']) ?? [];
         $expectedNetWeightKg = round((float)(
             $data['total_weight_kg']
@@ -488,6 +473,42 @@ try {
             ], 409);
             return;
         }
+
+        $completionGuard = [
+            'expected_net_weight_kg' => $expectedNetWeightKg,
+            'weight_per_unit_g' => $weightPerUnitG,
+            'production_summary' => $productionSummary,
+            'partial_summary' => $partialSummary,
+            'partial_received_net_weight_kg' => $partialReceivedNetWeightKg,
+            'partial_received_units' => $partialReceivedUnits,
+            'produced_net_weight_kg' => $producedNetWeightKg,
+        ];
+    }
+
+    if ($isCompletingNow) {
+        $orderItemStmt = $pdo->prepare("
+            SELECT oi.id AS order_item_id, oi.order_id, oi.screening_item_id,
+                   oi.customer_batch_number, o.customer_id
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.id
+            WHERE oi.id = :oiid
+        ");
+        $orderItemStmt->execute(['oiid' => $existingWorkOrder['order_item_id']]);
+        $orderItemInfo = $orderItemStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$orderItemInfo) {
+            $pdo->rollBack();
+            jsonResponse(['success' => false, 'message' => '找不到工單對應的訂單品項，無法完成工單。'], 409);
+            return;
+        }
+
+        $expectedNetWeightKg = (float)$completionGuard['expected_net_weight_kg'];
+        $weightPerUnitG = (float)$completionGuard['weight_per_unit_g'];
+        $productionSummary = $completionGuard['production_summary'];
+        $partialSummary = $completionGuard['partial_summary'];
+        $partialReceivedNetWeightKg = (float)$completionGuard['partial_received_net_weight_kg'];
+        $partialReceivedUnits = (float)$completionGuard['partial_received_units'];
+        $producedNetWeightKg = (float)$completionGuard['produced_net_weight_kg'];
 
         $shortageNetWeightKg = round(max($expectedNetWeightKg - $producedNetWeightKg, 0), 2);
         $shortageUnits = workOrderUnitsFromWeight($shortageNetWeightKg, $weightPerUnitG);

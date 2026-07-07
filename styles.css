@@ -7093,6 +7093,7 @@ td.actions-col {
 [data-work-orders-edit-modal] .work-order-edit-service-section table {
     table-layout: fixed;
     width: 100%;
+    min-width: 760px;
 }
 
 [data-work-orders-edit-modal] .work-order-edit-service-section th,
@@ -7100,6 +7101,12 @@ td.actions-col {
     height: 34px;
     padding: 4px 6px;
     vertical-align: middle;
+}
+
+[data-work-orders-edit-modal] .work-order-edit-service-section th:nth-child(5),
+[data-work-orders-edit-modal] .work-order-edit-service-section td:nth-child(5) {
+    width: 112px;
+    min-width: 112px;
 }
 
 [data-screening-services-table] th:first-child,
@@ -7119,6 +7126,10 @@ td.actions-col {
     min-height: 28px;
     padding: 4px 6px;
     font-size: var(--font-base);
+}
+
+[data-work-orders-edit-modal] .screening-service-defect-input {
+    min-width: 88px;
 }
 
 [data-work-orders-edit-modal] .work-order-edit-first-piece-card .work-order-first-piece-grid {

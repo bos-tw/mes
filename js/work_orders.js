@@ -4908,6 +4908,28 @@
             .some(field => hasSubmittedValue(record[field]));
     }
 
+    function collectPrimaryScheduleFields(form, data) {
+        if (!form || !data || data.work_order_type === 'split') {
+            return;
+        }
+
+        const scheduleSection = form.querySelector('[data-edit-schedule-section], [data-create-schedule-section]') || form;
+        const scheduleFields = [
+            'assigned_employee_id',
+            'machine_id',
+            'calibration_employee_id',
+            'quantity_to_produce'
+        ];
+
+        scheduleFields.forEach((fieldName) => {
+            const field = scheduleSection.querySelector(`[name="${fieldName}"]`);
+            if (!field || field.disabled) {
+                return;
+            }
+            data[fieldName] = field.value;
+        });
+    }
+
     async function handleFormSubmit(e) {
         e.preventDefault();
 
@@ -4940,17 +4962,24 @@
         const screeningServiceRows = form.querySelectorAll(
             isEditMode ? '[data-edit-screening-services-body] tr[data-service-id]' : '[data-screening-services-body] tr[data-service-id]'
         );
-        screeningServiceRows.forEach((row) => {
+        for (const row of screeningServiceRows) {
             const serviceId = String(row.dataset.serviceId || '').trim();
             if (!serviceId) {
-                return;
+                continue;
             }
 
             const defectInput = row.querySelector('[name^="defect_quantity_"]');
             const notesInput = row.querySelector('[name^="screening_notes_"]');
-            const defectQuantity = parseInt(defectInput?.value || '0', 10) || 0;
+            const rawDefectQuantity = String(defectInput?.value || '0').trim();
+            const numericDefectQuantity = rawDefectQuantity === '' ? 0 : Number(rawDefectQuantity);
             const notes = notesInput ? notesInput.value.trim() : '';
 
+            if (!Number.isInteger(numericDefectQuantity) || numericDefectQuantity < 0) {
+                showModalAlert('error', '不良品數量必須為 0 或正整數。', false, isEditMode);
+                return;
+            }
+
+            const defectQuantity = numericDefectQuantity;
             if (defectQuantity > 0 || notes !== '') {
                 screeningDefects.push({
                     screening_service_id: serviceId,
@@ -4958,10 +4987,10 @@
                     notes: notes || null
                 });
             }
-        });
+        }
 
-        // 將篩分服務缺陷數量加入 payload
-        if (screeningDefects.length > 0) {
+        // 表格已載入時一律送出目前狀態，讓使用者可把既有不良數量清為 0。
+        if (screeningServiceRows.length > 0) {
             data.screening_defects = screeningDefects;
         }
 
@@ -5053,6 +5082,7 @@
 
         const workOrderType = form.querySelector('[name="work_order_type"]')?.value || 'normal';
         data.work_order_type = workOrderType;
+        collectPrimaryScheduleFields(form, data);
         if (workOrderType === 'split') {
             data.machine_id = null;
             const splitValidationMessage = validateSplitMachineRunsBeforeSubmit(isEditMode);
@@ -6603,10 +6633,10 @@
             }
 
             // 不良品數量 (編輯時可輸入)
-            const defectQuantity = service.defect_quantity || 0;
+            const defectQuantity = service.defect_quantity ?? 0;
             const defectInput = isEditMode
                 ? `<input type="number" name="defect_quantity_${serviceKey}"
-                          value="${defectQuantity}" min="0" step="1"
+                          value="${escapeHtml(String(defectQuantity))}" min="0" step="1" inputmode="numeric"
                           data-service-id="${serviceKey}"
                           class="screening-service-defect-input" />`
                 : `<span>${defectQuantity}</span>`;
