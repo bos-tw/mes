@@ -46,6 +46,69 @@ body {
 | 徽章 | `6px` |
 | 頭像/Logo | `50%`（圓形） |
 
+### 1.4 UI Token 與密度規範（強制）
+
+MES 是資料密集型後台系統，預設 UI 密度為 `compact`。所有新增或重構的表格、表單、Modal、統計側欄、區塊標題與卡片 spacing，必須優先使用 `:root` token 或既有共用 class，不得再用零散硬編碼形成第二套視覺規格。
+
+#### 必備 token
+
+`styles.css` 的 `:root` 必須維護以下語意 token；若需要新增同類規格，需先確認是否可沿用既有 token。
+
+```css
+:root {
+    --ui-density: compact;
+
+    --ui-section-padding-y: 8px;
+    --ui-section-padding-x: 10px;
+    --ui-section-gap: 8px;
+    --ui-subsection-header-padding-y: 0;
+    --ui-subsection-header-padding-bottom: 6px;
+
+    --ui-control-height: 32px;
+    --ui-control-padding-y: 4px;
+    --ui-control-padding-x: 8px;
+    --ui-inline-label-width: 112px;
+    --ui-inline-label-padding-y: 4px;
+    --ui-inline-label-padding-x: 8px;
+
+    --ui-table-cell-padding-y: 4px;
+    --ui-table-cell-padding-x: 6px;
+    --ui-table-header-padding-y: 5px;
+    --ui-table-header-padding-x: 6px;
+
+    --ui-card-padding-y: 10px;
+    --ui-card-padding-x: 12px;
+    --ui-metric-row-padding-y: 6px;
+    --ui-metric-row-padding-x: 8px;
+    --ui-metric-gap: 8px;
+
+    --ui-radius-control: 4px;
+    --ui-radius-card: 8px;
+    --ui-radius-panel: 8px;
+    --ui-radius-pill: 999px;
+}
+```
+
+#### 使用規則
+
+- 新 CSS 不得直接散落新增 `padding: 10px 14px`、`gap: 13px`、`min-height: 38px`、`border-radius: 11px` 這類無規格來源的數值。
+- 若特殊元件必須硬編碼 spacing / size，必須在同一段 CSS 前加上 `ui-token-exception` 註解並說明原因。
+- 允許例外的場景限於列印模板、第三方套件相容、QR Code / Canvas / 固定比例圖片、或被外部設備限制的掃描/輸入元件。
+- 同一 Modal 或卡片內不得混用多套 section padding、表格列高、表單 control 高度。
+- 若發現既有樣式與 token 衝突，優先補待辦或逐步重構，不得再複製舊樣式擴散。
+
+```css
+/* ui-token-exception: QR Code 固定尺寸，需配合掃描器最小可讀範圍。 */
+.qr-code-preview {
+    width: 180px;
+    height: 180px;
+}
+
+.compact-data-table td {
+    padding: var(--ui-table-cell-padding-y) var(--ui-table-cell-padding-x);
+}
+```
+
 ---
 
 ## 2. 按鈕樣式
@@ -136,7 +199,7 @@ body {
 .data-table th,
 .data-table td {
     border: 1px solid #e0e0e0;
-    padding: 6px 8px;
+    padding: var(--ui-table-cell-padding-y) var(--ui-table-cell-padding-x);
     text-align: left;
     font-size: 15px;
 }
@@ -305,7 +368,7 @@ body {
     width: min(1800px, 95%);
     max-height: 90vh;
     overflow-y: auto;
-    padding: 24px;
+    padding: var(--ui-card-padding-y) var(--ui-card-padding-x);
     position: relative;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
@@ -329,8 +392,8 @@ body {
     font-size: 20px;
     color: #6c757d;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 4px;
+    padding: var(--ui-control-padding-y) var(--ui-control-padding-x);
+    border-radius: var(--ui-radius-control);
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -340,8 +403,8 @@ body {
 }
 
 .modal-window h3 {
-    margin-bottom: 20px;
-    padding-bottom: 12px;
+    margin-bottom: var(--ui-section-gap);
+    padding-bottom: var(--ui-subsection-header-padding-bottom);
     border-bottom: 1px solid #e0e0e0;
     font-size: 18px;
     color: #333;
@@ -358,19 +421,20 @@ body {
 .form-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 16px;
+    gap: var(--ui-section-gap);
 }
 
 .form-section {
-    margin-bottom: 24px;
+    margin-bottom: var(--ui-section-gap);
+    padding: var(--ui-section-padding-y) var(--ui-section-padding-x);
 }
 
 .form-section h4 {
     font-size: 15px;
     font-weight: 600;
     color: #333;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
+    margin-bottom: var(--ui-section-gap);
+    padding-bottom: var(--ui-subsection-header-padding-bottom);
     border-bottom: 1px solid #e0e0e0;
 }
 ```
@@ -381,7 +445,7 @@ body {
 .inline-label {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--ui-section-gap);
 }
 
 .inline-label span {
@@ -393,9 +457,10 @@ body {
 .inline-label input,
 .inline-label select,
 .inline-label textarea {
-    padding: 8px 12px;
+    min-height: var(--ui-control-height);
+    padding: var(--ui-control-padding-y) var(--ui-control-padding-x);
     border: 1px solid #ced4da;
-    border-radius: 4px;
+    border-radius: var(--ui-radius-control);
     font-size: 14px;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -425,9 +490,9 @@ body {
 ```css
 .form-actions {
     display: flex;
-    gap: 12px;
-    margin-top: 20px;
-    padding-top: 16px;
+    gap: var(--ui-section-gap);
+    margin-top: var(--ui-section-gap);
+    padding-top: var(--ui-section-gap);
     border-top: 1px solid #e0e0e0;
 }
 
@@ -447,9 +512,9 @@ body {
 ```css
 .module-alert,
 .modal-alert {
-    padding: 12px 16px;
-    border-radius: 4px;
-    margin-bottom: 16px;
+    padding: var(--ui-alert-padding-y) var(--ui-alert-padding-x);
+    border-radius: var(--ui-badge-radius);
+    margin-bottom: var(--ui-alert-margin-bottom);
     font-size: 14px;
 }
 
@@ -582,10 +647,10 @@ body {
 
 ```css
 .sidebar {
-    width: 250px;
+    width: var(--ui-sidebar-width);
     background-color: #313a46;
     color: #e0e0e0;
-    padding-top: 20px;
+    padding-top: var(--ui-shell-content-padding);
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
     flex-shrink: 0;
     transition: width 0.3s ease;
@@ -594,7 +659,7 @@ body {
 .menu-link {
     display: flex;
     align-items: center;
-    padding: 12px 20px;
+    padding: var(--ui-nav-item-padding-y) var(--ui-nav-item-padding-x);
     color: #e0e0e0;
     text-decoration: none;
     transition: background-color 0.3s ease, color 0.3s ease;
@@ -614,7 +679,7 @@ body {
 }
 
 .submenu li a {
-    padding: 10px 20px 10px 55px;
+    padding: var(--ui-nav-subitem-padding-y) var(--ui-nav-subitem-padding-x) var(--ui-nav-subitem-padding-y) var(--ui-nav-subitem-indent);
     color: #a0a0a0;
 }
 
@@ -705,3 +770,70 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.25);
 }
 ```
+
+---
+
+## 13. 共用 Compact Utility Class（強制優先）
+
+新增資料密集型區塊時，優先使用既有 utility class，不要重新定義近似 padding、gap、radius。
+
+| Utility | 用途 |
+|---------|------|
+| `.ui-compact-section` | 一般 section/card 的 compact padding、border、radius |
+| `.ui-compact-table` | 表格 cell/header padding 與字級 |
+| `.ui-compact-form-row` | inline label + control 的單列排版 |
+| `.ui-metric-card` | 統計卡外框、padding、radius |
+| `.ui-metric-row` | 統計 label/value 單列間距與底線 |
+
+```html
+<section class="form-section ui-compact-section">
+    <header class="subsection-header"><h4>區塊標題</h4></header>
+    <div class="subsection-body">
+        <table class="data-table compact ui-compact-table"></table>
+    </div>
+</section>
+
+<label class="inline-label ui-compact-form-row">
+    <span>欄位標題</span>
+    <input type="text">
+</label>
+
+<section class="ui-metric-card">
+    <div class="ui-metric-row">
+        <span class="metric-label">統計名稱</span>
+        <strong>123</strong>
+    </div>
+</section>
+```
+
+- 若既有模組已有 `.form-section`、`.data-table compact`、`.metrics-panel`，可疊加 utility class 做漸進收斂。
+- utility class 僅負責密度、邊框與 label/value 排版，不應承載模組語意或 JS hook。
+- 若 utility class 不足以表達特殊版面，先評估是否需要新增 token；不得直接散落硬編碼尺寸。
+- 特殊固定尺寸需加 `ui-token-exception:` 註解並說明原因。
+
+---
+
+## 14. UI 統一落地規則（強制）
+
+### 14.1 修改前
+
+- 先搜尋是否已有相同用途的 token、共用 class 或模組既有樣式，不得直接新增一組近似 spacing。
+- 修改 `styles.css` 前必須讀本文件與 `.github/skills/ui-style.md`。
+- 修改畫面模板前必須讀 `.github/skills/html-module-style.md` 與 `.github/skills/ui-style.md`。
+- 若是系統性 UI 統一工作，必須同步更新對應 todo / plan 文件。
+
+### 14.2 修改中
+
+- 優先調整共用 token 或共用 class，再用模組 scoped selector 做必要差異化。
+- 模組 scoped selector 必須以頁面或 modal 明確容器開頭，避免外溢影響其他模組。
+- 不得用 `!important` 處理一般 spacing、border 或 control height 問題。
+- 避免雙層框線模型：label 外層若有完整 border，內部 input/select 不得再畫完整 border；可搜尋下拉若外層 control 已有 border，內層 input 不得重複畫框。
+- 統計資料列應明確分離 label 與 value；label 可用淡底圓角標題帶，value 保持乾淨可讀。
+
+### 14.3 修改後
+
+- 檢查是否新增未註解的硬編碼 `padding`、`gap`、`height`、`min-height`、`border-radius`。
+- 回報時需說明是否新增 `ui-token-exception`，以及例外原因。
+- 功能模組 UI/CSS 修改前後需執行 `node tools/audit-system-health.js --changed --base origin/main`。
+- 配置型模組仍需執行 `node tools/validate-config-modules.js`。
+- 若本輪只完成部分模組統一，必須在 todo 文件留下範圍、剩餘項目與驗收方式。

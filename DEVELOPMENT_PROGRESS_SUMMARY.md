@@ -3,97 +3,93 @@
 ## 1. 專案架構
 
 - 專案根目錄：`C:\Apache24\htdocs\mes`
-- 技術棧：PHP API、MySQL/MariaDB、原生 HTML/CSS/JavaScript、PowerShell schema/更新包工具。
+- 技術棧：PHP API、MySQL、原生 HTML/CSS/JavaScript、PowerShell 工具鏈
 - 主要目錄：
-  - `api/`：後端 API 與流程守門。
-  - `js/`：前端功能模組邏輯。
-  - `modules/`：主系統模組 HTML。
-  - `print/`：列印模板。
-  - `docs/`：審計報告與交接文件。
-  - `release-notes/`：更新包 release note。
-  - `tools/`：健康審計、DataSync 審計、schema 同步與更新包打包工具。
-  - `dist/`：一鍵更新包輸出。
+  - `api/`：後端 API、更新器、流程守門
+  - `js/`：前端模組邏輯
+  - `modules/`：模組 HTML
+  - `core/configs/`：配置型模組設定
+  - `tools/`：審計、schema、打包、驗包工具
+  - `release-notes/`：一鍵更新 release note
+  - `docs/`：交接、audit、reference 文件
+  - `dist/`：更新包輸出
 - 本輪主要涉及模組 / API / 資料表：
-  - 生產工單編輯：`js/work_orders.js`、`styles.css`。
-  - 工單更新 API：`api/work_orders/update.php`。
-  - 生產命令單列印：`print/work_order_print.html`.
-  - DataSync 審計報告：`docs/data-sync-audit.md`。
-  - 更新包說明：`release-notes/2026-07-07-v3.0.19.txt`。
-  - 資料表：未新增或修改資料表；使用既有 `work_orders`、`production_records`、`work_order_screening_defects`。
+  - UI 統一化：`styles.css`
+  - 工單 / 訂單品項 / 排程 / 出貨 / 退貨 / 庫存：`js/work_orders.js`、`js/shipping_orders.js`、`js/return_orders.js`、`js/inventory_items.js`、`js/inventory_transactions.js`
+  - 對應 HTML：`modules/work_orders.html`、`modules/order_items.html`、`modules/production_work_order_schedule.html`、`modules/return_orders.html`、`modules/shipping_order_return_modals.html`
+  - 配置：`core/configs/inventory_items.config.js`、`core/configs/shipping_orders.config.js`
+  - 審計 / 打包工具：`tools/audit-system-health.js`、`tools/audit-ui-style.js`、`tools/build-update-package-safe.ps1`、`tools/prepare-one-click-update.ps1`、`tools/verify-update-package.ps1`
+  - 文件：`.github/copilot-instructions.md`、`.github/skills/ui-style.md`、`.github/skills/css-style-guide.md`、`docs/ui-standardization-todo-2026-07-08.md`、`docs/ui-standardization-reference-2026-07-08.md`、`docs/ui-style-audit.md`、`docs/data-sync-audit.md`、`docs/one-click-update-rollback-playbook.md`
+  - 資料表：本輪未新增或修改資料表；沿用既有 `inventory_items`、`inventory_transactions`、`shipping_orders`、`return_orders`、`work_orders`
 
 ## 2. 已完成功能
 
-- 生產工單編輯：
-  - 修正一般工單「篩分服務明細」不良品數量欄位可操作性，避免欄寬壓縮造成難以修改。
-  - 編輯送出時，只要篩分服務表格已載入，就送出目前不良明細狀態，讓既有不良品數量可改回 `0` 並清除。
-  - 不良品數量新增非負整數前端防呆；空值視為 `0`，負數或小數會提示並停止送出。
-  - 修正一般工單「生產排程」圈選欄位儲存：指定員工、指定機台、校機人員、生產數量會從排程區明確寫入 payload，避免自訂選單或版面變動造成漏送。
-- 工單完工重量守門：
-  - 修正已完成一般工單再次編輯生產重量時的超重漏洞。
-  - `api/work_orders/update.php` 現在只要儲存後狀態仍為已完成，就用最新生產紀錄重新檢查良品淨重不可超過工單預期淨重。
-- 生產命令單列印：
-  - 移除標題下方資訊區的中間細線，保留上方粗分隔線。
-  - 將「預計交期：YYY/MM/DD（週X）」移入標題下方資訊區，並加大加粗。
-  - 拆分工單時交期字級略縮小，避免與拆分標記擠出 A4 寬度。
+- 新增 / 修改：
+  - 建立 `--ui-*` token 與 compact utility class，收斂 section、table、form row、metric card 密度規格
+  - 收斂工單編輯 Modal 與右側統計卡樣式
+  - 第一批套用至 `work_orders`、`order_items`、`production_work_order_schedule`、`shipping_orders`、`return_orders`、`inventory_items`、`inventory_transactions`
+  - 收斂全域 shell / sidebar / dropdown / alert spacing、padding、radius
+  - 新增 UI style audit 工具：`tools/audit-ui-style.js`
+  - `tools/audit-system-health.js` 整合 UI style audit 摘要
+  - 新增一鍵更新前預檢工具：`tools/prepare-one-click-update.ps1`
+  - 新增更新包驗證工具：`tools/verify-update-package.ps1`
+  - 補齊 UI reference 與一鍵更新文件
 - 重要資料庫異動：
-  - 無 migration。
-  - 無 schema 變更。
-  - `tools/sync-local-schema.ps1` 無需更新 `$migrationChecks`。
-- 版本與更新包：
-  - 新增 `release-notes/2026-07-07-v3.0.19.txt`，內容固定 3 行。
-  - 已使用 `tools/build-update-package.ps1` 建立更新包：`dist/update_v3.0.19_20260707_221257.zip`。
-  - 更新包版本：`v3.0.19`，`FileVersion=v3.0.19`，`ReleaseDate=2026-07-07`。
-  - 更新包包含 files 7、migrations 0；已確認 zip 內有 `manifest.json`。
+  - 本輪無 migration
+  - 無 schema 變更
+  - `tools/sync-local-schema.ps1` 的 `$migrationChecks` 無需更新
+- 版本與更新包資訊：
+  - release note：`release-notes/2026-07-08-v3.0.20.txt`
+  - 正式使用 `tools/build-update-package.ps1` 建立更新包：`dist/update_v3.0.20_20260708_184807.zip`
+  - 更新包驗證通過：`manifest.json` 存在、`files_root=files`、`version_number=file_version=v3.0.20`
 
 ## 3. 待修 Bug
 
-- 全域健康審計仍有既有 warning：
-  - 重現條件：執行 `node tools/audit-system-health.js`。
-  - 目前結果：錯誤 0、警告 17、提示 11。
-  - 目前推測原因：既有技術債，包含大型 JS、既有 POST fallback、既有 inline style、雙重狀態欄位等；本輪 changed audit 未新增阻擋問題。
-- 生產命令單列印版面仍需人工驗收：
-  - 重現條件：以瀏覽器列印預覽 A4，檢查標題下方預計交期區域、QR 備註區與長資料情境。
-  - 目前推測原因：列印版面受資料長度、瀏覽器列印縮放、拆分工單標記與圖片/備註內容影響，自動化檢查無法完全覆蓋。
-- 更新包尚未實機套用：
-  - 重現條件：在測試或遠端環境套用 `dist/update_v3.0.19_20260707_221257.zip`。
-  - 目前推測原因：本機已完成打包與 manifest 檢查，但尚未在目標環境走更新器流程。
+- `node tools/audit-system-health.js` 仍有既有 warning 17 項
+  - 重現：直接執行完整 health audit
+  - 現況：無 error，但有大型 JS、POST fallback、inline style、雙重狀態欄位等歷史警告
+  - 推測原因：歷史技術債，非本輪新增
+- `modules/order_items.html` 仍有 inline style warning
+  - 重現：完整 health audit 會報 `M-1 HTML 內聯樣式`
+  - 推測原因：既有表格 / 區塊殘留 style attribute，尚未完全抽回 CSS
+- 更新包尚未在遠端環境實際套用
+  - 重現：目前僅完成本機打包與 ZIP 驗證
+  - 推測原因：尚未走遠端更新器上傳 / 套用流程
 
 ## 4. 下一步任務
 
-- P0：
-  - 在測試或遠端環境實際套用 `dist/update_v3.0.19_20260707_221257.zip`。
-  - 以瀏覽器列印預覽人工驗收生產命令單 A4 版面，確認預計交期區域與 QR 備註區不超出紙張。
-  - 以已完成工單測試：修改生產紀錄重量超過工單預期淨重時，後端應回傳 409 並阻擋儲存。
-- P1：
-  - 回歸一般工單編輯：不良品數量改為 `0`、排程四欄修改/清空後重新開啟仍正確保存。
-  - 驗證 DataSync 跨分頁刷新：工單更新後相關列表與依賴模組狀態不殘留舊資料。
-  - 驗證拆分工單列印時預計交期與拆分標記在 A4 寬度內。
-- P2：
-  - 逐步拆分大型 JS 檔案，降低健康審計 F-1 warning。
-  - 逐步處理既有 POST fallback、inline style、雙重狀態欄位等健康審計 warning。
-  - 補強列印模板自動化視覺回歸檢查。
+- P0
+  - 在測試 / 遠端環境實際套用 `dist/update_v3.0.20_20260708_184807.zip`
+  - 驗證更新器完整流程：上傳、驗 manifest、套用、回報版本
+  - 確認套用後 UI 統一化相關畫面無 CSS regression
+- P1
+  - 清理 `order_items` 既有 inline style warning
+  - 繼續降低全域 hardcoded spacing/radius，特別是 login、tab、badge、舊全域樣式
+  - 補 UI 驗收截圖 / 參考畫面
+- P2
+  - 研究是否將 UI audit 升級為 changed-scope 硬性守門
+  - 逐步拆分大型 JS 檔案，降低 `F-1 JS 檔案過大` warning
 
 ## 5. 驗證狀態
 
 - 已執行：
-  - `git fetch --all --prune`
-  - `git checkout main`
-  - `git pull --ff-only origin main`
-  - `powershell -ExecutionPolicy Bypass -File .\tools\sync-local-schema.ps1`：Applied 29、Pending 0、schema already in sync。
+  - `node tools/audit-system-health.js`
+  - `node tools/audit-system-health.js --changed --base origin/main`
+  - `node --check js/inventory_items.js`
+  - `node --check js/inventory_transactions.js`
+  - `node --check js/return_orders.js`
+  - `node --check js/shipping_orders.js`
   - `node --check js/work_orders.js`
+  - `node --check tools/audit-system-health.js`
+  - `node --check tools/audit-ui-style.js`
   - `node --check js/data-sync.js`
   - `node --check tools/audit-data-sync.js`
-  - `node tools/audit-data-sync.js --write docs/data-sync-audit.md`：P0 0、P1 0、P2 10。
-  - `php -l api/work_orders/update.php`
-  - `php -l api/work_orders/helpers.php`
-  - `php -r '... validateWorkOrderData(...)'`：排程四欄 payload 驗證通過。
-  - `php -r '... insertWorkOrderProductionRecords(...); fetchWorkOrderProductionSummary(...); rollBack();'`：已完成工單超重 smoke test 判定 `over_limit=true`。
-  - `node tools/audit-system-health.js --changed --base origin/main`：新增 0、阻擋 0。
-  - `node tools/audit-system-health.js`：錯誤 0、警告 17、提示 11。
-  - `git diff --check`：無 whitespace error。
-  - `tools/build-update-package.ps1` 建立 `dist/update_v3.0.19_20260707_221257.zip`：files 7、migrations 0。
-  - 更新包檢查：`manifest.json` 存在，manifest 版本 `v3.0.19`，files 7，migrations 0。
+  - `node tools/audit-data-sync.js --write docs/data-sync-audit.md`
+  - `node tools/audit-ui-style.js --write docs/ui-style-audit.md --max-samples 0`
+  - `git diff --check`
+  - `powershell -ExecutionPolicy Bypass -File .\tools\verify-update-package.ps1 -ZipPath .\dist\update_v3.0.20_20260708_184807.zip -ExpectedVersionNumber v3.0.20 -ExpectedFileVersion v3.0.20 -ExpectedReleaseDate 2026-07-08`
+  - `tools/build-update-package.ps1` 已成功產出更新包
 - 尚未驗證風險：
-  - 更新包尚未在測試或遠端環境實際套用。
-  - 生產命令單尚未由使用者完成實機 A4 預覽/列印驗收。
-  - 本輪無 migration；未執行新增 migration 的重複套用驗證。
+  - 本輪無 PHP API 異動，未執行 `php -l`
+  - 本輪無 migration，未執行 schema 套用與 migration 重複執行驗證
+  - 更新包尚未在遠端環境實際套用

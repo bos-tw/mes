@@ -864,7 +864,7 @@ function renderTable(items) {
             <div class="detail-section">
                 <h4>出貨履歷</h4>
                 <div class="table-responsive">
-                    <table class="data-table">
+                    <table class="data-table ui-compact-table">
                         <thead>
                             <tr>
                                 <th>出貨單號</th>
@@ -900,7 +900,7 @@ function renderTable(items) {
             <div class="detail-section">
                 <h4>異動記錄</h4>
                 <div class="table-responsive">
-                    <table class="data-table">
+                    <table class="data-table ui-compact-table">
                         <thead>
                             <tr>
                                 <th>時間</th>

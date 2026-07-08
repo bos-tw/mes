@@ -12,6 +12,7 @@
  *   node tools/audit-system-health.js --format json
  *   node tools/audit-system-health.js --write docs/system-health-audit.md
  *   node tools/audit-system-health.js --changed --base origin/main
+ *   node tools/audit-system-health.js --changed --base origin/main --ui-style-audit
  *   node tools/audit-system-health.js --update-baseline --confirm-reviewed-baseline
  *
  * 整合 validate-config-modules.js 之後，完整檢查請執行：
@@ -57,6 +58,7 @@ const OUTPUT_PATH = getOptionValue('--write');
 const BASELINE_PATH = getOptionValue('--baseline') || DEFAULT_BASELINE_PATH;
 const BASE_REF = getOptionValue('--base');
 const CHANGED_MODE = process.argv.includes('--changed');
+const RUN_UI_STYLE_AUDIT = process.argv.includes('--ui-style-audit') || CHANGED_MODE;
 const UPDATE_BASELINE = process.argv.includes('--update-baseline');
 const CONFIRM_BASELINE_REVIEW = process.argv.includes('--confirm-reviewed-baseline');
 const IS_MACHINE_OUTPUT = OUTPUT_FORMAT === 'json';
@@ -1149,6 +1151,28 @@ function getCurrentCommit() {
     }
 }
 
+function runUiStyleAuditSummary() {
+    try {
+        const output = require('child_process')
+            .execFileSync(process.execPath, [path.join(ROOT, 'tools', 'audit-ui-style.js'), '--format', 'json'], {
+                cwd: ROOT,
+                encoding: 'utf8',
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+        const parsed = JSON.parse(output);
+        return {
+            ok: true,
+            scannedFiles: Array.isArray(parsed.files) ? parsed.files : [],
+            summary: parsed.summary
+        };
+    } catch (error) {
+        return {
+            ok: false,
+            message: error.message
+        };
+    }
+}
+
 function printChangedSummary(report) {
     const comparison = report.comparison;
     const scope = report.scope;
@@ -1173,6 +1197,23 @@ function printChangedSummary(report) {
     if (comparison.resolved.length > 0) {
         console.log(`\n✅ 已解決 ${comparison.resolved.length} 項歷史問題，可在確認後更新基準線。`);
     }
+}
+
+function printUiStyleAuditSummary(uiStyleAudit) {
+    if (!uiStyleAudit) return;
+
+    if (!uiStyleAudit.ok) {
+        console.log('\n⚠️  UI Style Audit 執行失敗');
+        console.log(`   ${uiStyleAudit.message}`);
+        return;
+    }
+
+    console.log('\n🎨 UI Style Audit 摘要');
+    console.log(`  掃描檔案: ${uiStyleAudit.scannedFiles.join(', ')}`);
+    console.log(`  Hardcoded spacing/radius: ${uiStyleAudit.summary.total}`);
+    console.log(`  Token candidates: ${uiStyleAudit.summary.tokenCandidates}`);
+    console.log(`  Needs review: ${uiStyleAudit.summary.review}`);
+    console.log(`  ui-token-exception: ${uiStyleAudit.summary.exempted}`);
 }
 
 // ─────────────────────────────────────────────
@@ -1420,6 +1461,11 @@ function runAllChecks() {
     const report = buildReport(ERRORS, WARNINGS, INFOS);
     let exitCode = ERRORS.length > 0 ? 1 : 0;
 
+    const uiStyleAudit = RUN_UI_STYLE_AUDIT ? runUiStyleAuditSummary() : null;
+    if (uiStyleAudit) {
+        report.uiStyleAudit = uiStyleAudit;
+    }
+
     if (UPDATE_BASELINE) {
         if (!CONFIRM_BASELINE_REVIEW) {
             report.baselineUpdate = {
@@ -1536,6 +1582,7 @@ function runAllChecks() {
             console.log(`\n❌ ${report.auditError.message}`);
         } else {
             printChangedSummary(report);
+            printUiStyleAuditSummary(report.uiStyleAudit);
             console.log(exitCode === 0
                 ? '\n✅ 本次變更未新增審計問題。\n'
                 : '\n❌ 本次變更新增或暴露不可基準化問題。\n');
@@ -1546,6 +1593,7 @@ function runAllChecks() {
     // ── 輸出報告 ──────────────────────────────
     console.log(`\n${sep}`);
     console.log('\n📊 審計結果摘要\n');
+    printUiStyleAuditSummary(report.uiStyleAudit);
 
     const byCategory = {};
     const collect = (arr, level) => arr.forEach(item => {

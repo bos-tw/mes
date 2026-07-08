@@ -660,7 +660,7 @@
                     <div class="metrics-sidebar-header">生產統計 <span class="text-muted small">(訂單 vs 實際篩分)</span></div>
                     <div class="metrics-comparison-container">
                             <!-- 訂單預期 -->
-                            <div class="metrics-panel">
+                            <div class="metrics-panel ui-metric-card">
                                 <h5 class="metrics-subtitle">訂單</h5>
                                 <div class="metrics-grid">
                                     <div class="metric">
@@ -683,7 +683,7 @@
                             </div>
 
                             <!-- 實際篩分後 -->
-                            <div class="metrics-panel">
+                            <div class="metrics-panel ui-metric-card">
                                 <h5 class="metrics-subtitle">實際篩分後</h5>
                                 <div class="metrics-grid">
                                     <div class="metric">
@@ -796,13 +796,23 @@
                                 <label class="inline-label work-order-detail-field-part-number"><span>料號</span><input type="text" name="part_number" readonly class="readonly-field"></label>
                                 <label class="inline-label work-order-detail-field-delivery-location"><span>指送地點</span><input type="text" name="delivery_location" readonly class="readonly-field"></label>
                             </div>
-                            <section class="subsection work-order-edit-drawing-card">
-                                <header class="subsection-header">
-                                    <h4>圖面附件</h4>
+                        </div>
+                    </section>
+
+                    <div class="work-order-edit-order-support-row">
+                        <section class="form-section ui-compact-section work-order-collapsible-section work-order-edit-drawing-card" data-collapsible-section>
+                            <header class="subsection-header">
+                                <div class="subsection-actions">
+                                    <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-order-drawings-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
+                                </div>
+                                <h4>圖面附件</h4>
+                                <div class="subsection-actions subsection-actions-right">
                                     <button type="button" class="btn ghost small" data-action="add-order-drawing"><i class="fas fa-plus"></i><span>新增圖面</span></button>
-                                </header>
+                                </div>
+                            </header>
+                            <div class="subsection-body" data-edit-order-drawings-section>
                                 <div class="table-responsive">
-                                    <table class="data-table compact">
+                                    <table class="data-table compact ui-compact-table">
                                         <thead>
                                             <tr>
                                                 <th>圖面編號</th>
@@ -818,17 +828,21 @@
                                         </tbody>
                                     </table>
                                 </div>
-                            </section>
-                            <section class="subsection work-order-edit-drawing-card">
-                                <header class="subsection-header">
-                                    <h4>客戶載具紀錄與遺留分析</h4>
-                                </header>
-                                <div class="subsection-body">
-                                    <div data-work-order-customer-tool-analysis class="text-muted">載入中...</div>
+                            </div>
+                        </section>
+
+                        <section class="form-section ui-compact-section work-order-collapsible-section work-order-edit-drawing-card" data-collapsible-section>
+                            <header class="subsection-header">
+                                <div class="subsection-actions">
+                                    <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-customer-tool-analysis-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
                                 </div>
-                            </section>
-                        </div>
-                    </section>
+                                <h4>客戶載具紀錄與遺留分析</h4>
+                            </header>
+                            <div class="subsection-body" data-edit-customer-tool-analysis-section>
+                                <div data-work-order-customer-tool-analysis class="text-muted">載入中...</div>
+                            </div>
+                        </section>
+                    </div>
 
                     <section class="form-section work-order-screening-tabs-section">
                         <div class="work-order-production-mode-tabs work-order-screening-stage-tabs" role="tablist" aria-label="篩分階段">
@@ -871,7 +885,7 @@
                         </div>
                     </section>
 
-                    <section class="form-section work-order-partial-history-section" data-collapsible-section>
+                    <section class="form-section ui-compact-section work-order-partial-history-section" data-collapsible-section>
                         <header class="subsection-header">
                             <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-partial-history-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
                             <h4>部分入庫歷程 / 結清追蹤</h4>
@@ -879,7 +893,7 @@
                         <div class="subsection-body" data-work-order-partial-history-section>
                             <div class="work-order-balance-alert hidden" data-work-order-balance-alert></div>
                             <div class="table-responsive">
-                                <table class="data-table compact">
+                                <table class="data-table compact ui-compact-table">
                                     <thead>
                                         <tr>
                                             <th>入庫單號</th>
@@ -1182,7 +1196,7 @@
                     <div class="metrics-sidebar-header">生產統計 <span class="text-muted small">(訂單 vs 實際篩分)</span></div>
                     <div class="metrics-comparison-container">
                             <!-- 訂單預期 -->
-                            <div class="metrics-panel">
+                            <div class="metrics-panel ui-metric-card">
                                 <h5 class="metrics-subtitle">訂單</h5>
                                 <div class="metrics-grid">
                                     <div class="metric">
@@ -1209,7 +1223,7 @@
                             </div>
 
                             <!-- 實際篩分後 -->
-                            <div class="metrics-panel">
+                            <div class="metrics-panel ui-metric-card">
                                 <h5 class="metrics-subtitle">實際篩分後</h5>
                                 <div class="metrics-grid">
                                     <div class="metric">
@@ -1244,7 +1258,7 @@
                             </div>
                     </div>
 
-                    <section class="work-order-balance-card">
+                    <section class="work-order-balance-card ui-metric-card">
                         <div class="metrics-sidebar-header">工單數量平衡 <span class="text-muted small">(預計 = 先行入庫 + 最終補入 + 真實短缺)</span></div>
                         <div class="work-order-balance-grid">
                             <div class="metric">

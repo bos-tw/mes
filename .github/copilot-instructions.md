@@ -245,6 +245,58 @@ MES 是流程型系統，核心流程為：
 
 ## 🚨 開始工作前必讀（2026-02-04 新增，2026-03-01 更新）
 
+### 🎨 UI 密度與 CSS Token 規範（2026-07-08 新增，強制）
+
+本系統是高資訊密度的 MES 後台工具，所有新增或修改 UI / CSS 的工作都必須維持「緊密、清楚、可長時間操作」的統一風格。禁止只用局部 `padding`、`gap`、`height` 補丁把單一畫面修到可看，卻讓系統整體密度繼續分裂。
+
+#### A. 必讀文件
+
+1. 修改 `*.css` 前，必須先讀：
+    - `.github/skills/css-style-guide.md`
+    - `.github/skills/ui-style.md`
+2. 修改 `modules/**/*.html`、`index.php`、`index.html` 或任何會影響畫面的 JS template 前，必須先讀：
+    - `.github/skills/html-module-style.md`
+    - `.github/skills/ui-style.md`
+3. 若本輪已讀 `.github/copilot-instructions.md`，仍必須依「Skills 全檔讀取規範」完整讀取 `.github/skills/` 全部檔案。
+
+#### B. CSS Token 強制規則
+
+1. 新增或重構 UI 間距時，必須優先使用 `:root` 內的 UI token 或新增明確命名 token。
+2. 禁止在新 UI 區塊任意新增裸寫的 `padding`、`gap`、`height`、`min-height`、`border-radius` 作為長期規格。
+3. 若因特殊版面必須硬編碼，必須在同一段 CSS 前加註例外原因，格式如下：
+
+```css
+/* ui-token-exception: 列印 A4 固定版面，需要精準毫米/像素對齊。 */
+```
+
+4. 例外只允許用於列印模板、第三方套件相容、固定比例圖片/QR Code/Canvas、或已經有明確視覺限制的特殊元件。
+5. 不得新增與既有 token 意義重疊的變數；需要新增時應補到 `:root`，並同步更新 `.github/skills/css-style-guide.md`。
+
+#### C. UI 密度強制規則
+
+1. 後台資料密集畫面預設使用 compact density。
+2. 表格、表單、Modal、側欄統計卡、區塊標題列必須使用同一套密度規格。
+3. 表格 cell、表單 control、section padding、card padding、header gap 不得各模組自行任意放大。
+4. 操作按鈕仍需保留可點擊範圍；視覺可以緊密，但不可犧牲基本可用性。
+5. 流程守門、危險操作、錯誤提示、確認對話框可使用 normal density，但必須保持與系統 token 一致。
+
+#### D. 驗收要求
+
+1. UI/CSS 修改後，回報時必須說明是否新增硬編碼 spacing 例外。
+2. UI/CSS 修改後，必須執行：
+
+```bash
+node tools/audit-system-health.js --changed --base origin/main
+```
+
+3. 若修改配置型模組，仍必須依既有規範執行：
+
+```bash
+node tools/validate-config-modules.js
+```
+
+4. 若本輪是系統性 UI 統一工作，必須同步更新對應 todo / plan 文件，避免只留下零散樣式補丁。
+
 ### ⚡ 自動化驗證工具（強制執行）
 
 系統共有兩個驗證工具，依工作類型選擇執行：

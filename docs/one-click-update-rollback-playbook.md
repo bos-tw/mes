@@ -121,6 +121,8 @@ ZIP 根目錄必須包含：
 
 1. `build-update-package.ps1`
 2. `build-update-package-safe.ps1`（從 `git diff` 自動收檔 + ZIP 覆蓋驗證）
+3. `prepare-one-click-update.ps1`（先跑 UI / config / DataSync / schema / health 預檢，再交給 safe builder）
+4. `verify-update-package.ps1`（對既有 `dist/update_*.zip` 做 manifest / files_root / 版本欄位驗證）
 
 另外，若你要「真的可回滾」，打包器要支援把 `rollback_migrations` 寫進 `manifest.json`，並把反向 SQL 放入 ZIP。  
 很多專案只打了 `migrations`，導致 UI 有回滾按鈕但實際不可回滾。
@@ -148,6 +150,8 @@ ZIP 根目錄必須包含：
 - `api/system_update_backup.php`
 - `tools/build-update-package.ps1`
 - `tools/build-update-package-safe.ps1`
+- `tools/prepare-one-click-update.ps1`
+- `tools/verify-update-package.ps1`
 - `migrations/2026_05_09_create_system_update_jobs.sql`
 - `migrations/2026_05_09_create_system_update_logs.sql`
 

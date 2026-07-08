@@ -1730,7 +1730,7 @@ function renderTable(items) {
                         </div>
                         ${qualityInspections.length > 0 ? `
                         <div class="table-responsive" style="margin-top: 1rem;">
-                            <table class="data-table compact">
+                            <table class="data-table compact ui-compact-table">
                                 <thead>
                                     <tr>
                                         <th>檢驗時間</th>
@@ -1820,7 +1820,7 @@ function renderTable(items) {
                     <section class="detail-section">
                         <h4>客戶載具摘要</h4>
                         <div class="table-responsive">
-                            <table class="data-table compact">
+                            <table class="data-table compact ui-compact-table">
                                 <thead>
                                     <tr>
                                         <th>載具名稱</th>
@@ -1882,7 +1882,7 @@ function renderTable(items) {
                         <div style="margin-top: 1rem;">
                             <h5 style="margin-bottom: 0.5rem;">本次來源載具紀錄</h5>
                             <div class="table-responsive">
-                                <table class="data-table compact">
+                                <table class="data-table compact ui-compact-table">
                                     <thead>
                                         <tr>
                                             <th>來源庫存</th>
@@ -1907,7 +1907,7 @@ function renderTable(items) {
                         <div style="margin-top: 1rem;">
                             <h5 style="margin-bottom: 0.5rem;">訂單 / 工單 / 出貨載具對照</h5>
                             <div class="table-responsive">
-                                <table class="data-table compact">
+                                <table class="data-table compact ui-compact-table">
                                     <thead>
                                         <tr>
                                             <th>來源庫存</th>
@@ -1938,7 +1938,7 @@ function renderTable(items) {
                         <div style="margin-top: 1rem;">
                             <h5 style="margin-bottom: 0.5rem;">客戶載具遺留分析</h5>
                             <div class="table-responsive">
-                                <table class="data-table compact">
+                                <table class="data-table compact ui-compact-table">
                                     <thead>
                                         <tr>
                                             <th>載具名稱</th>
@@ -1989,7 +1989,7 @@ function renderTable(items) {
                         </div>
                         ${items.length > 0 ? `
                         <div class="table-responsive">
-                            <table class="data-table compact">
+                            <table class="data-table compact ui-compact-table">
                                 <thead>
                                     <tr>
                                         <th>庫存編號</th>
@@ -2058,7 +2058,7 @@ function renderTable(items) {
                     <section class="detail-section">
                         <h4>二次篩選來源追溯</h4>
                         <div class="table-responsive">
-                            <table class="data-table compact">
+                            <table class="data-table compact ui-compact-table">
                                 <thead>
                                     <tr>
                                         <th>出貨庫存</th>
@@ -2101,7 +2101,7 @@ function renderTable(items) {
                     <section class="detail-section">
                         <h4>相關退貨單 (${order.return_orders.length})</h4>
                         <div class="table-responsive">
-                            <table class="data-table compact">
+                            <table class="data-table compact ui-compact-table">
                                 <thead>
                                     <tr>
                                         <th>退貨單號</th>

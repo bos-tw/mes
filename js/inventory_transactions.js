@@ -154,16 +154,16 @@
         }
 
     
-function renderDetailContent(item) {
+        function renderDetailContent(item) {
             if (!elements.detailContent) return;
             const directionLabel = escapeHtml(item.direction_label || getDirectionLabel(item.direction));
             const directionClass = getDirectionClass(item.direction);
             const sourceInfo = buildSourceInfo(item);
 
             elements.detailContent.innerHTML = `
-                <div class="detail-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="detail-grid detail-grid-two-column">
                     <div class="detail-section">
-                        <h4 style="margin-bottom: 0.5rem; color: #666; border-bottom: 1px solid #eee; padding-bottom: 0.25rem;">基本資訊</h4>
+                        <h4>基本資訊</h4>
                         <p><strong>異動編號：</strong>${item.id}</p>
                         <p><strong>庫存編號：</strong>${escapeHtml(item.inventory_number) || '-'}</p>
                         <p><strong>客戶批號：</strong>${escapeHtml(item.customer_batch_number || item.order_item_batch_number) || '-'}</p>
@@ -171,7 +171,7 @@ function renderDetailContent(item) {
                         <p><strong>客戶：</strong>${escapeHtml(item.customer_name) || '-'}</p>
                     </div>
                     <div class="detail-section">
-                        <h4 style="margin-bottom: 0.5rem; color: #666; border-bottom: 1px solid #eee; padding-bottom: 0.25rem;">異動資訊</h4>
+                        <h4>異動資訊</h4>
                         <p><strong>異動方向：</strong><span class="status-badge ${directionClass}">${directionLabel}</span></p>
                         <p><strong>變動數量：</strong>${formatNumber(item.quantity)}</p>
                         <p><strong>異動後庫存：</strong>${formatNumber(item.after_quantity)}</p>
@@ -179,10 +179,10 @@ function renderDetailContent(item) {
                         <p><strong>建立人：</strong>${escapeHtml(item.created_by_employee_name) || '-'}</p>
                     </div>
                 </div>
-                <div class="detail-section" style="margin-top: 1rem;">
-                    <h4 style="margin-bottom: 0.5rem; color: #666; border-bottom: 1px solid #eee; padding-bottom: 0.25rem;">來源關聯</h4>
+                <div class="detail-section detail-section-spaced-top">
+                    <h4>來源關聯</h4>
                     ${sourceInfo}
-                    ${item.notes ? `<p style="margin-top: 0.5rem;"><strong>備註：</strong>${escapeHtml(item.notes)}</p>` : ''}
+                    ${item.notes ? `<p class="detail-inline-note"><strong>備註：</strong>${escapeHtml(item.notes)}</p>` : ''}
                 </div>
             `;
         }

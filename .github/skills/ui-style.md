@@ -16,6 +16,61 @@
 - **主內容**：以白色卡片或白底表格承載資訊，背景為淺灰以提升對比。
 - **行為一致**：分頁載入在 `#tab-content-area`，不要改變核心布局。
 
+### 1.3 UI 密度（Density）- 強制規範
+
+MES 是長時間操作的資料密集型後台系統，預設 UI 密度為 **compact**。新增或修改 UI 時，必須優先維持資訊緊密、對齊清楚、可快速掃描，不得以過大的 padding/gap 造成同一視窗可見資訊量下降。
+
+#### 密度分級
+
+| 密度 | 適用情境 | 規則 |
+|------|----------|------|
+| `compact` | 列表、工單編輯、訂單/出貨/庫存明細、統計側欄 | 預設使用，間距最小但保留可讀性 |
+| `normal` | 新增/編輯一般 Modal、設定頁、低頻維護表單 | 可略寬鬆，但仍須使用 token |
+| `comfortable` | 危險操作確認、流程守門、錯誤提示、說明型內容 | 只限需要降低誤操作或提高閱讀理解的區塊 |
+
+#### 強制原則
+
+1. 資料表格、表單列、統計卡、區塊標題列必須優先使用 compact density。
+2. 同一 Modal 內不得混用多套 padding/gap 風格，除非有明確視覺分層需求。
+3. 表格 cell、input/select、label、section、card 的尺寸必須由 CSS token 或共用 class 控制。
+4. 禁止用「局部補丁」持續新增不成系統的 `padding: 10px 14px`、`gap: 13px` 等硬編碼值。
+5. 可點擊元件仍需保留最小操作範圍：一般按鈕 / 下拉箭頭建議不低於 30px，高頻操作不低於 32px。
+
+#### Compact 基準值
+
+| 元件 | 建議值 |
+|------|--------|
+| Section padding | `8px 10px` |
+| Section gap / row gap | `8px` |
+| Subsection header padding-bottom | `6px` |
+| 表格 cell padding | `4px 6px` |
+| 表單 control height | `32px` |
+| 表單 control padding | `4px 8px` |
+| Inline label padding | `4px 8px` |
+| 統計卡 metric row padding | `6px 8px` |
+| Modal body section gap | `8px ~ 10px` |
+
+實際 CSS 不應直接散落使用上述數值；需透過 `css-style-guide.md` 定義的 token 或既有共用 class 使用。
+
+#### 共用 Utility Class
+
+資料密集區塊應優先使用下列 class 做漸進統一：
+
+| Utility | 適用區塊 |
+|---------|----------|
+| `.ui-compact-section` | 表單 section、附件卡片、可收合區塊 |
+| `.ui-compact-table` | compact 明細表、附件表、歷程表 |
+| `.ui-compact-form-row` | inline label + input/select/textarea |
+| `.ui-metric-card` | 右側統計卡、平衡卡、摘要卡 |
+| `.ui-metric-row` | label/value 統計列 |
+
+使用規則：
+
+1. utility class 只處理密度、框線、圓角、label/value 間距，不可作為 JS hook。
+2. 若既有模組已使用 `.form-section`、`.data-table compact`、`.metrics-panel`，可疊加 utility class 漸進收斂。
+3. 新增 compact 區塊時，不得另寫一組近似的 padding/gap/radius。
+4. 特殊版面若不能使用 utility class，需先評估新增 token，必要時加 `ui-token-exception:` 註解。
+
 ---
 
 ## 2. 色彩系統
@@ -158,15 +213,26 @@
 - **表頭**：字重 600、背景微灰
 - **列 hover**：淺灰背景
 - **次要資訊**：使用 `.subtext` 樣式（0.8em，灰色）
+- **密度**：資料列表與 Modal 內明細表預設使用 compact cell padding，不得任意放大列高。
 
 ### 4.8 表單（Form）
 - **輸入框**：圓角 6px，邊框 `#ddd`
 - **Focus**：主色系邊框或陰影
 - **Label**：深灰 `#2f3b4c`
+- **框線模型**：inline label 不得同時讓外層 label 和內部 label/input 各畫一層完整外框，避免雙層粗框。
+- **下拉元件**：可搜尋下拉若有外層 control border，內層 input 不得再畫完整 border。
 
 ### 4.9 Modal / Card
 - **卡片**：白色背景、圓角 10~12px、微陰影
 - **Modal**：置中顯示、層次感明確
+- **Modal 密度**：複雜作業 Modal 預設 compact；Section、表格、統計側欄必須使用同一套密度 token。
+
+### 4.10 統計側欄（Metrics Sidebar）
+- **用途**：顯示工單、訂單、篩分、平衡等即時統計。
+- **外觀**：白底或淡灰底卡片，細邊框，圓角不得超過系統 token。
+- **Metric row**：label 與 value 必須有清楚區隔；label 可使用淡底圓角標題帶，value 不應被過度裝飾。
+- **留白**：label/value 不得貼齊卡片圓角或邊界，左右需保留 token 化 padding。
+- **資料密度**：數值列表需緊密排列，避免一張側欄卡片占用過多垂直空間。
 
 ---
 
@@ -208,6 +274,9 @@
 - `.subtext`：表格內次要文字
 - `.row-inactive`：不活躍列
 - `.sidebar-toggle`：側欄收合按鈕
+- `.user-dropdown-toggle` / `.user-dropdown-menu`：右上角使用者下拉選單
+- `.module-alert` / `.modal-alert`：模組與 Modal 訊息提示
+- `.sidebar-tab-btn` / `.sidebar-content-toolbar`：側欄型頁籤與搜尋工具列
 
 ---
 
@@ -218,6 +287,12 @@
 3. **H2 標題固定 18px**。
 4. **所有新 UI 元件需符合現有配色、陰影與留白**。
 5. **避免引入新的 UI library**，除非明確要求。
+6. **新增或修改 UI 間距必須使用 CSS token 或既有共用 class**。
+7. **禁止新增無規格來源的硬編碼 padding/gap/height/border-radius**；特殊情境必須加 `ui-token-exception` 註解。
+8. **修改資料密集畫面時必須優先採用 compact density**。
+9. **同一 Modal 內表格、輸入框、標題、統計卡的密度必須一致**。
+10. **若發現既有 UI 密度不一致，應提出待辦並優先收斂到共用 token，而不是繼續新增局部覆蓋。**
+11. **全域 shell（top navbar / sidebar / dropdown / alert / sidebar tabs）也屬統一規格範圍，不可繼續用局部硬編碼 spacing / radius 擴散。**
 
 ---
 
@@ -228,4 +303,9 @@
 - [ ] 狀態資訊使用 `.status-badge`
 - [ ] 表格/卡片符合背景與邊框規範
 - [ ] 互動狀態有 Hover/Focus 視覺回饋
+- [ ] 間距、欄高、圓角使用 CSS token 或共用 class
+- [ ] 未新增無註解的硬編碼 padding/gap/height/border-radius
+- [ ] 資料密集畫面使用 compact density
+- [ ] 同一 Modal / Card 內框線模型一致，沒有雙層粗框
+- [ ] 表格、輸入框、下拉選單、統計列的可見密度一致
 

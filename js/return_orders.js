@@ -623,7 +623,7 @@
                 ${data.items && data.items.length > 0 ? `
                 <div class="detail-section">
                     <h4>退貨品項</h4>
-                    <table class="data-table">
+                    <table class="data-table ui-compact-table">
                         <thead>
                             <tr>
                                 <th>品項</th>

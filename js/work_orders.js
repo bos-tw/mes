@@ -2634,6 +2634,16 @@
                     toggleSectionBody(detailToggleButton, elements.editModalForm.querySelector('[data-edit-detail-section]'));
                     return;
                 }
+                const orderDrawingsToggleButton = e.target.closest('[data-action="toggle-order-drawings-section"]');
+                if (orderDrawingsToggleButton) {
+                    toggleSectionBody(orderDrawingsToggleButton, elements.editModalForm.querySelector('[data-edit-order-drawings-section]'));
+                    return;
+                }
+                const customerToolAnalysisToggleButton = e.target.closest('[data-action="toggle-customer-tool-analysis-section"]');
+                if (customerToolAnalysisToggleButton) {
+                    toggleSectionBody(customerToolAnalysisToggleButton, elements.editModalForm.querySelector('[data-edit-customer-tool-analysis-section]'));
+                    return;
+                }
                 const scheduleToggleButton = e.target.closest('[data-action="toggle-schedule-section"]');
                 if (scheduleToggleButton) {
                     toggleSectionBody(scheduleToggleButton, elements.editModalForm.querySelector('[data-edit-schedule-section]'));
@@ -3463,26 +3473,26 @@
 
         container.classList.remove('text-muted');
         container.innerHTML = `
-            <div class="detail-grid" style="margin-bottom: 0.75rem;">
-                <div class="detail-item">
-                    <div class="detail-label">工單來源載具</div>
-                    <div class="detail-value">${escapeHtml(String(toolDetails.length || 0))} 種</div>
+            <div class="work-order-tool-analysis-summary">
+                <div class="work-order-tool-analysis-metric">
+                    <span class="work-order-tool-analysis-metric-label">工單來源載具</span>
+                    <span class="work-order-tool-analysis-metric-value">${escapeHtml(String(toolDetails.length || 0))} 種</span>
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">部分入庫載具紀錄</div>
-                    <div class="detail-value">${escapeHtml(String(partialReceipts.filter((receipt) => String(receipt.shipping_tool_details || '').trim() !== '').length))} 筆</div>
+                <div class="work-order-tool-analysis-metric">
+                    <span class="work-order-tool-analysis-metric-label">部分入庫載具紀錄</span>
+                    <span class="work-order-tool-analysis-metric-value">${escapeHtml(String(partialReceipts.filter((receipt) => String(receipt.shipping_tool_details || '').trim() !== '').length))} 筆</span>
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">客戶可能仍留廠</div>
-                    <div class="detail-value ${Number(analysis.outstanding_total_quantity || 0) > 0 ? 'text-danger' : 'text-success'}">${escapeHtml(String(analysis.outstanding_total_quantity || 0))} 個</div>
-                </div>
-                <div class="detail-item full-width">
-                    <div class="detail-label">分析口徑</div>
-                    <div class="detail-value">${escapeHtml(analysis.basis_note || '-')}</div>
+                <div class="work-order-tool-analysis-metric">
+                    <span class="work-order-tool-analysis-metric-label">客戶可能仍留廠</span>
+                    <span class="work-order-tool-analysis-metric-value ${Number(analysis.outstanding_total_quantity || 0) > 0 ? 'text-danger' : 'text-success'}">${escapeHtml(String(analysis.outstanding_total_quantity || 0))} 個</span>
                 </div>
             </div>
+            <div class="work-order-tool-analysis-basis">
+                <span class="work-order-tool-analysis-basis-label">分析口徑</span>
+                <span class="work-order-tool-analysis-basis-value">${escapeHtml(analysis.basis_note || '-')}</span>
+            </div>
             ${toolDetails.length > 0 ? `
-            <div class="table-responsive" style="margin-bottom: 0.75rem;">
+            <div class="table-responsive work-order-tool-analysis-table">
                 <table class="data-table compact">
                     <thead>
                         <tr>
@@ -3506,7 +3516,7 @@
                     </tbody>
                 </table>
             </div>
-            ` : '<div class="text-muted" style="margin-bottom: 0.75rem;">此工單目前沒有訂單載具設定。</div>'}
+            ` : '<div class="text-muted work-order-tool-analysis-empty">此工單目前沒有訂單載具設定。</div>'}
             ${outstandingRecords.length > 0 ? `
             <div class="table-responsive">
                 <table class="data-table compact">

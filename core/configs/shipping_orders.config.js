@@ -197,7 +197,7 @@ ModuleConfig.register('shipping_orders', {
                     </div>
                 </div>
                 <div class="table-responsive">
-                    <table class="data-table compact">
+                    <table class="data-table compact ui-compact-table">
                         <thead>
                             <tr>
                                 <th>載具名稱</th>

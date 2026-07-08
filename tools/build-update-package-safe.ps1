@@ -79,15 +79,33 @@ function Get-GitLines {
         [switch]$AllowFailure
     )
 
-    $output = & git -C $RepoRoot @GitArgs 2>$null
-    $exitCode = $LASTEXITCODE
+    $hasNativePreference = $null -ne (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue)
+    if ($hasNativePreference) {
+        $previousNativePreference = $PSNativeCommandUseErrorActionPreference
+        $PSNativeCommandUseErrorActionPreference = $false
+    }
+
+    try {
+        $output = & git -c core.safecrlf=false -c core.autocrlf=false -c core.quotepath=false -C $RepoRoot @GitArgs 2>$null
+        $exitCode = $LASTEXITCODE
+    } finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativePreference
+        }
+    }
 
     if ($exitCode -ne 0 -and -not $AllowFailure) {
         $argText = ($GitArgs -join ' ')
         throw "Git command failed: git -C $RepoRoot $argText"
     }
 
-    return @($output | Where-Object { $_ -and $_.Trim().Length -gt 0 })
+    return @(
+        $output | Where-Object {
+            $_ -and
+            $_.Trim().Length -gt 0 -and
+            $_.Trim() -notmatch '^warning:'
+        }
+    )
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot

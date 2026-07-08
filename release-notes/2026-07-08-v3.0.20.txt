@@ -1,0 +1,3 @@
+1. 完成 UI 統一化第一階段主流程收斂，將工單、訂單品項、生產排程、出貨、退貨、庫存與庫存異動等核心畫面改用 `--ui-*` token 與 compact utility class。
+2. 收斂全域 shell、sidebar、dropdown、alert 的 spacing / padding / radius，並補齊 UI 統一化 reference 與待辦文件。
+3. 新增 UI style audit、更新包預檢與 ZIP 驗證工具，支援一鍵更新前的自動檢查與正式打包流程。

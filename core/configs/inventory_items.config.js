@@ -247,7 +247,7 @@ ModuleConfig.register('inventory_items', {
                 <input type="hidden" name="customer_id">
 
                 <!-- 庫存項目資訊 -->
-                <section class="form-section">
+                <section class="form-section ui-compact-section">
                     <h4>庫存項目資訊</h4>
                     <div class="detail-grid">
                         <div class="detail-item">
@@ -270,17 +270,17 @@ ModuleConfig.register('inventory_items', {
                 </section>
 
                 <!-- 出貨單選擇 -->
-                <section class="form-section">
+                <section class="form-section ui-compact-section">
                     <h4>選擇出貨單</h4>
                     <div class="form-grid">
-                        <label class="inline-label">
+                        <label class="inline-label ui-compact-form-row">
                             <span>出貨單 <abbr title="必填">*</abbr></span>
                             <select name="shipping_order_id" required>
                                 <option value="">載入中...</option>
                             </select>
                             <small class="form-hint">選擇現有草稿或建立新出貨單</small>
                         </label>
-                        <label class="inline-label">
+                        <label class="inline-label ui-compact-form-row">
                             <span>出貨數量 <abbr title="必填">*</abbr></span>
                             <input type="number" name="quantity" min="1" required placeholder="輸入出貨數量" autocomplete="off">
                             <small class="form-hint" data-shipping-max-qty></small>
@@ -289,10 +289,10 @@ ModuleConfig.register('inventory_items', {
                 </section>
 
                 <!-- 備註 -->
-                <section class="form-section">
+                <section class="form-section ui-compact-section">
                     <h4>備註</h4>
                     <div class="form-grid">
-                        <label class="inline-label full-width">
+                        <label class="inline-label full-width ui-compact-form-row">
                             <span>備註</span>
                             <textarea name="notes" rows="2" placeholder="出貨備註（選填）"></textarea>
                         </label>
