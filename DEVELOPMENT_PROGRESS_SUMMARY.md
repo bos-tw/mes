@@ -131,5 +131,6 @@
 ## 6. Git 交接
 
 - 分支：`main`。
-- 本輪所有保留變更、migration、release note、測試與交接摘要將以單一可追溯 commit 推送至 `origin/main`；最終 commit 以本輪收尾回報與 `git log --oneline -1` 為準。
+- 功能與交付 commit：`ffec56eb6b78001990f3c7bc8f76f6bcdeb9589f`（`feat: complete P0-P2 system operation improvements`），已推送至 `origin/main`。
+- 本文件所在的收尾 commit 使用 `docs: finalize P0-P2 handoff`，並推送至 `origin/main`；最終 hash 以收尾回報與 `git log --oneline -1` 為準。
 - `dist/` 更新包為交付產物，不強制加入 Git；正式交付包路徑與 SHA-256 已列於上方。
