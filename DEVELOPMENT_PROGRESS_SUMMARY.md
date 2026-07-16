@@ -97,11 +97,9 @@
 
 ## 4. 下一步任務
 
-- P3：處理 DataSync 既有 P2 9 項與 health audit 既有 15 項 warning。
-- 依逐模組方式處理剩餘 408 個 CSS token candidate，每個模組完成瀏覽器視覺比較後才合併，禁止再次機械式全域改寫。
-- 管理員重啟 Apache2.4 服務後，以實際回應標頭複驗 Brotli/gzip 與 immutable cache；本輪已完成設定、`httpd -t` 與 module dump，但目前程序無權限由此工作階段重啟。
-- 待 in-app Browser 提供可用實例後，補做登入、工單狀態、稽核唯讀及 Outbox 下架的視覺回歸。
-- 由業務人員確認歷史 `draft` 出貨單／退貨單的真實狀態後，再執行資料修復。
+- P0：由業務人員確認歷史 `draft` 出貨單／退貨單的真實狀態，再依確認結果修復資料；程式已阻擋新增同類異常。
+- P1：管理員重啟 Apache2.4 後，以正式回應標頭複驗 Brotli/gzip 與 immutable cache；待 in-app Browser 可用時補做登入、工單狀態、稽核唯讀及 Outbox 下架的視覺回歸。
+- P2：處理 DataSync 既有 9 項 P2 與 health audit 既有 15 項 warning；逐模組處理剩餘 408 個 CSS token candidate，每個模組完成視覺比較後才合併，禁止再次機械式全域改寫。
 
 ## 5. 驗證狀態
 
@@ -132,5 +130,5 @@
 
 - 分支：`main`。
 - 功能與交付 commit：`ffec56eb6b78001990f3c7bc8f76f6bcdeb9589f`（`feat: complete P0-P2 system operation improvements`），已推送至 `origin/main`。
-- 本文件所在的收尾 commit 使用 `docs: finalize P0-P2 handoff`，並推送至 `origin/main`；最終 hash 以收尾回報與 `git log --oneline -1` 為準。
+- 首次交接摘要 commit：`3bd111e4403f3be771a60f5a42a4b7fb6bd14539`（`docs: finalize P0-P2 handoff`），已推送至 `origin/main`；最終優先級校正 commit 以收尾回報與 `git log --oneline -1` 為準。
 - `dist/` 更新包為交付產物，不強制加入 Git；正式交付包路徑與 SHA-256 已列於上方。
