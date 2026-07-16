@@ -64,6 +64,29 @@ if (!empty($errors)) {
     jsonResponse(['success' => false, 'message' => implode(' ', $errors)], 400);
 }
 
+$oldProcessingStatus = (string)($order['processing_status'] ?? 'pending');
+$newProcessingStatus = (string)($input['processing_status'] ?? $oldProcessingStatus);
+$allowedProcessingStatuses = ['pending', 'processing', 'completed', 'rejected'];
+if (!in_array($newProcessingStatus, $allowedProcessingStatuses, true)) {
+    jsonResponse(['success' => false, 'message' => '退貨處理狀態無效。'], 422);
+}
+if (!canTransitionReturnOrderStatus($oldProcessingStatus, $newProcessingStatus)) {
+    jsonResponse([
+        'success' => false,
+        'message' => "不允許將退貨單由 {$oldProcessingStatus} 變更為 {$newProcessingStatus}。",
+        'current_status' => $oldProcessingStatus,
+        'requested_status' => $newProcessingStatus,
+        'allowed_status_transitions' => getAllowedReturnOrderTransitions($oldProcessingStatus),
+    ], 409);
+}
+if ($newProcessingStatus === 'completed' && $oldProcessingStatus !== 'completed') {
+    $itemCountStmt = $pdo->prepare('SELECT COUNT(*) FROM return_order_items WHERE return_order_id = ?');
+    $itemCountStmt->execute([$id]);
+    if ((int)$itemCountStmt->fetchColumn() === 0) {
+        jsonResponse(['success' => false, 'message' => '退貨單沒有品項，無法標記為已完成。'], 409);
+    }
+}
+
 // 準備更新欄位
 $updateFields = [];
 $params = [];
@@ -92,11 +115,40 @@ $updateFields[] = "updated_at = NOW()";
 $params['id'] = $id;
 
 try {
+    $pdo->beginTransaction();
+    $lockStmt = $pdo->prepare('SELECT processing_status FROM return_orders WHERE id = :id AND deleted_at IS NULL FOR UPDATE');
+    $lockStmt->execute(['id' => $id]);
+    $lockedStatus = $lockStmt->fetchColumn();
+    if ($lockedStatus === false) {
+        $pdo->rollBack();
+        jsonResponse(['success' => false, 'message' => '找不到指定的退貨單。'], 404);
+    }
+    if ((string)$lockedStatus !== $oldProcessingStatus) {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => '退貨單狀態已被其他操作更新，請重新載入後再試。',
+            'current_status' => (string)$lockedStatus,
+        ], 409);
+    }
+
     $sql = "UPDATE return_orders SET " . implode(', ', $updateFields) . " WHERE id = :id";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
 
     logAuditAction('更新退貨單', 'ReturnOrders', $id, $input);
+
+    recordWorkflowStatusTransition(
+        $pdo,
+        'return_orders',
+        $id,
+        $oldProcessingStatus,
+        $newProcessingStatus,
+        isset($_SESSION['employee']['id']) ? (int)$_SESSION['employee']['id'] : null,
+        trim((string)($input['transition_reason'] ?? $input['status_reason'] ?? $input['notes'] ?? '')) ?: null
+    );
+
+    $pdo->commit();
 
     jsonResponse([
         'success' => true,
@@ -104,6 +156,9 @@ try {
     ]);
 
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     error_log('Return order update failed: ' . $e->getMessage());
     jsonResponse(['success' => false, 'message' => safeErrorMessage($e, '更新退貨單失敗，請稍後重試。')], 500);
 }

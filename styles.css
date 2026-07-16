@@ -47,6 +47,7 @@
 
     /* 文字色彩 */
     --color-text: #333;
+    --color-text-primary: var(--color-text);
     --color-text-secondary: #666;
     --color-text-muted: #6c757d;
     --color-text-light: #999;
@@ -1513,6 +1514,15 @@ body.login-page {
 
 .btn.primary:hover {
     background: linear-gradient(135deg, var(--color-primary-hover), #2c7d36);
+}
+
+.btn.danger {
+    background-color: var(--color-danger);
+    color: #fff;
+}
+
+.btn.danger:hover {
+    background-color: var(--color-danger-hover);
 }
 
 .btn.outline {

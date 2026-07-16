@@ -1202,7 +1202,7 @@
                 ? order.work_order_number
                 : `#${order.work_order_id || order.id || nodeKey}`;
 
-            if (!window.confirm(`確定將工單 ${workOrderNumber} 從機台排程移除，並回到待排程清單嗎？`)) {
+            if (!await window.AppFeedback.confirm({ title: '移除機台排程', message: `工單 ${workOrderNumber} 將回到待排程清單。`, impact: '機台時段與工單排程狀態' })) {
                 return;
             }
 

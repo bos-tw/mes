@@ -236,7 +236,7 @@
         }
 
         async function handleDelete(id) {
-            if (!confirm('確定要刪除此代碼領域嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除代碼領域', message: '確定要刪除此代碼領域嗎？', impact: '所屬代碼值與使用該代碼的功能' })) return;
 
             try {
                 const response = await fetch(`api/lookup_domains/delete.php?id=${id}`, {

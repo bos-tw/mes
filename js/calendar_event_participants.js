@@ -261,7 +261,7 @@
         }
 
         async function handleDelete(eventId, employeeId) {
-            if (!confirm('確定要移除此參與者嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '移除參與者', message: '確定要移除此參與者嗎？', impact: '參與者的事件通知與提醒' })) return;
 
             try {
                 const response = await fetch(`api/calendar_event_participants/delete.php?event_id=${eventId}&employee_id=${employeeId}`, {

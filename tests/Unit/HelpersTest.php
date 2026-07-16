@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
 class HelpersTest extends TestCase
@@ -15,6 +16,7 @@ class HelpersTest extends TestCase
     /**
      * 測試資料庫連線
      */
+    #[Group('database')]
     public function testDatabaseConnection(): void
     {
         $pdo = getTestDb();
@@ -26,6 +28,7 @@ class HelpersTest extends TestCase
     /**
      * 測試資料庫查詢
      */
+    #[Group('database')]
     public function testDatabaseQuery(): void
     {
         $pdo = getTestDb();

@@ -2609,10 +2609,7 @@ function updateButtons() {
             if (!assessment.allowed) {
                 return false;
             }
-            const impacts = Array.isArray(assessment.impacts) && assessment.impacts.length > 0
-                ? `\n\n影響範圍：\n${assessment.impacts.map((impact) => `- ${impact}`).join('\n')}`
-                : '';
-            return window.confirm(`${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`);
+            return window.AppFeedback.confirm({ title: '流程影響確認', message: assessment.message || fallbackMessage, impact: (assessment.impacts || []).join('、'), guidance: assessment.recommended_action || '', confirmLabel: confirmText });
         }
 
         async function handleDelete(id) {
@@ -3054,7 +3051,7 @@ function updateButtons() {
         }
 
         if (drawingsTableBody) {
-            drawingsTableBody.addEventListener('click', (event) => {
+            drawingsTableBody.addEventListener('click', async (event) => {
                 const target = event.target;
                 if (!(target instanceof HTMLElement)) {
                     return;
@@ -3065,7 +3062,7 @@ function updateButtons() {
                 if (removeAction) {
                     const row = removeAction.closest('tr');
                     if (row) {
-                        if (confirm('確定要移除此圖面嗎?')) {
+                        if (await window.AppFeedback.confirm({ title: '移除圖面', message: '確定要移除此圖面嗎？', impact: '訂單品項圖面附件' })) {
                             const drawingId = row.getAttribute('data-drawing-id');
 
                             // 如果是已存在的圖面,記錄要刪除的 ID
@@ -3105,7 +3102,7 @@ function updateButtons() {
         }
 
         if (attachmentsTableBody) {
-            attachmentsTableBody.addEventListener('click', (event) => {
+            attachmentsTableBody.addEventListener('click', async (event) => {
                 const target = event.target;
                 if (!(target instanceof HTMLElement)) {
                     return;
@@ -3116,7 +3113,7 @@ function updateButtons() {
                 if (removeAction) {
                     const row = removeAction.closest('tr');
                     if (row) {
-                        if (confirm('確定要移除此附件嗎?')) {
+                        if (await window.AppFeedback.confirm({ title: '移除附件', message: '確定要移除此附件嗎？', impact: '訂單品項附件' })) {
                             const attachmentId = row.getAttribute('data-attachment-id');
 
                             // 如果是已存在的附件,記錄要刪除的 ID

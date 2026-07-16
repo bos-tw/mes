@@ -639,7 +639,7 @@
 
         // ====== 刪除通知 ======
         async function deleteNotification(id) {
-            if (!confirm('確定要刪除此通知嗎？此操作無法復原。')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除通知', message: '此操作無法復原。', impact: '收件者的公告與已讀狀態' })) return;
 
             try {
                 const response = await fetch(`api/notifications/delete.php?id=${id}`, {

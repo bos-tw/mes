@@ -7,7 +7,7 @@
  * @endpoint GET /api/return_order_items/show.php?id={id}
  *
  * @auth 必須登入
- * @table return_order_items, return_orders, order_items, screening_items
+ * @table return_order_items, return_orders, shipping_order_items
  *
  * @input GET (Query string)
  * | 參數 | 類型 | 必填 | 說明        |

@@ -16,6 +16,7 @@ function mesFrontendCacheScanTargets(string $baseDir): array
         $baseDir . '/js',
         $baseDir . '/core',
         $baseDir . '/modules',
+        $baseDir . '/styles',
         $baseDir . '/print',
         $baseDir . '/help',
         $baseDir . '/api/common',

@@ -148,7 +148,12 @@ function validateOrderData(array $payload, bool $isUpdate = false): array
     // 訂單狀態 - 可選
     if (array_key_exists('status', $payload)) {
         $status = normalizeOrderNullableString($payload['status'] ?? '');
-        $data['status'] = $status === '' ? null : mb_substr($status, 0, 50);
+        $allowedStatuses = array_keys(getWorkflowTransitionDefinitions()['orders']);
+        if (!in_array($status, $allowedStatuses, true)) {
+            $errors['status'] = '訂單狀態不在允許清單中。';
+        } else {
+            $data['status'] = $status;
+        }
     }
 
     // 訂單總金額 - 可選，通常由系統計算

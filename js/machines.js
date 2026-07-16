@@ -672,7 +672,7 @@ function formatDecimal(value) {
         }
 
         async function deleteMachine(id) {
-            const confirmed = window.confirm('確認刪除此機台資料？');
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除機台', message: '確認刪除此機台資料？', impact: '排程、工單與維護追溯資料' });
             if (!confirmed) {
                 return;
             }

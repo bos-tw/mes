@@ -1465,7 +1465,6 @@ function maybeCreateRescreenExecutionWorkOrder(PDO $pdo, int $batchId, array $so
             tool_statistics,
             customer_instructions,
             other_notes,
-            status,
             status_lookup_id
         ) VALUES (
             :work_order_number,
@@ -1479,7 +1478,6 @@ function maybeCreateRescreenExecutionWorkOrder(PDO $pdo, int $batchId, array $so
             :tool_statistics,
             :customer_instructions,
             :other_notes,
-            :status,
             :status_lookup_id
         )
     ");
@@ -1494,7 +1492,6 @@ function maybeCreateRescreenExecutionWorkOrder(PDO $pdo, int $batchId, array $so
         'tool_statistics' => '二次篩選批',
         'customer_instructions' => null,
         'other_notes' => '系統自動建立之二次篩選執行工單；來源案件 #' . $batchId,
-        'status' => 'pending',
         'status_lookup_id' => $pendingStatusId > 0 ? $pendingStatusId : null,
     ]);
 

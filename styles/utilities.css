@@ -1,0 +1,16 @@
+.col-w-8 { width: 8%; }
+.col-w-9 { width: 9%; }
+.col-w-10 { width: 10%; }
+.col-w-11 { width: 11%; }
+.col-w-14 { width: 14%; }
+.col-w-15 { width: 15%; }
+.col-w-23 { width: 23%; }
+.col-w-39 { width: 39%; }
+.col-w-80 { width: 80px; }
+.col-w-100 { width: 100px; }
+.col-w-150 { width: 150px; }
+.col-w-180 { width: 180px; }
+
+@media (max-width: 48rem) {
+    .desktop-only { display: none !important; }
+}

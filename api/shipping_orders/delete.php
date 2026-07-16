@@ -62,6 +62,12 @@ try {
     if (!$order) {
         jsonResponse(['success' => false, 'message' => '找不到該出貨單。'], 404);
     }
+    if ((string)$order['status'] !== 'draft') {
+        jsonResponse([
+            'success' => false,
+            'message' => '只有草稿出貨單可以刪除。',
+        ], 409);
+    }
 
     $workflowGuard = getWorkflowDeleteAssessment($pdo, 'shipping_orders', $id);
     if (!$workflowGuard['allowed']) {
@@ -156,6 +162,12 @@ try {
         // 軟刪出貨單，保留出貨品項供追溯；列表透過 shipping_orders.deleted_at 排除。
         $stmt = $pdo->prepare("UPDATE shipping_orders SET deleted_at = NOW(), delete_token = id WHERE id = ? AND deleted_at IS NULL");
         $stmt->execute([$id]);
+
+        // 軟刪後以仍有效的待出貨單重算，消除歷史增量配貨可能產生的漂移。
+        foreach (array_unique(array_filter(array_map('intval', array_column($items, 'inventory_item_id')))) as $inventoryItemId) {
+            recalculateInventoryAllocation($pdo, $inventoryItemId);
+            recalculateInventoryStatus($pdo, $inventoryItemId);
+        }
 
         $pdo->commit();
 

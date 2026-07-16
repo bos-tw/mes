@@ -416,7 +416,7 @@
         }
 
         async function deleteDepartment(id) {
-            const confirmed = window.confirm('確認刪除此部門資料？');
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除部門', message: '確認刪除此部門資料？', impact: '員工與組織歸屬資料' });
             if (!confirmed) {
                 return;
             }

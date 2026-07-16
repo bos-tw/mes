@@ -155,22 +155,17 @@ function handleCreateShippingQualityInspection(): void
     try {
         $sql = <<<SQL
 INSERT INTO shipping_quality_inspections (
-    id, shipping_order_id, inspection_datetime, inspector_id,
+    shipping_order_id, inspection_datetime, inspector_id,
     sample_quantity_pcs, defective_quantity_pcs, rejection_rate_ppm,
     inspection_result, notes
 ) VALUES (
-    :id, :shipping_order_id, :inspection_datetime, :inspector_id,
+    :shipping_order_id, :inspection_datetime, :inspector_id,
     :sample_quantity_pcs, :defective_quantity_pcs, :rejection_rate_ppm,
     :inspection_result, :notes
 )
 SQL;
-        // 生成 ID
-        $idStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM shipping_quality_inspections');
-        $newId = (int)$idStmt->fetchColumn();
-
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            ':id'                     => $newId,
             ':shipping_order_id'      => $data['shipping_order_id'],
             ':inspection_datetime'    => $data['inspection_datetime'],
             ':inspector_id'           => $data['inspector_id'],
@@ -180,6 +175,7 @@ SQL;
             ':inspection_result'      => $data['inspection_result'],
             ':notes'                  => $data['notes'] ?: null,
         ]);
+        $newId = (int)$pdo->lastInsertId();
 
         $record = findShippingQualityInspection($pdo, $newId);
 

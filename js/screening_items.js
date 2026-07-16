@@ -643,7 +643,7 @@ function formatNumber(value, fractionDigits = 4) {
         async function handleDelete(id) {
             const target = state.items.find((item) => item.id === id);
             const label = target ? `${target.item_number ?? ''} ${target.name ?? ''}`.trim() || `ID ${id}` : `ID ${id}`;
-            const confirmed = window.confirm(`確認刪除「${label}」？刪除後將無法復原。`);
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除受篩產品', message: `確認刪除「${label}」？`, impact: '相關訂單與工單產品資料' });
             if (!confirmed) {
                 return;
             }

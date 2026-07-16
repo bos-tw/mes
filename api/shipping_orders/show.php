@@ -158,6 +158,7 @@ try {
     unset($item);
 
     $order['items'] = $items;
+    $order['allowed_status_transitions'] = getAllowedShippingOrderTransitions((string)$order['status']);
 
     // Calculate totals
     $totalQuantity = 0;

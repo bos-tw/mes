@@ -19,6 +19,9 @@ abstract class ApiTestCase extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        if (getenv('MES_RUN_HTTP_API_TESTS') !== '1') {
+            $this->markTestSkipped('HTTP API 測試需以 MES_RUN_HTTP_API_TESTS=1 啟動隔離測試服務。');
+        }
         $this->client = new TestHttpClient();
 
         // 如果需要認證，先登入取得 token

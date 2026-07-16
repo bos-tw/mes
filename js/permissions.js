@@ -298,7 +298,7 @@
         }
 
         async function handleDelete(id) {
-            if (!confirm('確定要刪除此權限嗎？')) {
+            if (!await window.AppFeedback.confirm({ title: '刪除權限', message: '確定要刪除此權限嗎？', impact: '所有引用此權限的角色' })) {
                 return;
             }
 

@@ -729,7 +729,7 @@ function formatDateTime(value) {
         }
 
         async function deleteRecord(id) {
-            const confirmed = window.confirm('確定要刪除此品質檢驗紀錄嗎？此操作無法復原！');
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除品質檢驗紀錄', message: '此操作無法復原。', impact: '工單生產品質追溯資料' });
             if (!confirmed) {
                 return;
             }

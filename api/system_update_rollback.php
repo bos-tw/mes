@@ -249,6 +249,7 @@ $maintenanceWarning = '';
 $dbBackupInfo = null;
 $fileRestoreOperations = [];
 $healthCheck = null;
+$runtimeCacheInfo = null;
 
 try {
     if (function_exists('set_time_limit')) {
@@ -389,6 +390,57 @@ try {
         }
     }
 
+    $deleteFiles = is_array($manifest['delete_files'] ?? null)
+        ? $manifest['delete_files']
+        : [];
+    $restoredDeletedFileCount = 0;
+    foreach ($deleteFiles as $deleteFileRaw) {
+        $relativeFile = normalizeRelativePath((string)$deleteFileRaw);
+        if ($relativeFile === '' || isProtectedUpdatePath($relativeFile)) {
+            throw new RuntimeException('更新包包含無效的刪除路徑：' . (string)$deleteFileRaw);
+        }
+
+        $targetPath = $projectRoot . '/' . $relativeFile;
+        $runtimeBackupPath = $runtimeBackupDir . '/' . $relativeFile;
+        $backupSourcePath = $backupDirAbsolute . '/' . $relativeFile;
+
+        if (is_file($targetPath)) {
+            ensureDirectoryExists(dirname($runtimeBackupPath));
+            if (!copy($targetPath, $runtimeBackupPath)) {
+                throw new RuntimeException('建立回滾前保護備份失敗：' . $relativeFile);
+            }
+            $fileRestoreOperations[] = [
+                'type' => 'overwrite',
+                'target' => $targetPath,
+                'backup' => $runtimeBackupPath,
+            ];
+        } else {
+            $fileRestoreOperations[] = [
+                'type' => 'create',
+                'target' => $targetPath,
+                'backup' => '',
+            ];
+        }
+
+        if (is_file($backupSourcePath)) {
+            ensureDirectoryExists(dirname($targetPath));
+            if (!copy($backupSourcePath, $targetPath)) {
+                throw new RuntimeException('還原已刪除檔案失敗：' . $relativeFile);
+            }
+            $restoredDeletedFileCount++;
+            continue;
+        }
+
+        if (is_file($targetPath) && !unlink($targetPath)) {
+            throw new RuntimeException('恢復更新前缺檔狀態失敗：' . $relativeFile);
+        }
+    }
+
+    $runtimeCacheInfo = invalidateSystemUpdateRuntimeCaches(array_merge(
+        $packageFiles,
+        $deleteFiles
+    ));
+
     $migrationFiles = is_array($job['migration_files']) ? $job['migration_files'] : [];
     if ($migrationFiles === []) {
         $migrationFiles = is_array($manifest['migrations'] ?? null) ? $manifest['migrations'] : [];
@@ -435,10 +487,11 @@ try {
     }
 
     $message = sprintf(
-        '版本 %s（批次 #%d）回滾完成，還原 %d 個檔案，執行 rollback migration %d 個（%d 條語句），DB 快照%s：%s（保留 %d 天）%s。',
+        '版本 %s（批次 #%d）回滾完成，還原 %d 個套用檔案與 %d 個已刪除舊檔，執行 rollback migration %d 個（%d 條語句），DB 快照%s：%s（保留 %d 天）%s。',
         (string)$job['version_number'],
         (int)$job['id'],
         count($packageFiles),
+        $restoredDeletedFileCount,
         (int)$migrationRollbackResult['executed_files'],
         (int)$migrationRollbackResult['executed_statements'],
         ((bool)($dbBackupInfo['reused'] ?? false)) ? '重用當日檔案' : '已建立',
@@ -455,8 +508,10 @@ try {
     logAuditAction('手動回滾系統更新', 'system_update_jobs', (int)$job['id'], [
         'version_number' => $job['version_number'],
         'rolled_back_file_count' => count($packageFiles),
+        'restored_deleted_file_count' => $restoredDeletedFileCount,
         'migration_rollback' => $migrationRollbackResult,
         'db_backup' => $dbBackupInfo,
+        'runtime_cache' => $runtimeCacheInfo,
     ]);
 
     jsonResponse([
@@ -465,8 +520,10 @@ try {
         'data' => [
             'job' => getSystemUpdateJob($pdo, (int)$job['id']),
             'rolled_back_file_count' => count($packageFiles),
+            'restored_deleted_file_count' => $restoredDeletedFileCount,
             'migration_rollback' => $migrationRollbackResult,
             'db_backup' => $dbBackupInfo,
+            'runtime_cache' => $runtimeCacheInfo,
             'health_check' => $healthCheck,
             'maintenance' => getSystemUpdateMaintenanceState(),
         ],

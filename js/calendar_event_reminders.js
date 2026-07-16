@@ -331,7 +331,7 @@
         }
 
         async function handleDelete(id) {
-            if (!confirm('確定要刪除此提醒嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除行事曆提醒', message: '確定要刪除此提醒嗎？' })) return;
 
             try {
                 const response = await fetch(`api/calendar_event_reminders/delete.php?id=${id}`, {

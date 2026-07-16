@@ -331,7 +331,7 @@
         }
 
         async function handleDelete(id) {
-            if (!confirm('確定要刪除此流水號嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除流水號設定', message: '確定要刪除此流水號嗎？', impact: '後續單據編號產生' })) return;
 
             try {
                 const response = await fetch(`api/number_sequences/delete.php?id=${id}`, {

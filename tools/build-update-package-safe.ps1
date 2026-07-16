@@ -148,6 +148,7 @@ foreach ($line in $untrackedLines) {
 
 $allCandidates = @($changedSet)
 $packFiles = @()
+$deleteFiles = @()
 
 foreach ($relativePath in $allCandidates) {
     if (Is-ExcludedPath -RelativePath $relativePath) {
@@ -157,8 +158,12 @@ foreach ($relativePath in $allCandidates) {
     $full = Join-Path $repoRoot $relativePath
     if (Test-Path $full -PathType Leaf) {
         $packFiles += $relativePath
+    } else {
+        $deleteFiles += $relativePath
     }
 }
+
+$deleteFiles = @($deleteFiles | Sort-Object -Unique)
 
 if ($packFiles.Count -eq 0) {
     throw 'No files selected for package. Check FromRef/current workspace changes.'
@@ -189,6 +194,7 @@ $buildParams = @{
     ChangeSummaryFile = $summaryRel
     Files             = $mainFiles
     Migrations        = $migrationFiles
+    DeleteFiles       = $deleteFiles
     OutputDir         = $OutputDir
 }
 
@@ -245,6 +251,19 @@ try {
         $missingText = $missingMigrations -join ', '
         throw "Package validation failed: missing migrations in ZIP -> $missingText"
     }
+
+    $manifestEntry = $zip.GetEntry('manifest.json')
+    $reader = New-Object System.IO.StreamReader($manifestEntry.Open())
+    try {
+        $manifest = ($reader.ReadToEnd() | ConvertFrom-Json)
+    } finally {
+        $reader.Dispose()
+    }
+    $manifestDeletes = @($manifest.delete_files | ForEach-Object { Normalize-RelativePath -Path ([string]$_) })
+    $missingDeletes = @($deleteFiles | Where-Object { $manifestDeletes -notcontains $_ })
+    if ($missingDeletes.Count -gt 0) {
+        throw "Package validation failed: missing delete_files in manifest -> $($missingDeletes -join ', ')"
+    }
 }
 finally {
     $zip.Dispose()
@@ -254,3 +273,4 @@ Write-Host "Safe package created: $($latestZip.FullName)"
 Write-Host "FromRef: $FromRef"
 Write-Host "Main files: $($mainFiles.Count)"
 Write-Host "Migrations: $($migrationFiles.Count)"
+Write-Host "Deleted files: $($deleteFiles.Count)"

@@ -63,6 +63,8 @@ if ($id <= 0) {
 }
 
 $payload = readWorkOrderPayload();
+$transitionReason = trim((string)($payload['transition_reason'] ?? $payload['status_reason'] ?? ''));
+unset($payload['transition_reason'], $payload['status_reason']);
 
 // 控制狀態改為已完成時，是否同步建立庫存項目。未傳入時沿用既有行為：自動建立。
 $autoCreateInventory = true;
@@ -143,7 +145,7 @@ try {
     $pdo->beginTransaction();
 
     // Check if work order exists and get current status
-    $checkStmt = $pdo->prepare("SELECT id, status, status_lookup_id, completed_at, order_item_id, work_order_type, total_units, total_weight_kg, weight_per_unit_g, tool_statistics, machine_id, machine_sequence FROM work_orders WHERE id = :id AND deleted_at IS NULL");
+    $checkStmt = $pdo->prepare("SELECT id, status_lookup_id, completed_at, order_item_id, work_order_type, total_units, total_weight_kg, weight_per_unit_g, tool_statistics, machine_id, machine_sequence FROM work_orders WHERE id = :id AND deleted_at IS NULL FOR UPDATE");
     $checkStmt->execute(['id' => $id]);
     $existingWorkOrder = $checkStmt->fetch(PDO::FETCH_ASSOC);
     if (!$existingWorkOrder) {
@@ -153,10 +155,26 @@ try {
 
     $oldStatusLookupId = (int)$existingWorkOrder['status_lookup_id'];
     $newStatusLookupId = isset($data['status_lookup_id']) ? (int)$data['status_lookup_id'] : $oldStatusLookupId;
-    $oldStatusSnapshot = resolveWorkOrderStatusSnapshot($pdo, $oldStatusLookupId, $existingWorkOrder['status'] ?? null);
-    $newStatusSnapshot = resolveWorkOrderStatusSnapshot($pdo, $newStatusLookupId, $data['status'] ?? $existingWorkOrder['status'] ?? null);
-    $oldIsCompleted = isCompletedWorkOrderStatus($pdo, $oldStatusLookupId, $existingWorkOrder['status'] ?? null);
-    $newIsCompleted = isCompletedWorkOrderStatus($pdo, $newStatusLookupId, $data['status'] ?? $existingWorkOrder['status'] ?? null);
+    $oldStatusSnapshot = resolveWorkOrderStatusSnapshot($pdo, $oldStatusLookupId, null);
+    $newStatusSnapshot = resolveWorkOrderStatusSnapshot($pdo, $newStatusLookupId, null);
+    $oldStatusKey = resolveLookupValueKey($pdo, $oldStatusLookupId, 'status_work_order');
+    $newStatusKey = resolveLookupValueKey($pdo, $newStatusLookupId, 'status_work_order');
+    if ($oldStatusKey === null || $newStatusKey === null) {
+        $pdo->rollBack();
+        jsonResponse(['success' => false, 'message' => '工單狀態必須使用 status_work_order 定義值。'], 422);
+    }
+    if (!canTransitionWorkflowStatus('work_orders', $oldStatusKey, $newStatusKey)) {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => '不允許的工單狀態轉換。',
+            'current_status' => $oldStatusKey,
+            'requested_status' => $newStatusKey,
+            'allowed_transitions' => getAllowedWorkflowTransitions('work_orders', $oldStatusKey),
+        ], 409);
+    }
+    $oldIsCompleted = $oldStatusKey === 'completed';
+    $newIsCompleted = $newStatusKey === 'completed';
     $hasCompletedAt = !empty($existingWorkOrder['completed_at']);
 
     if ($newIsCompleted && !$hasCompletedAt) {
@@ -616,22 +634,25 @@ try {
 
                 $invId = (int)$pdo->lastInsertId();
                 $createdInventoryItemId = $invId;
+                ensureInventoryItemSource($pdo, $invId, $receiptType === 'final' ? 'final_receipt' : 'work_order_receipt', $invId, [
+                    'source_order_id' => (int)$orderItemInfo['order_id'],
+                    'source_order_item_id' => (int)$orderItemInfo['order_item_id'],
+                    'source_work_order_id' => $id,
+                ], '工單完工自動入庫');
 
-                $txnId = getNextInventoryTransactionId($pdo);
                 $txnSql = "
                     INSERT INTO inventory_transactions (
-                        id, inventory_item_id, order_id, order_item_id, work_order_id,
+                        inventory_item_id, order_id, order_item_id, work_order_id,
                         ref_type, ref_id, direction, quantity, after_quantity,
                         notes, created_by_employee_id
                     ) VALUES (
-                        :id, :inv_id, :order_id, :order_item_id, :work_order_id,
+                        :inv_id, :order_id, :order_item_id, :work_order_id,
                         :ref_type, :ref_id, 'inbound', :qty, :after_qty,
                         :notes, :created_by
                     )
                 ";
                 $txnStmt = $pdo->prepare($txnSql);
                 $txnStmt->execute([
-                    'id' => $txnId,
                     'inv_id' => $invId,
                     'order_id' => (int)$orderItemInfo['order_id'],
                     'order_item_id' => (int)$orderItemInfo['order_item_id'],
@@ -757,6 +778,16 @@ try {
                 'inventory_deleted' => $deletedInventoryItemId !== null,
             ],
         ]);
+        recordWorkflowStatusTransition(
+            $pdo,
+            'work_orders',
+            $id,
+            $oldStatusKey,
+            $newStatusKey,
+            isset($_SESSION['employee']['id']) ? (int)$_SESSION['employee']['id'] : null,
+            $transitionReason !== '' ? $transitionReason : $statusNotes,
+            ['status_lookup_id' => $newStatusLookupId]
+        );
     }
 
     // Log audit

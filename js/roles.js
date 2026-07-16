@@ -299,7 +299,7 @@
         }
 
         async function handleDelete(id) {
-            if (!confirm('確定要刪除此角色嗎？')) {
+            if (!await window.AppFeedback.confirm({ title: '刪除角色', message: '確定要刪除此角色嗎？', impact: '角色權限與員工角色指派' })) {
                 return;
             }
 

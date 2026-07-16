@@ -27,6 +27,18 @@ ModuleConfig.register('dashboard', {
         <div class="announcement-bar-count" data-dashboard-announcement-count></div>
     </section>
 
+    <section class="dashboard-work-queue" aria-labelledby="dashboard-work-queue-title">
+        <div class="section-header"><h3 id="dashboard-work-queue-title"><i class="fas fa-route"></i> 我的工作佇列</h3><span>依權限直接進入下一個流程節點</span></div>
+        <div class="dashboard-work-queue-grid">
+            <button type="button" data-dashboard-open="orders"><strong>接單待處理</strong><span>建立或確認客戶訂單</span></button>
+            <button type="button" data-dashboard-open="production_work_order_schedule"><strong>待排程</strong><span>安排工單、機台與人員</span></button>
+            <button type="button" data-dashboard-open="work_orders"><strong>生產執行</strong><span>記錄進度、品質與完工</span></button>
+            <button type="button" data-dashboard-open="inventory_items"><strong>待入庫</strong><span>核對來源與庫存數量</span></button>
+            <button type="button" data-dashboard-open="shipping_orders"><strong>待出貨</strong><span>配貨、包裝與出貨確認</span></button>
+            <button type="button" data-dashboard-open="quality_issue_reports"><strong>品質異常</strong><span>追蹤異常與二次篩選</span></button>
+        </div>
+    </section>
+
     <!-- ========== 統計資料區 ========== -->
     <section class="dashboard-section" data-section="statistics">
         <div class="section-header">

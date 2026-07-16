@@ -346,7 +346,6 @@
                 'daily_machine_inspection_items': 'dailyMachineInspectionItemColumnManager',
                 'daily_machine_inspections': 'dailyMachineInspectionColumnManager',
                 'dashboard_calendar_events': 'dashboardCalendarEventColumnManager',
-                'domain_event_outbox': 'domainEventOutboxColumnManager',
                 'machine_maintenance_tasks': 'machineMaintenanceTaskColumnManager',
                 'production_records': 'productionRecordColumnManager',
                 'quality_issue_reports': 'qualityIssueReportColumnManager',

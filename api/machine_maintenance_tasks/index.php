@@ -148,22 +148,17 @@ function handleCreateMaintenanceTask(): void
     try {
         $sql = <<<SQL
 INSERT INTO machine_maintenance_tasks (
-    id, machine_id, task_type, title, description,
+    machine_id, task_type, title, description,
     scheduled_start, scheduled_end, actual_start, actual_end,
     status, next_due_date
 ) VALUES (
-    :id, :machine_id, :task_type, :title, :description,
+    :machine_id, :task_type, :title, :description,
     :scheduled_start, :scheduled_end, :actual_start, :actual_end,
     :status, :next_due_date
 )
 SQL;
-        // 生成 ID
-        $idStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM machine_maintenance_tasks');
-        $newId = (int)$idStmt->fetchColumn();
-
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            ':id'              => $newId,
             ':machine_id'      => $data['machine_id'],
             ':task_type'       => $data['task_type'],
             ':title'           => $data['title'],
@@ -175,6 +170,7 @@ SQL;
             ':status'          => $data['status'],
             ':next_due_date'   => $data['next_due_date'] ?: null,
         ]);
+        $newId = (int)$pdo->lastInsertId();
 
         $record = findMaintenanceTask($pdo, $newId);
 

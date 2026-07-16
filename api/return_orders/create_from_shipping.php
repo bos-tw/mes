@@ -51,6 +51,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../return_order_items/helpers.php';
 require_once __DIR__ . '/helpers.php';
 
 $currentEmployee = requireAuth();
@@ -113,6 +114,9 @@ try {
 
     if (empty($shippingOrder['customer_id'])) {
         jsonResponse(['success' => false, 'message' => '出貨單沒有關聯的客戶。'], 400);
+    }
+    if (!in_array((string)$shippingOrder['status'], ['shipped', 'delivered'], true)) {
+        jsonResponse(['success' => false, 'message' => '只有已出貨或已送達的出貨單可以建立退貨單。'], 409);
     }
 
     // === 查詢並驗證退貨品項 ===
@@ -192,13 +196,24 @@ try {
     $pdo->beginTransaction();
 
     try {
+        $shippingLockStmt = $pdo->prepare("
+            SELECT status
+            FROM shipping_orders
+            WHERE id = ? AND deleted_at IS NULL
+            FOR UPDATE
+        ");
+        $shippingLockStmt->execute([$shippingOrderId]);
+        $lockedShippingStatus = $shippingLockStmt->fetchColumn();
+        if (!in_array((string)$lockedShippingStatus, ['shipped', 'delivered'], true)) {
+            $pdo->rollBack();
+            jsonResponse(['success' => false, 'message' => '出貨單狀態已變更，無法建立退貨單。'], 409);
+        }
+
         // 建立退貨單
-        $returnOrderId = generateReturnOrderId();
         $returnOrderNumber = generateReturnOrderNumber($pdo);
 
         $insertOrderSql = "
             INSERT INTO return_orders (
-                id,
                 return_order_number,
                 customer_id,
                 original_shipping_order_id,
@@ -208,7 +223,6 @@ try {
                 notes,
                 created_at
             ) VALUES (
-                :id,
                 :return_order_number,
                 :customer_id,
                 :original_shipping_order_id,
@@ -222,7 +236,6 @@ try {
 
         $insertOrderStmt = $pdo->prepare($insertOrderSql);
         $insertOrderStmt->execute([
-            'id' => $returnOrderId,
             'return_order_number' => $returnOrderNumber,
             'customer_id' => $shippingOrder['customer_id'],
             'original_shipping_order_id' => $shippingOrderId,
@@ -231,11 +244,11 @@ try {
             'processing_status' => 'pending',
             'notes' => $input['notes'] ?? null,
         ]);
+        $returnOrderId = (int)$pdo->lastInsertId();
 
         // 新增退貨品項
         $insertItemSql = "
             INSERT INTO return_order_items (
-                id,
                 return_order_id,
                 shipping_order_item_id,
                 returned_quantity,
@@ -243,7 +256,6 @@ try {
                 reason,
                 created_at
             ) VALUES (
-                :id,
                 :return_order_id,
                 :shipping_order_item_id,
                 :returned_quantity,
@@ -257,15 +269,30 @@ try {
         $itemCount = 0;
 
         foreach ($input['items'] as $item) {
-            $itemId = generateReturnOrderId();
+            $business = validateReturnOrderItemBusinessRules(
+                $pdo,
+                $returnOrderId,
+                (int)$item['shipping_order_item_id'],
+                (float)$item['returned_quantity']
+            );
+            if ($business['errors'] !== []) {
+                $pdo->rollBack();
+                jsonResponse([
+                    'success' => false,
+                    'message' => implode('；', array_values($business['errors'])),
+                    'errors' => $business['errors'],
+                ], 409);
+            }
+
             $insertItemStmt->execute([
-                'id' => $itemId,
                 'return_order_id' => $returnOrderId,
                 'shipping_order_item_id' => (int)$item['shipping_order_item_id'],
                 'returned_quantity' => (float)$item['returned_quantity'],
                 'returned_unit' => $item['returned_unit'] ?? $itemsMap[(int)$item['shipping_order_item_id']]['shipped_unit'] ?? null,
                 'reason' => $item['reason'] ?? null,
             ]);
+            $itemId = (int)$pdo->lastInsertId();
+            recordReturnOrderItemInventorySource($pdo, $itemId, $business['source'] ?? []);
             $itemCount++;
         }
 

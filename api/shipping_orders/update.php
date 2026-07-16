@@ -95,8 +95,33 @@ try {
     // 準備更新欄位
     $updateFields = [];
     $params = [];
-    $oldStatus = $order['status'];
-    $newStatus = $input['status'] ?? $oldStatus;
+    $oldStatus = (string)$order['status'];
+    $newStatus = (string)($validation['data']['status'] ?? $oldStatus);
+    if (!canTransitionShippingOrderStatus($oldStatus, $newStatus)) {
+        jsonResponse([
+            'success' => false,
+            'message' => "不允許將出貨單由 {$oldStatus} 變更為 {$newStatus}。",
+            'current_status' => $oldStatus,
+            'requested_status' => $newStatus,
+            'allowed_status_transitions' => getAllowedShippingOrderTransitions($oldStatus),
+            'suggested_action' => '重新載入出貨單，並選擇 allowed_status_transitions 中的下一狀態。',
+        ], 409);
+    }
+    if ($oldStatus !== 'draft') {
+        foreach (['customer_id', 'order_id'] as $immutableField) {
+            if (
+                array_key_exists($immutableField, $validation['data'])
+                && (string)($validation['data'][$immutableField] ?? '') !== (string)($order[$immutableField] ?? '')
+            ) {
+                jsonResponse([
+                    'success' => false,
+                    'message' => '出貨單離開草稿後不可變更客戶或來源訂單。',
+                    'current_status' => $oldStatus,
+                    'field' => $immutableField,
+                ], 409);
+            }
+        }
+    }
     $hasDefectSummaryInput = array_key_exists('defect_quantity', $input)
         || array_key_exists('defect_weight_per_unit_g', $input)
         || array_key_exists('defect_total_weight_kg', $input)
@@ -131,51 +156,106 @@ try {
     $pdo->beginTransaction();
 
     try {
+        // 鎖定出貨單，避免兩個狀態請求同時通過舊狀態檢查。
+        $lockedOrderStmt = $pdo->prepare("
+            SELECT *
+            FROM shipping_orders
+            WHERE id = ? AND deleted_at IS NULL
+            FOR UPDATE
+        ");
+        $lockedOrderStmt->execute([$id]);
+        $lockedOrder = $lockedOrderStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$lockedOrder) {
+            $pdo->rollBack();
+            jsonResponse(['success' => false, 'message' => '找不到該出貨單。'], 404);
+        }
+        if ((string)$lockedOrder['status'] !== $oldStatus) {
+            $pdo->rollBack();
+            jsonResponse([
+                'success' => false,
+                'message' => '出貨單狀態已被其他操作更新，請重新載入後再試。',
+                'current_status' => (string)$lockedOrder['status'],
+            ], 409);
+        }
+
         // ──────────────────────────────────────────────
         // 狀態轉換連動邏輯
         // ──────────────────────────────────────────────
 
         // 取得所有出貨品項（狀態轉換時需要）
         $itemsStmt = $pdo->prepare("
-            SELECT soi.*, ii.quantity_on_hand, ii.inventory_number
+            SELECT soi.*, ii.inventory_number
             FROM shipping_order_items soi
             LEFT JOIN inventory_items ii ON ii.id = soi.inventory_item_id
             WHERE soi.shipping_order_id = ?
+            ORDER BY soi.inventory_item_id ASC, soi.id ASC
         ");
         $itemsStmt->execute([$id]);
         $shippingItems = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $currentUserId = getCurrentEmployeeId();
+        $inventoryEffect = getShippingOrderInventoryEffect($oldStatus, $newStatus);
 
-        // ── 情境 A：出貨確認 (任何狀態 → shipped) ──
-        if ($oldStatus !== 'shipped' && $newStatus === 'shipped') {
+        // ── 情境 A：已包裝 → 已出貨 ──
+        if ($inventoryEffect === 'ship') {
+            if ($shippingItems === []) {
+                $pdo->rollBack();
+                jsonResponse(['success' => false, 'message' => '出貨單沒有任何品項，無法出貨。'], 409);
+            }
 
             foreach ($shippingItems as $si) {
                 $qty = (float)$si['shipped_quantity'];
                 $invId = (int)$si['inventory_item_id'];
 
                 if (!$invId || $qty <= 0) {
-                    continue;
+                    $pdo->rollBack();
+                    jsonResponse(['success' => false, 'message' => '出貨品項缺少有效庫存或數量，無法出貨。'], 409);
                 }
 
-                // 前置檢查：庫存是否足夠
-                $onHand = (float)$si['quantity_on_hand'];
-                if ($onHand < $qty) {
+                $inventoryStmt = $pdo->prepare("
+                    SELECT inventory_number, quantity_on_hand
+                    FROM inventory_items
+                    WHERE id = ? AND deleted_at IS NULL
+                    FOR UPDATE
+                ");
+                $inventoryStmt->execute([$invId]);
+                $inventory = $inventoryStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$inventory) {
                     $pdo->rollBack();
                     jsonResponse([
                         'success' => false,
-                        'message' => "庫存不足：{$si['inventory_number']}，在庫 {$onHand}，需出貨 {$qty}。"
-                    ], 400);
+                        'message' => "出貨品項對應的庫存不存在：{$si['inventory_number']}。",
+                    ], 409);
+                }
+
+                // 扣除其他待出貨單已保留的數量後，本單仍須有足夠庫存。
+                $otherAllocationStmt = $pdo->prepare("
+                    SELECT COALESCE(SUM(other_soi.shipped_quantity), 0)
+                    FROM shipping_order_items other_soi
+                    INNER JOIN shipping_orders other_so ON other_so.id = other_soi.shipping_order_id
+                    WHERE other_soi.inventory_item_id = ?
+                      AND other_soi.shipping_order_id <> ?
+                      AND other_so.deleted_at IS NULL
+                      AND other_so.status IN ('draft', 'confirmed', 'preparing', 'packed')
+                ");
+                $otherAllocationStmt->execute([$invId, $id]);
+                $otherAllocated = (float)$otherAllocationStmt->fetchColumn();
+                $onHand = (float)$inventory['quantity_on_hand'];
+                if (($onHand - $otherAllocated) < $qty) {
+                    $pdo->rollBack();
+                    jsonResponse([
+                        'success' => false,
+                        'message' => "庫存不足：{$inventory['inventory_number']}，本單可用 " . max(0, $onHand - $otherAllocated) . "，需出貨 {$qty}。",
+                    ], 409);
                 }
 
                 // 1. 更新庫存數量
                 $pdo->prepare("
                     UPDATE inventory_items SET
                         quantity_on_hand = quantity_on_hand - ?,
-                        quantity_allocated = GREATEST(0, quantity_allocated - ?),
                         quantity_shipped = quantity_shipped + ?
                     WHERE id = ? AND deleted_at IS NULL
-                ")->execute([$qty, $qty, $qty, $invId]);
+                ")->execute([$qty, $qty, $invId]);
 
                 // 2. 建立庫存異動記錄 (outbound)
                 $newOnHand = $onHand - $qty;
@@ -195,15 +275,23 @@ try {
                 recalculateInventoryStatus($pdo, $invId);
             }
 
-            // 4. 重新計算所有相關訂單品項的出貨統計
-            $affectedOrderItemIds = array_unique(array_filter(array_column($shippingItems, 'order_item_id')));
-            foreach ($affectedOrderItemIds as $oiId) {
-                recalculateOrderItemShipping($pdo, (int)$oiId);
-            }
         }
 
         // ── 情境 B：出貨取消 (shipped → cancelled) ──
-        if ($oldStatus === 'shipped' && $newStatus === 'cancelled') {
+        if ($inventoryEffect === 'reverse_shipment') {
+            $returnCountStmt = $pdo->prepare("
+                SELECT COUNT(*)
+                FROM return_orders
+                WHERE original_shipping_order_id = ? AND deleted_at IS NULL
+            ");
+            $returnCountStmt->execute([$id]);
+            if ((int)$returnCountStmt->fetchColumn() > 0) {
+                $pdo->rollBack();
+                jsonResponse([
+                    'success' => false,
+                    'message' => '此出貨單已有退貨紀錄，無法取消出貨；請先依退貨流程完成處理。',
+                ], 409);
+            }
 
             foreach ($shippingItems as $si) {
                 $qty = (float)$si['shipped_quantity'];
@@ -243,38 +331,6 @@ try {
                 recalculateInventoryStatus($pdo, $invId);
             }
 
-            // 5. 重新計算所有相關訂單品項的出貨統計
-            $affectedOrderItemIds = array_unique(array_filter(array_column($shippingItems, 'order_item_id')));
-            foreach ($affectedOrderItemIds as $oiId) {
-                recalculateOrderItemShipping($pdo, (int)$oiId);
-            }
-        }
-
-        // ── 情境 C：退回草稿 (confirmed/其他 → draft) ──
-        //    釋放已分配的庫存（原有邏輯保留並增強）
-        if ($oldStatus !== 'draft' && $newStatus === 'draft') {
-            foreach ($shippingItems as $si) {
-                $qty = (float)$si['shipped_quantity'];
-                $invId = (int)$si['inventory_item_id'];
-
-                if (!$invId || $qty <= 0) {
-                    continue;
-                }
-
-                $pdo->prepare("
-                    UPDATE inventory_items
-                    SET quantity_allocated = GREATEST(0, quantity_allocated - ?)
-                    WHERE id = ?
-                ")->execute([$qty, $invId]);
-
-                recalculateInventoryStatus($pdo, $invId);
-            }
-
-            // 重新計算所有相關訂單品項的出貨統計
-            $affectedOrderItemIds = array_unique(array_filter(array_column($shippingItems, 'order_item_id')));
-            foreach ($affectedOrderItemIds as $oiId) {
-                recalculateOrderItemShipping($pdo, (int)$oiId);
-            }
         }
 
         // ──────────────────────────────────────────────
@@ -291,6 +347,24 @@ try {
             $stmt->execute($params);
         }
 
+        // 出貨單狀態更新後，再以真實來源重算配貨與訂單出貨統計。
+        $affectedInventoryItemIds = array_unique(array_filter(array_map(
+            'intval',
+            array_column($shippingItems, 'inventory_item_id')
+        )));
+        foreach ($affectedInventoryItemIds as $inventoryItemId) {
+            recalculateInventoryAllocation($pdo, $inventoryItemId);
+            recalculateInventoryStatus($pdo, $inventoryItemId);
+        }
+
+        $affectedOrderItemIds = array_unique(array_filter(array_map(
+            'intval',
+            array_column($shippingItems, 'order_item_id')
+        )));
+        foreach ($affectedOrderItemIds as $orderItemId) {
+            recalculateOrderItemShipping($pdo, $orderItemId);
+        }
+
         if ($hasDefectSummaryInput) {
             saveShippingOrderDefectSummary($pdo, $id, $defectSummaryResult['summary']);
         }
@@ -298,6 +372,17 @@ try {
         if ($hasToolSummariesInput) {
             replaceShippingOrderToolSummaries($pdo, $id, $toolSummaryResult['summaries']);
         }
+
+        recordWorkflowStatusTransition(
+            $pdo,
+            'shipping_orders',
+            $id,
+            $oldStatus,
+            $newStatus,
+            $currentUserId,
+            trim((string)($input['transition_reason'] ?? $input['status_reason'] ?? $input['notes'] ?? '')) ?: null,
+            ['inventory_effect' => $inventoryEffect]
+        );
 
         $pdo->commit();
 

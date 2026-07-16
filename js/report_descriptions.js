@@ -429,7 +429,7 @@
         }
 
         async function confirmDelete(id) {
-            if (!confirm('確定要刪除此報表說明嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除報表說明', message: '確定要刪除此報表說明嗎？' })) return;
 
             try {
                 const response = await fetch('api/report_descriptions/delete.php', {

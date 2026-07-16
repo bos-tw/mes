@@ -389,7 +389,7 @@
         }
 
         async function handleDelete(id) {
-            if (!confirm('確定要刪除此行事曆事件嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除行事曆事件', message: '確定要刪除此行事曆事件嗎？', impact: '參與者與提醒資料' })) return;
 
             try {
                 const response = await fetch(`api/dashboard_calendar_events/delete.php?id=${id}`, {

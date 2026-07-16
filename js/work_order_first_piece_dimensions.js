@@ -666,7 +666,7 @@
                 return;
             }
 
-            if (!confirm('確定要刪除這筆首件檢驗資料嗎？此動作無法復原。')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除首件檢驗', message: '此動作無法復原。', impact: '工單品質追溯資料' })) return;
 
             try {
                 const response = await fetch('api/work_order_first_piece_dimensions/delete.php', {

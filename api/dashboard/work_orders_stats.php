@@ -68,21 +68,21 @@ function handleWorkOrdersStats(): void
     }
 
     // 建立查詢條件
-    $whereConditions = ["deleted_at IS NULL"];
+    $whereConditions = ["wo.deleted_at IS NULL"];
     $params = [];
 
     if ($startDate && $endDate) {
-        $whereConditions[] = "scheduled_start_date >= :start_date";
-        $whereConditions[] = "scheduled_start_date <= :end_date";
+        $whereConditions[] = "wo.scheduled_start_date >= :start_date";
+        $whereConditions[] = "wo.scheduled_start_date <= :end_date";
         $params[':start_date'] = $startDate;
         $params[':end_date'] = $endDate;
     } elseif ($month !== null) {
-        $whereConditions[] = "YEAR(scheduled_start_date) = :year";
-        $whereConditions[] = "MONTH(scheduled_start_date) = :month";
+        $whereConditions[] = "YEAR(wo.scheduled_start_date) = :year";
+        $whereConditions[] = "MONTH(wo.scheduled_start_date) = :month";
         $params[':year'] = $year;
         $params[':month'] = $month;
     } else {
-        $whereConditions[] = "YEAR(scheduled_start_date) = :year";
+        $whereConditions[] = "YEAR(wo.scheduled_start_date) = :year";
         $params[':year'] = $year;
     }
 
@@ -93,8 +93,9 @@ function handleWorkOrdersStats(): void
         $statsQuery = "
             SELECT
                 COUNT(*) as total_count,
-                SUM(CASE WHEN status IN ('pending', 'in_progress') THEN 1 ELSE 0 END) as active_count
-            FROM work_orders
+                SUM(CASE WHEN lv.value_key IN ('pending', 'in_progress') THEN 1 ELSE 0 END) as active_count
+            FROM work_orders wo
+            JOIN lookup_values lv ON lv.id = wo.status_lookup_id
             WHERE {$whereClause}
         ";
 
@@ -105,11 +106,12 @@ function handleWorkOrdersStats(): void
         // 計算狀態分佈
         $statusQuery = "
             SELECT
-                status,
+                lv.value_key AS status,
                 COUNT(*) as count
-            FROM work_orders
+            FROM work_orders wo
+            JOIN lookup_values lv ON lv.id = wo.status_lookup_id
             WHERE {$whereClause}
-            GROUP BY status
+            GROUP BY lv.value_key
             ORDER BY count DESC
         ";
 
@@ -132,11 +134,12 @@ function handleWorkOrdersStats(): void
                 wo.work_order_number,
                 wo.scheduled_start_date,
                 wo.scheduled_end_date,
-                wo.status,
+                lv.value_key AS status,
                 o.order_number
             FROM work_orders wo
             LEFT JOIN order_items oi ON wo.order_item_id = oi.id
             LEFT JOIN orders o ON oi.order_id = o.id
+            JOIN lookup_values lv ON lv.id = wo.status_lookup_id
             WHERE wo.deleted_at IS NULL
         ";
 

@@ -103,7 +103,7 @@ function formatDateTime(value) {
 
         function renderLoadingRow() {
             if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="9" class="text-center">資料載入中...</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="6" class="text-center">資料載入中...</td></tr>';
             }
         }
 
@@ -113,7 +113,7 @@ function formatDateTime(value) {
             }
 
             if (!Array.isArray(rows) || rows.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="9" class="text-center">尚無符合條件的資料。</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="6" class="text-center">尚無符合條件的資料。</td></tr>';
                 if (selectAllCheckbox) {
                     selectAllCheckbox.checked = false;
                 }
@@ -123,7 +123,6 @@ function formatDateTime(value) {
 
             const html = rows.map((log) => {
                 auditLogsCache.set(log.id, log);
-                const isChecked = state.selectedIds.has(log.id);
                 const employeeDisplay = formatEmployee(log);
                 const ipDisplay = log.ip_address || '-';
                 const detailsPreview = formatDetailsPreview(log.details);
@@ -131,9 +130,6 @@ function formatDateTime(value) {
 
                 return `
                     <tr data-id="${log.id}">
-                        <td>
-                            <input type="checkbox" data-role="row-checkbox" aria-label="選擇操作日誌 ${log.id}" ${isChecked ? 'checked' : ''}>
-                        </td>
                         <td title="${escapeHtml(employeeDisplay)}">${escapeHtml(employeeDisplay)}</td>
                         <td title="${escapeHtml(log.action)}">${escapeHtml(log.action)}</td>
                         <td>${escapeHtml(log.target_table || '-')}</td>
@@ -388,7 +384,7 @@ function formatDateTime(value) {
                 return;
             }
 
-            const confirmed = window.confirm(`確認刪除選取的 ${state.selectedIds.size} 筆操作日誌？`);
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除操作日誌', message: `確認刪除選取的 ${state.selectedIds.size} 筆操作日誌？`, impact: '稽核追溯資料' });
             if (!confirmed) {
                 return;
             }

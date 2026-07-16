@@ -880,7 +880,7 @@ function formatWithTooltip(value, maxLength = 50) {
         }
 
         async function deleteSupplier(id) {
-            const confirmed = window.confirm('確認刪除此供應商資料？');
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除供應商', message: '確認刪除此供應商資料？', impact: '採購與來源追溯資料' });
             if (!confirmed) {
                 return;
             }

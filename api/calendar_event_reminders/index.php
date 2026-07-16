@@ -155,22 +155,18 @@ function handleCreateReminder(): void
         ], 404);
     }
 
-    // 取得新 ID
-    $maxIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM calendar_event_reminders');
-    $newId = (int)$maxIdStmt->fetchColumn();
-
-    $sql = 'INSERT INTO calendar_event_reminders (id, event_id, employee_id, reminder_datetime, reminder_type, is_sent, created_at, updated_at) '
-        . 'VALUES (:id, :event_id, :employee_id, :reminder_datetime, :reminder_type, 0, NOW(), NOW())';
+    $sql = 'INSERT INTO calendar_event_reminders (event_id, employee_id, reminder_datetime, reminder_type, is_sent, created_at, updated_at) '
+        . 'VALUES (:event_id, :employee_id, :reminder_datetime, :reminder_type, 0, NOW(), NOW())';
 
     try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            'id' => $newId,
             'event_id' => $data['event_id'],
             'employee_id' => $data['employee_id'],
             'reminder_datetime' => $data['reminder_datetime'],
             'reminder_type' => $data['reminder_type'] ?? null,
         ]);
+        $newId = (int)$pdo->lastInsertId();
     } catch (PDOException $exception) {
         jsonResponse([
             'success' => false,

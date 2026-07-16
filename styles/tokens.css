@@ -1,0 +1,55 @@
+:root {
+    --space-0: 0;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --ui-space-4px: 4px;
+    --ui-space-5px: 5px;
+    --ui-space-6px: 6px;
+    --ui-space-8px: 8px;
+    --ui-space-10px: 10px;
+    --ui-space-12px: 12px;
+    --ui-space-16px: 16px;
+    --ui-space-20px: 20px;
+    --ui-space-24px: 24px;
+    --ui-control-height-28px: 28px;
+    --ui-control-height-30px: 30px;
+    --ui-control-height-32px: 32px;
+    --ui-control-height-34px: 34px;
+    --ui-control-height-36px: 36px;
+    --ui-control-height-38px: 38px;
+    --ui-control-height-40px: 40px;
+    --ui-radius-4px: 4px;
+    --ui-radius-6px: 6px;
+    --ui-radius-8px: 8px;
+    --ui-radius-10px: 10px;
+    --ui-radius-12px: 12px;
+    --ui-radius-pill: 999px;
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --color-surface: #fff;
+    --color-surface-muted: #f4f7fb;
+    --color-border: #c7d2e0;
+    --color-text: #172033;
+    --color-text-muted: #536176;
+    --color-primary: #175cd3;
+    --color-primary-strong: #0b429e;
+    --color-danger: #b42318;
+    --color-success: #067647;
+    --color-warning: #b54708;
+    --focus-ring: 0 0 0 3px rgba(23, 92, 211, 0.35);
+    --shadow-modal: 0 1.5rem 4rem rgba(15, 23, 42, 0.28);
+}
+
+@media (prefers-contrast: more) {
+    :root {
+        --color-border: #344054;
+        --color-text-muted: #344054;
+        --focus-ring: 0 0 0 4px #ffbf47;
+    }
+}

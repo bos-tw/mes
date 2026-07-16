@@ -16,13 +16,13 @@ $ver = $cacheVersion['version'];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>精密光學篩選管理系統</title>
+    <link rel="stylesheet" href="styles/tokens.css?v=<?= $ver ?>">
+    <link rel="stylesheet" href="styles/shell.css?v=<?= $ver ?>">
     <link rel="stylesheet" href="styles.css?v=<?= $ver ?>">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- FullCalendar 套件 (Dashboard 使用) -->
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
-    <script defer src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-    <!-- Chart.js 圖表套件 (Dashboard 使用) -->
-    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="styles/components.css?v=<?= $ver ?>">
+    <link rel="stylesheet" href="styles/utilities.css?v=<?= $ver ?>">
+    <link rel="stylesheet" href="styles/workspaces.css?v=<?= $ver ?>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha384-5e2ESR8Ycmos6g3gAKr1Jvwye8sW4U1u/cAKulfVJnkakCcMqhOudbtPnvJ+nbv7" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
 <body>
     <div class="app-container">
@@ -93,7 +93,7 @@ $ver = $cacheVersion['version'];
                         <li class="menu-item has-submenu active">
                             <a href="#" class="menu-link" data-menu-id="master_data">
                                 <i class="fas fa-database menu-icon"></i>
-                                <span class="menu-text">基本資料管理</span>
+                                <span class="menu-text">常用基礎資料</span>
                             </a>
                             <ul class="submenu">
                                 <li><a href="#" data-page="companies" data-title="公司基本資料"><i class="fas fa-building"></i> 公司基本資料</a></li>
@@ -135,7 +135,6 @@ $ver = $cacheVersion['version'];
                                 <li><a href="#" data-page="security_settings" data-title="安全設定"><i class="fas fa-shield-alt"></i> 安全設定</a></li>
                                 <li><a href="#" data-page="report_descriptions" data-title="列印報表說明"><i class="fas fa-file-alt"></i> 列印報表說明</a></li>
                                 <li><a href="#" data-page="audit_logs" data-title="操作日誌"><i class="fas fa-history"></i> 操作日誌</a></li>
-                                <li><a href="#" data-page="domain_event_outbox" data-title="領域事件Outbox"><i class="fas fa-inbox"></i> 領域事件Outbox</a></li>
                                 <li class="menu-divider"></li>
                                 <li><a href="#" data-action="show-version-info"><i class="fas fa-info-circle"></i> 關於系統</a></li>
                             </ul>
@@ -145,7 +144,7 @@ $ver = $cacheVersion['version'];
                         <li class="menu-item has-submenu">
                             <a href="#" class="menu-link" data-menu-id="order_management">
                                 <i class="fas fa-file-invoice menu-icon"></i>
-                                <span class="menu-text">訂單管理</span>
+                                <span class="menu-text">接單作業</span>
                             </a>
                             <ul class="submenu">
                                 <li><a href="#" data-page="orders" data-title="訂單主表管理"><i class="fas fa-file-invoice"></i> 訂單主表管理</a></li>
@@ -157,7 +156,7 @@ $ver = $cacheVersion['version'];
                         <li class="menu-item has-submenu">
                             <a href="#" class="menu-link" data-menu-id="production_operations">
                                 <i class="fas fa-industry menu-icon"></i>
-                                <span class="menu-text">生產作業</span>
+                                <span class="menu-text">排程與生產</span>
                             </a>
                             <ul class="submenu">
                                 <li><a href="#" data-page="work_orders" data-title="生產工單"><i class="fas fa-clipboard"></i> 生產工單</a></li>
@@ -172,7 +171,7 @@ $ver = $cacheVersion['version'];
                         <li class="menu-item has-submenu">
                             <a href="#" class="menu-link" data-menu-id="quality_management">
                                 <i class="fas fa-check-circle menu-icon"></i>
-                                <span class="menu-text">品質管理</span>
+                                <span class="menu-text">品質與異常</span>
                             </a>
                             <ul class="submenu">
                                 <li><a href="#" data-page="production_quality_records" data-title="生產品質檢驗"><i class="fas fa-microscope"></i> 生產品質檢驗</a></li>
@@ -187,7 +186,7 @@ $ver = $cacheVersion['version'];
                         <li class="menu-item has-submenu">
                             <a href="#" class="menu-link" data-menu-id="inventory_management">
                                 <i class="fas fa-warehouse menu-icon"></i>
-                                <span class="menu-text">庫存管理</span>
+                                <span class="menu-text">入庫與庫存</span>
                             </a>
                             <ul class="submenu">
                                 <li><a href="#" data-page="inventory_items" data-title="庫存項目"><i class="fas fa-boxes"></i> 庫存項目</a></li>
@@ -200,7 +199,7 @@ $ver = $cacheVersion['version'];
                         <li class="menu-item has-submenu">
                             <a href="#" class="menu-link" data-menu-id="shipping_management">
                                 <i class="fas fa-shipping-fast menu-icon"></i>
-                                <span class="menu-text">出貨管理</span>
+                                <span class="menu-text">出貨作業</span>
                             </a>
                             <ul class="submenu">
                                 <li><a href="#" data-page="shipping_orders" data-title="出貨單"><i class="fas fa-file-export"></i> 出貨單</a></li>
@@ -212,7 +211,7 @@ $ver = $cacheVersion['version'];
                         <li class="menu-item has-submenu">
                             <a href="#" class="menu-link" data-menu-id="return_management">
                                 <i class="fas fa-undo-alt menu-icon"></i>
-                                <span class="menu-text">退貨管理</span>
+                                <span class="menu-text">退貨作業</span>
                             </a>
                             <ul class="submenu">
                                 <li><a href="#" data-page="return_orders" data-title="退貨單"><i class="fas fa-undo-alt"></i> 退貨單</a></li>
@@ -415,122 +414,19 @@ $ver = $cacheVersion['version'];
         </div>
     </div>
 
-    <!-- 模組配置系統 (必須在 script.js 之前載入) -->
+    <!-- 僅載入登入後 shell 所需核心；業務模組由 module-assets 按需載入。 -->
     <script>
         window.APP_ASSET_VERSION = <?= json_encode($ver, JSON_UNESCAPED_SLASHES) ?>;
     </script>
     <script defer src="core/module-config.js?v=<?= $ver ?>"></script>
     <script defer src="core/module-renderer.js?v=<?= $ver ?>"></script>
-    <!-- 模組配置檔 -->
-    <script defer src="core/configs/companies.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/departments.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/employees.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/tools.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/machines.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/machine_capabilities.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/suppliers.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/screening_services.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/screening_items.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/roles.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/permissions.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/customers.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/lookup_domains.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/number_sequences.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/system_parameters.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/orders.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/return_orders.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/rescreen_batches.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/shipping_orders.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/shipping_order_items.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/return_order_items.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/order_items.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/inventory_items.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/inventory_transactions.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/work_orders.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/work_order_first_piece_dimensions.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/work_order_images.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/role_permissions.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/employee_roles.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/production_records.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/quality_issue_reports.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/shipping_quality_inspections.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/production_quality_records.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/defect_history_records.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/machine_maintenance_tasks.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/daily_machine_inspections.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/daily_machine_inspection_items.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/audit_logs.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/lookup_values.config.js?v=<?= $ver ?>"></script>
-    <!-- dashboard 使用自訂 HTML，不使用配置檔 -->
-    <script defer src="core/configs/dashboard.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/messages.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/notifications.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/domain_event_outbox.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/dashboard_calendar_events.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/calendar_event_participants.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/calendar_event_reminders.config.js?v=<?= $ver ?>"></script>
-    <script defer src="core/configs/report_descriptions.config.js?v=<?= $ver ?>"></script>
-
-    <script defer src="script.js?v=<?= $ver ?>"></script>
-    <!-- 跨分頁資料同步模組 -->
+    <script defer src="core/module-assets.js?v=<?= $ver ?>"></script>
+    <script defer src="core/feedback.js?v=<?= $ver ?>"></script>
+    <script defer src="core/workspace-navigation.js?v=<?= $ver ?>"></script>
     <script defer src="js/data-sync.js?v=<?= $ver ?>"></script>
-    <!-- 通用欄位管理器 (必須在各模組 JS 之前載入) -->
     <script defer src="api/common/column_manager.js?v=<?= $ver ?>"></script>
-    <!-- 全域列表硬序號管理器 (統一替所有功能列表補序號) -->
     <script defer src="api/common/table_row_numbers.js?v=<?= $ver ?>"></script>
-    <!-- 共用工具函數庫 (必須在各模組 JS 之前載入) -->
     <script defer src="js/utils.js?v=<?= $ver ?>"></script>
-    <script defer src="js/companies.js?v=<?= $ver ?>"></script>
-    <script defer src="js/employees.js?v=<?= $ver ?>"></script>
-    <script defer src="js/customers.js?v=<?= $ver ?>"></script>
-    <script defer src="js/suppliers.js?v=<?= $ver ?>"></script>
-    <script defer src="js/screening_items.js?v=<?= $ver ?>"></script>
-    <script defer src="js/screening_services.js?v=<?= $ver ?>"></script>
-    <script defer src="js/machines.js?v=<?= $ver ?>"></script>
-    <script defer src="js/machine_capabilities.js?v=<?= $ver ?>"></script>
-    <script defer src="js/tools.js?v=<?= $ver ?>"></script>
-    <script defer src="js/audit_logs.js?v=<?= $ver ?>"></script>
-    <script defer src="js/lookup_values.js?v=<?= $ver ?>"></script>
-    <script defer src="js/orders.js?v=<?= $ver ?>"></script>
-    <script defer src="js/order_items.js?v=<?= $ver ?>"></script>
-    <script defer src="js/departments.js?v=<?= $ver ?>"></script>
-    <script defer src="js/work_orders.js?v=<?= $ver ?>"></script>
-    <script defer src="js/production_work_order_schedule.js?v=<?= $ver ?>"></script>
-    <script defer src="js/work_order_first_piece_dimensions.js?v=<?= $ver ?>"></script>
-    <script defer src="js/work_order_images.js?v=<?= $ver ?>"></script>
-    <script defer src="js/inventory_items.js?v=<?= $ver ?>"></script>
-    <script defer src="js/inventory_transactions.js?v=<?= $ver ?>"></script>
-    <script defer src="js/shipping_orders.js?v=<?= $ver ?>"></script>
-    <script defer src="js/shipping_order_items.js?v=<?= $ver ?>"></script>
-    <script defer src="js/return_orders.js?v=<?= $ver ?>"></script>
-    <script defer src="js/rescreen_batches.js?v=<?= $ver ?>"></script>
-    <script defer src="js/rescreen_batches_execution.js?v=<?= $ver ?>"></script>
-    <script defer src="js/production_quality_records.js?v=<?= $ver ?>"></script>
-    <script defer src="js/defect_history_records.js?v=<?= $ver ?>"></script>
-    <script defer src="js/dashboard.js?v=<?= $ver ?>"></script>
-    <!-- 新增模組 -->
-    <script defer src="js/roles.js?v=<?= $ver ?>"></script>
-    <script defer src="js/permissions.js?v=<?= $ver ?>"></script>
-    <script defer src="js/role_permissions.js?v=<?= $ver ?>"></script>
-    <script defer src="js/employee_roles.js?v=<?= $ver ?>"></script>
-    <script defer src="js/quality_issue_reports.js?v=<?= $ver ?>"></script>
-    <script defer src="js/machine_maintenance_tasks.js?v=<?= $ver ?>"></script>
-    <script defer src="js/daily_machine_inspections.js?v=<?= $ver ?>"></script>
-    <script defer src="js/daily_machine_inspection_items.js?v=<?= $ver ?>"></script>
-    <script defer src="js/shipping_quality_inspections.js?v=<?= $ver ?>"></script>
-    <script defer src="js/production_records.js?v=<?= $ver ?>"></script>
-    <!-- 系統設定模組 -->
-    <script defer src="js/lookup_domains.js?v=<?= $ver ?>"></script>
-    <script defer src="js/number_sequences.js?v=<?= $ver ?>"></script>
-    <script defer src="js/system_parameters.js?v=<?= $ver ?>"></script>
-    <script defer src="js/security_settings.js?v=<?= $ver ?>"></script>
-    <script defer src="js/dashboard_calendar_events.js?v=<?= $ver ?>"></script>
-    <script defer src="js/calendar_event_participants.js?v=<?= $ver ?>"></script>
-    <script defer src="js/calendar_event_reminders.js?v=<?= $ver ?>"></script>
-    <script defer src="js/domain_event_outbox.js?v=<?= $ver ?>"></script>
-    <script defer src="js/report_descriptions.js?v=<?= $ver ?>"></script>
-    <!-- 通知與訊息模組 -->
-    <script defer src="js/notifications.js?v=<?= $ver ?>"></script>
-    <script defer src="js/messages.js?v=<?= $ver ?>"></script>
+    <script defer src="script.js?v=<?= $ver ?>"></script>
 </body>
 </html>

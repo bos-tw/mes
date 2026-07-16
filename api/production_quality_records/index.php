@@ -223,27 +223,22 @@ function handleCreateQualityRecord(): void
     $defectiveQty = (int)($data['defective_quantity_pcs'] ?? 0);
     $rejectionRatePpm = calculateRejectionRatePpm($sampleQty, $defectiveQty);
 
-    // 取得下一個 ID
-    $nextIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM production_quality_records');
-    $nextId = (int)$nextIdStmt->fetch(PDO::FETCH_ASSOC)['next_id'];
-
     try {
         $pdo->beginTransaction();
 
         $stmt = $pdo->prepare(
             'INSERT INTO production_quality_records (
-                id, production_record_id, inspection_datetime, inspector_id,
+                production_record_id, inspection_datetime, inspector_id,
                 sample_quantity_pcs, defective_quantity_pcs, rejection_rate_ppm,
                 inspection_result, rework_needed, notes
             ) VALUES (
-                :id, :production_record_id, :inspection_datetime, :inspector_id,
+                :production_record_id, :inspection_datetime, :inspector_id,
                 :sample_quantity_pcs, :defective_quantity_pcs, :rejection_rate_ppm,
                 :inspection_result, :rework_needed, :notes
             )'
         );
 
         $stmt->execute([
-            'id' => $nextId,
             'production_record_id' => $data['production_record_id'],
             'inspection_datetime' => $data['inspection_datetime'],
             'inspector_id' => $data['inspector_id'],
@@ -254,6 +249,7 @@ function handleCreateQualityRecord(): void
             'rework_needed' => (int)($data['rework_needed'] ?? 0),
             'notes' => $data['notes'] ?? null,
         ]);
+        $nextId = (int)$pdo->lastInsertId();
 
         // 記錄操作日誌
         logAuditAction(

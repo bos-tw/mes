@@ -7,6 +7,7 @@ ini_set('html_errors', '0');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/common/workflow_state_machine.php';
 
 /**
  * 從 system_parameters 資料表取得設定值。
@@ -817,63 +818,9 @@ function hasPermissionInList(array $permissions, string $permissionName): bool
     return false;
 }
 
-/**
- * 依據請求 URL 與 HTTP 方法自動檢查模組權限。
- *
- * 規則：
- * - 僅對寫入操作（POST/PUT/PATCH/DELETE）執行檢查
- * - 若使用者尚未被賦予任何權限（permissions 為空），則跳過檢查（向後相容）
- * - 權限命名慣例：{模組名稱}.{動作}（例如 departments.create）
- * - profile/dashboard/common 等通用端點不做模組權限檢查
- *
- * @param array $employee 已登入的使用者資料
- */
-function autoEnforcePermission(array $employee): void
+/** @return array<string, string> */
+function getLegacyModulePermissionMap(): array
 {
-    // 從 URL 路徑取得模組名稱
-    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
-    if (!preg_match('#/api/([a-z_]+)/#', $scriptName, $matches)) {
-        return;
-    }
-    $module = $matches[1];
-
-    // 跳過通用 / 個人端點
-    static $skipModules = [
-        'common', 'docs', 'tools', 'profile', 'dashboard',
-        'session', 'login', 'logout', 'healthcheck', 'diagnose',
-    ];
-    if (in_array($module, $skipModules, true)) {
-        return;
-    }
-
-    // 僅對寫入操作檢查權限
-    $method = getRequestMethod();
-    $actionMap = [
-        'POST'   => 'create',
-        'PUT'    => 'edit',
-        'PATCH'  => 'edit',
-        'DELETE' => 'delete',
-    ];
-    if (!isset($actionMap[$method])) {
-        return; // GET / HEAD / OPTIONS 不檢查
-    }
-
-    $action = $actionMap[$method];
-    $permissionName = "{$module}.{$action}";
-
-    // 若使用者尚未被賦予任何權限，跳過檢查（向後相容、初始部署）
-    $permissions = $employee['permissions'] ?? [];
-    if (empty($permissions)) {
-        return;
-    }
-
-    // 檢查是否擁有所需權限
-    // 支援新格式 (module.action) 與舊格式 (manage_*) 向後相容
-    if (hasPermissionInList($permissions, $permissionName)) {
-        return; // 新格式權限匹配
-    }
-
-    // 舊格式相容：將模組名稱映射到舊的 manage_* 權限
     static $legacyPermissionMap = [
         'companies'                     => 'manage_companies',
         'customers'                     => 'manage_customers',
@@ -920,7 +867,6 @@ function autoEnforcePermission(array $employee): void
         'system_parameters'             => 'manage_system_parameters',
         'report_descriptions'           => 'manage_system_parameters',
         'audit_logs'                    => 'view_audit_logs',
-        'domain_event_outbox'           => 'manage_system_parameters',
         'security_settings'             => 'manage_system_parameters',
         'dashboard_calendar_events'     => 'manage_calendar_events',
         'calendar_event_participants'   => 'manage_calendar_events',
@@ -929,9 +875,136 @@ function autoEnforcePermission(array $employee): void
         'messages'                      => 'manage_system_parameters',
     ];
 
-    $legacyPermission = $legacyPermissionMap[$module] ?? null;
-    if ($legacyPermission && hasPermissionInList($permissions, $legacyPermission)) {
-        return; // 舊格式權限匹配
+    return $legacyPermissionMap;
+}
+
+/**
+ * 模組在建立關聯選單或工作流程詳情時所需的唯讀相依權限。
+ * 僅擴充 GET/HEAD，不授予相依模組的寫入能力。
+ *
+ * @return array<string, list<string>>
+ */
+function getModuleReadConsumerPermissionMap(): array
+{
+    return [
+        'customers' => ['manage_orders', 'manage_work_orders', 'manage_shipping_orders', 'manage_return_orders'],
+        'screening_items' => ['manage_screening_services', 'manage_orders', 'manage_work_orders', 'manage_inventory'],
+        'orders' => ['manage_work_orders', 'manage_shipping_orders', 'manage_return_orders'],
+        'order_items' => ['manage_work_orders', 'manage_shipping_orders', 'manage_return_orders'],
+        'employees' => ['manage_work_orders', 'manage_production_records', 'manage_daily_inspections', 'manage_production_quality', 'manage_shipping_quality'],
+        'machines' => ['manage_work_orders', 'manage_production_records', 'manage_daily_inspections', 'manage_maintenance_tasks'],
+        'tools' => ['manage_orders', 'manage_work_orders', 'manage_shipping_orders'],
+        'inventory_items' => ['manage_work_orders', 'manage_shipping_orders', 'manage_return_orders', 'manage_production_quality'],
+        'shipping_orders' => ['manage_return_orders', 'manage_shipping_quality'],
+        'shipping_order_items' => ['manage_return_orders', 'manage_shipping_quality'],
+    ];
+}
+
+/**
+ * 解析自動權限檢查所需的模組與動作。
+ *
+ * @return array{module: string, action: string}|null
+ */
+function resolveAutomaticPermissionContext(string $scriptName, string $method): ?array
+{
+    if (!preg_match('#/api/([a-z_]+)/#', $scriptName, $matches)) {
+        return null;
+    }
+
+    $module = $matches[1];
+    $skipModules = [
+        'common', 'docs', 'profile',
+        'session', 'login', 'logout', 'healthcheck', 'diagnose',
+    ];
+    if (in_array($module, $skipModules, true)) {
+        return null;
+    }
+
+    $actionMap = [
+        'GET'    => 'read',
+        'HEAD'   => 'read',
+        'POST'   => 'create',
+        'PUT'    => 'edit',
+        'PATCH'  => 'edit',
+        'DELETE' => 'delete',
+    ];
+    $normalizedMethod = strtoupper($method);
+    if (!isset($actionMap[$normalizedMethod])) {
+        return null;
+    }
+
+    return [
+        'module' => $module,
+        'action' => $actionMap[$normalizedMethod],
+    ];
+}
+
+/**
+ * 判斷權限清單是否可通過指定模組動作。
+ *
+ * lookup_values 為所有登入使用者都會使用的非敏感代碼表，僅開放讀取。
+ *
+ * @param array<int, string> $permissions
+ */
+function isAutomaticPermissionGranted(array $permissions, string $module, string $action): bool
+{
+    if ($action === 'read' && $module === 'lookup_values') {
+        return true;
+    }
+
+    if ($permissions === []) {
+        return false;
+    }
+
+    if ($action === 'read' && in_array($module, ['dashboard', 'status_board'], true)) {
+        return true;
+    }
+
+    $permissionName = "{$module}.{$action}";
+    if (hasPermissionInList($permissions, $permissionName)) {
+        return true;
+    }
+
+    if ($action === 'read') {
+        foreach (getModuleReadConsumerPermissionMap()[$module] ?? [] as $consumerPermission) {
+            if (hasPermissionInList($permissions, $consumerPermission)) {
+                return true;
+            }
+        }
+    }
+
+    $legacyPermission = getLegacyModulePermissionMap()[$module] ?? null;
+    return $legacyPermission !== null
+        && hasPermissionInList($permissions, $legacyPermission);
+}
+
+/**
+ * 依據請求 URL 與 HTTP 方法自動檢查模組權限。
+ *
+ * 讀寫皆檢查；空權限採 fail-closed。common/profile 等個人或共用端點由端點自身守門。
+ *
+ * @param array<string,mixed> $employee
+ */
+function autoEnforcePermission(array $employee): void
+{
+    $context = resolveAutomaticPermissionContext(
+        (string)($_SERVER['SCRIPT_NAME'] ?? ''),
+        getRequestMethod()
+    );
+    if ($context === null) {
+        return;
+    }
+
+    $module = $context['module'];
+    $action = $context['action'];
+    $permissionName = "{$module}.{$action}";
+    $permissions = array_values(array_filter(
+        (array)($employee['permissions'] ?? []),
+        static fn($permission): bool => is_string($permission) && $permission !== ''
+    ));
+
+    if (isAutomaticPermissionGranted($permissions, $module, $action)) {
+        return;
     }
 
     jsonResponse([

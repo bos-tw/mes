@@ -111,10 +111,40 @@ function getTestDb(): PDO
     static $pdo = null;
 
     if ($pdo === null) {
+        require_once __DIR__ . '/../api/config.php';
+        $config = getDatabaseConfig();
+        $sourceDatabase = DB_NAME;
+        $testDatabase = getenv('SCREWSYSTEM_DB_NAME') ?: 'yucyuan_test';
+        if (!str_ends_with($testDatabase, '_test')) {
+            throw new RuntimeException('測試資料庫名稱必須以 _test 結尾。');
+        }
+
+        $admin = new PDO(
+            sprintf('mysql:host=%s;port=%d;charset=utf8mb4', $config['host'], $config['port']),
+            $config['user'],
+            $config['password'],
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]
+        );
+        $quotedTestDb = '`' . str_replace('`', '``', $testDatabase) . '`';
+        $quotedSourceDb = '`' . str_replace('`', '``', $sourceDatabase) . '`';
+        $admin->exec("DROP DATABASE IF EXISTS {$quotedTestDb}");
+        $admin->exec("CREATE DATABASE {$quotedTestDb} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        $admin->exec('SET FOREIGN_KEY_CHECKS=0');
+        $tablesStmt = $admin->prepare('SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = \'BASE TABLE\'');
+        $tablesStmt->execute([$sourceDatabase]);
+        foreach ($tablesStmt->fetchAll(PDO::FETCH_COLUMN) as $table) {
+            $quotedTable = '`' . str_replace('`', '``', (string)$table) . '`';
+            $admin->exec("CREATE TABLE IF NOT EXISTS {$quotedTestDb}.{$quotedTable} LIKE {$quotedSourceDb}.{$quotedTable}");
+        }
+        $admin->exec('SET FOREIGN_KEY_CHECKS=1');
+
         $pdo = new PDO(
-            'mysql:host=localhost;dbname=yucyuan_test;charset=utf8mb4',
-            'root',
-            '',
+            sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $config['host'], $config['port'], $testDatabase),
+            $config['user'],
+            $config['password'],
             [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

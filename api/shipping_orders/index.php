@@ -68,7 +68,6 @@ switch ($method) {
     default:
         jsonResponse(['success' => false, 'message' => '不支援的請求方法。'], 405);
 }
-
 /**
  * List shipping orders with pagination and filters
  */
@@ -242,7 +241,8 @@ function handleCreate(): void
     $consigneeAddress = $data['consignee_address'] ?? null;
     $carrier = $data['carrier'] ?? null;
     $trackingNumber = $data['tracking_number'] ?? null;
-    $status = (string)($data['status'] ?? 'draft');
+    // 新單一律由草稿開始，狀態變更必須走 update.php 的狀態機與庫存連動。
+    $status = 'draft';
     $notes = $data['notes'] ?? null;
     $orderId = $data['order_id'] ?? null;
     $shipmentPurpose = (string)($data['shipment_purpose'] ?? 'normal');
@@ -256,20 +256,18 @@ function handleCreate(): void
         // Insert shipping order
         $sql = "
             INSERT INTO shipping_orders (
-                id, shipping_order_number, customer_id, order_id, shipping_date,
+                shipping_order_number, customer_id, order_id, shipping_date,
                 delivery_method, consignee_name, consignee_address, carrier,
                 tracking_number, shipment_purpose, status, notes
             ) VALUES (
-                :id, :shipping_order_number, :customer_id, :order_id, :shipping_date,
+                :shipping_order_number, :customer_id, :order_id, :shipping_date,
                 :delivery_method, :consignee_name, :consignee_address, :carrier,
                 :tracking_number, :shipment_purpose, :status, :notes
             )
         ";
 
-        $id = generateId();
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            'id' => $id,
             'shipping_order_number' => $shippingOrderNumber,
             'customer_id' => $customerId,
             'order_id' => $orderId,
@@ -283,6 +281,7 @@ function handleCreate(): void
             'status' => $status,
             'notes' => $notes,
         ]);
+        $id = (int)$pdo->lastInsertId();
 
         saveShippingOrderDefectSummary($pdo, $id, $defectSummaryResult['summary']);
         replaceShippingOrderToolSummaries($pdo, $id, $toolSummaryResult['summaries']);
@@ -316,12 +315,4 @@ function handleCreate(): void
 function generateShippingOrderNumber(PDO $pdo): string
 {
     return generateManagedDocumentNumber($pdo, 'SO');
-}
-
-/**
- * Generate unique ID (simplified snowflake-like)
- */
-function generateId(): int
-{
-    return (int)(microtime(true) * 10000) + random_int(0, 9999);
 }

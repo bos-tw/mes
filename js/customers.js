@@ -1271,7 +1271,7 @@ function setFieldValue(name, value, form = modalForm) {
             const customer = customersCache.get(id);
             const isActive = customer && (customer.is_active !== 0 && customer.is_active !== '0');
             const actionLabel = isActive ? '停用' : '啟用';
-            const confirmed = window.confirm(`確認${actionLabel}此客戶？`);
+            const confirmed = await window.AppFeedback.confirm({ title: `${actionLabel}客戶`, message: `確認${actionLabel}此客戶？`, impact: '客戶後續接單可用狀態', danger: false });
             if (!confirmed) {
                 return;
             }
@@ -1333,19 +1333,19 @@ function setFieldValue(name, value, form = modalForm) {
 
                 confirmMessage += `確定要永久刪除此客戶嗎？此操作無法復原！`;
 
-                const confirmed = window.confirm(confirmMessage);
+                const confirmed = await window.AppFeedback.confirm({ title: '刪除客戶', message: confirmMessage, impact: '訂單、工單、庫存與出退貨歷史', guidance: '若只是暫時不使用，請取消並改用停用。' });
                 if (!confirmed) {
                     return;
                 }
 
                 // 如果有關聯資料，再次確認
                 if (has_related_data) {
-                    const doubleConfirm = window.confirm(
-                        `⚠️ 最後確認！\n\n` +
-                        `此客戶有 ${stats.orders} 筆訂單、${stats.work_orders} 筆工單等關聯資料。\n\n` +
-                        `刪除後這些紀錄將失去客戶資訊連結，\n` +
-                        `確定要繼續刪除嗎？`
-                    );
+                    const doubleConfirm = await window.AppFeedback.confirm({
+                        title: '最後確認永久刪除',
+                        message: `此客戶有 ${stats.orders} 筆訂單、${stats.work_orders} 筆工單等關聯資料。`,
+                        impact: '刪除後這些紀錄將失去客戶資訊連結',
+                        confirmLabel: '永久刪除'
+                    });
                     if (!doubleConfirm) {
                         return;
                     }

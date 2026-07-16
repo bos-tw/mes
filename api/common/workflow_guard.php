@@ -166,7 +166,7 @@ function assessWorkOrderDelete(PDO $pdo, int $id): array
 {
     $statusLookupColumn = 'status_' . 'lookup_id';
     $stmt = $pdo->prepare("
-        SELECT wo.id, wo.work_order_number, wo.status, wo.completed_at,
+        SELECT wo.id, wo.work_order_number, wo.completed_at,
                lv.value_key AS status_key, lv.value_label AS status_label
         FROM work_orders wo
         LEFT JOIN lookup_values lv ON wo.{$statusLookupColumn} = lv.id
@@ -190,9 +190,8 @@ function assessWorkOrderDelete(PDO $pdo, int $id): array
     }
 
     $statusKey = strtolower(trim((string)($workOrder['status_key'] ?? '')));
-    $legacyStatus = strtolower(trim((string)($workOrder['status'] ?? '')));
     $statusLabel = trim((string)($workOrder['status_label'] ?? ''));
-    if (!empty($workOrder['completed_at']) || $statusKey === 'completed' || $legacyStatus === 'completed' || $statusLabel === '已完成') {
+    if (!empty($workOrder['completed_at']) || $statusKey === 'completed' || $statusLabel === '已完成') {
         return workflowBlocked(
             '此工單已進入完成流程，不能直接刪除。請使用退回狀態或作廢流程保留追溯。',
             ['工單狀態：已完成'],
@@ -263,8 +262,8 @@ function assessShippingOrderDelete(PDO $pdo, int $id): array
     }
 
     $status = strtolower(trim((string)($order['status'] ?? '')));
-    if (in_array($status, ['shipped', 'delivered'], true)) {
-        return workflowBlocked('此出貨單已確認出貨，不能直接刪除；請使用退貨、沖銷或作廢流程。', ['出貨狀態：已出貨'], 'return_or_void');
+    if ($status !== 'draft') {
+        return workflowBlocked('只有草稿出貨單可以刪除；請先依狀態流程取消或完成後續處理。', ["目前狀態：{$status}"], 'review');
     }
 
     $returnStmt = $pdo->prepare('SELECT COUNT(*) FROM return_orders WHERE original_shipping_order_id = :id AND deleted_at IS NULL');
@@ -290,7 +289,7 @@ function assessShippingOrderDelete(PDO $pdo, int $id): array
         $impacts[] = '釋放數量合計：' . (float)$itemStats[1];
     }
 
-    return workflowAllowed('此出貨單尚未確認出貨，可以刪除；系統會釋放已配貨庫存並保留刪除追溯。', $impacts);
+    return workflowAllowed('此草稿出貨單可以刪除；系統會釋放已配貨庫存並保留刪除追溯。', $impacts);
 }
 
 function assessOrderItemDelete(PDO $pdo, int $id): array

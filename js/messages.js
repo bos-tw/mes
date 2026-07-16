@@ -1156,7 +1156,7 @@
 
         // ====== 刪除留言 ======
         async function deleteMessage(id) {
-            if (!confirm('確定要刪除此留言嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除留言', message: '確定要刪除此留言嗎？', impact: '留言內容與回覆紀錄' })) return;
 
             try {
                 const response = await fetch(`api/messages/delete.php?id=${id}`, {

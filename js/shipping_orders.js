@@ -668,6 +668,39 @@
             ];
         }
 
+        function getAllowedStatusTransitions(status) {
+            const transitions = {
+                draft: ['confirmed', 'cancelled'],
+                confirmed: ['draft', 'preparing', 'cancelled'],
+                preparing: ['confirmed', 'draft', 'packed', 'cancelled'],
+                packed: ['preparing', 'draft', 'shipped', 'cancelled'],
+                shipped: ['delivered', 'cancelled'],
+                delivered: [],
+                cancelled: []
+            };
+            return transitions[status] || [];
+        }
+
+        function populateEditableStatusSelect(select, order) {
+            const currentStatus = order.status || 'draft';
+            const allowedTransitions = Array.isArray(order.allowed_status_transitions)
+                ? order.allowed_status_transitions
+                : getAllowedStatusTransitions(currentStatus);
+            const selectableStatuses = new Set([currentStatus, ...allowedTransitions]);
+            const statusList = state.shippingStatuses.length ? state.shippingStatuses : getDefaultShippingStatuses();
+
+            select.innerHTML = '';
+            statusList
+                .filter(status => selectableStatuses.has(status.value_key))
+                .forEach(status => appendSelectOption(select, status.value_key, status.value_label));
+
+            if (!select.querySelector(`option[value="${currentStatus}"]`)) {
+                appendSelectOption(select, currentStatus, order.status_label || currentStatus);
+            }
+            select.value = currentStatus;
+            select.disabled = allowedTransitions.length === 0;
+        }
+
         function populateStatusSelects() {
             const filterSelect = elements.filterForm?.querySelector('[name="status"]');
             const modalSelect = elements.modalForm?.querySelector('[name="status"]');
@@ -1255,6 +1288,7 @@ function renderTable(items) {
             // 填充客戶選單
             const customerSelect = elements.modalForm.querySelector('[name="customer_id"]');
             if (customerSelect) {
+                customerSelect.disabled = false;
                 customerSelect.innerHTML = '<option value="">-- 請選擇客戶 --</option>';
                 state.customers.forEach(customer => {
                     appendSelectOption(customerSelect, customer.id, `${customer.customer_number} - ${customer.name}`);
@@ -1265,11 +1299,9 @@ function renderTable(items) {
             const statusSelect = elements.modalForm.querySelector('[name="status"]');
             if (statusSelect) {
                 statusSelect.innerHTML = '';
-                const statusList = state.shippingStatuses.length ? state.shippingStatuses : getDefaultShippingStatuses();
-                statusList.forEach(status => {
-                    appendSelectOption(statusSelect, status.value_key, status.value_label);
-                });
-                statusSelect.value = 'draft'; // 預設選草稿
+                appendSelectOption(statusSelect, 'draft', '草稿');
+                statusSelect.value = 'draft';
+                statusSelect.disabled = true;
             }
 
             const shipmentPurposeSelect = elements.modalForm.querySelector('[name="shipment_purpose"]');
@@ -1278,6 +1310,10 @@ function renderTable(items) {
             }
 
             populateOrderSelect();
+            const orderSelect = elements.modalForm.querySelector('[name="order_id"]');
+            if (orderSelect) {
+                orderSelect.disabled = false;
+            }
             renderQualityInspectionModalEntry(null);
             renderToolSummaryRows([]);
             recalculateDefectSummaryTotal();
@@ -1332,6 +1368,7 @@ function renderTable(items) {
                     if (order.customer_id) {
                         customerSelect.value = order.customer_id;
                     }
+                    customerSelect.disabled = order.status !== 'draft';
                 }
 
                 // 填充訂單選單並設定值
@@ -1340,27 +1377,19 @@ function renderTable(items) {
                     const orderSelect = elements.modalForm.querySelector('[name="order_id"]');
                     if (orderSelect) {
                         orderSelect.value = order.order_id;
+                        orderSelect.disabled = order.status !== 'draft';
                     }
+                }
+
+                const orderSelect = elements.modalForm.querySelector('[name="order_id"]');
+                if (orderSelect) {
+                    orderSelect.disabled = order.status !== 'draft';
                 }
 
                 // 確保狀態選單選項已填充
                 const statusSelect = elements.modalForm.querySelector('[name="status"]');
                 if (statusSelect) {
-                    statusSelect.innerHTML = '';
-                    const statusList = state.shippingStatuses.length ? state.shippingStatuses : getDefaultShippingStatuses();
-                    statusList.forEach(status => {
-                        appendSelectOption(statusSelect, status.value_key, status.value_label);
-                    });
-                    // 設定當前狀態值
-                    if (order.status && !statusSelect.querySelector(`option[value="${order.status}"]`)) {
-                        const fallbackOption = document.createElement('option');
-                        fallbackOption.value = order.status;
-                        fallbackOption.textContent = order.status_label || order.status;
-                        statusSelect.appendChild(fallbackOption);
-                    }
-                    if (order.status) {
-                        statusSelect.value = order.status;
-                    }
+                    populateEditableStatusSelect(statusSelect, order);
                 }
 
                 // Populate other form fields (excluding status which is handled above)
@@ -2468,7 +2497,7 @@ function renderTable(items) {
             if (!assessment.allowed) {
                 return false;
             }
-            return window.confirm(buildWorkflowConfirmMessage(assessment, fallbackMessage));
+            return window.AppFeedback.confirm({ title: '流程影響確認', message: assessment.message || fallbackMessage, impact: (assessment.impacts || []).join('、'), guidance: assessment.recommended_action || '', confirmLabel: confirmText });
         }
 
         async function handleDelete(id) {
@@ -2536,7 +2565,7 @@ function renderTable(items) {
                 .filter(Number.isInteger);
         }
 
-        function handleBatchPrint() {
+        async function handleBatchPrint() {
             const ids = selectedShippingOrderIds.size > 0
                 ? Array.from(selectedShippingOrderIds)
                 : getCurrentPageRowIds();
@@ -2546,7 +2575,7 @@ function renderTable(items) {
                 return;
             }
 
-            const confirmed = window.confirm(`即將開啟 ${ids.length} 筆出貨單列印頁，是否繼續？`);
+            const confirmed = await window.AppFeedback.confirm({ title: '批次列印出貨單', message: `即將開啟 ${ids.length} 筆出貨單列印頁。`, danger: false, confirmLabel: '繼續列印' });
             if (!confirmed) {
                 return;
             }

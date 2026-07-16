@@ -239,7 +239,7 @@
         }
 
         async function handleDelete(id) {
-            if (!confirm('確定要刪除此系統參數嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除系統參數', message: '確定要刪除此系統參數嗎？', impact: '使用此參數的系統功能' })) return;
 
             try {
                 const response = await fetch(`api/system_parameters/delete.php?id=${id}`, {

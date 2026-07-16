@@ -138,18 +138,13 @@ function handleCreateInspectionItem(): void
     try {
         $sql = <<<SQL
 INSERT INTO daily_machine_inspection_items (
-    id, inspection_id, item_name, standard, actual_result, is_pass, remarks
+    inspection_id, item_name, standard, actual_result, is_pass, remarks
 ) VALUES (
-    :id, :inspection_id, :item_name, :standard, :actual_result, :is_pass, :remarks
+    :inspection_id, :item_name, :standard, :actual_result, :is_pass, :remarks
 )
 SQL;
-        // 生成 ID
-        $idStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM daily_machine_inspection_items');
-        $newId = (int)$idStmt->fetchColumn();
-
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            ':id'            => $newId,
             ':inspection_id' => $data['inspection_id'],
             ':item_name'     => $data['item_name'],
             ':standard'      => $data['standard'] ?: null,
@@ -157,6 +152,7 @@ SQL;
             ':is_pass'       => $data['is_pass'] ? 1 : 0,
             ':remarks'       => $data['remarks'] ?: null,
         ]);
+        $newId = (int)$pdo->lastInsertId();
 
         $record = findInspectionItem($pdo, $newId);
 

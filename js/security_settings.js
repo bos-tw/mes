@@ -503,9 +503,9 @@
             }
 
             const selectedLabel = selectedOption?.textContent || `#${selectedJobId}`;
-            const confirmed = window.confirm(
+            const confirmed = await window.AppFeedback.confirm({ title: '回復系統版本', message:
                 `確定要回退版本 ${selectedLabel} 嗎？\n此操作會還原檔案並執行 rollback migration。`
-            );
+            });
             if (!confirmed) {
                 return;
             }

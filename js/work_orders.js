@@ -14,6 +14,7 @@
         }
 
         moduleRoot.dataset.initialised = 'true';
+        window.WorkOrderWorkspace?.enhance(moduleRoot);
 
     // DOM Elements
     const elements = {
@@ -568,7 +569,7 @@
     function hasRelaxedWorkOrderPermission(permissionName) {
         const permissions = Array.isArray(state.currentUser?.permissions) ? state.currentUser.permissions : [];
         if (permissions.length === 0) {
-            return true;
+            return false;
         }
         if (typeof window.hasPermission === 'function') {
             return window.hasPermission(permissionName);
@@ -3306,13 +3307,7 @@
     }
 
     async function checkWorkflowDelete(moduleName, id) {
-        const response = await fetch(`api/workflow_guard/check.php?module=${encodeURIComponent(moduleName)}&action=delete&id=${encodeURIComponent(id)}`, {
-            credentials: 'include'
-        });
-        const result = await response.json();
-        if (!response.ok || !result.success) {
-            throw new Error(result.message || '流程檢查失敗');
-        }
+        const result = await window.WorkOrderApi.request(`api/workflow_guard/check.php?module=${encodeURIComponent(moduleName)}&action=delete&id=${encodeURIComponent(id)}`);
         return result.data || {};
     }
 
@@ -3339,7 +3334,13 @@
         if (!assessment.allowed) {
             return false;
         }
-        return window.confirm(buildWorkflowConfirmMessage(assessment, fallbackMessage));
+        return window.AppFeedback.confirm({
+            title: '流程影響確認',
+            message: assessment.message || fallbackMessage,
+            impact: (assessment.impacts || []).join('、'),
+            guidance: assessment.recommended_action || '確認資料關聯後再繼續',
+            confirmLabel: confirmText
+        });
     }
 
     async function deleteWorkOrder(id) {
@@ -3382,8 +3383,15 @@
         }
     }
 
-    function handleConvertToInventory(workOrderId) {
-        if (!confirm('確定要將此工單轉為庫存項目嗎?\n\n系統將自動帶入工單相關資訊,請在確認後儲存。')) {
+    async function handleConvertToInventory(workOrderId) {
+        if (!await window.AppFeedback.confirm({
+            stage: '完工入庫',
+            title: '建立庫存項目',
+            message: '系統將帶入工單來源與數量，仍需在庫存畫面核對後儲存。',
+            impact: '工單與新庫存項目的來源鏈',
+            danger: false,
+            confirmLabel: '前往建立庫存'
+        })) {
             return;
         }
 
@@ -5445,7 +5453,7 @@
             return;
         }
 
-        const confirmed = window.confirm(`確定要列印 ${selectedWorkOrders.size} 筆工單？`);
+        const confirmed = await window.AppFeedback.confirm({ title: '批次列印工單', message: `將開啟 ${selectedWorkOrders.size} 筆工單的列印頁。`, danger: false, confirmLabel: '繼續列印' });
         if (!confirmed) return;
 
         try {
@@ -7096,7 +7104,7 @@
         const tbody = resultsContainer.querySelector('tbody');
 
         if (!keyword && !startDate && !endDate) {
-            alert('請輸入至少一個搜尋條件');
+            window.AppFeedback.toast('請輸入至少一個搜尋條件', 'warning');
             return;
         }
 
@@ -7416,7 +7424,7 @@
 
     // Handle delete image
     async function handleDeleteImage(imageId, workOrderId, isEditMode) {
-        if (!confirm('確定要刪除此圖片嗎?')) return;
+        if (!await window.AppFeedback.confirm({ title: '刪除工單圖片', message: '圖片刪除後無法復原。', impact: '工單附件與追溯資料', confirmLabel: '刪除圖片' })) return;
 
         try {
             const response = await fetch('api/work_order_images/delete.php', {
@@ -7445,7 +7453,7 @@
             return;
         }
 
-        if (!confirm(`確定要刪除此${tableConfig.label}嗎?`)) {
+        if (!await window.AppFeedback.confirm({ title: `刪除${tableConfig.label}`, message: `確定刪除此${tableConfig.label}嗎？`, impact: '工單品質與生產追溯資料', confirmLabel: '確認刪除' })) {
             return;
         }
 

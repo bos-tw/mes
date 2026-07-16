@@ -6,7 +6,20 @@ const NON_BASELINEABLE_RULES = new Set([
     'S-1',
     'S-2',
     'P-1',
-    'WF-1'
+    'WF-1',
+    'SEC-3',
+    'PERM-2',
+    'SCHEMA-1',
+    'NAV-1',
+    'STATE-1',
+    'INV-1',
+    'AUDIT-1',
+    'OUTBOX-1',
+    'ASSET-1',
+    'CSS-1',
+    'TEST-1',
+    'UX-1',
+    'UPDATE-1'
 ]);
 
 const MEDIUM_CONFIDENCE_RULES = new Set([

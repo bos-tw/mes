@@ -17,14 +17,27 @@ DirectoryIndex index.php index.html
     </FilesMatch>
 </IfModule>
 
-# --- 本地 JS / CSS：內部系統直接不快取，確保每次都取得最新版本 ---
-# 區域網路環境下效能影響微乎其微，換取零維護成本
+# --- 版本化靜態資產：入口會附加內容版本戳，可安全長期快取 ---
 <IfModule mod_headers.c>
-    <FilesMatch "\.(js|css)$">
-        Header set Cache-Control "no-cache, no-store, must-revalidate"
-        Header set Pragma "no-cache"
-        Header set Expires "0"
+    <FilesMatch "\.(js|css|woff2?|png|jpe?g|gif|svg|webp)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+        Header unset Pragma
     </FilesMatch>
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# Brotli 優先，未啟用時由 deflate 提供 gzip。
+<IfModule mod_brotli.c>
+    AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/css application/javascript application/json image/svg+xml
+</IfModule>
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css application/javascript application/json image/svg+xml
 </IfModule>
 
 # --- PHP API：完全不快取（API 回應必須即時） ---

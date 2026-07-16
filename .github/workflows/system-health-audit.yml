@@ -23,11 +23,29 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+
+      - name: Install PHP test dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run PHPUnit
+        run: vendor/bin/phpunit --configuration phpunit.xml --exclude-group database
+
       - name: Test audit framework
         run: node tools/test-audit-system.js
 
       - name: Validate config modules
         run: node tools/validate-config-modules.js
+
+      - name: Audit frontend asset budget
+        run: node tools/audit-frontend-assets.js
+
+      - name: Audit native feedback usage
+        run: node tools/audit-native-feedback.js
 
       - name: Audit DataSync
         run: node tools/audit-data-sync.js

@@ -443,6 +443,12 @@
             state.editingId = null;
             if (elements.modalTitle) elements.modalTitle.textContent = '新增退貨單';
             if (elements.modalForm) elements.modalForm.reset();
+            const processingStatusSelect = elements.modalForm?.querySelector('[name="processing_status"]');
+            if (processingStatusSelect) {
+                processingStatusSelect.innerHTML = '<option value="pending">待處理</option>';
+                processingStatusSelect.value = 'pending';
+                processingStatusSelect.disabled = true;
+            }
             resetShippingItems();
             hideAlert(true);
             loadCustomerOptions();
@@ -494,6 +500,32 @@
 
             const fields = ['customer_id', 'return_date', 'return_reason', 'processing_status', 'notes', 'original_shipping_order_id'];
             fields.forEach(field => setFieldValue(field, data[field]));
+
+            const processingStatusSelect = elements.modalForm.querySelector('[name="processing_status"]');
+            if (processingStatusSelect) {
+                const labels = {
+                    pending: '待處理',
+                    processing: '處理中',
+                    completed: '已完成',
+                    rejected: '已拒絕'
+                };
+                const transitions = {
+                    pending: ['processing', 'rejected'],
+                    processing: ['pending', 'completed', 'rejected'],
+                    completed: [],
+                    rejected: []
+                };
+                const allowed = [data.processing_status, ...(transitions[data.processing_status] || [])];
+                processingStatusSelect.innerHTML = '';
+                allowed.forEach(status => {
+                    const option = document.createElement('option');
+                    option.value = status;
+                    option.textContent = labels[status] || status;
+                    processingStatusSelect.appendChild(option);
+                });
+                processingStatusSelect.value = data.processing_status;
+                processingStatusSelect.disabled = allowed.length === 1;
+            }
 
             if (data.customer_id) {
                 loadShippingOrdersForCustomer(data.customer_id, data.original_shipping_order_id || null);
@@ -659,6 +691,11 @@
             const formData = new FormData(elements.modalForm);
             const data = Object.fromEntries(formData.entries());
 
+            const processingStatusSelect = elements.modalForm.querySelector('[name="processing_status"]');
+            if (processingStatusSelect?.disabled && state.editingId) {
+                data.processing_status = processingStatusSelect.value;
+            }
+
             // 手動收集 disabled 的 select 值
             if (elements.shippingOrderSelect && elements.shippingOrderSelect.value) {
                 data.original_shipping_order_id = elements.shippingOrderSelect.value;
@@ -720,7 +757,7 @@
                 assessment = await checkWorkflowDelete('return_orders', id);
             } catch (error) {
                 const message = error instanceof Error ? error.message : '流程檢查失敗。';
-                alert(message);
+                window.AppFeedback.toast(message, 'error');
                 return;
             }
 
@@ -747,11 +784,11 @@
                         dataSyncHelper.notifyDeleted({ id });
                     }
                 } else {
-                    alert(result.message);
+                    window.AppFeedback.toast(result.message, 'error');
                 }
             } catch (error) {
                 console.error('刪除退貨單失敗:', error);
-                alert('刪除資料失敗。');
+                window.AppFeedback.toast('刪除資料失敗。', 'error');
             }
         }
 
@@ -782,10 +819,7 @@
             if (!assessment.allowed) {
                 return false;
             }
-            const impacts = Array.isArray(assessment.impacts) && assessment.impacts.length > 0
-                ? `\n\n影響範圍：\n${assessment.impacts.map((impact) => `- ${impact}`).join('\n')}`
-                : '';
-            return window.confirm(`${assessment.message || fallbackMessage}${impacts}\n\n確定繼續嗎？`);
+            return window.AppFeedback.confirm({ title: '流程影響確認', message: assessment.message || fallbackMessage, impact: (assessment.impacts || []).join('、'), guidance: assessment.recommended_action || '', confirmLabel: confirmText });
         }
 
         // 事件綁定
@@ -1203,7 +1237,7 @@
                 return;
             }
 
-            const confirmed = window.confirm(`即將開啟 ${ids.length} 筆退貨單列印頁，是否繼續？`);
+            const confirmed = await window.AppFeedback.confirm({ title: '批次列印退貨單', message: `即將開啟 ${ids.length} 筆退貨單列印頁。`, danger: false, confirmLabel: '繼續列印' });
             if (!confirmed) {
                 return;
             }

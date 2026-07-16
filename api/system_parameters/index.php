@@ -122,20 +122,16 @@ function handleCreateSystemParameter(): void
         ], 409);
     }
 
-    // 取得新 ID
-    $maxIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM system_parameters');
-    $newId = (int)$maxIdStmt->fetchColumn();
-
-    $sql = 'INSERT INTO system_parameters (id, param_key, param_value, description, created_at, updated_at) VALUES (:id, :param_key, :param_value, :description, NOW(), NOW())';
+    $sql = 'INSERT INTO system_parameters (param_key, param_value, description, created_at, updated_at) VALUES (:param_key, :param_value, :description, NOW(), NOW())';
 
     try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            'id' => $newId,
             'param_key' => $data['param_key'],
             'param_value' => $data['param_value'],
             'description' => $data['description'],
         ]);
+        $newId = (int)$pdo->lastInsertId();
     } catch (PDOException $exception) {
         jsonResponse([
             'success' => false,

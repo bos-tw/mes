@@ -979,7 +979,7 @@
             if (!assessment.allowed) {
                 return false;
             }
-            return window.confirm(buildWorkflowConfirmMessage(assessment, fallbackMessage));
+            return window.AppFeedback.confirm({ title: '流程影響確認', message: assessment.message || fallbackMessage, impact: (assessment.impacts || []).join('、'), guidance: assessment.recommended_action || '', confirmLabel: confirmText });
         }
 
         async function deleteOrder(id) {
@@ -1227,7 +1227,7 @@
         async function deleteOrderItemInline(orderId, orderItemId) {
             const items = orderItemsCache.get(orderId) || [];
             const item = items.find((candidate) => Number.parseInt(candidate.id, 10) === orderItemId);
-            const confirmed = window.confirm(`確認刪除「${getOrderItemDeleteLabel(item)}」？刪除後將無法復原。`);
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除訂單品項', message: `確認刪除「${getOrderItemDeleteLabel(item)}」？`, impact: '相關工單、庫存或出貨資料可能阻擋此操作', confirmLabel: '確認刪除' });
             if (!confirmed) {
                 return;
             }
@@ -1621,7 +1621,7 @@ ${pagesHtml}
                 return;
             }
 
-            const confirmed = window.confirm(`確定要列印 ${selectedOrders.size} 筆訂單？`);
+            const confirmed = await window.AppFeedback.confirm({ title: '批次列印訂單', message: `將開啟 ${selectedOrders.size} 筆訂單的列印頁。`, danger: false, confirmLabel: '繼續列印' });
             if (!confirmed) return;
 
             try {

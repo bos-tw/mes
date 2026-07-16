@@ -65,11 +65,7 @@ set_exception_handler(function($exception) {
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
-        'message' => '伺服器錯誤：' . $exception->getMessage(),
-        'error' => $exception->getMessage(),
-        'file' => $exception->getFile(),
-        'line' => $exception->getLine(),
-        'trace' => $exception->getTraceAsString(),
+        'message' => '伺服器錯誤，請稍後再試。',
     ], JSON_UNESCAPED_UNICODE);
     exit;
 });
@@ -100,6 +96,8 @@ if (!$orderItem) {
 }
 
 $payload = readOrderItemPayload();
+$transitionReason = trim((string)($payload['transition_reason'] ?? $payload['status_reason'] ?? ''));
+unset($payload['transition_reason'], $payload['status_reason']);
 
 // 處理要刪除的圖面
 $deletedDrawingIds = [];
@@ -315,6 +313,28 @@ $replaceDetails = array_key_exists('screening_details', $payload);
 try {
     $pdo->beginTransaction();
 
+    $lockStmt = $pdo->prepare('SELECT id, status FROM order_items WHERE id = :id AND deleted_at IS NULL FOR UPDATE');
+    $lockStmt->execute(['id' => $id]);
+    $lockedItem = $lockStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$lockedItem) {
+        throw new InvalidArgumentException('找不到對應的客戶批號資料。');
+    }
+    $oldStatus = trim((string)($lockedItem['status'] ?? ''));
+    $newStatus = trim((string)($data['status'] ?? $oldStatus));
+    if ($oldStatus === '' && $newStatus !== '') {
+        $oldStatus = 'pending';
+    }
+    if ($newStatus !== '' && !canTransitionWorkflowStatus('order_items', $oldStatus, $newStatus)) {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => '不允許的訂單品項狀態轉換。',
+            'current_status' => $oldStatus,
+            'requested_status' => $newStatus,
+            'allowed_transitions' => getAllowedWorkflowTransitions('order_items', $oldStatus),
+        ], 409);
+    }
+
     $normalisedTools = $replaceTools ? normaliseToolPayload($pdo, $toolsPayload) : $currentTools;
     $normalisedServices = $replaceDetails ? normaliseServicePayload($pdo, $servicePayload) : $currentDetails;
 
@@ -516,6 +536,18 @@ try {
         'total_price' => $metrics['total_price'],
     ]);
 
+    if ($newStatus !== '') {
+        recordWorkflowStatusTransition(
+            $pdo,
+            'order_items',
+            $id,
+            $oldStatus,
+            $newStatus,
+            isset($_SESSION['employee']['id']) ? (int)$_SESSION['employee']['id'] : null,
+            $transitionReason !== '' ? $transitionReason : null
+        );
+    }
+
     $pdo->commit();
 } catch (InvalidArgumentException $exception) {
     $pdo->rollBack();
@@ -528,7 +560,6 @@ try {
     jsonResponse([
         'success' => false,
         'message' => '無法更新客戶批號，請稍後再試。',
-        'error' => $exception->getMessage(),
     ], 500);
 }
 

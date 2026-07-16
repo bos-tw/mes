@@ -14,12 +14,11 @@ ModuleConfig.register('audit_logs', {
     requiresHtmlModal: true,
     
     title: '操作日誌',
-    subtitle: '檢視並管理系統操作記錄，可建立人工日誌或批次刪除',
+    subtitle: '唯讀檢視與匯出系統自動產生的不可變操作紀錄',
 
     // 標題區按鈕
     actions: [
-        { label: '匯出', icon: 'fa-file-export', action: 'export', style: 'outline', wrapLabel: true },
-        { label: '刪除勾選項目', icon: 'fa-trash', action: 'delete-selected', style: 'danger', wrapLabel: true, disabled: true }
+        { label: '匯出', icon: 'fa-file-export', action: 'export', style: 'outline', wrapLabel: true }
     ],
 
     hasColumnSelector: true,
@@ -45,7 +44,6 @@ ModuleConfig.register('audit_logs', {
 
     // 資料表格欄位（含排序和 checkbox）
     columns: [
-        { key: 'checkbox', label: '', sortable: false, isCheckbox: true },
         { key: 'employee_name', label: '員工', sortable: true, selectable: true },
         { key: 'action', label: '動作', sortable: true, selectable: true },
         { key: 'target_table', label: '目標資料表', sortable: true, selectable: true },

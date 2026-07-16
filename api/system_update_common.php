@@ -375,7 +375,32 @@ function parseSystemUpdateManifestFromZip(string $zipPath): array
             $rollbackMigrationFiles[] = str_replace('\\', '/', $rollbackMigrationFile);
         }
 
+        $deleteFilesRaw = $manifest['delete_files'] ?? [];
+        if (!is_array($deleteFilesRaw)) {
+            throw new RuntimeException('manifest.json 的 delete_files 需為陣列。');
+        }
+
+        $deleteFiles = [];
+        $deletePathSet = [];
+        foreach ($deleteFilesRaw as $deleteFileRaw) {
+            $deleteFile = normalizeRelativePath((string)$deleteFileRaw);
+            if ($deleteFile === '') {
+                throw new RuntimeException('manifest.json 的 delete_files 不可包含空路徑。');
+            }
+            if (isProtectedUpdatePath($deleteFile)) {
+                throw new RuntimeException('更新包要求刪除受保護路徑：' . $deleteFile);
+            }
+
+            $deleteKey = strtolower($deleteFile);
+            if (isset($deletePathSet[$deleteKey])) {
+                throw new RuntimeException('manifest.json 的 delete_files 包含重複路徑：' . $deleteFile);
+            }
+            $deletePathSet[$deleteKey] = true;
+            $deleteFiles[] = str_replace('\\', '/', $deleteFile);
+        }
+
         $fileCount = 0;
+        $packagePathSet = [];
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $entryName = $zip->getNameIndex($i);
             if ($entryName === false) {
@@ -407,6 +432,15 @@ function parseSystemUpdateManifestFromZip(string $zipPath): array
                 throw new RuntimeException('更新包包含受保護路徑：' . $targetRelative);
             }
 
+            $targetKey = strtolower($targetRelative);
+            if (isset($deletePathSet[$targetKey])) {
+                throw new RuntimeException('更新包同時包含並要求刪除檔案：' . $targetRelative);
+            }
+            if (isset($packagePathSet[$targetKey])) {
+                throw new RuntimeException('更新包包含重複目標路徑：' . $targetRelative);
+            }
+            $packagePathSet[$targetKey] = true;
+
             $fileCount++;
         }
 
@@ -426,6 +460,7 @@ function parseSystemUpdateManifestFromZip(string $zipPath): array
             'files_root' => $filesRoot,
             'migrations' => array_values($migrationFiles),
             'rollback_migrations' => array_values($rollbackMigrationFiles),
+            'delete_files' => array_values($deleteFiles),
             'file_count' => $fileCount,
         ];
     } finally {
@@ -1178,7 +1213,7 @@ function executeSqlMigrationFile(PDO $pdo, string $sqlFilePath): int
     $statements = splitSqlStatements($content);
     $executed = 0;
 
-    foreach ($statements as $statement) {
+    foreach ($statements as $statementIndex => $statement) {
         $trimmed = trim($statement);
         if ($trimmed === '') {
             continue;
@@ -1189,7 +1224,27 @@ function executeSqlMigrationFile(PDO $pdo, string $sqlFilePath): int
             continue;
         }
 
-        $pdo->exec($trimmed);
+        try {
+            $pdo->exec($trimmed);
+        } catch (Throwable $exception) {
+            $databaseMessage = preg_replace('/\s+/', ' ', trim($exception->getMessage()));
+            if (!is_string($databaseMessage) || $databaseMessage === '') {
+                $databaseMessage = '資料庫未提供詳細錯誤。';
+            }
+            if (strlen($databaseMessage) > 600) {
+                $databaseMessage = substr($databaseMessage, 0, 600) . '…';
+            }
+            throw new RuntimeException(
+                sprintf(
+                    'Migration 執行失敗：%s（第 %d 個命令）。資料庫回覆：%s',
+                    basename($sqlFilePath),
+                    $statementIndex + 1,
+                    $databaseMessage
+                ),
+                0,
+                $exception
+            );
+        }
         $executed++;
     }
 

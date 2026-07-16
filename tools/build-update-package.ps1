@@ -18,6 +18,9 @@ param(
     [string[]]$Migrations = @(),
 
     [Parameter(Mandatory = $false)]
+    [string[]]$DeleteFiles = @(),
+
+    [Parameter(Mandatory = $false)]
     [string]$OutputDir = "dist"
 )
 
@@ -52,6 +55,21 @@ function Normalize-RelativePath {
     }
 
     return $normalized
+}
+
+function Get-NormalizedUniquePathList {
+    param([string[]]$Paths)
+
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    $result = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($pathItem in $Paths) {
+        $normalized = Normalize-RelativePath -Path $pathItem
+        if ($seen.Add($normalized)) {
+            $result.Add($normalized)
+        }
+    }
+
+    return @($result)
 }
 
 function Copy-RelativeFile {
@@ -92,6 +110,28 @@ if ($Files.Count -eq 0) {
     throw "At least one file is required in -Files."
 }
 
+$fileList = @(Get-NormalizedUniquePathList -Paths $Files)
+# Migration 可能存在明確依賴，必須保留呼叫端傳入順序，不可按檔名字母排序。
+$migrationList = @(Get-NormalizedUniquePathList -Paths $Migrations)
+$deleteList = @(Get-NormalizedUniquePathList -Paths $DeleteFiles)
+
+$packagedPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($file in $fileList) {
+    if (-not $packagedPaths.Add($file)) {
+        throw "Duplicate package file: $file"
+    }
+}
+foreach ($migration in $migrationList) {
+    if (-not $packagedPaths.Add($migration)) {
+        throw "Migration is also listed in -Files: $migration"
+    }
+}
+foreach ($deleteFile in $deleteList) {
+    if ($packagedPaths.Contains($deleteFile)) {
+        throw "Deleted file is also packaged: $deleteFile"
+    }
+}
+
 $outputRoot = Join-Path $repoRoot $OutputDir
 if (!(Test-Path $outputRoot)) {
     New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
@@ -101,15 +141,17 @@ $workDir = Join-Path $outputRoot ("update_pkg_{0}" -f ([Guid]::NewGuid().ToStrin
 $filesRoot = Join-Path $workDir 'files'
 New-Item -ItemType Directory -Path $filesRoot -Force | Out-Null
 
-foreach ($file in $Files) {
+foreach ($file in $fileList) {
     Copy-RelativeFile -RepoRoot $repoRoot -RelativePath $file -TargetRoot $filesRoot
 }
 
-$migrationList = @()
-foreach ($migration in $Migrations) {
-    $migrationRel = Normalize-RelativePath -Path $migration
-    Copy-RelativeFile -RepoRoot $repoRoot -RelativePath $migrationRel -TargetRoot $workDir
-    $migrationList += $migrationRel
+foreach ($migration in $migrationList) {
+    $migrationSource = Join-Path $repoRoot $migration
+    $migrationContent = Get-Content -LiteralPath $migrationSource -Raw -Encoding UTF8
+    if ($migrationContent -match '(?im)^\s*DELIMITER\s+') {
+        throw "Migration uses mysql-client DELIMITER syntax, which is not supported by the PDO update executor: $migration"
+    }
+    Copy-RelativeFile -RepoRoot $repoRoot -RelativePath $migration -TargetRoot $workDir
 }
 
 $manifest = [ordered]@{
@@ -119,6 +161,7 @@ $manifest = [ordered]@{
     change_summary = $changeSummary.Trim()
     files_root     = 'files'
     migrations     = $migrationList
+    delete_files   = $deleteList
 }
 
 $manifestPath = Join-Path $workDir 'manifest.json'
@@ -131,11 +174,22 @@ if (Test-Path $zipPath) {
     Remove-Item $zipPath -Force
 }
 
-Compress-Archive -Path (Join-Path $workDir '*') -DestinationPath $zipPath -CompressionLevel Optimal
-
-Remove-Item -Path $workDir -Recurse -Force
+try {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+        $workDir,
+        $zipPath,
+        [System.IO.Compression.CompressionLevel]::Optimal,
+        $false
+    )
+} finally {
+    if (Test-Path -LiteralPath $workDir) {
+        Remove-Item -LiteralPath $workDir -Recurse -Force
+    }
+}
 
 Write-Host "Package created: $zipPath"
 Write-Host "Version: $VersionNumber"
-Write-Host "Files: $($Files.Count)"
+Write-Host "Files: $($fileList.Count)"
 Write-Host "Migrations: $($migrationList.Count)"
+Write-Host "Deleted files: $($deleteList.Count)"

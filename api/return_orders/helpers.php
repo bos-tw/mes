@@ -13,7 +13,6 @@
  * - getReturnOrderDetails(): 取得退貨單詳細
  * - getReturnOrderItems(): 取得退貨品項
  * - canDeleteReturnOrder(): 檢查是否可刪除
- * - generateReturnOrderId(): 產生退貨單 ID
  *
  * @author System
  * @since 1.0.0
@@ -56,6 +55,16 @@ function validateReturnOrderData(array $data, bool $isUpdate = false): array
     }
 
     return $errors;
+}
+/** @return list<string> */
+function getAllowedReturnOrderTransitions(string $status): array
+{
+    return getAllowedWorkflowTransitions('return_orders', $status);
+}
+
+function canTransitionReturnOrderStatus(string $fromStatus, string $toStatus): bool
+{
+    return canTransitionWorkflowStatus('return_orders', $fromStatus, $toStatus);
 }
 
 /**
@@ -153,12 +162,4 @@ function canDeleteReturnOrder(PDO $pdo, int $id): array
     }
 
     return ['can_delete' => true];
-}
-
-/**
- * 產生唯一 ID
- */
-function generateReturnOrderId(): int
-{
-    return (int)(microtime(true) * 10000) + random_int(0, 9999);
 }

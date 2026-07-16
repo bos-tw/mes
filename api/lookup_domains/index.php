@@ -123,19 +123,15 @@ function handleCreateLookupDomain(): void
         ], 409);
     }
 
-    // 取得新 ID
-    $maxIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM lookup_domains');
-    $newId = (int)$maxIdStmt->fetchColumn();
-
-    $sql = 'INSERT INTO lookup_domains (id, domain_key, description, created_at, updated_at) VALUES (:id, :domain_key, :description, NOW(), NOW())';
+    $sql = 'INSERT INTO lookup_domains (domain_key, description, created_at, updated_at) VALUES (:domain_key, :description, NOW(), NOW())';
 
     try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            'id' => $newId,
             'domain_key' => $data['domain_key'],
             'description' => $data['description'],
         ]);
+        $newId = (int)$pdo->lastInsertId();
     } catch (PDOException $exception) {
         jsonResponse([
             'success' => false,

@@ -297,7 +297,7 @@
 
         /* ---------- 刪除 ---------- */
         async function handleDelete(id) {
-            if (!confirm('確定要刪除此每日機台檢驗紀錄嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除機台檢驗', message: '確定要刪除此每日機台檢驗紀錄嗎？', impact: '機台點檢追溯資料' })) return;
 
             try {
                 const resp = await fetch(`${API_BASE}/delete.php?id=${id}`, {

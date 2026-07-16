@@ -248,7 +248,7 @@
 
         /* ---------- 刪除 ---------- */
         async function handleDelete(employeeId, roleId) {
-            if (!confirm('確定要刪除此員工角色關聯嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '移除員工角色', message: '確定要移除此員工角色關聯嗎？', impact: '員工登入後可使用的功能權限' })) return;
 
             try {
                 const resp = await fetch(`${API_BASE}/delete.php?employee_id=${employeeId}&role_id=${roleId}`, {

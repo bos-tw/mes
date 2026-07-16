@@ -64,13 +64,14 @@ function handleGet(PDO $pdo): void
         SELECT
             fpd.*,
             wo.work_order_number,
-            wo.status AS work_order_status,
+            work_order_status.value_key AS work_order_status,
             e.name AS measured_by_name,
             oi.customer_batch_number,
             c.name AS customer_name,
             si.name AS screening_item_name
         FROM work_order_first_piece_dimensions fpd
         LEFT JOIN work_orders wo ON fpd.work_order_id = wo.id
+        LEFT JOIN lookup_values work_order_status ON wo.status_lookup_id = work_order_status.id
         LEFT JOIN order_items oi ON wo.order_item_id = oi.id
         LEFT JOIN orders o ON oi.order_id = o.id
         LEFT JOIN customers c ON o.customer_id = c.id

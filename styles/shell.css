@@ -1,0 +1,21 @@
+/* Application shell layer. Legacy shell declarations remain compatible in styles.css. */
+.app-container,
+.main-content-wrapper,
+.main-content,
+.tab-container {
+    min-width: 0;
+}
+
+.sidebar nav {
+    overflow-x: hidden;
+}
+
+@media (max-width: 48rem) {
+    .top-navbar-right .top-icon-group {
+        display: none;
+    }
+
+    .main-content {
+        overflow-x: auto;
+    }
+}

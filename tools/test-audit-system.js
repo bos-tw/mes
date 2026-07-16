@@ -15,11 +15,14 @@ const commands = [
     ['node', ['--check', 'tools/audit/core/reporter.js']],
     ['node', ['--check', 'tools/audit/rules/frontend-xss.js']],
     ['node', ['--check', 'tools/audit/rules/frontend-quality.js']],
+    ['node', ['--check', 'tools/audit/rules/governance-contracts.js']],
     ['node', ['--check', 'tools/audit/adapters/data-sync.js']],
     ['node', ['tools/audit/tests/finding.test.js']],
     ['node', ['tools/audit/tests/baseline.test.js']],
     ['node', ['tools/audit/tests/frontend-xss.test.js']],
     ['node', ['tools/audit/tests/frontend-quality.test.js']],
+    ['node', ['tools/audit/tests/governance-contracts.test.js']],
+    ['node', ['tools/audit/tests/version-checker-behavior.test.js']],
     ['node', ['tools/audit/tests/data-sync-adapter.test.js']]
 ];
 

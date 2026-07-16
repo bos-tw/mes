@@ -372,7 +372,7 @@
 
         /* ---------- 刪除 ---------- */
         async function handleDelete(id) {
-            if (!confirm('確定要刪除此品質異常報告嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除品質異常報告', message: '確定要刪除此品質異常報告嗎？', impact: '品質異常與後續處置追蹤' })) return;
 
             try {
                 const resp = await fetch(`${API_BASE}/delete.php?id=${id}`, {

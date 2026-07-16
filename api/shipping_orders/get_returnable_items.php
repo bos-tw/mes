@@ -98,7 +98,7 @@ try {
             ii.net_weight_kg,
             si.name AS screening_item_name,
             si.item_number AS screening_item_number,
-            si.specification,
+            NULL AS specification,
             wo.work_order_number,
             wopr.receipt_number AS partial_receipt_number,
             wopr.shipping_tool_details AS partial_receipt_shipping_tool_details,

@@ -14,12 +14,48 @@
 window.AppVersionChecker = (function () {
     'use strict';
 
+    const CHANNEL_NAME = 'mes-app-version';
+    const MESSAGE_STORAGE_KEY = 'mes_app_version_message';
+    const EXPECTED_VERSION_KEY = 'mes_expected_asset_version';
+    const RELOAD_ATTEMPT_PREFIX = 'mes_asset_reload_attempts:';
+    const SNOOZE_UNTIL_PREFIX = 'mes_update_snooze_until:';
+    const SNOOZE_DURATION_MS = 15 * 60 * 1000;
+    const MAX_RELOAD_RETRIES = 1;
+    const OWNED_CACHE_PREFIXES = ['mes-', 'screwsystem-'];
+
     let _currentVersion = window.APP_ASSET_VERSION || null;
-    let _bannerShown    = false;
-    let _enabled        = true;
-    let _intervalId     = null;
-    let _lastCheckedAt  = 0;
-    const AUTO_RELOAD_SESSION_KEY = 'mes_auto_reloaded_asset_version';
+    let _availableVersion = '';
+    let _updateRequired = false;
+    let _enabled = true;
+    let _intervalId = null;
+    let _lastCheckedAt = 0;
+    let _lastAnnouncedVersion = '';
+    let _channel = null;
+
+    function readSession(key, fallback = '') {
+        try {
+            const value = window.sessionStorage.getItem(key);
+            return value === null ? fallback : value;
+        } catch (_error) {
+            return fallback;
+        }
+    }
+
+    function writeSession(key, value) {
+        try {
+            window.sessionStorage.setItem(key, String(value));
+        } catch (_error) {
+            // 隱私模式或停用儲存時，仍可完成本次更新流程。
+        }
+    }
+
+    function removeSession(key) {
+        try {
+            window.sessionStorage.removeItem(key);
+        } catch (_error) {
+            // sessionStorage 非必要條件。
+        }
+    }
 
     function buildReloadUrl(targetVersion = '') {
         const url = new URL(window.location.href);
@@ -30,68 +66,254 @@ window.AppVersionChecker = (function () {
         return url.toString();
     }
 
-    async function clearBrowserRuntimeCaches() {
+    async function clearOwnedRuntimeCaches() {
         try {
             if ('caches' in window) {
                 const names = await caches.keys();
-                await Promise.all(names.map(name => caches.delete(name)));
-            }
-            if ('serviceWorker' in navigator) {
-                const registrations = await navigator.serviceWorker.getRegistrations();
-                await Promise.all(registrations.map(registration => registration.unregister()));
+                const ownedNames = names.filter(name => OWNED_CACHE_PREFIXES.some(prefix => name.startsWith(prefix)));
+                await Promise.all(ownedNames.map(name => caches.delete(name)));
             }
         } catch (_e) {
-            // Runtime cache / Service Worker 不是必要條件，失敗時仍繼續重整。
+            // Runtime cache 不是必要條件，失敗時仍繼續重整。
         }
     }
 
-    async function reloadNow(targetVersion = '') {
-        await clearBrowserRuntimeCaches();
-        window.location.replace(buildReloadUrl(targetVersion));
+    function hasUnsavedChanges() {
+        try {
+            return Boolean(window.AppUnsavedChanges && window.AppUnsavedChanges.hasAny());
+        } catch (_error) {
+            return false;
+        }
     }
 
-    async function autoReloadForVersion(targetVersion) {
-        const normalizedTarget = String(targetVersion || '').trim();
-        if (!normalizedTarget) {
-            showUpdateBanner();
+    function getUnsavedChangesCount() {
+        try {
+            return Number(window.AppUnsavedChanges && window.AppUnsavedChanges.count()) || 0;
+        } catch (_error) {
+            return 0;
+        }
+    }
+
+    async function confirmDiscardForUpdate() {
+        const count = getUnsavedChangesCount();
+        if (window.AppFeedback && typeof window.AppFeedback.confirm === 'function') {
+            return window.AppFeedback.confirm({
+                stage: '版本更新',
+                title: '尚有未儲存的資料',
+                message: '更新頁面會放棄目前尚未儲存的輸入。',
+                impact: count > 0 ? `共有 ${count} 個工作分頁可能受影響。` : '目前工作分頁的輸入可能遺失。',
+                guidance: '建議先取消並儲存資料；若已確認不需保留，再繼續更新。',
+                cancelLabel: '返回儲存',
+                confirmLabel: '放棄並更新'
+            });
+        }
+        return window.confirm('尚有未儲存的資料。更新頁面將放棄這些輸入，確定要繼續嗎？');
+    }
+
+    function normalizeVersion(value) {
+        return String(value || '').trim();
+    }
+
+    function snoozeKey(targetVersion) {
+        return `${SNOOZE_UNTIL_PREFIX}${normalizeVersion(targetVersion)}`;
+    }
+
+    function reloadAttemptKey(targetVersion) {
+        return `${RELOAD_ATTEMPT_PREFIX}${normalizeVersion(targetVersion)}`;
+    }
+
+    function isSnoozed(targetVersion) {
+        if (_updateRequired) {
+            return false;
+        }
+        return Number(readSession(snoozeKey(targetVersion), '0')) > Date.now();
+    }
+
+    function removeBanner() {
+        document.getElementById('app-update-banner')?.remove();
+        document.body?.classList.remove('has-app-update-banner');
+    }
+
+    function createButton(label, className, action) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = className;
+        button.dataset.action = action;
+        button.textContent = label;
+        return button;
+    }
+
+    function showUpdateBanner(targetVersion = _availableVersion, options = {}) {
+        const normalizedTarget = normalizeVersion(targetVersion);
+        if (!normalizedTarget || (!options.failed && isSnoozed(normalizedTarget))) {
+            return;
+        }
+        if (!document.body) {
+            document.addEventListener('DOMContentLoaded', () => showUpdateBanner(normalizedTarget, options), { once: true });
             return;
         }
 
-        try {
-            const reloadedVersion = sessionStorage.getItem(AUTO_RELOAD_SESSION_KEY);
-            if (reloadedVersion === normalizedTarget) {
-                showUpdateBanner();
-                return;
-            }
-            sessionStorage.setItem(AUTO_RELOAD_SESSION_KEY, normalizedTarget);
-        } catch (_e) {
-            // sessionStorage 失效時仍嘗試自動刷新一次。
+        _availableVersion = normalizedTarget;
+        const existingBanner = document.getElementById('app-update-banner');
+        if (existingBanner
+            && existingBanner.dataset.version === normalizedTarget
+            && existingBanner.dataset.failed === String(Boolean(options.failed))) {
+            return;
         }
+        removeBanner();
 
-        await reloadNow(normalizedTarget);
+        const banner = document.createElement('section');
+        banner.id = 'app-update-banner';
+        banner.className = `app-update-banner${options.failed ? ' app-update-banner-warning' : ''}`;
+        banner.dataset.version = normalizedTarget;
+        banner.dataset.failed = String(Boolean(options.failed));
+        banner.setAttribute('role', options.failed ? 'alert' : 'status');
+        banner.setAttribute('aria-live', options.failed ? 'assertive' : 'polite');
+
+        const content = document.createElement('div');
+        content.className = 'app-update-banner-content';
+
+        const icon = document.createElement('i');
+        icon.className = options.failed ? 'fas fa-exclamation-triangle' : 'fas fa-cloud-download-alt';
+        icon.setAttribute('aria-hidden', 'true');
+
+        const message = document.createElement('div');
+        message.className = 'app-update-banner-message';
+        const title = document.createElement('strong');
+        title.textContent = options.failed ? '更新內容尚未完整載入' : '系統有新版本可用';
+        const detail = document.createElement('span');
+        detail.textContent = options.failed
+            ? `版本 ${normalizedTarget} 載入失敗，已停止自動重試以避免循環。`
+            : `版本 ${normalizedTarget} 已發布，更新後即可看到最新功能與畫面。`;
+        message.append(title, detail);
+        content.append(icon, message);
+
+        const actions = document.createElement('div');
+        actions.className = 'app-update-banner-actions';
+        if (!_updateRequired) {
+            const laterButton = createButton('稍後提醒', 'btn outline', 'snooze-update');
+            laterButton.addEventListener('click', () => snooze(normalizedTarget));
+            actions.appendChild(laterButton);
+        }
+        const updateButton = createButton(options.failed ? '重新嘗試' : '立即更新', 'btn primary', 'apply-update');
+        updateButton.addEventListener('click', () => reloadNow(normalizedTarget));
+        actions.appendChild(updateButton);
+
+        banner.append(content, actions);
+        document.body.classList.add('has-app-update-banner');
+        document.body.prepend(banner);
     }
 
-    function showUpdateBanner() {
-        if (_bannerShown) { return; }
-        _bannerShown = true;
+    function handleVersionMessage(message) {
+        if (!message || typeof message !== 'object') {
+            return;
+        }
+        const targetVersion = normalizeVersion(message.version);
+        if (!targetVersion) {
+            return;
+        }
+        if (message.type === 'version-available') {
+            if (targetVersion === _currentVersion) {
+                removeBanner();
+                return;
+            }
+            _availableVersion = targetVersion;
+            _updateRequired = Boolean(message.required);
+            showUpdateBanner(targetVersion);
+        } else if (message.type === 'snoozed') {
+            writeSession(snoozeKey(targetVersion), message.until || Date.now() + SNOOZE_DURATION_MS);
+            if (_availableVersion === targetVersion) {
+                removeBanner();
+            }
+        } else if (message.type === 'version-loaded' && targetVersion === _currentVersion) {
+            removeBanner();
+        }
+    }
 
-        const banner = document.createElement('div');
-        banner.id = 'app-update-banner';
-        banner.style.cssText = [
-            'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:99999',
-            'background:#e74c3c', 'color:#fff', 'text-align:center',
-            'padding:12px 20px', 'font-size:15px', 'font-weight:600',
-            'display:flex', 'align-items:center', 'justify-content:center',
-            'gap:16px', 'box-shadow:0 4px 12px rgba(0,0,0,0.3)',
-        ].join(';');
-        banner.innerHTML = `
-            <span>⚠️ 系統已更新，請重新整理頁面以載入最新版本</span>
-            <button onclick="window.AppVersionChecker.reloadNow()"
-                style="background:#fff;color:#e74c3c;border:none;border-radius:4px;
-                       padding:6px 18px;font-weight:700;cursor:pointer;font-size:14px;">
-                立即重整
-            </button>`;
-        document.body.prepend(banner);
+    function announce(message) {
+        const payload = { ...message, sentAt: Date.now() };
+        if (_channel) {
+            _channel.postMessage(payload);
+        }
+        try {
+            window.localStorage.setItem(MESSAGE_STORAGE_KEY, JSON.stringify({ ...payload, nonce: Math.random() }));
+        } catch (_error) {
+            // localStorage 僅作為不支援 BroadcastChannel 時的跨分頁備援。
+        }
+    }
+
+    function setupCrossTabSync() {
+        if ('BroadcastChannel' in window) {
+            _channel = new BroadcastChannel(CHANNEL_NAME);
+            _channel.addEventListener('message', event => handleVersionMessage(event.data));
+        }
+        window.addEventListener('storage', event => {
+            if (event.key !== MESSAGE_STORAGE_KEY || !event.newValue) {
+                return;
+            }
+            try {
+                handleVersionMessage(JSON.parse(event.newValue));
+            } catch (_error) {
+                // 忽略其他程式寫入的無效資料。
+            }
+        });
+    }
+
+    function snooze(targetVersion) {
+        const until = Date.now() + SNOOZE_DURATION_MS;
+        writeSession(snoozeKey(targetVersion), until);
+        removeBanner();
+        announce({ type: 'snoozed', version: targetVersion, until });
+        window.AppFeedback?.toast?.('已延後提醒；15 分鐘後會再次顯示更新通知。', 'info');
+    }
+
+    async function performNavigation(targetVersion) {
+        await clearOwnedRuntimeCaches();
+        window.__MES_ALLOW_UPDATE_RELOAD__ = true;
+        window.location.replace(buildReloadUrl(targetVersion));
+    }
+
+    async function reloadNow(targetVersion = _availableVersion, options = {}) {
+        const normalizedTarget = normalizeVersion(targetVersion);
+        if (!normalizedTarget) {
+            return false;
+        }
+        if (!options.skipUnsavedGuard && hasUnsavedChanges() && !(await confirmDiscardForUpdate())) {
+            return false;
+        }
+
+        writeSession(EXPECTED_VERSION_KEY, normalizedTarget);
+        if (!options.preserveAttempts) {
+            writeSession(reloadAttemptKey(normalizedTarget), 0);
+        }
+        announce({ type: 'reload-started', version: normalizedTarget });
+        await performNavigation(normalizedTarget);
+        return true;
+    }
+
+    function verifyExpectedVersion() {
+        const expectedVersion = normalizeVersion(readSession(EXPECTED_VERSION_KEY));
+        if (!expectedVersion) {
+            return;
+        }
+        if (expectedVersion === _currentVersion) {
+            removeSession(EXPECTED_VERSION_KEY);
+            removeSession(reloadAttemptKey(expectedVersion));
+            announce({ type: 'version-loaded', version: expectedVersion });
+            return;
+        }
+
+        const attemptKey = reloadAttemptKey(expectedVersion);
+        const attempts = Number(readSession(attemptKey, '0')) || 0;
+        if (attempts < MAX_RELOAD_RETRIES) {
+            writeSession(attemptKey, attempts + 1);
+            window.setTimeout(() => performNavigation(expectedVersion), 0);
+            return;
+        }
+
+        removeSession(EXPECTED_VERSION_KEY);
+        _availableVersion = expectedVersion;
+        showUpdateBanner(expectedVersion, { failed: true });
     }
 
     async function checkVersion(options = {}) {
@@ -103,15 +325,25 @@ window.AppVersionChecker = (function () {
         _lastCheckedAt = now;
 
         try {
-            const res = await fetch('api/version.php', { cache: 'no-store' });
+            const versionUrl = `${window.APP_BASE_PATH || './'}api/version.php`;
+            const res = await fetch(versionUrl, { cache: 'no-store', credentials: 'same-origin' });
             if (!res.ok) { return; }
             const data = await res.json();
-            const ver  = data && data.version;
+            const ver = normalizeVersion(data && data.version);
             if (!ver) { return; }
             if (_currentVersion === null) {
                 _currentVersion = ver;
             } else if (ver !== _currentVersion) {
-                await autoReloadForVersion(ver);
+                _availableVersion = ver;
+                _updateRequired = Boolean(data.required);
+                showUpdateBanner(ver);
+                if (_lastAnnouncedVersion !== ver) {
+                    _lastAnnouncedVersion = ver;
+                    announce({ type: 'version-available', version: ver, required: _updateRequired });
+                }
+            } else {
+                removeBanner();
+                _availableVersion = '';
             }
         } catch (_e) {
             // 網路錯誤靜默忽略
@@ -127,8 +359,20 @@ window.AppVersionChecker = (function () {
     // 公開 API，供安全設定模組呼叫
     function configure(enabled, intervalMinutes) {
         _enabled = !!enabled;
-        startPolling(intervalMinutes || 5);
+        if (_enabled) {
+            startPolling(intervalMinutes || 5);
+            checkVersion({ force: true });
+        } else {
+            if (_intervalId) {
+                clearInterval(_intervalId);
+                _intervalId = null;
+            }
+            removeBanner();
+        }
     }
+
+    setupCrossTabSync();
+    verifyExpectedVersion();
 
     // 初始啟動（使用預設值，待安全設定載入後再重設）
     if (document.readyState === 'loading') {
@@ -148,7 +392,12 @@ window.AppVersionChecker = (function () {
     });
     startPolling(5);
 
-    return { configure, checkNow: () => checkVersion({ force: true }), reloadNow };
+    return {
+        configure,
+        checkNow: () => checkVersion({ force: true }),
+        reloadNow,
+        showUpdateBanner
+    };
 })();
 
 // ──────────────────────────────────────────────
@@ -961,7 +1210,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function runModuleInitializer(moduleId, container, context = null) {
-        const initializer = moduleInitializers[moduleId];
+        const initializer = moduleInitializers[moduleId]
+            || (window.ModuleAssets && window.ModuleAssets.initializer(moduleId));
         if (typeof initializer === 'function') {
             initializer(container, context);
         }
@@ -1381,7 +1631,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         system_parameters: 'manage_system_parameters',
         report_descriptions: 'manage_system_parameters',
         audit_logs: 'view_audit_logs',
-        domain_event_outbox: 'manage_system_parameters',
         security_settings: 'manage_system_parameters',
         dashboard_calendar_events: 'manage_calendar_events',
         calendar_event_participants: 'manage_calendar_events',
@@ -1446,13 +1695,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     function canAccessModule(moduleId) {
-        if (!moduleId || moduleId === 'dashboard') {
+        if (!moduleId) {
             return true;
         }
 
         const permissions = Array.isArray(currentUser?.permissions) ? currentUser.permissions : [];
         if (permissions.length === 0) {
-            // 向後相容：尚未建立權限資料時預設放行
+            return false;
+        }
+
+        if (moduleId === 'dashboard') {
             return true;
         }
 
@@ -2056,8 +2308,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Close all tabs button event listener
     const closeAllTabsBtn = document.getElementById('close-all-tabs');
     if (closeAllTabsBtn) {
-        closeAllTabsBtn.addEventListener('click', () => {
-            if (confirm('確定要關閉所有分頁嗎？')) {
+        closeAllTabsBtn.addEventListener('click', async () => {
+            if (await window.AppFeedback.confirm({ title: '關閉全部分頁', message: '確定要關閉所有分頁嗎？未儲存的分頁仍會逐一提示。', danger: false })) {
                 closeAllTabs();
             }
         });
@@ -2070,7 +2322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function openTab(pageId, title, contentUrl, options = {}) {
         if (!options.skipPermissionCheck && !canAccessModule(pageId)) {
             if (!options.silentDenied) {
-                window.alert('您沒有瀏覽此功能的權限。');
+                window.AppFeedback.toast('您沒有瀏覽此功能的權限。', 'warning');
             }
             return;
         }
@@ -2253,6 +2505,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Function to load content into a tab pane
     async function loadTabContent(tabContentElement, contentUrl, moduleId) {
         try {
+            if (moduleId && window.ModuleAssets) {
+                tabContentElement.innerHTML = '<div class="module-loading" role="status"><span class="spinner" aria-hidden="true"></span>載入功能中…</div>';
+                await window.ModuleAssets.load(moduleId);
+            }
             // 檢查是否使用配置化渲染
             if (typeof ModuleConfig !== 'undefined' && ModuleConfig.has(moduleId)) {
                 const config = ModuleConfig.get(moduleId);
@@ -2427,6 +2683,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     registerModuleInitializer('shipping_orders', window.initializeShippingOrdersModule);
     registerModuleInitializer('shipping_order_items', window.initializeShippingOrderItemsModule);
     registerModuleInitializer('return_orders', window.initializeReturnOrdersModule);
+    registerModuleInitializer('return_order_items', window.initializeReturnOrderItemsModule);
     registerModuleInitializer('rescreen_batches', window.initializeRescreenBatchesModule);
     registerModuleInitializer('production_quality_records', window.initializeProductionQualityRecordsModule);
     registerModuleInitializer('defect_history_records', window.initializeDefectHistoryRecordsModule);
@@ -2595,7 +2852,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     registerModuleInitializer('dashboard_calendar_events', window.initializeDashboardCalendarEventsModule);
     registerModuleInitializer('calendar_event_participants', window.initializeCalendarEventParticipantsModule);
     registerModuleInitializer('calendar_event_reminders', window.initializeCalendarEventRemindersModule);
-    registerModuleInitializer('domain_event_outbox', window.initializeDomainEventOutboxModule);
     // 通知與訊息模組
     registerModuleInitializer('notifications', window.initializeNotificationsModule);
     registerModuleInitializer('messages', window.initializeMessagesModule);
@@ -2620,7 +2876,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         } else {
             // 如果沒有已儲存的分頁，預設開啟 Dashboard
-            openTab('dashboard', '系統儀表板', 'modules/dashboard.html');
+            if (canAccessModule('dashboard')) {
+                openTab('dashboard', '系統儀表板', 'modules/dashboard.html');
+            } else if (tabContentArea) {
+                const emptyState = document.createElement('section');
+                emptyState.className = 'empty-state';
+                const title = document.createElement('h2');
+                title.textContent = '尚未配置系統權限';
+                const description = document.createElement('p');
+                description.textContent = '您的帳號目前無法存取業務模組，請聯絡系統管理員指派正式角色。';
+                emptyState.append(title, description);
+                tabContentArea.replaceChildren(emptyState);
+            }
         }
     }
 
@@ -2670,6 +2937,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, true);
 
     window.addEventListener('beforeunload', (event) => {
+        if (window.__MES_ALLOW_UPDATE_RELOAD__ === true) {
+            return;
+        }
         const hasUnsavedTabs = openTabs.some((tab) => hasTrackedUnsavedChanges(tab.id));
         if (!hasUnsavedTabs) {
             return;
@@ -2682,6 +2952,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 暴露 openTab 函數到全域,供其他模組使用
     window.openTab = openTab;
     window.markTabChangesClean = markTabChangesClean;
+    window.AppUnsavedChanges = Object.freeze({
+        hasAny: () => openTabs.some((tab) => hasTrackedUnsavedChanges(tab.id)),
+        count: () => openTabs.filter((tab) => hasTrackedUnsavedChanges(tab.id)).length
+    });
 
     /**
      * 開啟指定分頁並傳遞參數（跨模組導航用）

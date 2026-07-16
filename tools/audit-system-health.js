@@ -50,6 +50,9 @@ const {
 const {
     checkDataSyncIntegration: runDataSyncAudit
 } = require('./audit/adapters/data-sync');
+const {
+    runGovernanceContracts
+} = require('./audit/rules/governance-contracts');
 
 const ROOT = path.resolve(__dirname, '..');
 const SHOW_FIX_HINTS = process.argv.includes('--fix-hints');
@@ -365,6 +368,19 @@ function checkJsFileSize() {
     });
 }
 
+function checkGovernanceContracts() {
+    console.log('🔍 [GOV] 檢查權限、schema、導航、狀態、來源鏈與治理契約...');
+    for (const finding of runGovernanceContracts(ROOT)) {
+        if (finding.level === 'error') {
+            err(finding.category, finding.file, finding.rule, finding.message, finding.fix);
+        } else if (finding.level === 'warning') {
+            warn(finding.category, finding.file, finding.rule, finding.message, finding.fix);
+        } else {
+            info(finding.category, finding.file, finding.message);
+        }
+    }
+}
+
 // ─────────────────────────────────────────────
 // F-2  列印範本無法取得 CSRF Token
 // ─────────────────────────────────────────────
@@ -524,7 +540,13 @@ function checkDualStatusFields() {
 
             const rel = path.relative(ROOT, full).replace(/\\/g, '/');
             const content = fs.readFileSync(full, 'utf-8');
-            if (content.includes('status_lookup_id') && /[`'"]status[`'"]/.test(content)) {
+            const hasDualStatusWrite = content.split(/;\s*(?:\r?\n|$)/).some(chunk => {
+                if (!chunk.includes('status_lookup_id') || !/(?:INSERT\s+INTO|UPDATE\s+\w+\s+SET|CREATE\s+TABLE)/i.test(chunk)) {
+                    return false;
+                }
+                return /(?:[`'"]status[`'"]|\bstatus\s*(?:=|,|\)))/i.test(chunk);
+            });
+            if (hasDualStatusWrite) {
                 // 排除 bootstrap / lookup 本身
                 if (!rel.includes('bootstrap') && !rel.includes('lookup') && !isKnownCrossModuleStatusUsage(content, rel)) {
                     affected.push(rel);
@@ -659,10 +681,10 @@ function checkPrintApiPaths() {
 }
 
 // ─────────────────────────────────────────────
-// INDEX  index.html 中未載入的配置檔
+// INDEX  主入口或按需資產 manifest 中未登錄的配置檔
 // ─────────────────────────────────────────────
 function checkConfigFilesLoadedInIndex() {
-    console.log('🔍 [INDEX] 檢查主入口是否載入所有配置檔...');
+    console.log('🔍 [INDEX] 檢查主入口或按需資產 manifest 是否登錄所有配置檔...');
 
     const htmlContent = readFile('index.html');
     const entryFile = htmlContent && isIndexHtmlRedirectEntrypoint(htmlContent) ? 'index.php' : 'index.html';
@@ -672,16 +694,22 @@ function checkConfigFilesLoadedInIndex() {
         return;
     }
 
+    const assetManifest = readFile('core/module-assets.js') || '';
+    const usesDynamicAssets = indexContent.includes('core/module-assets.js');
     const configDir = path.join(ROOT, 'core', 'configs');
     if (!fs.existsSync(configDir)) return;
 
     const configFiles = fs.readdirSync(configDir).filter(f => f.endsWith('.config.js'));
 
     configFiles.forEach(fname => {
-        if (!indexContent.includes(fname)) {
+        const moduleId = fname.replace(/\.config\.js$/, '');
+        const registeredDynamically = usesDynamicAssets
+            && assetManifest.includes(`'${moduleId}'`)
+            && assetManifest.includes('core/configs/${moduleId}.config.js');
+        if (!indexContent.includes(fname) && !registeredDynamically) {
             err('架構', `core/configs/${fname}`, 'INDEX 配置未載入',
-                `配置檔 ${fname} 存在但未在 ${entryFile} 中以 <script> 標籤載入`,
-                `在 ${entryFile} 加入：<script src="core/configs/${fname}"></script>`);
+                `配置檔 ${fname} 存在但未在 ${entryFile} 或按需資產 manifest 中登錄`,
+                `在 core/module-assets.js 登錄 ${moduleId}，或由 ${entryFile} 直接載入`);
         }
     });
 }
@@ -1454,6 +1482,7 @@ function runAllChecks() {
         checkDataSyncIntegration();
         checkWorkflowDeleteGuard();
         checkSplitWorkOrderIntegrity();
+        checkGovernanceContracts();
     } finally {
         console.log = originalConsoleLog;
     }

@@ -143,7 +143,12 @@ function validateOrderItemData(array $payload, bool $isUpdate = false): array
     // status
     if (array_key_exists('status', $payload)) {
         $status = trim((string)$payload['status']);
-        $data['status'] = $status === '' ? null : mb_substr($status, 0, 50);
+        $allowedStatuses = array_keys(getWorkflowTransitionDefinitions()['order_items']);
+        if (!in_array($status, $allowedStatuses, true)) {
+            $errors['status'] = '訂單品項狀態不在允許清單中。';
+        } else {
+            $data['status'] = $status;
+        }
     }
 
     // sub_item_number

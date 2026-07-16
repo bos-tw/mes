@@ -62,7 +62,6 @@ try {
         SELECT
             wo.id,
             wo.work_order_number,
-            wo.status,
             wo.completed_at,
             wo.updated_at,
             lv.value_key AS status_key,
@@ -89,10 +88,9 @@ try {
     }
 
     $statusKey = strtolower(trim((string)($workOrder['status_key'] ?? '')));
-    $legacyStatus = strtolower(trim((string)($workOrder['status'] ?? '')));
     $statusLabel = trim((string)($workOrder['status_label'] ?? ''));
-    if (!empty($workOrder['completed_at']) || $statusKey === 'completed' || $legacyStatus === 'completed' || $statusLabel === '已完成') {
-        if (empty($workOrder['completed_at']) && ($statusKey === 'completed' || $legacyStatus === 'completed' || $statusLabel === '已完成')) {
+    if (!empty($workOrder['completed_at']) || $statusKey === 'completed' || $statusLabel === '已完成') {
+        if (empty($workOrder['completed_at']) && ($statusKey === 'completed' || $statusLabel === '已完成')) {
             $lockStmt = $pdo->prepare('UPDATE work_orders SET completed_at = COALESCE(completed_at, updated_at, NOW()) WHERE id = :id');
             $lockStmt->execute(['id' => $id]);
             $pdo->commit();

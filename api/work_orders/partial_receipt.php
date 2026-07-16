@@ -302,6 +302,11 @@ try {
         'created_by_employee_id' => $currentUserId,
     ]);
     $inventoryItemId = (int)$pdo->lastInsertId();
+    ensureInventoryItemSource($pdo, $inventoryItemId, 'partial_receipt', $inventoryItemId, [
+        'source_order_id' => (int)$workOrder['order_id'],
+        'source_order_item_id' => (int)$workOrder['order_item_id'],
+        'source_work_order_id' => $workOrderId,
+    ], '工單部分入庫');
 
     $partialReceiptStmt = $pdo->prepare("
         INSERT INTO work_order_partial_receipts (
@@ -350,20 +355,18 @@ try {
         ]);
     }
 
-    $transactionId = getNextInventoryTransactionId($pdo);
     $transactionStmt = $pdo->prepare("
         INSERT INTO inventory_transactions (
-            id, inventory_item_id, order_id, order_item_id, work_order_id,
+            inventory_item_id, order_id, order_item_id, work_order_id,
             ref_type, ref_id, direction, quantity, after_quantity,
             notes, created_by_employee_id
         ) VALUES (
-            :id, :inventory_item_id, :order_id, :order_item_id, :work_order_id,
+            :inventory_item_id, :order_id, :order_item_id, :work_order_id,
             'work_order_partial_receipt', :ref_id, 'inbound', :quantity, :after_quantity,
             :notes, :created_by_employee_id
         )
     ");
     $transactionStmt->execute([
-        'id' => $transactionId,
         'inventory_item_id' => $inventoryItemId,
         'order_id' => (int)$workOrder['order_id'],
         'order_item_id' => (int)$workOrder['order_item_id'],

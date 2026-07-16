@@ -1397,7 +1397,7 @@ function renderTable(items) {
                 DataSync.notifyWithDependencies('shipping_orders', DataSync.EVENT_TYPES.UPDATED, eventPayload);
             }
 
-            if (createdShippingOrderId && confirm('已成功加入出貨單！是否前往出貨單頁面查看？')) {
+            if (createdShippingOrderId && await window.AppFeedback.confirm({ stage: '出貨', title: '出貨單已更新', message: '是否前往出貨單頁面繼續配貨與確認？', danger: false, confirmLabel: '前往出貨單' })) {
                 if (typeof window.openTabAndNavigate === 'function') {
                     window.openTabAndNavigate('shipping_orders', '出貨單', {
                         shippingOrderId: Number(createdShippingOrderId)
@@ -1678,7 +1678,7 @@ function renderTable(items) {
         if (!assessment.allowed) {
             return false;
         }
-        return window.confirm(buildWorkflowConfirmMessage(assessment, fallbackMessage));
+        return window.AppFeedback.confirm({ title: '流程影響確認', message: assessment.message || fallbackMessage, impact: (assessment.impacts || []).join('、'), guidance: assessment.recommended_action || '', confirmLabel: confirmText });
     }
 
     async function handleDelete(id) {

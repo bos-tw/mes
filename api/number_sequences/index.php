@@ -147,22 +147,18 @@ function handleCreateNumberSequence(): void
         ], 409);
     }
 
-    // 取得新 ID
-    $maxIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM number_sequences');
-    $newId = (int)$maxIdStmt->fetchColumn();
-
-    $sql = 'INSERT INTO number_sequences (id, seq_key, seq_prefix, active_from, active_until, current_value, last_generated_on, created_at, updated_at) VALUES (:id, :seq_key, :seq_prefix, :active_from, :active_until, :current_value, NULL, NOW(), NOW())';
+    $sql = 'INSERT INTO number_sequences (seq_key, seq_prefix, active_from, active_until, current_value, last_generated_on, created_at, updated_at) VALUES (:seq_key, :seq_prefix, :active_from, :active_until, :current_value, NULL, NOW(), NOW())';
 
     try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            'id' => $newId,
             'seq_key' => $data['seq_key'],
             'seq_prefix' => $data['seq_prefix'],
             'active_from' => $data['active_from'],
             'active_until' => $data['active_until'] ?? null,
             'current_value' => $data['current_value'] ?? 0,
         ]);
+        $newId = (int)$pdo->lastInsertId();
     } catch (PDOException $exception) {
         jsonResponse([
             'success' => false,

@@ -86,7 +86,7 @@
 
             // 最後回退到 window.alert，並在 console 也列印
             console[type === 'error' ? 'error' : 'warn']('[screening_services] ' + message);
-            window.alert(message);
+            window.AppFeedback.toast(message, type === 'success' ? 'success' : 'error');
         }
 
         function hideModalAlert() {
@@ -113,7 +113,7 @@
             if (!alertBox) {
                 // 若沒有 alertBox，fallback 到 console + window.alert
                 console[type === 'error' ? 'error' : 'log']('[screening_services] ' + message);
-                window.alert(message);
+                window.AppFeedback.toast(message, type === 'success' ? 'success' : 'error');
                 return;
             }
 
@@ -485,7 +485,7 @@ function formatDecimal(value, decimals = 2) {
         }
 
         async function deleteService(id) {
-            const confirmed = window.confirm('確認刪除此篩分服務資料？');
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除篩分服務', message: '確認刪除此篩分服務資料？', impact: '訂單品項與工單服務設定' });
             if (!confirmed) {
                 return;
             }

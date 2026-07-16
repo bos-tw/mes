@@ -531,7 +531,7 @@ function formatNumber(value) {
         }
 
         async function deleteTool(id) {
-            const confirmed = window.confirm('確認刪除此載具資料？');
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除載具', message: '確認刪除此載具資料？', impact: '工單、庫存與出貨載具資料' });
             if (!confirmed) {
                 return;
             }

@@ -76,6 +76,8 @@ if (!$order) {
 }
 
 $payload = readOrderPayload();
+$transitionReason = trim((string)($payload['transition_reason'] ?? $payload['status_reason'] ?? ''));
+unset($payload['transition_reason'], $payload['status_reason']);
 $validated = validateOrderData($payload, true);
 if ($validated['errors'] !== []) {
     jsonResponse([
@@ -108,14 +110,50 @@ if (isset($data['customer_id']) && !customerExists($pdo, $data['customer_id'])) 
     ], 422);
 }
 
-$setClauses = [];
-foreach ($data as $column => $value) {
-    $setClauses[] = "$column = :$column";
-}
-
-$sql = 'UPDATE orders SET ' . implode(', ', $setClauses) . ' WHERE id = :id AND deleted_at IS NULL';
-
 try {
+    $pdo->beginTransaction();
+    $lockStmt = $pdo->prepare('SELECT id, customer_id, status FROM orders WHERE id = :id AND deleted_at IS NULL FOR UPDATE');
+    $lockStmt->execute(['id' => (int)$id]);
+    $lockedOrder = $lockStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$lockedOrder) {
+        $pdo->rollBack();
+        jsonResponse(['success' => false, 'message' => '找不到對應的訂單資料。'], 404);
+    }
+
+    $oldStatus = (string)$lockedOrder['status'];
+    $newStatus = (string)($data['status'] ?? $oldStatus);
+    if (!canTransitionWorkflowStatus('orders', $oldStatus, $newStatus)) {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => '不允許的訂單狀態轉換。',
+            'current_status' => $oldStatus,
+            'requested_status' => $newStatus,
+            'allowed_transitions' => getAllowedWorkflowTransitions('orders', $oldStatus),
+        ], 409);
+    }
+
+    if (isset($data['customer_id']) && (int)$data['customer_id'] !== (int)$lockedOrder['customer_id']) {
+        $flowStmt = $pdo->prepare("SELECT EXISTS(
+            SELECT 1 FROM order_items oi
+            LEFT JOIN work_orders wo ON wo.order_item_id = oi.id AND wo.deleted_at IS NULL
+            LEFT JOIN inventory_items ii ON ii.order_item_id = oi.id AND ii.deleted_at IS NULL
+            LEFT JOIN shipping_order_items soi ON soi.order_item_id = oi.id
+            WHERE oi.order_id = :id
+              AND (wo.id IS NOT NULL OR ii.id IS NOT NULL OR soi.id IS NOT NULL)
+        )");
+        $flowStmt->execute(['id' => (int)$id]);
+        if ((int)$flowStmt->fetchColumn() === 1) {
+            $pdo->rollBack();
+            jsonResponse(['success' => false, 'message' => '訂單已有工單、庫存或出貨資料，不能變更客戶。'], 409);
+        }
+    }
+
+    $setClauses = [];
+    foreach ($data as $column => $value) {
+        $setClauses[] = "$column = :$column";
+    }
+    $sql = 'UPDATE orders SET ' . implode(', ', $setClauses) . ' WHERE id = :id AND deleted_at IS NULL';
     $stmt = $pdo->prepare($sql);
     foreach ($data as $column => $value) {
         if ($value === null) {
@@ -128,10 +166,25 @@ try {
     $stmt->bindValue(':id', (int)$id, PDO::PARAM_INT);
     $stmt->execute();
 
+    recordWorkflowStatusTransition(
+        $pdo,
+        'orders',
+        (int)$id,
+        $oldStatus,
+        $newStatus,
+        isset($_SESSION['employee']['id']) ? (int)$_SESSION['employee']['id'] : null,
+        $transitionReason !== '' ? $transitionReason : null
+    );
+
     // 記錄操作日誌
     logAuditAction('更新訂單', 'Orders', (int)$id, $data);
 
+    $pdo->commit();
+
 } catch (PDOException $exception) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     handleOrderPdoWriteException($exception);
 }
 

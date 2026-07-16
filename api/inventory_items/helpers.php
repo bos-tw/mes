@@ -13,7 +13,6 @@
  * - getInventoryItemDetails(): 取得庫存詳細
  * - canDeleteInventoryItem(): 檢查是否可刪除
  * - updateInventoryQuantities(): 更新庫存數量
- * - getNextInventoryTransactionId(): 取得下一筆庫存異動 ID
  * - getInventoryStatistics(): 取得庫存統計
  * - buildInventoryWhereClause(): 建立查詢條件
  *
@@ -155,7 +154,7 @@ function getInventoryItemDetails(PDO $pdo, int $id): ?array
             si.material AS screening_item_material,
             si.thread_type AS screening_item_thread_type,
             wo.work_order_number,
-            wo.status AS work_order_status,
+            work_order_status.value_key AS work_order_status,
             oi.sub_item_number,
             oi.part_number,
             oi.drawing_number,
@@ -180,6 +179,7 @@ function getInventoryItemDetails(PDO $pdo, int $id): ?array
         FROM inventory_items ii
         LEFT JOIN screening_items si ON ii.screening_item_id = si.id
         LEFT JOIN work_orders wo ON ii.work_order_id = wo.id
+        LEFT JOIN lookup_values work_order_status ON wo.status_lookup_id = work_order_status.id
         LEFT JOIN order_items oi ON ii.order_item_id = oi.id
         LEFT JOIN orders o ON ii.order_id = o.id
         LEFT JOIN customers c ON ii.customer_id = c.id
@@ -297,7 +297,65 @@ function getInventoryItemSourceChain(PDO $pdo, int $inventoryItemId): array
     ");
     $stmt->execute(['inventory_item_id' => $inventoryItemId]);
 
-    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $sources = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($sources !== []) {
+        return $sources;
+    }
+
+    // Migration 前的相容 fallback：至少以庫存既有直接關聯提供可追溯節點。
+    $fallbackStmt = $pdo->prepare("SELECT ii.order_id AS source_order_id, o.order_number,
+        ii.order_item_id AS source_order_item_id, ii.work_order_id AS source_work_order_id,
+        wo.work_order_number
+        FROM inventory_items ii
+        LEFT JOIN orders o ON o.id = ii.order_id
+        LEFT JOIN work_orders wo ON wo.id = ii.work_order_id
+        WHERE ii.id = :id AND ii.deleted_at IS NULL");
+    $fallbackStmt->execute(['id' => $inventoryItemId]);
+    $fallback = $fallbackStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$fallback) {
+        return [];
+    }
+    return [array_merge([
+        'source_type' => 'legacy_direct_relation',
+        'source_id' => $inventoryItemId,
+        'notes' => '由既有直接關聯提供的相容來源鏈',
+    ], $fallback)];
+}
+
+/** @param array<string,int|null> $links */
+function ensureInventoryItemSource(
+    PDO $pdo,
+    int $inventoryItemId,
+    string $sourceType,
+    ?int $sourceId,
+    array $links = [],
+    ?string $notes = null
+): void {
+    if ($inventoryItemId <= 0 || trim($sourceType) === '') {
+        throw new InvalidArgumentException('庫存來源鏈缺少必要識別。');
+    }
+    $sourceId ??= $inventoryItemId;
+    $stmt = $pdo->prepare("INSERT INTO inventory_item_sources (
+        inventory_item_id, source_type, source_id, source_order_id,
+        source_order_item_id, source_work_order_id, source_shipping_order_id,
+        source_shipping_order_item_id, source_return_order_id,
+        source_return_order_item_id, source_rescreen_batch_id,
+        source_rescreen_batch_item_id, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE id = id");
+    $stmt->execute([
+        $inventoryItemId, trim($sourceType), $sourceId,
+        $links['source_order_id'] ?? null,
+        $links['source_order_item_id'] ?? null,
+        $links['source_work_order_id'] ?? null,
+        $links['source_shipping_order_id'] ?? null,
+        $links['source_shipping_order_item_id'] ?? null,
+        $links['source_return_order_id'] ?? null,
+        $links['source_return_order_item_id'] ?? null,
+        $links['source_rescreen_batch_id'] ?? null,
+        $links['source_rescreen_batch_item_id'] ?? null,
+        $notes,
+    ]);
 }
 
 /**
@@ -385,31 +443,6 @@ function updateInventoryQuantities(PDO $pdo, int $id, array $changes): bool
     $stmt = $pdo->prepare($sql);
 
     return $stmt->execute($params);
-}
-
-function getNextInventoryTransactionId(PDO $pdo): int
-{
-    $query = '
-        SELECT COALESCE(MAX(id), 0) + 1 AS next_id
-        FROM inventory_transactions
-    ';
-
-    if ($pdo->inTransaction()) {
-        $query .= ' FOR UPDATE';
-    }
-
-    $stmt = $pdo->query($query);
-
-    if ($stmt === false) {
-        throw new RuntimeException('無法取得庫存交易序號');
-    }
-
-    $nextId = $stmt->fetchColumn();
-    if ($nextId === false) {
-        return 1;
-    }
-
-    return max(1, (int)$nextId);
 }
 
 /**

@@ -133,13 +133,14 @@ function handleCalendarEvents(): void
                 wo.work_order_number,
                 wo.scheduled_start_date as start_date,
                 wo.scheduled_end_date as due_date,
-                wo.status,
+                lv.value_key AS status,
                 o.order_number
             FROM work_orders wo
             LEFT JOIN order_items oi ON wo.order_item_id = oi.id
             LEFT JOIN orders o ON oi.order_id = o.id
+            JOIN lookup_values lv ON lv.id = wo.status_lookup_id
             WHERE wo.deleted_at IS NULL
-                AND wo.status != 'cancelled'
+                AND lv.value_key != 'cancelled'
                 AND (
                     (wo.scheduled_start_date BETWEEN :start1 AND :end1)
                     OR (wo.scheduled_end_date BETWEEN :start2 AND :end2)

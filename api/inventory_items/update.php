@@ -49,6 +49,8 @@ requireMethod(['PUT', 'PATCH']);
 $pdo = db();
 
 $data = getJsonInput();
+$transitionReason = trim((string)($data['transition_reason'] ?? $data['status_reason'] ?? $data['adjustment_notes'] ?? ''));
+unset($data['transition_reason'], $data['status_reason']);
 $id = (int)($data['id'] ?? 0);
 
 if ($id <= 0) {
@@ -69,6 +71,26 @@ if (!empty($errors)) {
 
 try {
     $pdo->beginTransaction();
+
+    $lockStmt = $pdo->prepare('SELECT status, quantity_on_hand FROM inventory_items WHERE id = :id AND deleted_at IS NULL FOR UPDATE');
+    $lockStmt->execute(['id' => $id]);
+    $lockedItem = $lockStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$lockedItem) {
+        $pdo->rollBack();
+        jsonResponse(['success' => false, 'message' => '庫存項目不存在。'], 404);
+    }
+    $oldStatus = (string)$lockedItem['status'];
+    $newStatus = (string)($data['status'] ?? $oldStatus);
+    if (!canTransitionWorkflowStatus('inventory_items', $oldStatus, $newStatus)) {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => '不允許的庫存狀態轉換。',
+            'current_status' => $oldStatus,
+            'requested_status' => $newStatus,
+            'allowed_transitions' => getAllowedWorkflowTransitions('inventory_items', $oldStatus),
+        ], 409);
+    }
 
     // Build update query
     $updateFields = [];
@@ -116,16 +138,13 @@ try {
     $stmt->execute($params);
 
     // If quantity changed, create transaction record
-    if (isset($data['quantity_on_hand']) && $data['quantity_on_hand'] != $existingItem['quantity_on_hand']) {
+    if (isset($data['quantity_on_hand']) && $data['quantity_on_hand'] != $lockedItem['quantity_on_hand']) {
         $currentUser = requireAuth();
-        $quantityDiff = $data['quantity_on_hand'] - $existingItem['quantity_on_hand'];
+        $quantityDiff = $data['quantity_on_hand'] - $lockedItem['quantity_on_hand'];
         $direction = $quantityDiff > 0 ? 'inbound' : 'outbound';
-
-        $transactionId = getNextInventoryTransactionId($pdo);
 
         $transStmt = $pdo->prepare("
             INSERT INTO inventory_transactions (
-                id,
                 inventory_item_id,
                 ref_type,
                 ref_id,
@@ -135,7 +154,6 @@ try {
                 notes,
                 created_by_employee_id
             ) VALUES (
-                :id,
                 :inventory_item_id,
                 'adjustment',
                 :ref_id,
@@ -148,7 +166,6 @@ try {
         ");
 
         $transStmt->execute([
-            'id' => $transactionId,
             'inventory_item_id' => $id,
             'ref_id' => $id,
             'direction' => $direction,
@@ -158,6 +175,17 @@ try {
             'created_by_employee_id' => $currentUser['id'] ?? null,
         ]);
     }
+
+    recordWorkflowStatusTransition(
+        $pdo,
+        'inventory_items',
+        $id,
+        $oldStatus,
+        $newStatus,
+        isset($_SESSION['employee']['id']) ? (int)$_SESSION['employee']['id'] : null,
+        $transitionReason !== '' ? $transitionReason : null
+    );
+    logAuditAction('更新庫存品項', 'inventory_items', $id, $data);
 
     $pdo->commit();
 

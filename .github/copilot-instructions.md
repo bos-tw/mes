@@ -2187,7 +2187,7 @@ A 分頁執行 CRUD
                      └→ 相依模組的 onDependencyUpdate 或 fallback onRefresh 被呼叫
 ```
 
-### 完整 MODULE_DEPENDENCIES 對照表（2026-03-03 更新）
+### 完整 MODULE_DEPENDENCIES 對照表（2026-07-15 更新）
 
 > 此表對應 `js/data-sync.js` 的 `MODULE_DEPENDENCIES`。新增模組時必須同步更新此表與程式碼。
 
@@ -2209,9 +2209,10 @@ A 分頁執行 CRUD
 | `order_items` | `orders`, `work_orders`, `inventory_items` | 訂單項目影響訂單合計/工單/庫存 |
 | `work_orders` | `order_items`, `orders`, `work_order_images`, `work_order_first_piece_dimensions`, `inventory_items`, `inventory_transactions`, `dashboard`, `production_records`, `production_work_order_schedule` | 工單影響訂單主表細項、訂單項目按鈕/圖片/首件/庫存/儀表板/生產/排程看板 |
 | `work_order_pre_production_images` | `work_orders` | 工單生產前圖片附件影響工單附件狀態與列印參考圖 |
-| `shipping_orders` | `shipping_order_items`, `inventory_items`, `order_items`, `inventory_transactions`, `return_orders`, `dashboard`, `shipping_quality_inspections` | 出貨單影響出貨項目/庫存/退貨/儀表板/品質 |
-| `shipping_order_items` | `shipping_orders`, `order_items`, `inventory_items`, `inventory_transactions`, `return_orders` | 出貨明細影響出貨單狀態/訂單項目/庫存/異動紀錄/退貨可選品項 |
-| `return_orders` | `inventory_items`, `inventory_transactions`, `shipping_orders`, `shipping_order_items` | 退貨影響庫存、異動紀錄與出貨/明細退貨狀態 |
+| `shipping_orders` | `shipping_order_items`, `inventory_items`, `order_items`, `inventory_transactions`, `return_orders`, `return_order_items`, `dashboard`, `shipping_quality_inspections`, `defect_history_records` | 出貨單影響出貨項目/庫存/退貨/儀表板/品質/缺陷追溯 |
+| `shipping_order_items` | `shipping_orders`, `order_items`, `inventory_items`, `inventory_transactions`, `return_orders`, `return_order_items` | 出貨明細影響出貨單狀態/訂單項目/庫存/異動紀錄/退貨可選品項 |
+| `return_orders` | `return_order_items`, `inventory_items`, `inventory_transactions`, `shipping_orders`, `shipping_order_items`, `rescreen_batches` | 退貨影響退貨品項、庫存、異動紀錄、出貨狀態與二次篩選 |
+| `return_order_items` | `return_orders`, `shipping_orders`, `shipping_order_items` | 退貨品項異動後同步退貨單與原出貨單退貨狀態 |
 | `inventory_items` | `work_orders`, `inventory_transactions`, `shipping_orders`, `shipping_order_items` | 庫存項目影響工單轉庫存按鈕、出貨分配與交易記錄 |
 | `dashboard_calendar_events` | `calendar_event_participants`, `calendar_event_reminders`, `dashboard` | 行事曆事件影響參與者/提醒/儀表板 |
 | `daily_machine_inspections` | `daily_machine_inspection_items` | 檢驗單影響檢驗項目 |

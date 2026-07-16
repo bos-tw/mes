@@ -901,7 +901,7 @@
         }
 
         async function deleteCompany(id) {
-            const confirmed = window.confirm('確認刪除此公司資料？');
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除公司', message: '確認刪除此公司資料？', impact: '報表抬頭與公司設定' });
             if (!confirmed) {
                 return;
             }
@@ -1067,7 +1067,7 @@
 
         // 刪除 LOGO
         async function deleteLogo(logoId) {
-            const confirmed = window.confirm('確認刪除此 LOGO？');
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除公司 LOGO', message: '確認刪除此 LOGO？', impact: '列印報表與系統品牌顯示' });
             if (!confirmed) return;
 
             try {

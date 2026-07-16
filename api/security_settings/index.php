@@ -161,14 +161,11 @@ function handleUpdateSecuritySettings(): void
             );
             $updStmt->execute([':v' => $val, ':d' => $cfg['label'], ':id' => (int) $existing['id']]);
         } else {
-            // id 欄位無 AUTO_INCREMENT，需手動取得下一個 id
-            $maxIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM system_parameters');
-            $newId = (int) $maxIdStmt->fetchColumn();
             $insStmt = $pdo->prepare(
-                'INSERT INTO system_parameters (id, param_key, param_value, description, created_at, updated_at)
-                 VALUES (:id, :k, :v, :d, NOW(), NOW())'
+                'INSERT INTO system_parameters (param_key, param_value, description, created_at, updated_at)
+                 VALUES (:k, :v, :d, NOW(), NOW())'
             );
-            $insStmt->execute([':id' => $newId, ':k' => $key, ':v' => $val, ':d' => $cfg['label']]);
+            $insStmt->execute([':k' => $key, ':v' => $val, ':d' => $cfg['label']]);
         }
         $updated[] = $key;
     }

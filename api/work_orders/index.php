@@ -189,7 +189,7 @@ function handleListWorkOrders(PDO $pdo): void
             wo.screening_speed,
             wo.customer_instructions,
             wo.other_notes,
-            wo.status,
+            lv.value_key AS status,
             wo.status_lookup_id,
             wo.completed_at,
             wo.is_printed,

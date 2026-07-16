@@ -65,6 +65,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/../return_order_items/helpers.php';
 
 $currentEmployee = requireAuth();
 $pdo = db();
@@ -228,31 +229,55 @@ function handleCreate(PDO $pdo, array $currentEmployee): void
 
     // 驗證原出貨單（如果有提供）
     if (!empty($input['original_shipping_order_id'])) {
-        $soStmt = $pdo->prepare("SELECT id FROM shipping_orders WHERE id = ? AND deleted_at IS NULL");
+        $soStmt = $pdo->prepare("SELECT id, customer_id, status FROM shipping_orders WHERE id = ? AND deleted_at IS NULL");
         $soStmt->execute([$input['original_shipping_order_id']]);
-        if (!$soStmt->fetch()) {
+        $sourceShippingOrder = $soStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$sourceShippingOrder) {
             jsonResponse(['success' => false, 'message' => '原出貨單不存在。'], 400);
+        }
+        if (!in_array((string)$sourceShippingOrder['status'], ['shipped', 'delivered'], true)) {
+            jsonResponse(['success' => false, 'message' => '只有已出貨或已送達的出貨單可以建立退貨單。'], 409);
+        }
+        if ((int)$sourceShippingOrder['customer_id'] !== (int)$input['customer_id']) {
+            jsonResponse(['success' => false, 'message' => '退貨單客戶與原出貨單客戶不一致。'], 409);
         }
     }
 
     $pdo->beginTransaction();
 
     try {
-        $id = generateReturnOrderId();
+        if (!empty($input['original_shipping_order_id'])) {
+            $shippingLockStmt = $pdo->prepare("
+                SELECT customer_id, status
+                FROM shipping_orders
+                WHERE id = ? AND deleted_at IS NULL
+                FOR UPDATE
+            ");
+            $shippingLockStmt->execute([(int)$input['original_shipping_order_id']]);
+            $lockedShippingOrder = $shippingLockStmt->fetch(PDO::FETCH_ASSOC);
+            if (
+                !$lockedShippingOrder
+                || !in_array((string)$lockedShippingOrder['status'], ['shipped', 'delivered'], true)
+                || (int)$lockedShippingOrder['customer_id'] !== (int)$input['customer_id']
+            ) {
+                $pdo->rollBack();
+                jsonResponse(['success' => false, 'message' => '原出貨單狀態或客戶已變更，無法建立退貨單。'], 409);
+            }
+        }
+
         $returnOrderNumber = generateReturnOrderNumber($pdo);
 
         $stmt = $pdo->prepare("
             INSERT INTO return_orders (
-                id, return_order_number, customer_id, original_shipping_order_id,
+                return_order_number, customer_id, original_shipping_order_id,
                 return_date, return_reason, processing_status, notes, created_at
             ) VALUES (
-                :id, :return_order_number, :customer_id, :original_shipping_order_id,
+                :return_order_number, :customer_id, :original_shipping_order_id,
                 :return_date, :return_reason, :processing_status, :notes, NOW()
             )
         ");
 
         $stmt->execute([
-            'id' => $id,
             'return_order_number' => $returnOrderNumber,
             'customer_id' => $input['customer_id'],
             'original_shipping_order_id' => $input['original_shipping_order_id'] ?? null,
@@ -261,32 +286,63 @@ function handleCreate(PDO $pdo, array $currentEmployee): void
             'processing_status' => 'pending',
             'notes' => $input['notes'] ?? null,
         ]);
+        $id = (int)$pdo->lastInsertId();
 
         // 如果有品項資料，一併新增
         if (!empty($input['items']) && is_array($input['items'])) {
             $itemStmt = $pdo->prepare("
                 INSERT INTO return_order_items (
-                    id, return_order_id, shipping_order_item_id, returned_quantity, returned_unit, reason
+                    return_order_id, shipping_order_item_id, returned_quantity, returned_unit, reason
                 ) VALUES (
-                    :id, :return_order_id, :shipping_order_item_id, :returned_quantity, :returned_unit, :reason
+                    :return_order_id, :shipping_order_item_id, :returned_quantity, :returned_unit, :reason
                 )
             ");
 
             foreach ($input['items'] as $item) {
-                if (empty($item['shipping_order_item_id']) || empty($item['returned_quantity'])) {
-                    continue;
-                }
-
-                $itemId = generateReturnOrderId();
-                $itemStmt->execute([
-                    'id' => $itemId,
+                $itemValidation = validateReturnOrderItemData([
                     'return_order_id' => $id,
-                    'shipping_order_item_id' => $item['shipping_order_item_id'],
-                    'returned_quantity' => $item['returned_quantity'],
+                    'shipping_order_item_id' => $item['shipping_order_item_id'] ?? null,
+                    'returned_quantity' => $item['returned_quantity'] ?? null,
                     'returned_unit' => $item['returned_unit'] ?? null,
                     'reason' => $item['reason'] ?? null,
                 ]);
+                if ($itemValidation['errors'] !== []) {
+                    $pdo->rollBack();
+                    jsonResponse([
+                        'success' => false,
+                        'message' => implode('；', array_values($itemValidation['errors'])),
+                        'errors' => $itemValidation['errors'],
+                    ], 422);
+                }
+
+                $itemData = $itemValidation['data'];
+                $business = validateReturnOrderItemBusinessRules(
+                    $pdo,
+                    $id,
+                    (int)$itemData['shipping_order_item_id'],
+                    (float)$itemData['returned_quantity']
+                );
+                if ($business['errors'] !== []) {
+                    $pdo->rollBack();
+                    jsonResponse([
+                        'success' => false,
+                        'message' => implode('；', array_values($business['errors'])),
+                        'errors' => $business['errors'],
+                    ], 409);
+                }
+
+                $itemStmt->execute([
+                    'return_order_id' => $id,
+                    'shipping_order_item_id' => $itemData['shipping_order_item_id'],
+                    'returned_quantity' => $itemData['returned_quantity'],
+                    'returned_unit' => $itemData['returned_unit'],
+                    'reason' => $itemData['reason'] ?? null,
+                ]);
+                $itemId = (int)$pdo->lastInsertId();
+                recordReturnOrderItemInventorySource($pdo, $itemId, $business['source'] ?? []);
             }
+
+            recalculateShippingOrderReturnStatus($pdo, (int)$input['original_shipping_order_id']);
         }
 
         $pdo->commit();

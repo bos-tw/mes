@@ -402,7 +402,7 @@
     }
 
     async function handleDelete(id) {
-        if (!confirm('確定要刪除此出貨品質檢驗紀錄嗎？')) return;
+        if (!await window.AppFeedback.confirm({ title: '刪除出貨品質檢驗', message: '確定要刪除此出貨品質檢驗紀錄嗎？', impact: '出貨品質追溯資料' })) return;
         try {
             await deleteRecord(id);
             showAlert('出貨品質檢驗刪除成功', 'success');

@@ -43,7 +43,7 @@ try {
             wo.shortage_notes,
             wo.shortage_confirmed_by,
             wo.shortage_confirmed_at,
-            wo.status,
+            lv.value_key AS status,
             wo.actual_start_date,
             wo.actual_end_date,
             wo.is_printed,

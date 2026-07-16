@@ -161,24 +161,20 @@ function handleCreateDailyInspection(): void
     try {
         $sql = <<<SQL
 INSERT INTO daily_machine_inspections (
-    id, inspection_date, machine_id, inspector_id, is_qualified, notes
+    inspection_date, machine_id, inspector_id, is_qualified, notes
 ) VALUES (
-    :id, :inspection_date, :machine_id, :inspector_id, :is_qualified, :notes
+    :inspection_date, :machine_id, :inspector_id, :is_qualified, :notes
 )
 SQL;
-        // 生成 ID
-        $idStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM daily_machine_inspections');
-        $newId = (int)$idStmt->fetchColumn();
-
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            ':id'              => $newId,
             ':inspection_date' => $data['inspection_date'],
             ':machine_id'      => $data['machine_id'],
             ':inspector_id'    => $data['inspector_id'],
             ':is_qualified'    => $data['is_qualified'] ? 1 : 0,
             ':notes'           => $data['notes'] ?: null,
         ]);
+        $newId = (int)$pdo->lastInsertId();
 
         $record = findDailyInspection($pdo, $newId);
 

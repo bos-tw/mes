@@ -78,6 +78,15 @@ function rollbackCopiedFiles(array $operations): void
                 }
                 @copy($backup, $target);
             }
+        } elseif ($type === 'delete') {
+            $backup = $op['backup'] ?? '';
+            if ($backup !== '' && is_file($backup)) {
+                $targetDir = dirname($target);
+                if (!is_dir($targetDir)) {
+                    @mkdir($targetDir, 0755, true);
+                }
+                @copy($backup, $target);
+            }
         } elseif ($type === 'create') {
             if (is_file($target)) {
                 @unlink($target);
@@ -174,6 +183,7 @@ $extractDir = '';
 $backupDir = '';
 $copyOperations = [];
 $copiedRelativeFiles = [];
+$deletedRelativeFiles = [];
 $rollbackMigrationMap = [];
 $executedMigrationFiles = [];
 $maintenanceEnabledByThisApply = false;
@@ -183,6 +193,7 @@ $cacheVersionStamp = null;
 $runtimeCacheInfo = null;
 $healthCheck = null;
 $rollbackReport = null;
+$applyStage = '初始化';
 
 try {
     if (function_exists('set_time_limit')) {
@@ -258,8 +269,10 @@ try {
         : [];
     $rollbackMigrationMap = buildRollbackMigrationMap($migrationFiles, $rollbackMigrations);
 
+    $applyStage = '建立資料庫快照';
     $dbBackupInfo = createDailyDatabaseSnapshot($pdo, 7);
 
+    $applyStage = '解壓縮更新包';
     $zip = new ZipArchive();
     $openResult = $zip->open($packagePath);
     if ($openResult !== true) {
@@ -290,6 +303,7 @@ try {
         throw new RuntimeException('更新包未包含可套用檔案。');
     }
 
+    $applyStage = '覆蓋更新檔案';
     $copiedFileCount = 0;
     foreach ($packageFiles as $relative) {
         $sourcePath = $sourceRoot . '/' . $relative;
@@ -330,11 +344,54 @@ try {
         $copiedFileCount++;
     }
 
-    $runtimeCacheInfo = invalidateSystemUpdateRuntimeCaches($copiedRelativeFiles);
+    $applyStage = '刪除舊版檔案';
+    $deleteFiles = is_array($manifest['delete_files'] ?? null)
+        ? $manifest['delete_files']
+        : [];
+    $deletedFileCount = 0;
+    foreach ($deleteFiles as $deleteFileRaw) {
+        $relative = normalizeRelativePath((string)$deleteFileRaw);
+        if ($relative === '' || isProtectedUpdatePath($relative)) {
+            throw new RuntimeException('更新包包含無效的刪除路徑：' . (string)$deleteFileRaw);
+        }
+
+        $targetPath = $projectRoot . '/' . $relative;
+        if (!file_exists($targetPath)) {
+            $deletedRelativeFiles[] = $relative;
+            continue;
+        }
+        if (!is_file($targetPath)) {
+            throw new RuntimeException('更新包刪除目標不是檔案：' . $relative);
+        }
+
+        $backupPath = $backupDir . '/' . $relative;
+        ensureDirectoryExists(dirname($backupPath));
+        if (!copy($targetPath, $backupPath)) {
+            throw new RuntimeException('備份待刪除檔案失敗：' . $relative);
+        }
+        $copyOperations[] = [
+            'type' => 'delete',
+            'target' => $targetPath,
+            'backup' => $backupPath,
+        ];
+        if (!unlink($targetPath)) {
+            throw new RuntimeException('刪除舊版檔案失敗：' . $relative);
+        }
+
+        clearstatcache(true, $targetPath);
+        $deletedRelativeFiles[] = $relative;
+        $deletedFileCount++;
+    }
+
+    $runtimeCacheInfo = invalidateSystemUpdateRuntimeCaches(array_merge(
+        $copiedRelativeFiles,
+        $deletedRelativeFiles
+    ));
 
     $executedMigrationFilesCount = 0;
     $executedMigrationStatements = 0;
 
+    $applyStage = '執行資料庫 migration';
     foreach ($migrationFiles as $migrationFileRaw) {
         $migrationFile = normalizeRelativePath((string)$migrationFileRaw);
         if ($migrationFile === '') {
@@ -347,6 +404,7 @@ try {
         $executedMigrationFilesCount++;
     }
 
+    $applyStage = '套用後健康檢查';
     $healthCheck = performPostUpdateHealthCheck($pdo, $copiedRelativeFiles);
     if (!(bool)($healthCheck['passed'] ?? false)) {
         throw new RuntimeException('套用後健康檢查未通過：' . summarizeHealthCheckFailures($healthCheck));
@@ -400,8 +458,9 @@ try {
     }
 
     $message = sprintf(
-        '更新套用完成，共覆蓋 %d 個檔案，執行 %d 個 migration 檔（%d 條語句），DB 快照%s：%s（保留 %d 天）%s%s。',
+        '更新套用完成，共覆蓋 %d 個檔案、刪除 %d 個舊檔，執行 %d 個 migration 檔（%d 條語句），DB 快照%s：%s（保留 %d 天）%s%s。',
         $copiedFileCount,
+        $deletedFileCount,
         $executedMigrationFilesCount,
         $executedMigrationStatements,
         ((bool)($dbBackupInfo['reused'] ?? false)) ? '重用當日檔案' : '已建立',
@@ -420,6 +479,7 @@ try {
     logAuditAction('套用系統更新', 'system_update_jobs', (int)$job['id'], [
         'version_number' => $job['version_number'],
         'copied_file_count' => $copiedFileCount,
+        'deleted_file_count' => $deletedFileCount,
         'migration_file_count' => $executedMigrationFilesCount,
         'migration_statement_count' => $executedMigrationStatements,
         'db_backup' => $dbBackupInfo,
@@ -436,6 +496,7 @@ try {
         'data' => [
             'job' => $latestJob,
             'copied_file_count' => $copiedFileCount,
+            'deleted_file_count' => $deletedFileCount,
             'migration_file_count' => $executedMigrationFilesCount,
             'migration_statement_count' => $executedMigrationStatements,
             'db_backup' => $dbBackupInfo,
@@ -446,9 +507,24 @@ try {
         ],
     ]);
 } catch (Throwable $exception) {
+    $errorReference = strtoupper(substr(hash('sha256', implode('|', [
+        (string)$jobId,
+        $applyStage,
+        $exception->getMessage(),
+        (string)microtime(true),
+    ])), 0, 12));
+    error_log(sprintf(
+        '[system-update][%s][job:%d][stage:%s] %s in %s:%d',
+        $errorReference,
+        (int)$jobId,
+        $applyStage,
+        $exception->getMessage(),
+        $exception->getFile(),
+        $exception->getLine()
+    ));
     $message = safeErrorMessage(
         $exception instanceof Exception ? $exception : new RuntimeException($exception->getMessage()),
-        '套用更新失敗。'
+        sprintf('套用更新失敗（階段：%s，錯誤編號：%s）。', $applyStage, $errorReference)
     );
 
     if ($copyOperations !== []) {
@@ -509,6 +585,8 @@ try {
 
         logAuditAction('套用系統更新失敗', 'system_update_jobs', (int)$jobId, [
             'message' => $message,
+            'stage' => $applyStage,
+            'error_reference' => $errorReference,
             'rollback_report' => $rollbackReport,
             'db_backup' => $dbBackupInfo,
         ]);
@@ -521,6 +599,8 @@ try {
         'message' => $message,
         'data' => [
             'rollback_report' => $rollbackReport,
+            'stage' => $applyStage,
+            'error_reference' => $errorReference,
             'db_backup' => $dbBackupInfo,
             'health_check' => $healthCheck,
             'runtime_cache' => $runtimeCacheInfo,

@@ -1,0 +1,6563 @@
+{
+    "schemaVersion": 1,
+    "database": "yucyuan",
+    "generatedAt": "2026-07-16T06:06:25+00:00",
+    "tables": {
+        "audit_logs": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "action": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "target_table": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "target_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "details": {
+                "type": "longtext",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "ip_address": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": "DEFAULT_GENERATED"
+            }
+        },
+        "calendar_event_participants": {
+            "event_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "employee_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            }
+        },
+        "calendar_event_reminders": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "event_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "employee_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "reminder_datetime": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "reminder_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "is_sent": {
+                "type": "tinyint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sent_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "companies": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "name_en": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "address": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "phone": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "fax": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "email": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "tax_id": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "company_logos": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "company_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "file_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_path": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_size": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "mime_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "is_active": {
+                "type": "tinyint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "sort_order": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "uploaded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "customers": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "customer_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "company_registered_address": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "invoice_title": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "invoice_address": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "shipping_address": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "website": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "fax": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "product_category": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "contact_person": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "phone": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "email": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "address": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sales_contact_person": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sales_contact_extension": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sales_contact_mobile": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sales_contact_email": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "finance_contact_person": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "finance_contact_extension": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "finance_contact_mobile": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "finance_contact_email": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "billing_day": {
+                "type": "int",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "reconciliation_day": {
+                "type": "int",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "payment_method": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tax_id": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "minimum_order_amount": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "weight_tolerance_percentage": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "invoice_attachment_path": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "is_active": {
+                "type": "tinyint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delete_token": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "daily_machine_inspection_items": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "inspection_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "item_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "standard": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "actual_result": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "is_pass": {
+                "type": "tinyint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "remarks": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "daily_machine_inspections": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "inspection_date": {
+                "type": "date",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "machine_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "inspector_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "is_qualified": {
+                "type": "tinyint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "dashboard_calendar_events": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "event_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "reference_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "title": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "description": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "start_datetime": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "end_datetime": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "is_all_day": {
+                "type": "tinyint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "priority": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "color": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "departments": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "parent_department_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "manager_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "status_lookup_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delete_token": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "domain_event_outbox": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "aggregate_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "aggregate_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "event_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "payload": {
+                "type": "longtext",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "process_status": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "retry_count": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "last_error": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "processed_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "employee_roles": {
+            "employee_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "role_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            }
+        },
+        "employees": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "employee_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "account": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "department_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "job_title": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "email": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "password_hash": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "status_lookup_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "last_login_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "session_token": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delete_token": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "inventory_item_sources": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "inventory_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "source_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_order_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_work_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_shipping_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_shipping_order_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_return_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_return_order_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_rescreen_batch_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_rescreen_batch_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_defect_history_record_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            }
+        },
+        "inventory_items": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "screening_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "inventory_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "receipt_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "order_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "customer_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "customer_batch_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "internal_lot_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "total_good_units": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "total_defect_units": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "quantity_on_hand": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "quantity_allocated": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "quantity_reserved": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "quantity_shipped": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "net_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "gross_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "tool_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "weight_per_unit_g": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "tool_statistics": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "total_tool_quantity": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "quality_status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "inspection_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "inspector_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "quality_notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "warehouse_location": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "storage_zone": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "shelf_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "received_at": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "created_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delete_token": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "inventory_transactions": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "inventory_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "order_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "ref_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "ref_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "direction": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "direction_lookup_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "quantity": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "after_quantity": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "created_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "login_attempts": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "ip_address": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "account": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "success": {
+                "type": "tinyint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "attempted_at": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "MUL",
+                "extra": "DEFAULT_GENERATED"
+            }
+        },
+        "lookup_domains": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "domain_key": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "UNI",
+                "extra": ""
+            },
+            "description": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "lookup_values": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "domain_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "value_key": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "value_label": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "sort_order": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "is_active": {
+                "type": "tinyint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "machine_capabilities": {
+            "id": {
+                "type": "int",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "capability_code": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "UNI",
+                "extra": ""
+            },
+            "capability_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "UNI",
+                "extra": ""
+            },
+            "description": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sort_order": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "is_active": {
+                "type": "tinyint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "machine_capability_assignments": {
+            "machine_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "capability_id": {
+                "type": "int",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            }
+        },
+        "machine_maintenance_tasks": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "machine_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "task_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "title": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "description": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "scheduled_start": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "scheduled_end": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "actual_start": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "actual_end": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "next_due_date": {
+                "type": "date",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "machines": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "machine_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "UNI",
+                "extra": ""
+            },
+            "name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "model": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "purchase_date": {
+                "type": "date",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "department_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "lens_count": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "length_mm": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "thread_outer_diameter_mm": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "status_lookup_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "machine_capability_id": {
+                "type": "int",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "message_attachments": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "message_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "file_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_path": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_size": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "mime_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            }
+        },
+        "message_recipients": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "message_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "recipient_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "read_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "deleted_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            }
+        },
+        "notification_reads": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "notification_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "user_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "read_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            }
+        },
+        "number_sequences": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "seq_key": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "seq_prefix": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "active_from": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "active_until": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "current_value": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "last_generated_on": {
+                "type": "date",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "order_item_attachments": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "order_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "file_name": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "file_path": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "file_size": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "mime_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "order_item_drawings": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "order_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "drawing_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "file_name": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "file_path": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "file_size": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "mime_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "order_item_screening_details": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "order_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "screening_service_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "service_name": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "service_name_en": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "actual_price_per_unit": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_plus_value": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_plus_over": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_minus_value": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_minus_over": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "ppm_standard": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "description": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "order_item_tools": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "order_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "tool_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "tool_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "quantity": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "total_weight": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "order_items": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "screening_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "unit_price_per_thousand": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "total_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "total_units": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "total_price": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "drawing_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sub_item_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "part_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "customer_batch_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "customer_sample_status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "delivery_location": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "customer_provided_weight": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "confirmed_weight": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "actual_production_weight": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "total_shipped_quantity": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "shipping_status": {
+                "type": "enum",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "orders": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "order_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "customer_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "order_date": {
+                "type": "date",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "expected_delivery_date": {
+                "type": "date",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "expected_delivery_period": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "customer_po_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "status_lookup_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "total_amount": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "final_quote_per_m": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "single_ppm": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delete_token": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "permissions": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "UNI",
+                "extra": ""
+            },
+            "description": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "pma__bookmark": {
+            "id": {
+                "type": "int",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "dbase": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "user": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "label": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "query": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__central_columns": {
+            "db_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "col_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "col_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "col_length": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "col_collation": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "col_isNull": {
+                "type": "tinyint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "col_extra": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "col_default": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__column_info": {
+            "id": {
+                "type": "int",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "db_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "table_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "column_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "comment": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "mimetype": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "transformation": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "transformation_options": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "input_transformation": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "input_transformation_options": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__designer_settings": {
+            "username": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "settings_data": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__export_templates": {
+            "id": {
+                "type": "int",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "username": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "export_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "template_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "template_data": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__favorite": {
+            "username": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "tables": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__history": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "username": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "db": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "table": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "timevalue": {
+                "type": "timestamp",
+                "nullable": false,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "sqlquery": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__navigationhiding": {
+            "username": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "item_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "item_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "db_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "table_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            }
+        },
+        "pma__pdf_pages": {
+            "db_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "page_nr": {
+                "type": "int",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "page_descr": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__recent": {
+            "username": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "tables": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__relation": {
+            "master_db": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "master_table": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "master_field": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "foreign_db": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "foreign_table": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "foreign_field": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__savedsearches": {
+            "id": {
+                "type": "int",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "username": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "db_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "search_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "search_data": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__table_coords": {
+            "db_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "table_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "pdf_page_number": {
+                "type": "int",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "x": {
+                "type": "float",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "y": {
+                "type": "float",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__table_info": {
+            "db_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "table_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "display_field": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__table_uiprefs": {
+            "username": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "db_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "table_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "prefs": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "last_update": {
+                "type": "timestamp",
+                "nullable": false,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "pma__tracking": {
+            "db_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "table_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "version": {
+                "type": "int",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "date_created": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "date_updated": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "schema_snapshot": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "schema_sql": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "data_sql": {
+                "type": "longtext",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tracking": {
+                "type": "set",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tracking_active": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__userconfig": {
+            "username": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "timevalue": {
+                "type": "timestamp",
+                "nullable": false,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "config_data": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "pma__usergroups": {
+            "usergroup": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "tab": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "allowed": {
+                "type": "enum",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            }
+        },
+        "pma__users": {
+            "username": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "usergroup": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            }
+        },
+        "production_quality_records": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "production_record_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "inspection_datetime": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "inspector_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "sample_quantity_pcs": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "defective_quantity_pcs": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "rejection_rate_ppm": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "inspection_result": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "rework_needed": {
+                "type": "tinyint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "production_records": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "machine_run_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "production_source_mode": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "card_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "weight_kg": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "production_date": {
+                "type": "date",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "production_time": {
+                "type": "time",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "machine_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "machine_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tool_name": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tool_weight_kg": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "employee_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "quality_issue_reports": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "report_datetime": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "reported_by_employee_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "issue_source_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "issue_source_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "issue_description": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "root_cause_analysis": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "corrective_actions": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "preventive_actions": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "responsible_department_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "completion_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "report_descriptions": {
+            "id": {
+                "type": "int",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "report_code": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "UNI",
+                "extra": ""
+            },
+            "report_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "report_name_en": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "description": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "description_en": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "is_active": {
+                "type": "tinyint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "rescreen_batch_defects": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "rescreen_batch_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "rescreen_batch_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "screening_service_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "service_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "defect_quantity": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "defect_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "defect_units": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "disposition": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "source_return_order_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_defect_history_record_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "rescreen_round": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "recorded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "recorded_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            }
+        },
+        "rescreen_batch_images": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "rescreen_batch_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "image_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_path": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_size": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "mime_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sort_order": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "description": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "uploaded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "rescreen_batch_items": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "rescreen_batch_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "return_order_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "shipping_order_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_shipping_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "source_inventory_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_order_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_work_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_defect_history_record_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "returned_quantity": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "returned_unit": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "estimated_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "source_notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            }
+        },
+        "rescreen_batch_production_records": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "rescreen_batch_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_work_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "production_source_mode": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "card_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "weight_kg": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "production_date": {
+                "type": "date",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "production_time": {
+                "type": "time",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "machine_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "machine_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tool_name": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tool_weight_kg": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sort_order": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "rescreen_batch_rules": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "rescreen_batch_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "rule_stage": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "screening_service_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "service_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "is_enabled": {
+                "type": "tinyint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_plus_value": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_plus_over": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_minus_value": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_minus_over": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "ppm_standard": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "rescreen_batches": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "rescreen_batch_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_return_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_shipping_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "customer_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_order_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_work_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "rescreen_work_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "rescreen_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "request_reason_code": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "second_screening_reason": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "customer_approval_reference": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "source_requirement_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "source_defect_history_record_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "result_category": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "rescreen_round": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "source_item_count": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "source_work_order_count": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "received_total_quantity": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "received_total_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "rescreen_output_good_units": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "rescreen_output_defect_units": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "rescreen_output_scrap_units": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "scheduled_start_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "scheduled_end_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "actual_start_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "actual_end_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "assigned_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "calibration_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "machine_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "quantity_to_produce": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "screening_speed": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "first_piece_measured_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "first_piece_measured_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "first_piece_head_height": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "first_piece_head_width": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "first_piece_length": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "first_piece_thread_outer_diameter": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "first_piece_washer_diameter": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "first_piece_outer_diameter": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "first_piece_hole_diameter": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "first_piece_thickness": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "first_piece_notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "started_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "completed_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delete_token": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "return_order_items": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "return_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "shipping_order_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "returned_quantity": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "returned_unit": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "reason": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            }
+        },
+        "return_orders": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "return_order_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "original_shipping_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "customer_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "return_date": {
+                "type": "date",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "return_reason": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "processing_status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "status_lookup_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delete_token": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "role_permissions": {
+            "role_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            },
+            "permission_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": ""
+            }
+        },
+        "roles": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "UNI",
+                "extra": ""
+            },
+            "description": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "screening_items": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "item_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "UNI",
+                "extra": ""
+            },
+            "name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "material": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "thread_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "weight_per_unit_g": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "unit_price": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "unit": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "screening_services": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "service_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "UNI",
+                "extra": ""
+            },
+            "name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "name_en": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "category": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "description": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "default_price_per_unit": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_plus_value": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_plus_over": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_minus_value": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tolerance_minus_over": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "ppm_standard": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "is_active": {
+                "type": "tinyint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "shipping_order_defect_summaries": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "shipping_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "UNI",
+                "extra": ""
+            },
+            "source_shipping_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_work_order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_inventory_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "defect_quantity": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "weight_per_unit_g": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "total_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "shipping_order_items": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "shipping_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "order_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "inventory_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "shipped_quantity": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "shipped_unit": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "shipping_order_tool_summaries": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "shipping_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "tool_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "tool_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "tool_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "unit_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "quantity": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "total_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "shipping_orders": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "shipping_order_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "order_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "customer_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "shipping_date": {
+                "type": "date",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delivery_method": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tracking_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "consignee_name": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "consignee_address": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "carrier": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "shipment_purpose": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "return_status": {
+                "type": "enum",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "has_return": {
+                "type": "tinyint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "status_lookup_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delete_token": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "shipping_quality_inspections": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "shipping_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "inspection_datetime": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "inspector_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "sample_quantity_pcs": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "defective_quantity_pcs": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "rejection_rate_ppm": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "inspection_result": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "suppliers": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "supplier_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "service_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "contact_person": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "phone": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "email": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "address": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "supplier_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "tax_id": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "owner": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "contact_mobile": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "fax": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "factory_address": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "product_category": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "bank_account_name": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "bank_name": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "bank_code": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "bank_branch_name": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "bank_branch_code": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "bank_account_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "payment_method": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "attachment_path": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delete_token": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "system_notifications": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "title": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "content": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "notification_type": {
+                "type": "enum",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "priority": {
+                "type": "enum",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "target_type": {
+                "type": "enum",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "target_ids": {
+                "type": "longtext",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "related_module": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "related_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_by": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "expires_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "is_active": {
+                "type": "tinyint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "status": {
+                "type": "enum",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "system_parameters": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "param_key": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "UNI",
+                "extra": ""
+            },
+            "param_value": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "description": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "system_update_jobs": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "package_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "package_path": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "package_sha256": {
+                "type": "char",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "package_size": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "version_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_version": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "release_date": {
+                "type": "date",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "change_summary": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "files_root": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "migration_files": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "file_count": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "backup_dir": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "extract_dir": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "result_message": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_by": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "MUL",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "system_update_logs": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "version_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "UNI",
+                "extra": ""
+            },
+            "file_version": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "release_date": {
+                "type": "date",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "change_summary": {
+                "type": "text",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "created_by": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "is_active": {
+                "type": "tinyint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "tools": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "tool_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "status_lookup_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "current_location": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "capacity_kg": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delete_token": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "user_messages": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "sender_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "subject": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "content": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "reply_to_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "send_to_all": {
+                "type": "tinyint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "status": {
+                "type": "enum",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "MUL",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "sender_deleted_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "work_order_completion_images": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "file_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_path": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_size": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "mime_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sort_order": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "description": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "work_order_defect_images": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "file_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_path": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_size": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "mime_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sort_order": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "description": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "work_order_first_piece_dimensions": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "head_height": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "head_width": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "length": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "thread_outer_diameter": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "washer_diameter": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "outer_diameter": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "hole_diameter": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "thickness": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "measured_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "measured_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "notes": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "work_order_images": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "image_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "file_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_path": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_size": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "mime_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sort_order": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "description": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "work_order_machine_defects": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "machine_run_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "screening_service_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "service_name": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "defect_quantity": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "recorded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "recorded_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "work_order_machine_runs": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "run_label": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "machine_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "machine_sequence": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "assigned_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "calibration_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "scheduled_start_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "scheduled_end_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "actual_start_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "actual_end_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "quantity_to_produce": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "screening_speed": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "planned_net_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "completed_net_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "weight_per_unit_g": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "planned_units": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "completed_units": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "status": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "work_order_operation_logs": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "action_key": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "action_label": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "status_from_key": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "status_from_label": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "status_to_key": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "status_to_label": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "related_table": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "related_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "payload_json": {
+                "type": "json",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "created_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "work_order_partial_receipt_tools": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "partial_receipt_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "order_item_tool_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "tool_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "tool_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "tool_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "unit_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "quantity": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "total_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "datetime",
+                "nullable": false,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            }
+        },
+        "work_order_partial_receipts": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "machine_run_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "inventory_item_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "receipt_number": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "UNI",
+                "extra": ""
+            },
+            "net_weight_kg": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "weight_per_unit_g": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "calculated_units": {
+                "type": "decimal",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "receipt_status": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "settled_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "reversed_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "reversed_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "reverse_reason": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "settled_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "shipping_tool_details": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            }
+        },
+        "work_order_pre_production_images": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "file_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_path": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_size": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "mime_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sort_order": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "description": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "work_order_screening_defects": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "screening_service_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "service_name": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "defect_quantity": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "recorded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "recorded_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "work_order_tool_condition_images": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "file_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_path": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "file_size": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "mime_type": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "sort_order": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "description": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "uploaded_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            }
+        },
+        "work_orders": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "work_order_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "work_order_type": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "order_item_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "source_rescreen_batch_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "machine_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "machine_sequence": {
+                "type": "int",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "assigned_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "scheduled_start_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "scheduled_end_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "actual_start_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "actual_end_date": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "quantity_to_produce": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "total_weight_kg": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "weight_per_unit_g": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "total_units": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "tool_statistics": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "screening_speed": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "calibration_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "customer_instructions": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "other_notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "status_lookup_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "completed_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "shortage_net_weight_kg": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "shortage_units": {
+                "type": "decimal",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "shortage_reason_code": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "shortage_notes": {
+                "type": "text",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "shortage_confirmed_by": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "shortage_confirmed_at": {
+                "type": "datetime",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "is_printed": {
+                "type": "tinyint",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "created_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            },
+            "updated_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "delete_token": {
+                "type": "int",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            }
+        },
+        "workflow_status_transitions": {
+            "id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "PRI",
+                "extra": "auto_increment"
+            },
+            "module_name": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "MUL",
+                "extra": ""
+            },
+            "entity_id": {
+                "type": "bigint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "from_status": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "to_status": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "reason": {
+                "type": "varchar",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "metadata": {
+                "type": "json",
+                "nullable": true,
+                "key": "",
+                "extra": ""
+            },
+            "changed_by_employee_id": {
+                "type": "bigint",
+                "nullable": true,
+                "key": "MUL",
+                "extra": ""
+            },
+            "changed_at": {
+                "type": "timestamp",
+                "nullable": false,
+                "key": "",
+                "extra": "DEFAULT_GENERATED"
+            }
+        }
+    }
+}

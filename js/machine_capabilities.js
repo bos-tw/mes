@@ -282,7 +282,7 @@
         }
 
         async function handleDelete(id) {
-            if (!window.confirm('確定要刪除此機台能力嗎？')) {
+            if (!await window.AppFeedback.confirm({ title: '刪除機台能力', message: '確定要刪除此機台能力嗎？', impact: '機台可承接的生產能力設定' })) {
                 return;
             }
 

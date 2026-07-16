@@ -165,11 +165,14 @@
         }
 
         loadLookups().catch((error) => console.warn('rescreen execution lookup failed:', error));
-        modal.addEventListener('click', (event) => {
+        modal.addEventListener('click', async (event) => {
             const button = event.target.closest('[data-action]');
             if (!button) return;
-            if (button.dataset.action === 'upload-rescreen-image') uploadImage().catch((error) => alert(error.message));
-            if (button.dataset.action === 'delete-rescreen-image') deleteImage(button.dataset.imageId).catch((error) => alert(error.message));
+            if (button.dataset.action === 'upload-rescreen-image') uploadImage().catch((error) => window.AppFeedback.toast(error.message, 'error'));
+            if (button.dataset.action === 'delete-rescreen-image') {
+                const confirmed = await window.AppFeedback.confirm({ title: '刪除二次篩分圖片', message: '確定要刪除此圖片嗎？', impact: '二次篩分追溯附件' });
+                if (confirmed) deleteImage(button.dataset.imageId).catch((error) => window.AppFeedback.toast(error.message, 'error'));
+            }
         });
         new MutationObserver(() => {
             if (!modal.classList.contains('hidden')) {

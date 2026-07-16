@@ -1110,7 +1110,7 @@
         }
 
         async function deleteEmployee(id) {
-            const confirmed = window.confirm('確認刪除此員工資料？');
+            const confirmed = await window.AppFeedback.confirm({ title: '刪除員工', message: '確認刪除此員工資料？', impact: '帳號、角色與作業指派資料' });
             if (!confirmed) {
                 return;
             }

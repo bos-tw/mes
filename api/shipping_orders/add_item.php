@@ -140,25 +140,22 @@ try {
         $seq = $last ? ((int)explode('-', $last)[2] + 1) : 1;
         $shippingOrderNumber = sprintf('%s-%s-%04d', $prefix, $date, $seq);
 
-        // Create shipping order
-        $shippingOrderId = (int)(microtime(true) * 10000) + random_int(0, 9999);
-
         $createSql = "
             INSERT INTO shipping_orders (
-                id, shipping_order_number, customer_id, order_id, shipping_date, status
+                shipping_order_number, customer_id, order_id, shipping_date, status
             ) VALUES (
-                :id, :shipping_order_number, :customer_id, :order_id, :shipping_date, :status
+                :shipping_order_number, :customer_id, :order_id, :shipping_date, :status
             )
         ";
         $createStmt = $pdo->prepare($createSql);
         $createStmt->execute([
-            'id' => $shippingOrderId,
             'shipping_order_number' => $shippingOrderNumber,
             'customer_id' => $inventoryItem['customer_id'],
             'order_id' => $inventoryItem['order_id'],
             'shipping_date' => date('Y-m-d'),
             'status' => 'draft',
         ]);
+        $shippingOrderId = (int)$pdo->lastInsertId();
     } else {
         // 驗證出貨單存在且為草稿狀態
         $checkSql = "SELECT id, status, customer_id FROM shipping_orders WHERE id = :id AND deleted_at IS NULL";
@@ -200,23 +197,22 @@ try {
     }
 
     // 新增出貨品項
-    $itemId = (int)(microtime(true) * 10000) + random_int(0, 9999);
     $insertSql = "
         INSERT INTO shipping_order_items (
-            id, shipping_order_id, order_item_id, inventory_item_id, shipped_quantity, shipped_unit
+            shipping_order_id, order_item_id, inventory_item_id, shipped_quantity, shipped_unit
         ) VALUES (
-            :id, :shipping_order_id, :order_item_id, :inventory_item_id, :shipped_quantity, :shipped_unit
+            :shipping_order_id, :order_item_id, :inventory_item_id, :shipped_quantity, :shipped_unit
         )
     ";
     $insertStmt = $pdo->prepare($insertSql);
     $insertStmt->execute([
-        'id' => $itemId,
         'shipping_order_id' => $shippingOrderId,
         'order_item_id' => $inventoryItem['order_item_id'],
         'inventory_item_id' => $inventoryItemId,
         'shipped_quantity' => $shippedQuantity,
         'shipped_unit' => $shippedUnit,
     ]);
+    $itemId = (int)$pdo->lastInsertId();
 
     // 更新庫存項目的配貨數量
     $updateInvSql = "

@@ -1,15 +1,15 @@
 # DataSync 稽核報告
 
-產生時間：2026-07-08T10:42:19.558Z
+產生時間：2026-07-16T14:39:25.184Z
 
 ## 摘要
 
 - P0: 0
 - P1: 0
-- P2: 10
-- 通過：40
-- 相依來源數：40
-- 狀態型介面刷新檢查數：36
+- P2: 9
+- 通過：41
+- 相依來源數：41
+- 狀態型介面刷新檢查數：37
 
 ## 模組矩陣
 
@@ -18,7 +18,6 @@
 | P2 | audit_logs | audit_logs | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
 | P2 | calendar_event_participants | calendar_event_participants | POST, DELETE | (helper) | - | dashboard_calendar_events, employees | CRUD 模組未設定相依刷新目標 |
 | P2 | dashboard | dashboard | POST | notifications | - | dashboard_calendar_events, notifications, orders, quality_issue_reports, shipping_orders, work_orders | CRUD 模組未設定相依刷新目標 |
-| P2 | domain_event_outbox | domain_event_outbox | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
 | P2 | messages | messages | POST, DELETE | (helper) | - | employees | CRUD 模組未設定相依刷新目標 |
 | P2 | number_sequences | number_sequences | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
 | P2 | production_work_order_schedule | production_work_order_schedule | PUT | (helper), work_orders | - | machine_capabilities, machines, work_orders | CRUD 模組未設定相依刷新目標 |
@@ -52,13 +51,14 @@
 | OK | quality_issue_reports | quality_issue_reports | DELETE | (helper) | dashboard | departments, employees | - |
 | OK | rescreen_batches | rescreen_batches | - | (helper) | return_orders, work_orders, inventory_items, defect_history_records | customers, return_orders, work_orders | - |
 | OK | rescreen_batches_execution | - | - | rescreen_batches | - | - | - |
-| OK | return_orders | return_orders | DELETE | (helper) | inventory_items, inventory_transactions, shipping_orders, shipping_order_items, rescreen_batches | customers, rescreen_batches, shipping_order_items, shipping_orders | - |
+| OK | return_order_items | return_order_items | DELETE | (helper) | return_orders, shipping_orders, shipping_order_items | return_orders, shipping_order_items, shipping_orders | - |
+| OK | return_orders | return_orders | DELETE | (helper) | return_order_items, inventory_items, inventory_transactions, shipping_orders, shipping_order_items, rescreen_batches | customers, rescreen_batches, return_order_items, shipping_order_items, shipping_orders | - |
 | OK | role_permissions | role_permissions | PUT | (helper) | roles, permissions | permissions, roles | - |
 | OK | roles | roles | DELETE | (helper) | notifications, employee_roles, role_permissions | employee_roles, role_permissions | - |
 | OK | screening_items | screening_items | DELETE | screening_items | order_items, screening_services, inventory_items | lookup_values | - |
 | OK | screening_services | screening_services | POST, DELETE | screening_services | orders, order_items | customers, screening_items | - |
-| OK | shipping_order_items | shipping_order_items | - | - | shipping_orders, order_items, inventory_items, inventory_transactions, return_orders | inventory_items, return_orders, shipping_orders | - |
-| OK | shipping_orders | shipping_orders | POST, PUT, DELETE | return_orders, shipping_orders | shipping_order_items, inventory_items, order_items, inventory_transactions, return_orders, dashboard, shipping_quality_inspections, defect_history_records | inventory_items, return_orders, shipping_order_items, shipping_quality_inspections | - |
+| OK | shipping_order_items | shipping_order_items | - | - | shipping_orders, order_items, inventory_items, inventory_transactions, return_orders, return_order_items | inventory_items, return_order_items, return_orders, shipping_orders | - |
+| OK | shipping_orders | shipping_orders | POST, PUT, DELETE | return_orders, shipping_orders | shipping_order_items, inventory_items, order_items, inventory_transactions, return_orders, return_order_items, dashboard, shipping_quality_inspections, defect_history_records | inventory_items, return_order_items, return_orders, shipping_order_items, shipping_quality_inspections | - |
 | OK | shipping_quality_inspections | shipping_quality_inspections | POST, PUT, DELETE | (helper) | shipping_orders | employees, shipping_orders | - |
 | OK | suppliers | suppliers | POST, DELETE | suppliers | orders, inventory_items | companies, lookup_values | - |
 | OK | tools | tools | DELETE | tools | work_orders, order_items, defect_history_records | - | - |
@@ -71,7 +71,6 @@
 - P2 audit_logs：CRUD 模組未設定相依刷新目標
 - P2 calendar_event_participants：CRUD 模組未設定相依刷新目標
 - P2 dashboard：CRUD 模組未設定相依刷新目標
-- P2 domain_event_outbox：CRUD 模組未設定相依刷新目標
 - P2 messages：CRUD 模組未設定相依刷新目標
 - P2 number_sequences：CRUD 模組未設定相依刷新目標
 - P2 production_work_order_schedule：CRUD 模組未設定相依刷新目標
@@ -109,13 +108,14 @@
 | production_work_order_schedule | 展開列, 編輯視窗, 按鈕狀態 | machine_capabilities, machines, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | quality_issue_reports | 明細視窗, 編輯視窗, 按鈕狀態 | departments, employees | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | rescreen_batches | 明細視窗, 編輯視窗, 按鈕狀態 | customers, return_orders, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
-| return_orders | 明細視窗, 編輯視窗, 按鈕狀態 | customers, rescreen_batches, shipping_order_items, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| return_order_items | 編輯視窗, 按鈕狀態 | return_orders, shipping_order_items, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| return_orders | 明細視窗, 編輯視窗, 按鈕狀態 | customers, rescreen_batches, return_order_items, shipping_order_items, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | role_permissions | 編輯視窗, 按鈕狀態 | permissions, roles | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | roles | 快取, 編輯視窗, 按鈕狀態 | employee_roles, role_permissions | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | screening_items | 編輯視窗, 按鈕狀態 | lookup_values | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | screening_services | 快取, 編輯視窗, 按鈕狀態 | customers, screening_items | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
-| shipping_order_items | 編輯視窗, 按鈕狀態 | inventory_items, return_orders, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
-| shipping_orders | 明細視窗, 編輯視窗, 按鈕狀態 | inventory_items, return_orders, shipping_order_items, shipping_quality_inspections | 是 | 請確認目前開啟狀態的刷新路徑 |
+| shipping_order_items | 編輯視窗, 按鈕狀態 | inventory_items, return_order_items, return_orders, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| shipping_orders | 明細視窗, 編輯視窗, 按鈕狀態 | inventory_items, return_order_items, return_orders, shipping_order_items, shipping_quality_inspections | 是 | 請確認目前開啟狀態的刷新路徑 |
 | shipping_quality_inspections | 快取, 明細視窗, 編輯視窗, 按鈕狀態 | employees, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | suppliers | 快取, 編輯視窗, 按鈕狀態 | companies, lookup_values | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | work_order_first_piece_dimensions | 明細視窗, 編輯視窗, 按鈕狀態 | employees, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |

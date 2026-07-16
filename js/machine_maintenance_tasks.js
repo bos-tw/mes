@@ -389,7 +389,7 @@
 
         /* ---------- 刪除 ---------- */
         async function handleDelete(id) {
-            if (!confirm('確定要刪除此機台維修任務嗎？')) return;
+            if (!await window.AppFeedback.confirm({ title: '刪除維修任務', message: '確定要刪除此機台維修任務嗎？', impact: '機台維護追蹤資料' })) return;
 
             try {
                 const resp = await fetch(`${API_BASE}/delete.php?id=${id}`, {

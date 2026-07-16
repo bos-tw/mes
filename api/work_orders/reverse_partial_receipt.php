@@ -118,20 +118,18 @@ try {
         'id' => $partialReceiptId,
     ]);
 
-    $transactionId = getNextInventoryTransactionId($pdo);
     $transactionStmt = $pdo->prepare("
         INSERT INTO inventory_transactions (
-            id, inventory_item_id, order_id, order_item_id, work_order_id,
+            inventory_item_id, order_id, order_item_id, work_order_id,
             ref_type, ref_id, direction, quantity, after_quantity,
             notes, created_by_employee_id
         ) VALUES (
-            :id, :inventory_item_id, :order_id, :order_item_id, :work_order_id,
+            :inventory_item_id, :order_id, :order_item_id, :work_order_id,
             'work_order_partial_receipt_reverse', :ref_id, 'outbound', :quantity, 0,
             :notes, :created_by_employee_id
         )
     ");
     $transactionStmt->execute([
-        'id' => $transactionId,
         'inventory_item_id' => $inventoryItemId,
         'order_id' => isset($receipt['order_id']) ? (int)$receipt['order_id'] : null,
         'order_item_id' => isset($receipt['order_item_id']) ? (int)$receipt['order_item_id'] : null,

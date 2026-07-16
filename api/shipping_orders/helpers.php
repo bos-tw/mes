@@ -152,6 +152,37 @@ function validateShippingOrderData(array $payload, bool $isUpdate = false): arra
 }
 
 /**
+ * 取得出貨單狀態可前往的下一狀態。
+ *
+ * 已送達與已取消為終態；已出貨只能送達或取消回沖，避免任意倒退造成庫存重複異動。
+ *
+ * @return list<string>
+ */
+function getAllowedShippingOrderTransitions(string $status): array
+{
+    return getAllowedWorkflowTransitions('shipping_orders', $status);
+}
+
+function canTransitionShippingOrderStatus(string $fromStatus, string $toStatus): bool
+{
+    return canTransitionWorkflowStatus('shipping_orders', $fromStatus, $toStatus);
+}
+
+/**
+ * 取得狀態轉換對庫存的唯一作用；相同狀態重送不產生副作用。
+ */
+function getShippingOrderInventoryEffect(string $fromStatus, string $toStatus): string
+{
+    if ($fromStatus === 'packed' && $toStatus === 'shipped') {
+        return 'ship';
+    }
+    if ($fromStatus === 'shipped' && $toStatus === 'cancelled') {
+        return 'reverse_shipment';
+    }
+    return 'none';
+}
+
+/**
  * 標準化不良品摘要
  *
  * @param array<string,mixed> $payload
@@ -1292,6 +1323,7 @@ function transformShippingOrder(array $row): array
         'consignee_address' => $row['consignee_address'],
         'status' => $row['status'],
         'status_label' => $row['status_label'] ?? null,
+        'allowed_status_transitions' => getAllowedShippingOrderTransitions((string)$row['status']),
         'return_status' => $row['return_status'] ?? 'none',
         'has_return' => isset($row['has_return']) ? (bool)$row['has_return'] : false,
         'notes' => $row['notes'],
@@ -1411,7 +1443,7 @@ function recalculateOrderItemShipping(PDO $pdo, int $orderItemId): void
         FROM shipping_order_items soi
         JOIN shipping_orders so ON soi.shipping_order_id = so.id
         WHERE soi.order_item_id = ?
-          AND so.status = 'shipped'
+          AND so.status IN ('shipped', 'delivered')
           AND so.deleted_at IS NULL
     ");
     $sumStmt->execute([$orderItemId]);
@@ -1474,16 +1506,13 @@ function createInventoryTransaction(
 
     // 取得下一個交易 ID
     require_once __DIR__ . '/../inventory_items/helpers.php';
-    $transactionId = getNextInventoryTransactionId($pdo);
-
     $pdo->prepare("
         INSERT INTO inventory_transactions
-            (id, inventory_item_id, order_id, order_item_id, work_order_id,
+            (inventory_item_id, order_id, order_item_id, work_order_id,
              ref_type, ref_id, direction, quantity, after_quantity,
              notes, created_by_employee_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ")->execute([
-        $transactionId,
         $inventoryItemId,
         $inv['order_id'] ?? null,
         $inv['order_item_id'] ?? null,
@@ -1548,4 +1577,29 @@ function handleShippingOrderWriteException(PDOException $e): array
         'success' => false,
         'message' => '資料庫操作失敗，請稍後再試。',
     ];
+}
+
+/**
+ * 以尚未出貨且未取消的出貨品項重算配貨量，修復增量更新可能產生的漂移。
+ */
+function recalculateInventoryAllocation(PDO $pdo, int $inventoryItemId): float
+{
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(soi.shipped_quantity), 0)
+        FROM shipping_order_items soi
+        INNER JOIN shipping_orders so ON so.id = soi.shipping_order_id
+        WHERE soi.inventory_item_id = ?
+          AND so.deleted_at IS NULL
+          AND so.status IN ('draft', 'confirmed', 'preparing', 'packed')
+    ");
+    $stmt->execute([$inventoryItemId]);
+    $allocated = max(0.0, (float)$stmt->fetchColumn());
+
+    $pdo->prepare("
+        UPDATE inventory_items
+        SET quantity_allocated = ?
+        WHERE id = ? AND deleted_at IS NULL
+    ")->execute([$allocated, $inventoryItemId]);
+
+    return $allocated;
 }

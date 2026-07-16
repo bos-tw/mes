@@ -39,7 +39,7 @@ function handleScheduleNodesList(PDO $pdo): void
             wo.scheduled_end_date,
             wo.actual_start_date,
             wo.actual_end_date,
-            wo.status,
+            lv.value_key AS status,
             wo.status_lookup_id,
             wo.completed_at,
             o.order_number,

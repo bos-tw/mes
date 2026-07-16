@@ -392,13 +392,15 @@ function handleCreateInventoryItem(PDO $pdo): void
         ]);
 
         $inventoryItemId = (int)$pdo->lastInsertId();
+        ensureInventoryItemSource($pdo, $inventoryItemId, 'manual_receipt', $inventoryItemId, [
+            'source_order_id' => (int)$woData['order_id'],
+            'source_order_item_id' => (int)$woData['order_item_id'],
+            'source_work_order_id' => (int)$data['work_order_id'],
+        ], '庫存模組手動入庫');
 
         // Create inventory transaction record
-        $transactionId = getNextInventoryTransactionId($pdo);
-
         $transStmt = $pdo->prepare("
             INSERT INTO inventory_transactions (
-                id,
                 inventory_item_id,
                 ref_type,
                 ref_id,
@@ -408,7 +410,6 @@ function handleCreateInventoryItem(PDO $pdo): void
                 notes,
                 created_by_employee_id
             ) VALUES (
-                :id,
                 :inventory_item_id,
                 'work_order',
                 :ref_id,
@@ -421,7 +422,6 @@ function handleCreateInventoryItem(PDO $pdo): void
         ");
 
         $transStmt->execute([
-            'id' => $transactionId,
             'inventory_item_id' => $inventoryItemId,
             'ref_id' => $data['work_order_id'],
             'quantity' => $data['total_good_units'],

@@ -2,10 +2,9 @@
 /**
  * 稽核日誌 API - 列表與新增端點
  *
- * 提供系統稽核日誌的列表查詢（含分頁、關鍵字搜尋、排序）及手動新增功能。
+ * 提供系統稽核日誌的唯讀列表查詢（含分頁、關鍵字搜尋、排序）。
  *
  * @endpoint GET  /api/audit_logs/          取得日誌列表
- * @endpoint POST /api/audit_logs/          新增日誌（手動）
  *
  * @auth 必須登入
  * @table audit_logs, employees
@@ -57,14 +56,11 @@ require_once __DIR__ . '/helpers.php';
 
 $currentEmployee = requireAuth();
 
-$method = requireMethod(['GET', 'POST']);
+$method = requireMethod(['GET']);
 
 switch ($method) {
     case 'GET':
         handleListAuditLogs();
-        break;
-    case 'POST':
-        handleCreateAuditLog($currentEmployee);
         break;
     default:
         jsonResponse([
@@ -201,6 +197,8 @@ function handleListAuditLogs(): void
  */
 function handleCreateAuditLog(array $currentEmployee): void
 {
+    jsonResponse(['success' => false, 'message' => '稽核紀錄只能由系統業務動作產生。'], 405);
+    /* Legacy body intentionally unreachable pending physical removal after compatibility window.
     $pdo = db();
 
     $payload = readAuditLogPayload();
@@ -266,4 +264,5 @@ function handleCreateAuditLog(array $currentEmployee): void
         'message' => '操作日誌已建立。',
         'data' => transformAuditLog($log),
     ], 201);
+    */
 }

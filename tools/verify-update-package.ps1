@@ -106,6 +106,31 @@ try {
         }
     }
 
+    $deleteEntries = @()
+    $declaredPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($fileEntry in $fileEntries) {
+        $relativeFile = $fileEntry.FullName.Substring($filesRoot.Length + 1)
+        [void]$declaredPaths.Add($relativeFile)
+    }
+    foreach ($migrationEntry in $migrationEntries) {
+        [void]$declaredPaths.Add($migrationEntry)
+    }
+    if ($manifestProperties.ContainsKey('delete_files') -and $manifestProperties['delete_files']) {
+        foreach ($deleteFile in $manifestProperties['delete_files']) {
+            $normalizedDelete = Normalize-ZipPath -PathText ([string]$deleteFile)
+            if ([string]::IsNullOrWhiteSpace($normalizedDelete)) {
+                throw 'Package validation failed: manifest.delete_files contains an empty path'
+            }
+            if ($declaredPaths.Contains($normalizedDelete)) {
+                throw "Package validation failed: deleted path is also packaged -> $normalizedDelete"
+            }
+            if ($deleteEntries -contains $normalizedDelete) {
+                throw "Package validation failed: duplicate deleted path -> $normalizedDelete"
+            }
+            $deleteEntries += $normalizedDelete
+        }
+    }
+
     if ([string]::IsNullOrWhiteSpace([string]$manifest.change_summary)) {
         throw 'Package validation failed: manifest.change_summary is empty'
     }
@@ -119,6 +144,7 @@ try {
     Write-Host ("   FilesInZip: {0}" -f $fileEntries.Count)
     Write-Host ("   MigrationsInManifest: {0}" -f $migrationEntries.Count)
     Write-Host ("   RollbackMigrationsInManifest: {0}" -f $rollbackEntries.Count)
+    Write-Host ("   DeletedFilesInManifest: {0}" -f $deleteEntries.Count)
 } finally {
     $zip.Dispose()
 }

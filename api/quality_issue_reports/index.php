@@ -158,22 +158,17 @@ function handleCreateQualityIssueReport(): void
     try {
         $sql = <<<SQL
 INSERT INTO quality_issue_reports (
-    id, report_datetime, reported_by_employee_id, issue_source_type, issue_source_id,
+    report_datetime, reported_by_employee_id, issue_source_type, issue_source_id,
     issue_description, root_cause_analysis, corrective_actions, preventive_actions,
     responsible_department_id, status, completion_date
 ) VALUES (
-    :id, :report_datetime, :reported_by_employee_id, :issue_source_type, :issue_source_id,
+    :report_datetime, :reported_by_employee_id, :issue_source_type, :issue_source_id,
     :issue_description, :root_cause_analysis, :corrective_actions, :preventive_actions,
     :responsible_department_id, :status, :completion_date
 )
 SQL;
-        // 生成 ID
-        $idStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM quality_issue_reports');
-        $newId = (int)$idStmt->fetchColumn();
-
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            ':id'                        => $newId,
             ':report_datetime'           => $data['report_datetime'],
             ':reported_by_employee_id'   => $data['reported_by_employee_id'],
             ':issue_source_type'         => $data['issue_source_type'],
@@ -186,6 +181,7 @@ SQL;
             ':status'                    => $data['status'],
             ':completion_date'           => $data['completion_date'] ?: null,
         ]);
+        $newId = (int)$pdo->lastInsertId();
 
         $record = findQualityIssueReport($pdo, $newId);
         $issueSourceType = (string)($data['issue_source_type'] ?? '');

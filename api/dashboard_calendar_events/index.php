@@ -148,14 +148,9 @@ function handleCreateCalendarEvent(): void
 
     $data = $validated['data'];
 
-    // 取得新 ID
-    $maxIdStmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM dashboard_calendar_events');
-    $newId = (int)$maxIdStmt->fetchColumn();
-
-    $columns = ['id', 'created_by_employee_id', 'created_at', 'updated_at'];
-    $placeholders = [':id', ':created_by_employee_id', 'NOW()', 'NOW()'];
+    $columns = ['created_by_employee_id', 'created_at', 'updated_at'];
+    $placeholders = [':created_by_employee_id', 'NOW()', 'NOW()'];
     $params = [
-        'id' => $newId,
         'created_by_employee_id' => $currentEmployeeId,
     ];
 
@@ -170,10 +165,11 @@ function handleCreateCalendarEvent(): void
     try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
+        $newId = (int)$pdo->lastInsertId();
     } catch (PDOException $exception) {
         jsonResponse([
             'success' => false,
-            'message' => '新增行事曆事件失敗：' . $exception->getMessage(),
+            'message' => '新增行事曆事件失敗，請稍後再試。',
         ], 500);
     }
 
