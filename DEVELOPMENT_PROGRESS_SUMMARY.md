@@ -58,6 +58,6 @@
 
 - 分支：`main`。
 - 收尾前基線：`40cc32a383486fe2fb161cfbdc521c051bc02ae2`。
-- 預計提交訊息：`fix: close system repair handoff and package v3.1.3`。
-- 本輪摘要、功能修復、migration、驗證工具、文件與 release note 均納入本輪提交；測試快取 `.phpunit.result.cache` 已排除並移除。
-- 提交與 push 尚未執行；完成後必須確認本機 `HEAD == origin/main` 且 `git status --short` 無輸出。
+- 預計提交訊息：`fix: close system repair handoff and package v3.1.3`；實際功能／交付 commit 為 `a428535`，已推送至 `origin/main`。
+- 本輪摘要、功能修復、migration、驗證工具、文件與 release note 均已提交；測試快取 `.phpunit.result.cache` 已排除並移除。
+- Git push 已完成；本次文件收尾狀態更新後，仍須再次確認本機 `HEAD == origin/main` 且 `git status --short` 無輸出。
