@@ -15,6 +15,8 @@ if ($module === '' || $id <= 0) {
     jsonResponse(['success' => false, 'message' => '缺少流程檢查參數。'], 400);
 }
 
+requireWorkflowGuardPermission($module, $action);
+
 $assessment = getWorkflowActionAssessment(db(), $module, $action, $id);
 
 jsonResponse([

@@ -31,6 +31,36 @@ function workflowBlocked(string $message, array $impacts = [], string $action = 
     ];
 }
 
+/**
+ * Require the permission of the target workflow module before exposing an
+ * assessment. The guard endpoint is shared by several modules, so it cannot
+ * use one static module permission at bootstrap level.
+ */
+function requireWorkflowGuardPermission(string $module, string $action): void
+{
+    $permissionMap = [
+        'orders' => 'manage_orders',
+        'order_items' => 'manage_orders',
+        'work_orders' => 'manage_work_orders',
+        'inventory_items' => 'manage_inventory',
+        'shipping_orders' => 'manage_shipping_orders',
+        'shipping_order_items' => 'manage_shipping_orders',
+        'return_orders' => 'manage_return_orders',
+        'work_order_partial_receipts:reverse' => 'work_orders.reverse_partial_receipt',
+    ];
+
+    $permissionKey = $module . ($action !== 'delete' ? ':' . $action : '');
+    $permission = $permissionMap[$permissionKey] ?? $permissionMap[$module] ?? null;
+    if ($permission === null) {
+        jsonResponse([
+            'success' => false,
+            'message' => '此流程檢查尚未註冊授權規則。',
+        ], 403);
+    }
+
+    requirePermission($permission);
+}
+
 function workflowTableExists(PDO $pdo, string $table): bool
 {
     static $cache = [];

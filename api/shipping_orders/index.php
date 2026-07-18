@@ -258,11 +258,11 @@ function handleCreate(): void
             INSERT INTO shipping_orders (
                 shipping_order_number, customer_id, order_id, shipping_date,
                 delivery_method, consignee_name, consignee_address, carrier,
-                tracking_number, shipment_purpose, status, notes
+                tracking_number, shipment_purpose, status, status_lookup_id, notes
             ) VALUES (
                 :shipping_order_number, :customer_id, :order_id, :shipping_date,
                 :delivery_method, :consignee_name, :consignee_address, :carrier,
-                :tracking_number, :shipment_purpose, :status, :notes
+                :tracking_number, :shipment_purpose, :status, :status_lookup_id, :notes
             )
         ";
 
@@ -279,6 +279,7 @@ function handleCreate(): void
             'tracking_number' => $trackingNumber,
             'shipment_purpose' => $shipmentPurpose,
             'status' => $status,
+            'status_lookup_id' => getShippingOrderStatusLookupId($pdo, $status),
             'notes' => $notes,
         ]);
         $id = (int)$pdo->lastInsertId();

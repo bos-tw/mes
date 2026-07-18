@@ -80,6 +80,7 @@ function fetchUpdateJobs(PDO $pdo, int $limit): array
 }
 
 requireAuth();
+requirePermission('manage_system_parameters');
 requireMethod('GET');
 
 $pdo = db();

@@ -25,6 +25,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
 
 requireAuth();
+requirePermission('manage_system_parameters');
 requireMethod('GET');
 
 $pdo = db();

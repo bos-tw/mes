@@ -20,6 +20,18 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/../lookup_values/helpers.php';
+
+function getShippingOrderStatusLookupId(PDO $pdo, string $status): int
+{
+    $lookupId = getLookupValueId($pdo, 'shipping_status', $status);
+    if ($lookupId === null) {
+        throw new RuntimeException('找不到對應的出貨狀態設定。');
+    }
+
+    return $lookupId;
+}
+
 /**
  * 讀取請求資料
  *

@@ -32,6 +32,20 @@ const CORE_MODULES = new Set([
     'return_orders'
 ]);
 
+// These modules are intentionally terminal CRUD surfaces or read-only shells;
+// a missing downstream refresh target is not a DataSync defect for them.
+const STANDALONE_CRUD_MODULES = new Set([
+    'audit_logs',
+    'calendar_event_participants',
+    'dashboard',
+    'messages',
+    'number_sequences',
+    'production_work_order_schedule',
+    'report_descriptions',
+    'security_settings',
+    'system_parameters'
+]);
+
 const BUTTON_STATE_PATTERNS = [
     /data-action=/,
     /\.disabled\s*=/,
@@ -277,7 +291,10 @@ function analyzeModule(fileName, dependencies, inverseDependencies) {
         issues.push('button_state_without_dependency_handler');
     }
 
-    if (crudMethods.length > 0 && dependents.length === 0 && !CORE_MODULES.has(moduleName)) {
+    if (crudMethods.length > 0
+        && dependents.length === 0
+        && !CORE_MODULES.has(moduleName)
+        && !STANDALONE_CRUD_MODULES.has(moduleName)) {
         issues.push('crud_module_without_dependents');
     }
 

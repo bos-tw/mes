@@ -35,6 +35,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../number_sequences/helpers.php';
+require_once __DIR__ . '/../lookup_values/helpers.php';
 
 /**
  * Check if table has a specific column (cached per-request).
@@ -1367,10 +1368,11 @@ function isCompletedWorkOrderStatus(PDO $pdo, ?int $statusLookupId, ?string $leg
 /**
  * Validate and normalise work order input data.
  *
+ * @param PDO $pdo
  * @param array<string,mixed> $payload
  * @return array{data: array<string,mixed>, errors: array<string,string>}
  */
-function validateWorkOrderData(array $payload, bool $isUpdate = false): array
+function validateWorkOrderData(PDO $pdo, array $payload, bool $isUpdate = false): array
 {
     $errors = [];
     $data = [];
@@ -1603,11 +1605,20 @@ function validateWorkOrderData(array $payload, bool $isUpdate = false): array
         $data['status'] = $status === '' ? null : mb_substr($status, 0, 50);
     }
 
-    // 狀態 Lookup ID - 可選
+    // 狀態 Lookup ID - 新增工單預設為待開始；更新時禁止清空必要狀態
     if (array_key_exists('status_lookup_id', $payload)) {
         $statusLookupId = $payload['status_lookup_id'] ?? null;
         if ($statusLookupId === null || $statusLookupId === '') {
-            $data['status_lookup_id'] = null;
+            if ($isUpdate) {
+                $errors['status_lookup_id'] = '工單狀態不可為空。';
+            } else {
+                $defaultStatusId = getLookupValueId($pdo, 'status_work_order', 'pending');
+                if ($defaultStatusId === null) {
+                    $errors['status_lookup_id'] = '找不到工單預設狀態。';
+                } else {
+                    $data['status_lookup_id'] = $defaultStatusId;
+                }
+            }
         } else {
             $statusLookupIdInt = filter_var($statusLookupId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
             if ($statusLookupIdInt === false) {
@@ -1615,6 +1626,13 @@ function validateWorkOrderData(array $payload, bool $isUpdate = false): array
             } else {
                 $data['status_lookup_id'] = $statusLookupIdInt;
             }
+        }
+    } elseif (!$isUpdate) {
+        $defaultStatusId = getLookupValueId($pdo, 'status_work_order', 'pending');
+        if ($defaultStatusId === null) {
+            $errors['status_lookup_id'] = '找不到工單預設狀態。';
+        } else {
+            $data['status_lookup_id'] = $defaultStatusId;
         }
     }
 

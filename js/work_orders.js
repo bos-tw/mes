@@ -6891,6 +6891,13 @@
 
             const restoreValue = pendingValue || currentValue;
             select.value = restoreValue;
+            if (!restoreValue && selector === '[name="status_lookup_id"]'
+                && select.closest('[data-work-orders-create-form]')) {
+                const pendingStatus = data.find(item => String(item.value_key) === 'pending');
+                if (pendingStatus) {
+                    select.value = String(pendingStatus.id);
+                }
+            }
             if (pendingValue && select.value === pendingValue) {
                 delete select.dataset.pendingValue;
             }

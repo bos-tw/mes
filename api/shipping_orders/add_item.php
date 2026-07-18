@@ -39,6 +39,8 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/helpers.php';
+
 /**
  * Shipping Orders API - Add Item from Inventory
  * 從庫存項目加入出貨單
@@ -142,9 +144,9 @@ try {
 
         $createSql = "
             INSERT INTO shipping_orders (
-                shipping_order_number, customer_id, order_id, shipping_date, status
+                shipping_order_number, customer_id, order_id, shipping_date, status, status_lookup_id
             ) VALUES (
-                :shipping_order_number, :customer_id, :order_id, :shipping_date, :status
+                :shipping_order_number, :customer_id, :order_id, :shipping_date, :status, :status_lookup_id
             )
         ";
         $createStmt = $pdo->prepare($createSql);
@@ -154,6 +156,7 @@ try {
             'order_id' => $inventoryItem['order_id'],
             'shipping_date' => date('Y-m-d'),
             'status' => 'draft',
+            'status_lookup_id' => getShippingOrderStatusLookupId($pdo, 'draft'),
         ]);
         $shippingOrderId = (int)$pdo->lastInsertId();
     } else {

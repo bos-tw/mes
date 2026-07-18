@@ -317,20 +317,38 @@ $migrationChecks = [ordered]@{
         CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'rescreen_batch_images') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'rescreen_batch_images' AND column_name = 'rescreen_batch_id') AND EXISTS(SELECT 1 FROM information_schema.table_constraints WHERE table_schema = DATABASE() AND table_name = 'rescreen_batch_images' AND constraint_name = 'fk_rescreen_batch_images_batch'), 1, 0);"
         Description = 'rescreen batch site image uploads'
     }
+    '2026_07_18_repair_lookup_and_message_metadata.sql' = @{
+        CheckSql = "SELECT IF((SELECT HEX(description) FROM lookup_domains WHERE id = 0 AND domain_key = 'service_category' LIMIT 1) = 'E794A8E696BCE5AE9AE7BEA9E69C8DE58B99E58886E9A19E' AND (SELECT HEX(COLUMN_COMMENT) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'message_attachments' AND column_name = 'file_name') = 'E6AA94E6A188E5908DE7A8B1' AND (SELECT HEX(TABLE_COMMENT) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'message_attachments') = 'E8A88AE681AFE99984E4BBB6', 1, 0);"
+        Description = 'lookup domain and message attachment metadata repaired'
+    }
+    '2026_07_18_reconcile_status_lookup_mirrors.sql' = @{
+        CheckSql = "SELECT IF(NOT EXISTS(SELECT 1 FROM employees e WHERE e.status_lookup_id IS NULL OR NOT EXISTS(SELECT 1 FROM lookup_values lv JOIN lookup_domains ld ON ld.id = lv.domain_id AND ld.domain_key = 'employee_status' WHERE lv.id = e.status_lookup_id AND lv.value_key = e.status)) AND NOT EXISTS(SELECT 1 FROM orders o WHERE o.status_lookup_id IS NULL OR NOT EXISTS(SELECT 1 FROM lookup_values lv JOIN lookup_domains ld ON ld.id = lv.domain_id AND ld.domain_key = 'status_order' WHERE lv.id = o.status_lookup_id AND lv.value_key = o.status)) AND NOT EXISTS(SELECT 1 FROM shipping_orders so WHERE so.status_lookup_id IS NULL OR NOT EXISTS(SELECT 1 FROM lookup_values lv JOIN lookup_domains ld ON ld.id = lv.domain_id AND ld.domain_key = 'shipping_status' WHERE lv.id = so.status_lookup_id AND lv.value_key = so.status)) AND NOT EXISTS(SELECT 1 FROM tools t WHERE t.status_lookup_id IS NULL OR NOT EXISTS(SELECT 1 FROM lookup_values lv JOIN lookup_domains ld ON ld.id = lv.domain_id AND ld.domain_key = 'tool_status' WHERE lv.id = t.status_lookup_id AND lv.value_key = t.status)) AND EXISTS(SELECT 1 FROM lookup_values lv JOIN lookup_domains ld ON ld.id = lv.domain_id WHERE ld.domain_key = 'tool_status' AND lv.value_key = 'retired'), 1, 0);"
+        Description = 'legacy status lookup mirrors reconciled'
+    }
 }
 
-$migrationFiles = Get-ChildItem -LiteralPath $migrationsDir -File | Sort-Object Name
+$migrationFiles = @()
+$knownMigrationNames = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($migrationName in $migrationChecks.Keys) {
+    [void]$knownMigrationNames.Add($migrationName)
+    $migrationPath = Join-Path $migrationsDir $migrationName
+    if (Test-Path -LiteralPath $migrationPath -PathType Leaf) {
+        $migrationFiles += Get-Item -LiteralPath $migrationPath
+    }
+}
+
 $unknownMigrations = @()
 $pendingMigrations = @()
 $appliedMigrations = @()
 
+foreach ($migrationFile in (Get-ChildItem -LiteralPath $migrationsDir -File)) {
+    if (-not $knownMigrationNames.Contains($migrationFile.Name)) {
+        $unknownMigrations += $migrationFile.Name
+    }
+}
+
 foreach ($migrationFile in $migrationFiles) {
     $name = $migrationFile.Name
-    if (-not $migrationChecks.Contains($name)) {
-        $unknownMigrations += $name
-        continue
-    }
-
     $checkDefinition = $migrationChecks[$name]
     $checkResult = Invoke-MySqlScalar `
         -MySqlExe $mysqlExe `

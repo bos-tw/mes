@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bootstrap.php';
 
 requireAuth();
+requirePermission('manage_return_orders');
 requireMethod('DELETE');
 
 $payload = getJsonInput();

@@ -133,6 +133,16 @@ try {
         ], 409);
     }
 
+    if (array_key_exists('status', $data)) {
+        try {
+            $data['status_lookup_id'] = getOrderStatusLookupId($pdo, $newStatus);
+        } catch (RuntimeException $e) {
+            $pdo->rollBack();
+            error_log('Order status lookup resolution failed: ' . $e->getMessage());
+            jsonResponse(['success' => false, 'message' => '訂單狀態設定不存在，請聯繫管理員。'], 500);
+        }
+    }
+
     if (isset($data['customer_id']) && (int)$data['customer_id'] !== (int)$lockedOrder['customer_id']) {
         $flowStmt = $pdo->prepare("SELECT EXISTS(
             SELECT 1 FROM order_items oi

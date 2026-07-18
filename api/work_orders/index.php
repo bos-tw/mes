@@ -340,7 +340,7 @@ function handleCreateWorkOrder(PDO $pdo): void
     unset($payload['machine_runs']);
     $machineRunsPayload = is_array($machineRunsPayload) ? $machineRunsPayload : [];
 
-    $validation = validateWorkOrderData($payload, false);
+    $validation = validateWorkOrderData($pdo, $payload, false);
 
     if (!empty($validation['errors'])) {
         jsonResponse([
@@ -611,10 +611,7 @@ function handleCreateWorkOrder(PDO $pdo): void
 
         jsonResponse([
             'success' => false,
-            'message' => '新增工單失敗。',
-            'error' => $t->getMessage(),
-            'file' => basename($t->getFile()),
-            'line' => $t->getLine()
+            'message' => '新增工單失敗，請稍後重試或聯繫管理員。',
         ], 500);
     }
 }

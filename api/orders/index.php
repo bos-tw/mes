@@ -293,6 +293,12 @@ function handleCreateOrder(): void
     if (!isset($data['status'])) {
         $data['status'] = 'pending';
     }
+    try {
+        $data['status_lookup_id'] = getOrderStatusLookupId($pdo, (string)$data['status']);
+    } catch (RuntimeException $e) {
+        error_log('Order status lookup resolution failed: ' . $e->getMessage());
+        jsonResponse(['success' => false, 'message' => '訂單狀態設定不存在，請聯繫管理員。'], 500);
+    }
     if (!isset($data['total_amount'])) {
         $data['total_amount'] = 0.00;
     }

@@ -7,7 +7,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bootstrap.php';
 
 requireAuth();
-requireMethod(['POST', 'PUT']);
+requireMethod('PUT');
 requireCsrfForWrite();
 
 jsonResponse([

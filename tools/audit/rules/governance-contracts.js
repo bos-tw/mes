@@ -78,6 +78,55 @@ function scanReadPermissionContracts({ root, files }) {
     return findings;
 }
 
+function scanApiPermissionRegistration({ files }) {
+    const findings = [];
+    const bootstrap = files['api/bootstrap.php'] || '';
+    const mappedModules = new Set(
+        [...bootstrap.matchAll(/['"]([^'"]+)['"]\s*=>\s*['"][^'"]+['"]/g)].map(match => match[1])
+    );
+    const skipModules = new Set([
+        'common', 'docs', 'profile', 'session', 'login', 'logout', 'healthcheck', 'diagnose',
+        'dashboard', 'status_board', 'workflow_guard'
+    ]);
+    const moduleFiles = new Map();
+
+    for (const [file, source] of Object.entries(files)) {
+        const match = file.match(/^api\/([^/]+)\/([^/]+\.php)$/);
+        if (!match || /\/(helpers|validation)\.php$/.test(file)) continue;
+        if (!moduleFiles.has(match[1])) moduleFiles.set(match[1], []);
+        moduleFiles.get(match[1]).push({ file, source });
+    }
+
+    for (const [module, endpoints] of moduleFiles) {
+        if (skipModules.has(module)) continue;
+        if (!endpoints.some(({ source }) => /requireAuth\s*\(\)|requirePermission\s*\(/.test(source))) continue;
+        if (!mappedModules.has(module) && !endpoints.every(({ source }) => /requirePermission\s*\(/.test(source))) {
+            findings.push(issue(
+                'PERM-3 API module permission registration',
+                `api/${module}`,
+                `API 模組 ${module} 使用登入／權限保護，但未在 bootstrap legacy permission map 註冊。`,
+                `在 api/bootstrap.php 註冊 ${module} 的正式權限映射，或讓每個端點明確呼叫 requirePermission。`,
+                '安全性'
+            ));
+        }
+    }
+
+    for (const [file, source] of Object.entries(files)) {
+        if (!/^api\/[^/]+\.php$/.test(file) || file === 'api/diagnose.php') continue;
+        if (/requireAuth\s*\(\)/.test(source) && !/requirePermission\s*\(/.test(source)) {
+            findings.push(issue(
+                'PERM-3 top-level API permission contract',
+                file,
+                '頂層 API 只驗證登入，未明確限制敏感操作權限。',
+                '加入正式 requirePermission，並將讀取／寫入授權寫入端點契約。',
+                '安全性'
+            ));
+        }
+    }
+
+    return findings;
+}
+
 function scanSqlSchemaContracts(files, schema) {
     const findings = [];
     const tables = schema?.tables || {};
@@ -356,6 +405,7 @@ function runGovernanceContracts(root) {
     const productionPermissionFiles = Object.fromEntries(Object.entries(files).filter(([file]) => file === 'script.js' || file.startsWith('api/') || file.startsWith('js/')));
     findings.push(...scanFailOpen(productionPermissionFiles));
     findings.push(...scanReadPermissionContracts({ root, files }));
+    findings.push(...scanApiPermissionRegistration({ files }));
     findings.push(...scanSqlSchemaContracts(files, schema));
     findings.push(...scanMenuContracts(files));
     findings.push(...scanStateContracts(files, schema));
@@ -377,6 +427,7 @@ module.exports = {
     scanCssContracts,
     scanFailOpen,
     scanInventorySourceContracts,
+    scanApiPermissionRegistration,
     scanMenuContracts,
     scanOutboxContracts,
     scanReadPermissionContracts,

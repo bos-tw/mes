@@ -866,6 +866,8 @@ function getLegacyModulePermissionMap(): array
         'number_sequences'              => 'manage_system_parameters',
         'system_parameters'             => 'manage_system_parameters',
         'report_descriptions'           => 'manage_system_parameters',
+        'reports'                       => 'view_reports',
+        'domain_event_outbox'           => 'manage_system_parameters',
         'audit_logs'                    => 'view_audit_logs',
         'security_settings'             => 'manage_system_parameters',
         'dashboard_calendar_events'     => 'manage_calendar_events',
@@ -915,6 +917,7 @@ function resolveAutomaticPermissionContext(string $scriptName, string $method): 
     $skipModules = [
         'common', 'docs', 'profile',
         'session', 'login', 'logout', 'healthcheck', 'diagnose',
+        'workflow_guard', 'rescreen_batch_images',
     ];
     if (in_array($module, $skipModules, true)) {
         return null;

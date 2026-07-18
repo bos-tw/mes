@@ -21,6 +21,17 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../number_sequences/helpers.php';
+require_once __DIR__ . '/../lookup_values/helpers.php';
+
+function getOrderStatusLookupId(PDO $pdo, string $status): int
+{
+    $lookupId = getLookupValueId($pdo, 'status_order', $status);
+    if ($lookupId === null) {
+        throw new RuntimeException('找不到對應的訂單狀態設定。');
+    }
+
+    return $lookupId;
+}
 
 /**
  * 讀取訂單請求資料

@@ -1,13 +1,13 @@
 # DataSync 稽核報告
 
-產生時間：2026-07-16T14:39:25.184Z
+產生時間：2026-07-18T13:10:56.497Z
 
 ## 摘要
 
 - P0: 0
 - P1: 0
-- P2: 9
-- 通過：41
+- P2: 0
+- 通過：50
 - 相依來源數：41
 - 狀態型介面刷新檢查數：37
 
@@ -15,20 +15,14 @@
 
 | 優先級 | 模組 | 輔助模組 | CRUD 方法 | 通知模組 | 相依刷新目標 | 相依來源 | 問題 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| P2 | audit_logs | audit_logs | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
-| P2 | calendar_event_participants | calendar_event_participants | POST, DELETE | (helper) | - | dashboard_calendar_events, employees | CRUD 模組未設定相依刷新目標 |
-| P2 | dashboard | dashboard | POST | notifications | - | dashboard_calendar_events, notifications, orders, quality_issue_reports, shipping_orders, work_orders | CRUD 模組未設定相依刷新目標 |
-| P2 | messages | messages | POST, DELETE | (helper) | - | employees | CRUD 模組未設定相依刷新目標 |
-| P2 | number_sequences | number_sequences | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
-| P2 | production_work_order_schedule | production_work_order_schedule | PUT | (helper), work_orders | - | machine_capabilities, machines, work_orders | CRUD 模組未設定相依刷新目標 |
-| P2 | report_descriptions | report_descriptions | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
-| P2 | security_settings | security_settings | POST | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
-| P2 | system_parameters | system_parameters | DELETE | (helper) | - | - | CRUD 模組未設定相依刷新目標 |
+| OK | audit_logs | audit_logs | DELETE | (helper) | - | - | - |
+| OK | calendar_event_participants | calendar_event_participants | POST, DELETE | (helper) | - | dashboard_calendar_events, employees | - |
 | OK | calendar_event_reminders | calendar_event_reminders | DELETE | (helper) | dashboard_calendar_events | dashboard_calendar_events, employees | - |
 | OK | companies | companies | POST, PUT, DELETE | companies | employees, customers, suppliers | - | - |
 | OK | customers | customers | POST, PATCH, DELETE | customers | orders, screening_services, return_orders, rescreen_batches | companies, lookup_values | - |
 | OK | daily_machine_inspection_items | daily_machine_inspection_items | DELETE | (helper) | daily_machine_inspections | daily_machine_inspections, employees | - |
 | OK | daily_machine_inspections | daily_machine_inspections | DELETE | (helper) | daily_machine_inspection_items | daily_machine_inspection_items, employees, machines | - |
+| OK | dashboard | dashboard | POST | notifications | - | dashboard_calendar_events, notifications, orders, quality_issue_reports, shipping_orders, work_orders | - |
 | OK | dashboard_calendar_events | dashboard_calendar_events | DELETE | (helper) | calendar_event_participants, calendar_event_reminders, dashboard | calendar_event_reminders | - |
 | OK | defect_history_records | defect_history_records | - | - | - | order_items, production_records, rescreen_batches, shipping_orders, tools, work_orders | - |
 | OK | departments | departments | POST, PUT, DELETE | (helper) | employees, notifications, quality_issue_reports | - | - |
@@ -42,13 +36,17 @@
 | OK | machine_capabilities | machine_capabilities | POST, PUT, DELETE | (helper) | machines, work_orders, production_work_order_schedule | - | - |
 | OK | machine_maintenance_tasks | machine_maintenance_tasks | DELETE | (helper) | machines | employees, machines | - |
 | OK | machines | machines | POST, PUT, DELETE | machines | work_orders, machine_maintenance_tasks, daily_machine_inspections, production_records, production_work_order_schedule | machine_capabilities, machine_maintenance_tasks | - |
+| OK | messages | messages | POST, DELETE | (helper) | - | employees | - |
 | OK | notifications | notifications | POST, DELETE | (helper) | dashboard | departments, employees, roles | - |
+| OK | number_sequences | number_sequences | DELETE | (helper) | - | - | - |
 | OK | order_items | order_items | POST, DELETE | order_items | orders, work_orders, inventory_items, defect_history_records | orders, screening_items, screening_services, shipping_order_items, shipping_orders, tools, work_orders | - |
 | OK | orders | orders | POST, DELETE | (helper), order_items | order_items, work_orders, dashboard | customers, employees, lookup_values, order_items, screening_services, suppliers, work_orders | - |
 | OK | permissions | permissions | DELETE | (helper) | role_permissions | role_permissions | - |
 | OK | production_quality_records | production_quality_records | POST, DELETE | production_quality_records | work_orders | - | - |
 | OK | production_records | production_records | - | - | defect_history_records | employees, machines, work_orders | - |
+| OK | production_work_order_schedule | production_work_order_schedule | PUT | (helper), work_orders | - | machine_capabilities, machines, work_orders | - |
 | OK | quality_issue_reports | quality_issue_reports | DELETE | (helper) | dashboard | departments, employees | - |
+| OK | report_descriptions | report_descriptions | DELETE | (helper) | - | - | - |
 | OK | rescreen_batches | rescreen_batches | - | (helper) | return_orders, work_orders, inventory_items, defect_history_records | customers, return_orders, work_orders | - |
 | OK | rescreen_batches_execution | - | - | rescreen_batches | - | - | - |
 | OK | return_order_items | return_order_items | DELETE | (helper) | return_orders, shipping_orders, shipping_order_items | return_orders, shipping_order_items, shipping_orders | - |
@@ -57,10 +55,12 @@
 | OK | roles | roles | DELETE | (helper) | notifications, employee_roles, role_permissions | employee_roles, role_permissions | - |
 | OK | screening_items | screening_items | DELETE | screening_items | order_items, screening_services, inventory_items | lookup_values | - |
 | OK | screening_services | screening_services | POST, DELETE | screening_services | orders, order_items | customers, screening_items | - |
+| OK | security_settings | security_settings | POST | (helper) | - | - | - |
 | OK | shipping_order_items | shipping_order_items | - | - | shipping_orders, order_items, inventory_items, inventory_transactions, return_orders, return_order_items | inventory_items, return_order_items, return_orders, shipping_orders | - |
 | OK | shipping_orders | shipping_orders | POST, PUT, DELETE | return_orders, shipping_orders | shipping_order_items, inventory_items, order_items, inventory_transactions, return_orders, return_order_items, dashboard, shipping_quality_inspections, defect_history_records | inventory_items, return_order_items, return_orders, shipping_order_items, shipping_quality_inspections | - |
 | OK | shipping_quality_inspections | shipping_quality_inspections | POST, PUT, DELETE | (helper) | shipping_orders | employees, shipping_orders | - |
 | OK | suppliers | suppliers | POST, DELETE | suppliers | orders, inventory_items | companies, lookup_values | - |
+| OK | system_parameters | system_parameters | DELETE | (helper) | - | - | - |
 | OK | tools | tools | DELETE | tools | work_orders, order_items, defect_history_records | - | - |
 | OK | work_order_first_piece_dimensions | work_order_first_piece_dimensions | POST, DELETE | (helper) | work_orders | employees, work_orders | - |
 | OK | work_order_images | work_order_images | - | - | work_orders | work_orders | - |
@@ -68,15 +68,6 @@
 
 ## 建議處理順序
 
-- P2 audit_logs：CRUD 模組未設定相依刷新目標
-- P2 calendar_event_participants：CRUD 模組未設定相依刷新目標
-- P2 dashboard：CRUD 模組未設定相依刷新目標
-- P2 messages：CRUD 模組未設定相依刷新目標
-- P2 number_sequences：CRUD 模組未設定相依刷新目標
-- P2 production_work_order_schedule：CRUD 模組未設定相依刷新目標
-- P2 report_descriptions：CRUD 模組未設定相依刷新目標
-- P2 security_settings：CRUD 模組未設定相依刷新目標
-- P2 system_parameters：CRUD 模組未設定相依刷新目標
 
 ## 狀態型介面刷新檢查
 

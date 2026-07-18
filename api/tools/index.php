@@ -160,12 +160,18 @@ function handleCreateTool(): void
     try {
         $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare('INSERT INTO tools (tool_number, name, type, status, current_location, weight_kg, capacity_kg) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        $statusLookupId = $data['status_lookup_id'] ?? getLookupValueId($pdo, 'tool_status', $status);
+        if ($statusLookupId === null) {
+            $pdo->rollBack();
+            jsonResponse(['success' => false, 'message' => '載具狀態設定不存在，請聯繫管理員。'], 500);
+        }
+        $stmt = $pdo->prepare('INSERT INTO tools (tool_number, name, type, status, status_lookup_id, current_location, weight_kg, capacity_kg) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([
             $data['tool_number'] ?? null,
             $data['name'] ?? null,
             $data['type'] ?? null,
             $status,
+            $statusLookupId,
             $data['current_location'] ?? null,
             $data['weight_kg'] ?? null,
             $data['capacity_kg'] ?? null,

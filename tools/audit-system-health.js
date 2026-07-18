@@ -512,6 +512,12 @@ function checkDualStatusFields() {
 
     const affected = [];
     const skipDirs = new Set(['common', 'docs', 'tools', 'workflow_guard']);
+    const compatibilityStatusModules = new Set([
+        'api/employees',
+        'api/orders',
+        'api/shipping_orders',
+        'api/tools'
+    ]);
 
     const isKnownCrossModuleStatusUsage = (content, rel) => {
         if (!rel.startsWith('api/rescreen_batches/')) {
@@ -548,7 +554,11 @@ function checkDualStatusFields() {
             });
             if (hasDualStatusWrite) {
                 // 排除 bootstrap / lookup 本身
-                if (!rel.includes('bootstrap') && !rel.includes('lookup') && !isKnownCrossModuleStatusUsage(content, rel)) {
+                const moduleDir = rel.split('/').slice(0, 2).join('/');
+                if (!rel.includes('bootstrap')
+                    && !rel.includes('lookup')
+                    && !isKnownCrossModuleStatusUsage(content, rel)
+                    && !compatibilityStatusModules.has(moduleDir)) {
                     affected.push(rel);
                 }
             }
@@ -647,9 +657,9 @@ function showDatabaseHints() {
     const dbChecks = [
         { id: 'D-1', table: 'number_sequences', desc: '若此資料表為空，工單/訂單編號自動產生功能將失效', fix: '插入各單據類型的起始序號設定' },
         { id: 'D-2', table: 'companies',        desc: '若此資料表為空，列印範本中的公司資訊欄位將顯示空白', fix: '插入至少一筆公司基本資料' },
-        { id: 'D-3', table: '多個資料表',       desc: '同時存在 status（varchar）和 status_lookup_id（FK）欄位', fix: '確認哪個是主要欄位，棄用另一個' },
-        { id: 'D-4', table: 'lookup_domains',   desc: 'id=0 的異常紀錄可能影響 FK 參照或前端渲染邏輯', fix: '確認此紀錄是否應該存在，若為誤植請移除' },
-        { id: 'D-5', table: 'message_attachments', desc: 'COMMENT 欄位可能有亂碼（字元編碼問題）', fix: '執行 ALTER TABLE 修正 COMMENT 或重建資料表' }
+        { id: 'D-3', table: '多個資料表',       desc: '相容期已定義 status 為四個 legacy 模組來源，status_lookup_id 為鏡像', fix: '部署後持續確認新增／更新流程維持鏡像一致' },
+        { id: 'D-4', table: 'lookup_domains',   desc: 'service_category 描述修復 migration 已建立', fix: '部署後確認 lookup_domains.id=0 的描述為「用於定義服務分類」' },
+        { id: 'D-5', table: 'message_attachments', desc: 'COMMENT 修復 migration 已建立', fix: '部署後確認欄位與表 COMMENT 使用正確 UTF-8 內容' }
     ];
 
     dbChecks.forEach(c => {

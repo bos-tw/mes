@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../work_order_execution_image_common.php';
 
 requireAuth();
+requirePermission('manage_return_orders');
 
 $pdo = db();
 $method = requireMethod(['GET', 'POST']);

@@ -115,7 +115,7 @@ foreach ([
     }
 }
 
-$validation = validateWorkOrderData($payload, true);
+$validation = validateWorkOrderData($pdo, $payload, true);
 
 if (!empty($validation['errors'])) {
     jsonResponse([
