@@ -495,6 +495,7 @@ function buildInventoryWhereClause(array $filters): array
         $where[] = "(ii.inventory_number LIKE :keyword
                      OR ii.customer_batch_number LIKE :keyword_batch
                      OR wo.work_order_number LIKE :keyword_wo
+                     OR oi.order_item_number LIKE :keyword_order_item
                      OR o.order_number LIKE :keyword_order
                      OR c.name LIKE :keyword_customer
                      OR si.name LIKE :keyword_item)";
@@ -502,6 +503,7 @@ function buildInventoryWhereClause(array $filters): array
         $params['keyword'] = $keyword;
         $params['keyword_batch'] = $keyword;
         $params['keyword_wo'] = $keyword;
+        $params['keyword_order_item'] = $keyword;
         $params['keyword_order'] = $keyword;
         $params['keyword_customer'] = $keyword;
         $params['keyword_item'] = $keyword;

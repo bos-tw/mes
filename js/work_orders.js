@@ -4961,7 +4961,7 @@
         // 定義不應該提交到後端的顯示欄位（這些欄位僅供查看，實際資料從 OrderItems 關聯查詢）
         // 這些欄位設為 readonly 是為了防止使用者修改，確保與訂單資料一致
         const displayOnlyFields = [
-            'customer_name', 'customer_po_number', 'customer_batch_number', 'sub_item_number', 'drawing_number',
+            'customer_name', 'customer_po_number', 'order_item_number', 'customer_batch_number', 'sub_item_number', 'drawing_number',
             'screening_item_name', 'total_weight_kg', 'weight_per_unit_g', 'total_units',
             'tool_statistics', 'expected_delivery_date', 'customer_sample_status',
             'part_number', 'delivery_location' // 新增的訂單資訊欄位也設為 display-only
@@ -5332,9 +5332,7 @@
             const result = await response.json();
 
             if (result.success) {
-                // 更新按鈕樣式為已列印狀態
-                button.classList.remove('btn-print-new');
-                button.classList.add('btn-print-done');
+                // 標準列印按鈕維持共用 action 樣式，只更新提示文字
                 button.title = '再次列印（已列印過）';
 
                 // 發送 DataSync 通知
@@ -5848,6 +5846,7 @@
                 <td><span class="work-order-type-badge ${workOrderTypeClass}">${escapeHtml(workOrderTypeLabel)}</span></td>
                 <td>${secondScreeningSummary ? `<button type="button" class="record-link-button" data-action="open-second-screening" title="${escapeHtml(secondScreeningSummary.title)}">${escapeHtml(secondScreeningSummary.label)}</button>${secondScreeningSummary.reasonLabel ? `<span class="text-muted"> ${escapeHtml(secondScreeningSummary.reasonLabel)}</span>` : ''}` : ''}</td>
                 <td>${escapeHtml(item.order_number || '')}</td>
+                <td>${escapeHtml(item.order_item_number || '-')}</td>
                 <td>${customerDisplay}</td>
                 <td>${escapeHtml(item.screening_item_name || '')}</td>
                 <td>${escapeHtml(item.machine_name || '')}</td>
@@ -6265,6 +6264,7 @@
         const fieldMappings = {
             'customer_name': data.customer_name,
             'customer_po_number': data.customer_po_number,
+            'order_item_number': data.order_item_number,
             'customer_batch_number': data.customer_batch_number,
             'sub_item_number': data.sub_item_number,
             'part_number': data.part_number,

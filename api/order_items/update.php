@@ -273,6 +273,13 @@ $originalOrderId = (int)$orderItem['order_id'];
 $newOrderId = $originalOrderId;
 if (isset($data['order_id'])) {
     $newOrderId = (int)$data['order_id'];
+    if ($newOrderId !== $originalOrderId) {
+        jsonResponse([
+            'success' => false,
+            'message' => '訂單明細建立後不可移動至其他訂單，以維持訂單明細編號與流程追溯一致。',
+            'errors' => ['order_id' => '訂單明細不可變更父訂單。'],
+        ], 409);
+    }
     if (!ensureOrderExists($pdo, $newOrderId)) {
         jsonResponse([
             'success' => false,

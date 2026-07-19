@@ -2,70 +2,56 @@
 
 更新日期：2026-07-19
 
-## 專案架構
+## 最新架構與完成項目
 
-- 根目錄：`C:\Apache24\htdocs\mes`
 - 技術棧：PHP 8.4 API、MySQL 8、原生 JavaScript／HTML／CSS、PowerShell schema／更新工具、PHPUnit 12。
-- 主要目錄：`api/` 後端端點與共用守門、`js/` 前端模組、`modules/` 配置型畫面、`core/` 共用核心、`migrations/` 資料庫 migration、`tools/` 審計／schema／更新包工具、`docs/` 技術文件、`release-notes/` 版本說明、`dist/` 更新包。
-- 本輪涉及後端：系統更新、權限 bootstrap、流程守門、訂單、出貨、二次篩選圖片、狀態看板、工具、工作工單 API。
-- 本輪涉及前端：`js/work_orders.js`、`modules/work_orders.html`、`script.js`。
-- 本輪涉及資料表：`work_orders`、`orders`、`shipping_orders`、`tools`、`employees`、`lookup_domains`、`lookup_values`、`message_attachments`、`inventory_item_sources`、流程外鍵相關表。
+- 訂單明細新增穩定識別 `order_item_sequence`／`order_item_number`，格式為 `ORDER-YYYYMMDD-NNNN-L01`；客戶提供的 `customer_batch_number` 保留原值。
+- 客戶批號入口改為全域訂單明細工作區；訂單主表內嵌明細新增／編輯共用完整明細 Modal，並保留下游工單、庫存、出貨與退貨追溯。
+- 工單、庫存、出貨與退貨相關查詢、列表與匯出均帶出 `order_item_number`，既有 `order_item_id` 關聯鍵維持不變。
+- 系統設定新增「基本設定／字體調整」，提供 85%、90%、100%、110%、120% 五段字體選項、瀏覽器保存、跨分頁同步與訂單列表範例表格預覽。
+- 新增 `basic_settings.read` 權限；字體偏好保存在目前瀏覽器，不建立字體偏好資料表。
+- CSS 仍使用正式文字 token；未新增 inline style，圖示 token、控制項高度與列印版面維持原規格。
 
-## 本輪已完成
+## Migration 與 schema
 
-- 修復新增生產工單未帶 `status_lookup_id` 導致 `SQLSTATE[23000]`／HTTP 500；空白狀態建立時使用 pending，更新時拒絕空白狀態。
-- 修復工作工單錯誤回應洩漏例外檔案與行號。
-- 補強系統更新 API、報表權限映射、流程守門、二次篩選圖片與狀態看板 HTTP method 契約。
-- `domain_event_outbox` 維持停用 API（410），權限映射與前後端契約一致。
-- 完成 `status_lookup_id` 相容鏡像回填：員工、訂單、出貨單、載具；補齊載具 `retired` 狀態。四個 legacy 模組仍以 `status` 為相容來源，`status_lookup_id` 為鏡像；工單已改為 lookup 唯一來源。
-- `2026_07_16_unify_work_order_status.sql` 改為可重複執行，包含完整執行及部分執行後重試；明確處理狀態回填、欄位／FK／唯一鍵。
-- 新增並依序執行：
-  1. `migrations/2026_07_16_unify_work_order_status.sql`
-  2. `migrations/2026_07_18_repair_lookup_and_message_metadata.sql`
-  3. `migrations/2026_07_18_reconcile_status_lookup_mirrors.sql`
-- 修正 `service_category` 描述與 `message_attachments` UTF-8 COMMENT；`tools/sync-local-schema.ps1` 的 `$migrationChecks` 改為明確相依順序。
-- 新增狀態來源契約文件、更新 DataSync／system health governance 審計規則與報告。
-- 版本：`v3.1.3`／`FileVersion v3.1.3`／ReleaseDate `2026-07-18`。
-- 更新包：[dist/update_v3.1.3_20260718_211152.zip](C:/Apache24/htdocs/mes/dist/update_v3.1.3_20260718_211152.zip)，32 個檔案、3 個 migration、0 個刪除檔案；大小 227,694 bytes；SHA-256 `3c8701d21e4a42c06b2eb81716919c674eaf51f16814d425273c371897759624`。
-
-## 待修 Bug／已知風險
-
-- 完整 system health audit 仍有 13 項既有 F-1 大型 JavaScript 警告；本輪未新增阻擋問題。
-- `roles`／`employee_roles`、`number_sequences`、`companies`、`order_items.deleted_at` 等資料內容仍需部署後由管理員確認。
-- status mirror 已有 migration 與新增／更新流程同步，但部署後仍需抽查四個 legacy 模組的一致性。
-- 尚未完成實際瀏覽器逐頁操作與列印畫面驗收；目前以靜態審計、語法、API／資料庫情境測試替代。
-
-## 下一步任務
-
-- P0：部署後確認新增生產工單、工作工單六階段流程、列印權限與 system update API 的實際瀏覽器操作。
-- P1：確認正式資料庫的角色權限、編號序號、公司資料、狀態鏡像及 `message_attachments` metadata；持續觀察 migration 後資料一致性。
-- P2：逐項拆分大型 JS 檔案、處理 13 項既有 F-1 警告，並依模組完成剩餘 CSS token candidate 的視覺回歸；不得再次全域機械轉換。
+- 新增並收錄：
+  1. `migrations/2026_07_19_add_order_item_number.sql`
+  2. `migrations/2026_07_19_add_basic_settings_permission.sql`
+- migration 使用正式 PDO／SQL 分割執行路徑，不使用 `DELIMITER`／stored procedure。
+- 舊 schema／資料情境的完整執行、完整重跑、部分執行後重試均通過；測試資料庫已清理。
+- 本機 schema sync：Applied 38、Pending 0。
 
 ## 驗證狀態
 
-- `node tools/audit-system-health.js`：0 errors、13 既有 warnings。
-- `node tools/audit-system-health.js --changed --base origin/main`：0 新增、0 blocking。
+- `node tools/audit-system-health.js`：0 errors、13 項既有 F-1 warning。
+- `node tools/audit-system-health.js --changed --base origin/main`：0 new、0 blocking。
 - `node tools/validate-config-modules.js`：通過。
-- DataSync：`js/data-sync.js`、`tools/audit-data-sync.js` 語法通過；P0=0、P1=0、P2=0、OK=50，報告已寫入 `docs/data-sync-audit.md`。
-- PHP syntax：本輪 26 個 PHP 檔案全部通過 `php -l`；本輪相關 JS 全部通過 `node --check`。
-- 測試：`node tools/test-audit-system.js` 通過；P0 workflow 35 assertions 通過；PHPUnit 32 tests／76 assertions／16 skipped，通過。
-- Migration：使用正式 PDO／SQL 分割執行路徑，在接近舊 schema 的完整、重複、部分執行後重試情境均通過；測試資料庫已清理。
-- Schema sync：Applied 36、Pending 0。
-- 更新包官方 verifier、正式 PHP manifest parser、ZIP 精確檔案清單、migration 順序與來源 SHA-256 均通過。
-- `git diff --check`：通過；僅有既有 LF／CRLF 轉換提示，無 whitespace error。
+- DataSync：P0=0、P1=0、P2=0、OK=51；`docs/data-sync-audit.md` 已更新。
+- UI style audit 已執行；現有報告記錄 751 hardcoded spacing/radius、380 token candidates、371 needs review，未新增 blocking。
+- JS／PHP syntax、audit tests、P0 workflow 35 assertions 均通過。
+- PHPUnit：32 tests、76 assertions、16 skipped，測試通過。
+- 使用者已完成本地實機畫面驗收。
+- `git diff --check`：通過；僅有既有 LF／CRLF 轉換提示，沒有 whitespace error。
 
-## 本輪規範治理整理（2026-07-19）
+## 已知風險與下一輪優先事項
 
-- 建立 `.github/standards/` 作為程式風格、UI/UX、CSS token、前端契約與修改治理的唯一正式規範來源。
-- 更新 `.github/copilot-instructions.md`，明確定義規範優先順序、修改範圍、驗證與提交／推送授權規則。
-- 將 UI/CSS/HTML/JavaScript 的 `.github/instructions/` 與 `.github/skills/` 重複內容收斂為一致入口，移除會誤導 AI 的舊色票、按鈕與 Modal 範例。
-- 本輪沒有 PHP、JavaScript、HTML、CSS、migration、API 或功能程式實質變更；未建立更新包。
-- 工作樹目前保留本輪未提交規範文件，尚未 commit 或 push；未經使用者明確授權不得執行提交、推送或歷史改寫。
+- P0：無新增項目。
+- P1：部署後確認正式角色權限、`number_sequences`、公司資料、status mirror、`message_attachments` metadata，以及兩種角色權限操作。
+- P2：逐步拆分既有大型 JavaScript，處理 13 項既有 F-1 warning，並依模組完成剩餘 CSS token candidate 的視覺回歸。
+- `js/order_item_quick_editor.js` 目前被 Git 標示為工作樹狀態差異，但內容 hash 與基線相同；未列入本輪正式更新包。
+
+## 更新包
+
+- 版本：`v3.1.4`／`FileVersion v3.1.4`／ReleaseDate `2026-07-19`。
+- 已建立 v3.1.4 明確清單更新包：40 個一般檔案、2 個 migration、0 個刪除檔案；最終路徑與 SHA-256 於收尾交付回報提供。
+- 官方 verifier、正式 PHP manifest parser、ZIP 檔案集合、migration 順序與來源 hash 均通過。
+- 先前 safe builder 產生的候選包因包含非本輪內容相同的 `js/order_item_quick_editor.js`，未交付且保留於 `dist/` 供追溯；未刪除任何既有或歷史包。
 
 ## Git 交接
 
 - 分支：`main`。
-- 收尾前基線：`40cc32a383486fe2fb161cfbdc521c051bc02ae2`。
-- 預計提交訊息：`fix: close system repair handoff and package v3.1.3`；實際功能／交付 commit 為 `a428535`，已推送至 `origin/main`。
-- 本輪摘要、功能修復、migration、驗證工具、文件與 release note 均已提交；測試快取 `.phpunit.result.cache` 已排除並移除。
-- Git push 已完成；本次文件收尾狀態更新後，仍須再次確認本機 `HEAD == origin/main` 且 `git status --short` 無輸出。
+- 開始 commit／HEAD：`9c94806da87704abc366d85d160793d8725f8d86`。
+- `origin/main`：`9c94806da87704abc366d85d160793d8725f8d86`。
+- HEAD 與 `origin/main` 一致。
+- 本輪 Git 交接已取得使用者明確授權；不執行 rebase、merge、reset、restore、stash 或其他歷史改寫。
+- 起始基線為上述 HEAD／`origin/main`；commit hash、push 結果與最終工作樹狀態以本輪收尾命令輸出為準。

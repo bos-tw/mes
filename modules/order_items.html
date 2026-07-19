@@ -65,7 +65,7 @@
 <div class="content-header with-actions">
     <div>
         <h2>客戶批號管理</h2>
-        <p class="subtitle">維護篩分明細、載具與金額，並自動回寫訂單總額</p>
+        <p class="subtitle">全域追蹤客戶批號、訂單明細與下游流程</p>
     </div>
     <div class="header-actions">
         <button type="button" class="btn primary" data-action="create" disabled title="請先選擇訂單">
@@ -92,8 +92,20 @@
         <div class="column-selector-body">
 
             <label class="column-option">
+                <input type="checkbox" data-column="order_item_number" checked>
+                <span>訂單明細</span>
+            </label>
+            <label class="column-option">
                 <input type="checkbox" data-column="customer_batch_number" checked>
                 <span>客戶批號</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="order_number" checked>
+                <span>訂單號碼</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="customer_name" checked>
+                <span>客戶名稱</span>
             </label>
             <label class="column-option">
                 <input type="checkbox" data-column="screening_label" checked>
@@ -144,6 +156,22 @@
                 <span>出貨狀態</span>
             </label>
             <label class="column-option">
+                <input type="checkbox" data-column="work_order_count" checked>
+                <span>工單</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="inventory_item_count" checked>
+                <span>庫存</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="shipping_order_item_count" checked>
+                <span>出貨明細</span>
+            </label>
+            <label class="column-option">
+                <input type="checkbox" data-column="return_order_item_count" checked>
+                <span>退貨明細</span>
+            </label>
+            <label class="column-option">
                 <input type="checkbox" data-column="customer_provided_weight">
                 <span>客戶提供重量</span>
             </label>
@@ -180,11 +208,29 @@
     </div>
 
     <section class="info-banner" data-order-items-banner>
-        <div class="empty-state">
-            <i class="fas fa-clipboard-list"></i>
-            <p>請先於「訂單管理」的操作欄點擊 <span class="label">明細</span>，即可載入該訂單的品項資料。</p>
+        <div class="order-summary">
+            <div class="summary-item">
+                <span class="summary-label">工作區</span>
+                <strong>全部客戶批號</strong>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">資料責任</span>
+                <strong>客戶批號保留原始客戶內容</strong>
+            </div>
         </div>
     </section>
+    <div class="module-toolbar compact hidden" data-order-items-global-filter>
+        <form class="filter-form" data-order-items-global-filter-form>
+            <label class="inline-label">
+                <span>關鍵字</span>
+                <input type="search" data-order-items-global-keyword placeholder="明細編號／客戶批號／訂單／客戶／工單">
+            </label>
+            <div class="form-actions">
+                <button type="submit" class="btn primary small">搜尋</button>
+                <button type="button" class="btn outline small" data-action="reset-global-filter">重設</button>
+            </div>
+        </form>
+    </div>
 
     <section class="table-section">
         <div class="table-header-actions">
@@ -196,7 +242,10 @@
             <table class="data-table" data-order-items-table>
                 <thead>
                     <tr>
+                        <th data-sort="order_item_number" data-column="order_item_number">訂單明細 <i class="fas fa-sort"></i></th>
                         <th data-sort="customer_batch_number" data-column="customer_batch_number">客戶批號 <i class="fas fa-sort"></i></th>
+                        <th data-sort="order_number" data-column="order_number">訂單號碼 <i class="fas fa-sort"></i></th>
+                        <th data-sort="customer_name" data-column="customer_name">客戶名稱 <i class="fas fa-sort"></i></th>
                         <th data-sort="screening_label" data-column="screening_label">受篩品項 <i class="fas fa-sort"></i></th>
                         <th class="text-right" data-sort="total_weight_kg" data-column="total_weight_kg">總重量(kg) <i class="fas fa-sort"></i></th>
                         <th class="text-right" data-sort="tool_weight_kg" data-column="tool_weight_kg">載具重量(kg) <i class="fas fa-sort"></i></th>
@@ -209,6 +258,10 @@
                         <th data-sort="updated_at" data-column="updated_at">更新時間 <i class="fas fa-sort"></i></th>
                         <th class="text-right" data-sort="total_shipped_quantity" data-column="total_shipped_quantity">已出貨數量 <i class="fas fa-sort"></i></th>
                         <th data-sort="shipping_status" data-column="shipping_status">出貨狀態 <i class="fas fa-sort"></i></th>
+                        <th data-sort="work_order_count" data-column="work_order_count">工單 <i class="fas fa-sort"></i></th>
+                        <th data-sort="inventory_item_count" data-column="inventory_item_count">庫存 <i class="fas fa-sort"></i></th>
+                        <th data-sort="shipping_order_item_count" data-column="shipping_order_item_count">出貨明細 <i class="fas fa-sort"></i></th>
+                        <th data-sort="return_order_item_count" data-column="return_order_item_count">退貨明細 <i class="fas fa-sort"></i></th>
                         <th class="text-right" data-sort="customer_provided_weight" data-column="customer_provided_weight">客戶提供重量 <i class="fas fa-sort"></i></th>
                         <th class="text-right" data-sort="confirmed_weight" data-column="confirmed_weight">我方確認重量 <i class="fas fa-sort"></i></th>
                         <th class="text-right" data-sort="actual_production_weight" data-column="actual_production_weight">實際生產重量 <i class="fas fa-sort"></i></th>
@@ -221,8 +274,8 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="22" class="text-center" data-order-items-placeholder>
-                            尚未選擇訂單，表格將於載入訂單後顯示。
+                        <td colspan="28" class="text-center" data-order-items-placeholder>
+                            資料載入中…
                         </td>
                     </tr>
                 </tbody>

@@ -101,10 +101,14 @@ function handleListWorkOrders(PDO $pdo): void
     if ($keyword !== '') {
         $where[] = "(wo.work_order_number LIKE :keyword_wo_number
                      OR o.order_number LIKE :keyword_order_number
+                     OR oi.order_item_number LIKE :keyword_order_item_number
+                     OR oi.customer_batch_number LIKE :keyword_customer_batch
                      OR c.name LIKE :keyword_customer
                      OR si.name LIKE :keyword_screening_item)";
         $params['keyword_wo_number'] = "%{$keyword}%";
         $params['keyword_order_number'] = "%{$keyword}%";
+        $params['keyword_order_item_number'] = "%{$keyword}%";
+        $params['keyword_customer_batch'] = "%{$keyword}%";
         $params['keyword_customer'] = "%{$keyword}%";
         $params['keyword_screening_item'] = "%{$keyword}%";
     }
@@ -140,6 +144,8 @@ function handleListWorkOrders(PDO $pdo): void
         'id' => 'wo.id',
         'work_order_number' => 'wo.work_order_number',
         'order_number' => 'o.order_number',
+        'order_item_number' => 'oi.order_item_number',
+        'customer_batch_number' => 'oi.customer_batch_number',
         'customer_name' => 'c.name',
         'screening_item' => 'si.name',
         'machine_name' => 'm.name',
@@ -196,6 +202,8 @@ function handleListWorkOrders(PDO $pdo): void
             wo.created_at,
             wo.updated_at,
             o.order_number,
+            oi.order_item_number,
+            oi.customer_batch_number,
             o.customer_po_number,
             c.name AS customer_name,
             c.is_active AS customer_is_active,

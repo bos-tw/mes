@@ -1628,6 +1628,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         lookup_domains: 'manage_system_parameters',
         lookup_values: 'manage_system_parameters',
         number_sequences: 'manage_system_parameters',
+        basic_settings: 'manage_system_parameters',
         system_parameters: 'manage_system_parameters',
         report_descriptions: 'manage_system_parameters',
         reports: 'view_reports',
@@ -1658,6 +1659,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         'work_orders.reverse_partial_receipt': '工單部分入庫沖銷',
         'work_orders.confirm_shortage': '工單短缺確認',
         'production_work_order_schedule.read': '生產工單排程',
+        'basic_settings.read': '基本設定',
         manage_production_records: '生產紀錄',
         manage_shipping_orders: '出貨單',
         manage_return_orders: '退貨單',
@@ -2621,7 +2623,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const pageId = this.dataset.menuId;
             const title = this.querySelector('.menu-text').textContent;
             const contentUrl = `modules/${pageId}.html`;
-            openTab(pageId, title, contentUrl);
+            openTab(pageId, title, contentUrl, pageId === 'order_items' ? { context: null } : {});
             setActiveMenuByPageId(pageId);
         });
     });
@@ -2655,7 +2657,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const pageId = this.dataset.page;
             const title = this.dataset.title || this.textContent; // Use data-title if available, else textContent
             const contentUrl = `modules/${pageId}.html`; // Assuming module HTML files are in 'modules' folder
-            openTab(pageId, title, contentUrl);
+            openTab(pageId, title, contentUrl, pageId === 'order_items' ? { context: null } : {});
             setActiveMenuByPageId(pageId);
         });
     });
@@ -2847,6 +2849,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     registerModuleInitializer('production_records', window.initializeProductionRecordsModule);
     // 系統設定模組
+    registerModuleInitializer('basic_settings', window.initializeBasicSettingsModule);
     registerModuleInitializer('lookup_domains', window.initializeLookupDomainsModule);
     registerModuleInitializer('number_sequences', window.initializeNumberSequencesModule);
     registerModuleInitializer('system_parameters', window.initializeSystemParametersModule);

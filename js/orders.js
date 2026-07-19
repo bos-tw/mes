@@ -438,6 +438,9 @@
                         <div class="order-items-inline-panel">
                             <div class="order-items-inline-header">
                                 <strong>訂單細項</strong>
+                                <button type="button" class="btn primary small op-action-btn op-role-order-items" data-action="add-order-item" data-order-id="${orderId}" title="新增訂單細項">
+                                    <i class="fas fa-plus"></i> 新增明細
+                                </button>
                                 <button type="button" class="btn text op-action-btn op-role-order-items" data-action="open-order-items" data-order-id="${orderId}" title="客戶批號" aria-label="客戶批號">
                                     <i class="fas fa-external-link-alt"></i>
                                 </button>
@@ -1145,7 +1148,18 @@
                 const message = isEdit ? '訂單資料已更新。' : '訂單資料已建立。';
                 showAlert('success', message);
                 closeModal();
-                loadOrders(state.page);
+                await loadOrders(state.page);
+
+                if (!isEdit && result.data?.id) {
+                    const createdOrderId = Number.parseInt(result.data.id, 10);
+                    if (Number.isInteger(createdOrderId) && state.currentRows.some((order) => Number.parseInt(order.id, 10) === createdOrderId)) {
+                        expandedOrderIds.add(createdOrderId);
+                        await loadOrderItemsForOrder(createdOrderId, true);
+                        await openCreateOrderItemEditor(createdOrderId);
+                    } else {
+                        showAlert('success', `${message} 請在訂單列表展開該訂單以建立明細。`);
+                    }
+                }
 
                 if (dataSyncHelper) {
                     if (isEdit) {
@@ -1163,64 +1177,106 @@
         function openOrderItems(orderId) {
             if (typeof window.openTab === 'function') {
                 window.openTab('order_items', '客戶批號', 'modules/order_items.html', {
-                    context: getOrderContext(orderId),
+                    // 此入口固定維持全域一覽，不把目前訂單情境覆蓋到同一個分頁。
+                    context: null,
                 });
             }
         }
 
-        function loadOrderItemQuickEditor() {
-            if (window.OrderItemQuickEditor && typeof window.OrderItemQuickEditor.open === 'function') {
-                return Promise.resolve(window.OrderItemQuickEditor);
+        let orderItemEditorPromise = null;
+
+        async function loadOrderItemEditor() {
+            const existingRoot = moduleRoot.querySelector('[data-orders-order-item-editor-host] [data-module="order_items"]');
+            if (existingRoot?.orderItemsController) {
+                return existingRoot.orderItemsController;
+            }
+            if (orderItemEditorPromise) {
+                return orderItemEditorPromise;
             }
 
-            const existingScript = document.querySelector('script[src="js/order_item_quick_editor.js"]');
-            if (existingScript) {
-                return new Promise((resolve, reject) => {
-                    const startedAt = Date.now();
-                    const timer = window.setInterval(() => {
-                        if (window.OrderItemQuickEditor && typeof window.OrderItemQuickEditor.open === 'function') {
-                            window.clearInterval(timer);
-                            resolve(window.OrderItemQuickEditor);
-                        } else if (Date.now() - startedAt > 5000) {
-                            window.clearInterval(timer);
-                            reject(new Error('訂單細項快速編輯功能載入逾時。'));
-                        }
-                    }, 50);
+            orderItemEditorPromise = (async () => {
+                if (!window.ModuleAssets || typeof window.ModuleAssets.load !== 'function') {
+                    throw new Error('模組資產載入器不可用。');
+                }
+                await window.ModuleAssets.load('order_items');
+
+                const assetVersion = window.APP_ASSET_VERSION || document.documentElement.dataset.assetVersion || 'dev';
+                const response = await fetch(`modules/order_items.html?v=${encodeURIComponent(assetVersion)}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    cache: 'no-store',
                 });
-            }
+                if (!response.ok) {
+                    throw new Error(`載入完整客戶批號表單失敗（${response.status}）。`);
+                }
 
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = 'js/order_item_quick_editor.js';
-                script.defer = true;
-                script.onload = () => {
-                    if (window.OrderItemQuickEditor && typeof window.OrderItemQuickEditor.open === 'function') {
-                        resolve(window.OrderItemQuickEditor);
-                    } else {
-                        reject(new Error('訂單細項快速編輯功能載入失敗。'));
+                const html = await response.text();
+                const documentFragment = new DOMParser().parseFromString(html, 'text/html');
+                const sourceModal = documentFragment.querySelector('[data-order-items-modal]');
+                if (!sourceModal) {
+                    throw new Error('找不到完整客戶批號表單。');
+                }
+
+                const host = document.createElement('div');
+                host.setAttribute('data-orders-order-item-editor-host', '');
+                const editorRoot = document.createElement('div');
+                editorRoot.setAttribute('data-module', 'order_items');
+                editorRoot.className = 'order-items-editor-only';
+                editorRoot.appendChild(document.importNode(sourceModal, true));
+                host.appendChild(editorRoot);
+                moduleRoot.appendChild(host);
+
+                if (typeof window.initializeOrderItemsModule !== 'function') {
+                    throw new Error('完整客戶批號編輯器未正確載入。');
+                }
+
+                const controller = window.initializeOrderItemsModule(host, {
+                    editorOnly: true,
+                    onSaved: async (savedItem) => {
+                        const affectedOrderId = Number.parseInt(savedItem?.order_id, 10);
+                        await loadOrders(state.page);
+                        if (Number.isInteger(affectedOrderId) && affectedOrderId > 0) {
+                            expandedOrderIds.add(affectedOrderId);
+                            await loadOrderItemsForOrder(affectedOrderId, true);
+                        }
+                        showAlert('success', '訂單細項已儲存。');
+                    },
+                });
+                if (!controller) {
+                    throw new Error('完整客戶批號編輯器初始化失敗。');
+                }
+                return controller;
+            })().catch((error) => {
+                moduleRoot.querySelectorAll('[data-orders-order-item-editor-host]').forEach((host) => {
+                    const editorRoot = host.querySelector('[data-module="order_items"]');
+                    if (!editorRoot?.orderItemsController) {
+                        host.remove();
                     }
-                };
-                script.onerror = () => reject(new Error('訂單細項快速編輯功能載入失敗。'));
-                document.head.appendChild(script);
+                });
+                orderItemEditorPromise = null;
+                throw error;
             });
+
+            return orderItemEditorPromise;
         }
 
         async function openOrderItemEditor(orderId, orderItemId) {
             try {
-                const quickEditor = await loadOrderItemQuickEditor();
-                quickEditor.open({
-                    moduleRoot,
-                    orderId,
-                    orderItemId,
-                    showAlert,
-                    onSaved: async () => {
-                        await loadOrderItemsForOrder(orderId, true);
-                        await loadOrders(state.page);
-                    },
-                });
+                const editor = await loadOrderItemEditor();
+                await editor.openEdit(getOrderContext(orderId), orderItemId);
             } catch (error) {
                 console.error(error);
-                showAlert('error', error.message || '訂單細項快速編輯功能尚未載入。');
+                showAlert('error', error.message || '完整客戶批號編輯器尚未載入。');
+            }
+        }
+
+        async function openCreateOrderItemEditor(orderId) {
+            try {
+                const editor = await loadOrderItemEditor();
+                await editor.openCreate(getOrderContext(orderId));
+            } catch (error) {
+                console.error(error);
+                showAlert('error', error.message || '完整客戶批號編輯器尚未載入。');
             }
         }
 
@@ -2088,6 +2144,14 @@ ${pages}
                 if (!target) return;
 
                 const action = target.dataset.action;
+                if (action === 'add-order-item') {
+                    const orderId = Number.parseInt(target.dataset.orderId || '', 10);
+                    if (Number.isInteger(orderId)) {
+                        openCreateOrderItemEditor(orderId);
+                    }
+                    return;
+                }
+
                 if (action === 'edit-order-item-inline') {
                     const orderId = Number.parseInt(target.dataset.orderId || '', 10);
                     const orderItemId = Number.parseInt(target.dataset.orderItemId || '', 10);

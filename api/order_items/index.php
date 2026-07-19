@@ -120,17 +120,21 @@ switch ($method) {
 
 function handleListOrderItems(): void
 {
-    $orderId = filter_input(INPUT_GET, 'order_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-    if (!$orderId) {
-        jsonResponse([
-            'success' => false,
-            'message' => '請提供有效的訂單 ID。',
-        ], 400);
+    $orderId = null;
+    if (isset($_GET['order_id']) && (string)$_GET['order_id'] !== '') {
+        $parsedOrderId = filter_var($_GET['order_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($parsedOrderId === false) {
+            jsonResponse([
+                'success' => false,
+                'message' => '請提供有效的訂單 ID。',
+            ], 400);
+        }
+        $orderId = (int)$parsedOrderId;
     }
 
     $pdo = db();
 
-    if (!ensureOrderExists($pdo, $orderId)) {
+    if ($orderId !== null && !ensureOrderExists($pdo, $orderId)) {
         jsonResponse([
             'success' => false,
             'message' => '找不到對應的訂單資料。',
@@ -138,8 +142,11 @@ function handleListOrderItems(): void
     }
 
     $excludeHasWorkOrder = (string)($_GET['exclude_has_work_order'] ?? '') === '1';
+    $keyword = isset($_GET['keyword']) ? trim((string)$_GET['keyword']) : null;
 
-    $rows = findOrderItemsByOrder($pdo, $orderId);
+    $rows = $orderId !== null
+        ? findOrderItemsByOrder($pdo, $orderId)
+        : findAllOrderItems($pdo, $keyword);
     if ($excludeHasWorkOrder) {
         $rows = array_values(array_filter($rows, static function (array $row): bool {
             return empty($row['has_work_order']);
@@ -410,9 +417,7 @@ function handleCreateOrderItem(): void
     try {
         $pdo->beginTransaction();
 
-        if (!ensureOrderExists($pdo, (int)$data['order_id'], true)) {
-            throw new InvalidArgumentException('找不到對應的訂單資料。');
-        }
+        $orderIdentity = reserveNextOrderItemIdentity($pdo, (int)$data['order_id']);
 
         $screeningItem = findScreeningItem($pdo, (int)$data['screening_item_id'], true);
         if (!$screeningItem) {
@@ -428,6 +433,8 @@ function handleCreateOrderItem(): void
 
         $insert = [
             'order_id' => $data['order_id'],
+            'order_item_sequence' => $orderIdentity['order_item_sequence'],
+            'order_item_number' => $orderIdentity['order_item_number'],
             'screening_item_id' => $data['screening_item_id'],
             'unit_price_per_thousand' => $unitPricePerThousand !== null ? round($unitPricePerThousand, 2) : null,
             'total_weight_kg' => round($totalWeightKg, 2),

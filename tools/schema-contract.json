@@ -1,7 +1,7 @@
 {
     "schemaVersion": 1,
     "database": "yucyuan",
-    "generatedAt": "2026-07-16T06:06:25+00:00",
+    "generatedAt": "2026-07-19T08:20:25+00:00",
     "tables": {
         "audit_logs": {
             "id": {
@@ -2092,6 +2092,18 @@
                 "type": "bigint",
                 "nullable": false,
                 "key": "MUL",
+                "extra": ""
+            },
+            "order_item_sequence": {
+                "type": "smallint",
+                "nullable": false,
+                "key": "",
+                "extra": ""
+            },
+            "order_item_number": {
+                "type": "varchar",
+                "nullable": false,
+                "key": "UNI",
                 "extra": ""
             },
             "screening_item_id": {

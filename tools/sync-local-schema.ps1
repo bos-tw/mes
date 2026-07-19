@@ -325,6 +325,14 @@ $migrationChecks = [ordered]@{
         CheckSql = "SELECT IF(NOT EXISTS(SELECT 1 FROM employees e WHERE e.status_lookup_id IS NULL OR NOT EXISTS(SELECT 1 FROM lookup_values lv JOIN lookup_domains ld ON ld.id = lv.domain_id AND ld.domain_key = 'employee_status' WHERE lv.id = e.status_lookup_id AND lv.value_key = e.status)) AND NOT EXISTS(SELECT 1 FROM orders o WHERE o.status_lookup_id IS NULL OR NOT EXISTS(SELECT 1 FROM lookup_values lv JOIN lookup_domains ld ON ld.id = lv.domain_id AND ld.domain_key = 'status_order' WHERE lv.id = o.status_lookup_id AND lv.value_key = o.status)) AND NOT EXISTS(SELECT 1 FROM shipping_orders so WHERE so.status_lookup_id IS NULL OR NOT EXISTS(SELECT 1 FROM lookup_values lv JOIN lookup_domains ld ON ld.id = lv.domain_id AND ld.domain_key = 'shipping_status' WHERE lv.id = so.status_lookup_id AND lv.value_key = so.status)) AND NOT EXISTS(SELECT 1 FROM tools t WHERE t.status_lookup_id IS NULL OR NOT EXISTS(SELECT 1 FROM lookup_values lv JOIN lookup_domains ld ON ld.id = lv.domain_id AND ld.domain_key = 'tool_status' WHERE lv.id = t.status_lookup_id AND lv.value_key = t.status)) AND EXISTS(SELECT 1 FROM lookup_values lv JOIN lookup_domains ld ON ld.id = lv.domain_id WHERE ld.domain_key = 'tool_status' AND lv.value_key = 'retired'), 1, 0);"
         Description = 'legacy status lookup mirrors reconciled'
     }
+    '2026_07_19_add_order_item_number.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'order_items' AND column_name = 'order_item_sequence' AND is_nullable = 'NO') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'order_items' AND column_name = 'order_item_number' AND is_nullable = 'NO') AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'order_items' AND index_name = 'uk_order_items_order_item_number' AND non_unique = 0) AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'order_items' AND index_name = 'uk_order_items_order_sequence' AND non_unique = 0), 1, 0);"
+        Description = 'stable order detail identifier and per-order sequence'
+    }
+    '2026_07_19_add_basic_settings_permission.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM permissions WHERE name = 'basic_settings.read'), 1, 0);"
+        Description = 'basic_settings.read permission exists'
+    }
 }
 
 $migrationFiles = @()

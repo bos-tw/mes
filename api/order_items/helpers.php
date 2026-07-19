@@ -653,12 +653,16 @@ function recalculateOrderTotalAmount(PDO $pdo, int $orderId): void
 function findOrderItem(PDO $pdo, int $id): ?array
 {
     $sql = 'SELECT oi.*, '
+        . 'o.order_number, c.name AS customer_name, '
         . 'si.item_number AS screening_item_number, si.name AS screening_item_name, si.weight_per_unit_g, '
         . 'lv_status.value_label AS status_label, '
         . 'lv_sample.value_label AS customer_sample_status_label, '
         . '(SELECT COUNT(*) FROM work_orders wo WHERE wo.order_item_id = oi.id AND wo.deleted_at IS NULL) > 0 AS has_work_order, '
+        . '(SELECT COUNT(*) FROM work_orders wo WHERE wo.order_item_id = oi.id AND wo.deleted_at IS NULL) AS work_order_count, '
         . '(SELECT wo.work_order_number FROM work_orders wo WHERE wo.order_item_id = oi.id AND wo.deleted_at IS NULL ORDER BY wo.id LIMIT 1) AS work_order_number '
         . 'FROM order_items oi '
+        . 'JOIN orders o ON oi.order_id = o.id '
+        . 'JOIN customers c ON o.customer_id = c.id '
         . 'JOIN screening_items si ON oi.screening_item_id = si.id '
         . 'LEFT JOIN lookup_values lv_status ON oi.status = lv_status.value_key '
         . ' AND lv_status.domain_id = (SELECT id FROM lookup_domains WHERE domain_key = :statusDomain) '
@@ -686,12 +690,16 @@ function findOrderItem(PDO $pdo, int $id): ?array
 function findOrderItemsByOrder(PDO $pdo, int $orderId): array
 {
     $sql = 'SELECT oi.*, '
+        . 'o.order_number, c.name AS customer_name, '
         . 'si.item_number AS screening_item_number, si.name AS screening_item_name, si.weight_per_unit_g, '
         . 'lv_status.value_label AS status_label, '
         . 'lv_sample.value_label AS customer_sample_status_label, '
         . '(SELECT COUNT(*) FROM work_orders wo WHERE wo.order_item_id = oi.id AND wo.deleted_at IS NULL) > 0 AS has_work_order, '
+        . '(SELECT COUNT(*) FROM work_orders wo WHERE wo.order_item_id = oi.id AND wo.deleted_at IS NULL) AS work_order_count, '
         . '(SELECT wo.work_order_number FROM work_orders wo WHERE wo.order_item_id = oi.id AND wo.deleted_at IS NULL ORDER BY wo.id LIMIT 1) AS work_order_number '
         . 'FROM order_items oi '
+        . 'JOIN orders o ON oi.order_id = o.id '
+        . 'JOIN customers c ON o.customer_id = c.id '
         . 'JOIN screening_items si ON oi.screening_item_id = si.id '
         . 'LEFT JOIN lookup_values lv_status ON oi.status = lv_status.value_key '
         . ' AND lv_status.domain_id = (SELECT id FROM lookup_domains WHERE domain_key = :statusDomain) '
@@ -975,6 +983,10 @@ function transformOrderItem(array $row, array $tools, array $details, array $dra
     return [
         'id' => (int)$row['id'],
         'order_id' => (int)$row['order_id'],
+        'order_item_sequence' => isset($row['order_item_sequence']) ? (int)$row['order_item_sequence'] : null,
+        'order_item_number' => $row['order_item_number'] ?? null,
+        'order_number' => $row['order_number'] ?? null,
+        'customer_name' => $row['customer_name'] ?? null,
         'screening_item' => [
             'id' => (int)$row['screening_item_id'],
             'item_number' => $row['screening_item_number'] ?? null,
@@ -990,6 +1002,10 @@ function transformOrderItem(array $row, array $tools, array $details, array $dra
         'drawing_number' => $row['drawing_number'] ?? null, // Add drawing_number
         'has_work_order' => (bool)($row['has_work_order'] ?? false),
         'work_order_number' => $row['work_order_number'] ?? null,
+        'work_order_count' => isset($row['work_order_count']) ? (int)$row['work_order_count'] : ((bool)($row['has_work_order'] ?? false) ? 1 : 0),
+        'inventory_item_count' => isset($row['inventory_item_count']) ? (int)$row['inventory_item_count'] : 0,
+        'shipping_order_item_count' => isset($row['shipping_order_item_count']) ? (int)$row['shipping_order_item_count'] : 0,
+        'return_order_item_count' => isset($row['return_order_item_count']) ? (int)$row['return_order_item_count'] : 0,
         'sub_item_number' => $row['sub_item_number'] ?? null,
         'part_number' => $row['part_number'] ?? null,
         'customer_batch_number' => $row['customer_batch_number'] ?? null,
@@ -1016,6 +1032,99 @@ function transformOrderItem(array $row, array $tools, array $details, array $dra
             'service_unit_price_sum' => $unitPriceSum,
         ],
     ];
+}
+
+/**
+ * Reserve the next stable identifier for a new order item.
+ * The parent order row must be locked by this query before the sequence is read.
+ *
+ * @return array{order_id:int,order_number:string,order_item_sequence:int,order_item_number:string}
+ */
+function reserveNextOrderItemIdentity(PDO $pdo, int $orderId): array
+{
+    $orderStmt = $pdo->prepare(
+        'SELECT id, order_number
+         FROM orders
+         WHERE id = :id AND deleted_at IS NULL
+         FOR UPDATE'
+    );
+    $orderStmt->execute(['id' => $orderId]);
+    $order = $orderStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$order || trim((string)($order['order_number'] ?? '')) === '') {
+        throw new InvalidArgumentException('找不到對應的訂單資料。');
+    }
+
+    $sequenceStmt = $pdo->prepare(
+        'SELECT COALESCE(MAX(order_item_sequence), 0) + 1
+         FROM order_items
+         WHERE order_id = :order_id'
+    );
+    $sequenceStmt->execute(['order_id' => $orderId]);
+    $sequence = (int)$sequenceStmt->fetchColumn();
+
+    if ($sequence < 1 || $sequence > 99) {
+        throw new InvalidArgumentException('此訂單明細已達 L99 上限，請先確認例外編號策略。');
+    }
+
+    $orderNumber = trim((string)$order['order_number']);
+
+    return [
+        'order_id' => $orderId,
+        'order_number' => $orderNumber,
+        'order_item_sequence' => $sequence,
+        'order_item_number' => sprintf('%s-L%02d', $orderNumber, $sequence),
+    ];
+}
+
+/**
+ * Fetch all order items for the global customer-batch work area.
+ *
+ * @return list<array<string,mixed>>
+ */
+function findAllOrderItems(PDO $pdo, ?string $keyword = null): array
+{
+    $sql = 'SELECT oi.*, '
+        . 'o.order_number, c.name AS customer_name, '
+        . 'si.item_number AS screening_item_number, si.name AS screening_item_name, si.weight_per_unit_g, '
+        . 'lv_status.value_label AS status_label, '
+        . 'lv_sample.value_label AS customer_sample_status_label, '
+        . '(SELECT COUNT(*) FROM work_orders wo WHERE wo.order_item_id = oi.id AND wo.deleted_at IS NULL) > 0 AS has_work_order, '
+        . '(SELECT COUNT(*) FROM work_orders wo WHERE wo.order_item_id = oi.id AND wo.deleted_at IS NULL) AS work_order_count, '
+        . '(SELECT wo.work_order_number FROM work_orders wo WHERE wo.order_item_id = oi.id AND wo.deleted_at IS NULL ORDER BY wo.id LIMIT 1) AS work_order_number, '
+        . '(SELECT COUNT(*) FROM inventory_items ii WHERE ii.order_item_id = oi.id AND ii.deleted_at IS NULL) AS inventory_item_count, '
+        . '(SELECT COUNT(*) FROM shipping_order_items soi WHERE soi.order_item_id = oi.id) AS shipping_order_item_count, '
+        . '(SELECT COUNT(*) FROM return_order_items roi JOIN shipping_order_items soi_return ON soi_return.id = roi.shipping_order_item_id WHERE soi_return.order_item_id = oi.id) AS return_order_item_count '
+        . 'FROM order_items oi '
+        . 'JOIN orders o ON oi.order_id = o.id '
+        . 'JOIN customers c ON o.customer_id = c.id '
+        . 'JOIN screening_items si ON oi.screening_item_id = si.id '
+        . 'LEFT JOIN lookup_values lv_status ON oi.status = lv_status.value_key '
+        . ' AND lv_status.domain_id = (SELECT id FROM lookup_domains WHERE domain_key = :statusDomain) '
+        . 'LEFT JOIN lookup_values lv_sample ON oi.customer_sample_status = lv_sample.value_key '
+        . ' AND lv_sample.domain_id = (SELECT id FROM lookup_domains WHERE domain_key = :sampleDomain) ';
+
+    $params = [
+        'statusDomain' => ORDER_ITEM_STATUS_DOMAIN,
+        'sampleDomain' => ORDER_ITEM_SAMPLE_STATUS_DOMAIN,
+    ];
+
+    if ($keyword !== null && trim($keyword) !== '') {
+        $sql .= 'WHERE oi.order_item_number LIKE :keyword '
+            . ' OR oi.customer_batch_number LIKE :keyword '
+            . ' OR o.order_number LIKE :keyword '
+            . ' OR c.name LIKE :keyword '
+            . ' OR EXISTS (SELECT 1 FROM work_orders wo_search WHERE wo_search.order_item_id = oi.id AND wo_search.work_order_number LIKE :keyword) ';
+        $params['keyword'] = '%' . trim($keyword) . '%';
+    }
+
+    $sql .= 'ORDER BY oi.id DESC';
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    return $rows ?: [];
 }
 
 /**

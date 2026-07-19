@@ -22,7 +22,7 @@
  */
 ModuleConfig.register('order_items', {
     title: '客戶批號',
-    subtitle: '維護篩分明細、載具與金額，並自動回寫訂單總額',
+    subtitle: '全域追蹤客戶批號、訂單明細與下游流程',
 
     // ========================================
     // 混合配置模式標記
@@ -33,7 +33,7 @@ ModuleConfig.register('order_items', {
     // ========================================
     // 標題區按鈕
     // ========================================
-    // 注意：這些按鈕初始為 disabled，由 JS 在選擇訂單後啟用
+    // 新增與匯出仍需在訂單明細脈絡中執行；全域頁面負責查詢與追蹤。
     actions: [
         { 
             label: '新增品項', 
@@ -66,18 +66,39 @@ ModuleConfig.register('order_items', {
     // 此區塊會在選擇訂單後由 JS 動態更新內容
     customHtml: `
     <section class="info-banner" data-order-items-banner>
-        <div class="empty-state">
-            <i class="fas fa-clipboard-list"></i>
-            <p>請先於「訂單管理」的操作欄點擊 <span class="label">明細</span>，即可載入該訂單的品項資料。</p>
+        <div class="order-summary">
+            <div class="summary-item">
+                <span class="summary-label">工作區</span>
+                <strong>全部客戶批號</strong>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">資料責任</span>
+                <strong>客戶批號保留原始客戶內容</strong>
+            </div>
         </div>
-    </section>`,
+    </section>
+    <div class="module-toolbar compact hidden" data-order-items-global-filter>
+        <form class="filter-form" data-order-items-global-filter-form>
+            <label class="inline-label">
+                <span>關鍵字</span>
+                <input type="search" data-order-items-global-keyword placeholder="明細編號／客戶批號／訂單／客戶／工單">
+            </label>
+            <div class="form-actions">
+                <button type="submit" class="btn primary small">搜尋</button>
+                <button type="button" class="btn outline small" data-action="reset-global-filter">重設</button>
+            </div>
+        </form>
+    </div>`,
 
     // ========================================
     // 資料表格欄位定義
     // ========================================
-    // 無篩選工具列（資料由訂單帶入，不需要獨立篩選）
+    // 未帶入訂單時顯示全域客戶批號工作區；帶入訂單時沿用訂單明細清單。
     columns: [
+        { key: 'order_item_number', label: '訂單明細', sortable: true, selectable: true },
         { key: 'customer_batch_number', label: '客戶批號', sortable: true, selectable: true },
+        { key: 'order_number', label: '訂單號碼', sortable: true, selectable: true },
+        { key: 'customer_name', label: '客戶名稱', sortable: true, selectable: true },
         { key: 'screening_label', label: '受篩品項', sortable: true, selectable: true },
         { key: 'total_weight_kg', label: '總重量(kg)', sortable: true, selectable: true, className: 'text-right' },
         { key: 'tool_weight_kg', label: '載具重量(kg)', sortable: true, selectable: true, className: 'text-right' },
@@ -90,6 +111,10 @@ ModuleConfig.register('order_items', {
         { key: 'updated_at', label: '更新時間', sortable: true, selectable: true },
         { key: 'total_shipped_quantity', label: '已出貨數量', sortable: true, selectable: true, className: 'text-right' },
         { key: 'shipping_status', label: '出貨狀態', sortable: true, selectable: true },
+        { key: 'work_order_count', label: '工單', sortable: true, selectable: true },
+        { key: 'inventory_item_count', label: '庫存', sortable: true, selectable: true },
+        { key: 'shipping_order_item_count', label: '出貨明細', sortable: true, selectable: true },
+        { key: 'return_order_item_count', label: '退貨明細', sortable: true, selectable: true },
         { key: 'customer_provided_weight', label: '客戶提供重量', sortable: true, selectable: true, className: 'text-right' },
         { key: 'confirmed_weight', label: '確認重量', sortable: true, selectable: true, className: 'text-right' },
         { key: 'actual_production_weight', label: '實際生產重量', sortable: true, selectable: true, className: 'text-right' },

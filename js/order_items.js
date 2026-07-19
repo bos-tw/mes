@@ -7,15 +7,23 @@
 
     function initializeOrderItemsModule(container, initialContext = null) {
         const moduleRoot = container.querySelector('[data-module="order_items"]');
-        if (!moduleRoot || moduleRoot.dataset.initialised === 'true') {
-            return;
+        if (!moduleRoot) {
+            return null;
+        }
+        if (moduleRoot.dataset.initialised === 'true') {
+            return moduleRoot.orderItemsController || null;
         }
 
         moduleRoot.dataset.initialised = 'true';
+        const editorOnly = initialContext?.editorOnly === true;
+        const onEditorSaved = typeof initialContext?.onSaved === 'function' ? initialContext.onSaved : null;
         // 欄位管理器由 column_manager.js 自動初始化，不需要手動呼叫
 
         const alertBox = moduleRoot.querySelector('[data-order-items-alert]');
         const bannerElement = moduleRoot.querySelector('[data-order-items-banner]');
+        const globalFilter = moduleRoot.querySelector('[data-order-items-global-filter]');
+        const globalFilterForm = moduleRoot.querySelector('[data-order-items-global-filter-form]');
+        const globalKeywordInput = moduleRoot.querySelector('[data-order-items-global-keyword]');
     const tableElement = moduleRoot.querySelector('[data-order-items-table]');
     const tableHead = tableElement ? tableElement.querySelector('thead') : null;
     const tableBody = tableElement ? tableElement.querySelector('tbody') : null;
@@ -144,6 +152,8 @@
             itemMap: new Map(),
             currentMode: 'create',
             currentEditingId: null,
+            activeItemOrderId: null,
+            globalKeyword: '',
             activeRequestToken: null,
             lastNotifiedOrderId: null,
             screeningCreationVisible: false,
@@ -486,6 +496,20 @@
             switch (field) {
                 case 'id':
                     return Number(item.id ?? NaN);
+                case 'order_item_number':
+                    return item.order_item_number || '';
+                case 'order_number':
+                    return item.order_number || '';
+                case 'customer_name':
+                    return item.customer_name || '';
+                case 'work_order_count':
+                    return Number(item.work_order_count ?? 0);
+                case 'inventory_item_count':
+                    return Number(item.inventory_item_count ?? 0);
+                case 'shipping_order_item_count':
+                    return Number(item.shipping_order_item_count ?? 0);
+                case 'return_order_item_count':
+                    return Number(item.return_order_item_count ?? 0);
                 case 'screening_label':
                     return getOrderItemScreeningLabel(item);
                 case 'total_weight_kg':
@@ -648,7 +672,14 @@
         }
 
         function showAlert(type, message) {
-            if (!alertBox || !message) {
+            if (!message) {
+                return;
+            }
+
+            if (!alertBox) {
+                if (editorOnly && modalAlertBox) {
+                    showModalAlert(type, message, type === 'success');
+                }
                 return;
             }
 
@@ -668,7 +699,7 @@
         }
 
     
-function updateButtons() {
+        function updateButtons() {
             const hasOrder = Boolean(state.orderContext);
             const disableCreate = !hasOrder || state.isLoading;
 
@@ -680,6 +711,10 @@ function updateButtons() {
             if (exportButton) {
                 exportButton.disabled = !hasOrder;
                 exportButton.title = hasOrder ? '匯出客戶批號' : '請先選擇訂單';
+            }
+
+            if (globalFilter) {
+                globalFilter.classList.toggle('hidden', hasOrder);
             }
         }
 
@@ -698,7 +733,7 @@ function updateButtons() {
 
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="20" class="text-center">${escapeHtml(message)}</td>
+                    <td colspan="28" class="text-center">${escapeHtml(message)}</td>
                 </tr>
             `;
 
@@ -757,7 +792,10 @@ function updateButtons() {
 
                 return `
                     <tr data-id="${escapeHtml(item.id)}">
+                        <td>${escapeHtml(item.order_item_number || '-')}</td>
                         <td>${escapeHtml(item.customer_batch_number || '-')}</td>
+                        <td>${escapeHtml(item.order_number || state.orderContext?.orderNumber || '-')}</td>
+                        <td>${escapeHtml(item.customer_name || state.orderContext?.customerName || '-')}</td>
                         <td>
                             <div class="table-primary">${escapeHtml(screeningLabel)}</div>
                             ${item.drawing_number ? `<div class="table-secondary">圖面：${escapeHtml(item.drawing_number)}</div>` : ''}
@@ -773,6 +811,10 @@ function updateButtons() {
                         <td>${escapeHtml(updatedAtLabel)}</td>
                         <td class="text-right">${formatNumber(item.total_shipped_quantity ?? 0, 0)}</td>
                         <td class="${shippingStatusCls}">${escapeHtml(shippingStatusLabel)}</td>
+                        <td>${item.work_order_count ? `${escapeHtml(item.work_order_count)} 筆` : '-'}</td>
+                        <td>${item.inventory_item_count ? `${escapeHtml(item.inventory_item_count)} 筆` : '-'}</td>
+                        <td>${item.shipping_order_item_count ? `${escapeHtml(item.shipping_order_item_count)} 筆` : '-'}</td>
+                        <td>${item.return_order_item_count ? `${escapeHtml(item.return_order_item_count)} 筆` : '-'}</td>
                         <td class="text-right">${item.customer_provided_weight != null ? formatNumber(item.customer_provided_weight, 2) : '-'}</td>
                         <td class="text-right">${item.confirmed_weight != null ? formatNumber(item.confirmed_weight, 2) : '-'}</td>
                         <td class="text-right">${item.actual_production_weight != null ? formatNumber(item.actual_production_weight, 2) : '-'}</td>
@@ -781,6 +823,9 @@ function updateButtons() {
                         <td class="text-right">${item.tools && item.tools.length > 0 ? item.tools.map(t => formatNumber(t.weight_kg ?? 0, 4)).join(', ') : '-'}</td>
                         <td class="text-right">${item.tools && item.tools.length > 0 ? item.tools.map(t => Number(t.quantity) || 0).join(', ') : '-'}</td>
                         <td class="table-actions">
+                            <button type="button" class="btn text" data-action="open-order" title="開啟訂單主表">
+                                <i class="fas fa-file-invoice"></i>
+                            </button>
                             <button type="button" class="btn text" data-action="create-work-order" title="${workOrderBtnTitle}" ${workOrderBtnAttr}>
                                 <i class="fas fa-cogs"></i>
                             </button>
@@ -1056,7 +1101,7 @@ function updateButtons() {
                 }
             });
 
-            const displayEl = document.querySelector('[data-tool-total-weight-display]');
+            const displayEl = modalOverlay?.querySelector('[data-tool-total-weight-display]');
             if (displayEl) {
                 displayEl.textContent = formatNumber(totalWeight, 2);
             }
@@ -1976,7 +2021,8 @@ function updateButtons() {
         }
 
         function collectFormData() {
-            if (!state.orderContext) {
+            const formOrderId = state.orderContext?.orderId ?? state.activeItemOrderId;
+            if (!formOrderId) {
                 showModalAlert('error', '請先選擇訂單後再進行操作。', false);
                 return null;
             }
@@ -2042,7 +2088,7 @@ function updateButtons() {
             });
 
             return {
-                order_id: state.orderContext.orderId,
+                order_id: formOrderId,
                 screening_item_id: screeningId,
                 unit_price_per_thousand: unitPriceValue,
                 total_weight_kg: Number(totalWeight.toFixed(2)),
@@ -2238,7 +2284,20 @@ function updateButtons() {
                     DataSync.notifyWithDependencies('order_items', eventType, result.data);
                 }
                 closeModal();
-                await loadItems();
+                if (editorOnly) {
+                    moduleRoot.dispatchEvent(new CustomEvent('order-items:editor-saved', {
+                        bubbles: true,
+                        detail: {
+                            mode: isEdit ? 'edit' : 'create',
+                            data: result.data,
+                        },
+                    }));
+                    if (onEditorSaved) {
+                        await onEditorSaved(result.data, isEdit ? 'edit' : 'create');
+                    }
+                } else {
+                    await loadItems();
+                }
             } catch (error) {
                 const message = error instanceof Error ? error.message : '儲存失敗。';
                 showModalAlert('error', `儲存客戶批號失敗：${message}`, false);
@@ -2267,6 +2326,7 @@ function updateButtons() {
             document.removeEventListener('keydown', handleEscapeKey);
             state.currentMode = 'create';
             state.currentEditingId = null;
+            state.activeItemOrderId = null;
             state.deletedDrawingIds = []; // 清空待刪除的圖面 ID
             state.deletedAttachmentIds = []; // 清空待刪除的檔案附件 ID
             state.isCopyMode = false; // 清除複製模式標記
@@ -2280,11 +2340,12 @@ function updateButtons() {
 
             state.currentMode = mode;
             state.currentEditingId = mode === 'edit' && data ? data.id : null;
+            state.activeItemOrderId = data?.order_id ? Number.parseInt(data.order_id, 10) : (state.orderContext?.orderId ?? null);
             state.deletedDrawingIds = []; // 初始化待刪除的圖面 ID
             state.deletedAttachmentIds = []; // 初始化待刪除的檔案附件 ID
 
             if (modalTitle) {
-                modalTitle.textContent = mode === 'edit' ? '編輯客戶批號' : '新增品項';
+                modalTitle.textContent = mode === 'edit' ? '編輯客戶批號' : '新增訂單細項（客戶批號）';
             }
 
             resetModalForm();
@@ -2436,15 +2497,16 @@ function updateButtons() {
         }
 
         async function loadItems() {
-            if (!state.orderContext) {
-                renderEmptyTable('尚未選擇訂單，表格將於載入訂單後顯示。');
-                return false;
-            }
-
             setLoading(true);
 
             try {
-                const apiUrl = `api/order_items/index.php?order_id=${encodeURIComponent(state.orderContext.orderId)}`;
+                const params = new URLSearchParams();
+                if (state.orderContext) {
+                    params.set('order_id', state.orderContext.orderId);
+                } else if (state.globalKeyword) {
+                    params.set('keyword', state.globalKeyword);
+                }
+                const apiUrl = `api/order_items/index.php${params.toString() ? `?${params.toString()}` : ''}`;
                 const response = await fetch(apiUrl, {
                     method: 'GET',
                     credentials: 'include',
@@ -2465,7 +2527,7 @@ function updateButtons() {
 
                 if (data.length === 0) {
                     renderEmptyTable('尚無客戶批號資料。');
-                    renderGuidance(true);
+                    renderGuidance(!state.orderContext);
                 } else {
                     renderRows(data);
                     renderGuidance(false);
@@ -2613,10 +2675,6 @@ function updateButtons() {
         }
 
         async function handleDelete(id) {
-            if (!state.orderContext) {
-                return;
-            }
-
             const item = state.itemMap.get(id);
             const screeningLabel = item && item.screening_item
                 ? [item.screening_item.item_number, item.screening_item.name].filter(Boolean).join(' - ')
@@ -2663,7 +2721,7 @@ function updateButtons() {
                 if (typeof DataSync !== 'undefined') {
                     DataSync.notifyWithDependencies('order_items', DataSync.EVENT_TYPES.DELETED, {
                         id,
-                        order_id: item?.order_id ?? state.orderContext.orderId
+                        order_id: item?.order_id ?? state.orderContext?.orderId ?? null
                     });
                 }
                 await loadItems();
@@ -2674,10 +2732,6 @@ function updateButtons() {
         }
 
         async function handleCreateWorkOrder(orderItemId) {
-            if (!state.orderContext) {
-                return;
-            }
-
             // 切換到工單模組
             window.openTab('work_orders', '生產工單', 'modules/work_orders.html');
 
@@ -2708,12 +2762,17 @@ function updateButtons() {
                 state.itemMap.clear();
                 updateBanner();
                 updateButtons();
-                renderGuidance(true);
-                renderEmptyTable('尚未選擇訂單，表格將於載入訂單後顯示。');
+                clearAlert();
+                renderGuidance(false);
+                await loadItems();
                 return;
             }
 
             state.orderContext = normalized;
+            state.globalKeyword = '';
+            if (globalKeywordInput) {
+                globalKeywordInput.value = '';
+            }
             updateBanner();
             updateButtons();
             clearAlert();
@@ -2744,6 +2803,62 @@ function updateButtons() {
                 const message = error instanceof Error ? error.message : '載入客戶批號資料時發生錯誤。';
                 showAlert('error', message);
             }
+        }
+
+        async function prepareEditorContext(context) {
+            const normalized = normalizeOrderContext(context);
+            if (!normalized) {
+                throw new Error('請先提供有效的訂單資料。');
+            }
+
+            state.orderContext = normalized;
+            state.activeItemOrderId = normalized.orderId;
+            await loadOrderDetails(normalized.orderId);
+            await loadOptionsIfNeeded();
+            return normalized;
+        }
+
+        const orderItemsController = Object.freeze({
+            async openCreate(context) {
+                await prepareEditorContext(context);
+                openModal('create');
+            },
+            async openEdit(context, orderItemId) {
+                await prepareEditorContext(context);
+                const normalizedId = Number.parseInt(orderItemId, 10);
+                if (!Number.isInteger(normalizedId) || normalizedId <= 0) {
+                    throw new Error('請提供有效的客戶批號 ID。');
+                }
+                await openEditModal(normalizedId);
+            },
+            close() {
+                closeModal();
+            },
+        });
+        moduleRoot.orderItemsController = orderItemsController;
+
+        if (globalFilterForm) {
+            globalFilterForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (state.orderContext) {
+                    return;
+                }
+                state.globalKeyword = globalKeywordInput ? globalKeywordInput.value.trim() : '';
+                await loadItems();
+            });
+        }
+
+        const resetGlobalFilterButton = moduleRoot.querySelector('[data-action="reset-global-filter"]');
+        if (resetGlobalFilterButton) {
+            resetGlobalFilterButton.addEventListener('click', async () => {
+                if (globalKeywordInput) {
+                    globalKeywordInput.value = '';
+                }
+                state.globalKeyword = '';
+                if (!state.orderContext) {
+                    await loadItems();
+                }
+            });
         }
 
         if (headerCreateButton) {
@@ -2817,6 +2932,13 @@ function updateButtons() {
 
                 if (action === 'edit-order-item') {
                     openEditModal(id);
+                } else if (action === 'open-order') {
+                    const item = state.itemMap.get(id);
+                    if (item?.order_id && typeof window.openTab === 'function') {
+                        window.openTab('orders', '訂單主表管理', 'modules/orders.html', {
+                            context: { orderId: item.order_id, editItemId: id }
+                        });
+                    }
                 } else if (action === 'copy-order-item') {
                     openCopyModal(id);
                 } else if (action === 'delete-order-item') {
@@ -3255,27 +3377,29 @@ function updateButtons() {
             });
         }
 
-        container.addEventListener('module:context', (event) => {
-            if (!(event instanceof CustomEvent)) {
-                return;
+        if (!editorOnly) {
+            container.addEventListener('module:context', (event) => {
+                if (!(event instanceof CustomEvent)) {
+                    return;
+                }
+
+                const detail = event.detail || {};
+                if (detail.moduleId && detail.moduleId !== 'order_items') {
+                    return;
+                }
+
+                applyOrderContext(detail.context || null);
+            });
+
+            updateButtons();
+            updateBanner();
+
+            if (state.orderContext) {
+                applyOrderContext(state.orderContext);
+            } else {
+                renderGuidance(false);
+                loadItems();
             }
-
-            const detail = event.detail || {};
-            if (detail.moduleId && detail.moduleId !== 'order_items') {
-                return;
-            }
-
-            applyOrderContext(detail.context || null);
-        });
-
-        updateButtons();
-        updateBanner();
-
-        if (state.orderContext) {
-            applyOrderContext(state.orderContext);
-        } else {
-            renderGuidance(true);
-            renderEmptyTable('尚未選擇訂單，表格將於載入訂單後顯示。');
         }
 
         async function refreshOrderItemsForDataSync(sourceModule = null) {
@@ -3301,7 +3425,7 @@ function updateButtons() {
         }
 
         // 建立資料同步輔助器
-        if (typeof DataSync !== 'undefined') {
+        if (!editorOnly && typeof DataSync !== 'undefined') {
             DataSync.createModuleHelper('order_items', {
                 onRefresh: () => refreshOrderItemsForDataSync(),
                 onDependencyUpdate: (sourceModule) => refreshOrderItemsForDataSync(sourceModule),
@@ -3425,6 +3549,8 @@ function updateButtons() {
             });
 
         }
+
+        return orderItemsController;
     }
 
     window.initializeOrderItemsModule = initializeOrderItemsModule;

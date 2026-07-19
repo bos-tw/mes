@@ -87,6 +87,9 @@ if ($output === false) {
 
 $headers = [
     '品項ID',
+    '訂單明細',
+    '客戶批號',
+    '訂單號碼',
     '受篩產品',
     '總重量(kg)',
     '載具重量合計(kg)',
@@ -129,6 +132,9 @@ foreach ($rows as $row) {
 
     fputcsv($output, [
         $id,
+        $row['order_item_number'] ?? '',
+        $row['customer_batch_number'] ?? '',
+        $row['order_number'] ?? '',
         $screeningItemName,
         $totalWeight,
         $toolWeight,

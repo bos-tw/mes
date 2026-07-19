@@ -55,7 +55,7 @@
         // Modal 配置
         modal: {
             title: '新增公司',
-            size: 'large',
+            size: 'medium',
             hiddenFields: ['id'],
             // 使用 formRows 實現二欄佈局
             formRows: [

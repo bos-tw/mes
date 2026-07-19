@@ -108,7 +108,7 @@ function handleGetInventoryItems(PDO $pdo): void
     // Validate sort column
     $allowedSortColumns = [
         'id', 'inventory_number', 'customer_name', 'screening_item_name',
-        'work_order_number', 'customer_batch_number', 'quantity_on_hand',
+        'work_order_number', 'order_item_number', 'customer_batch_number', 'quantity_on_hand',
         'net_weight_kg', 'status', 'quality_status', 'received_at'
     ];
 
@@ -119,6 +119,7 @@ function handleGetInventoryItems(PDO $pdo): void
         'customer_name' => 'c.name',
         'screening_item_name' => 'si.name',
         'work_order_number' => 'wo.work_order_number',
+        'order_item_number' => 'oi.order_item_number',
         'inventory_number' => 'ii.inventory_number',
         'customer_batch_number' => 'ii.customer_batch_number',
         'quantity_on_hand' => 'ii.quantity_on_hand',
@@ -138,6 +139,7 @@ function handleGetInventoryItems(PDO $pdo): void
         LEFT JOIN screening_items si ON ii.screening_item_id = si.id
         LEFT JOIN work_orders wo ON ii.work_order_id = wo.id
         LEFT JOIN orders o ON ii.order_id = o.id
+        LEFT JOIN order_items oi ON ii.order_item_id = oi.id
         WHERE {$whereClause}
     ");
     $countStmt->execute($params);
@@ -154,6 +156,7 @@ function handleGetInventoryItems(PDO $pdo): void
             ii.work_order_id,
             wo.work_order_number,
             ii.order_item_id,
+            oi.order_item_number,
             oi.customer_batch_number AS order_item_batch_number,
             ii.order_id,
             o.order_number,

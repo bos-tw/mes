@@ -11,6 +11,7 @@
         roles: 'initializeRolesModule', permissions: 'initializePermissionsModule', role_permissions: 'initializeRolePermissionsModule',
         employee_roles: 'initializeEmployeeRolesModule', audit_logs: 'initializeAuditLogsModule', lookup_domains: 'initializeLookupDomainsModule',
         lookup_values: 'initializeLookupValuesModule', number_sequences: 'initializeNumberSequencesModule',
+        basic_settings: 'initializeBasicSettingsModule',
         system_parameters: 'initializeSystemParametersModule', security_settings: 'initializeSecuritySettingsModule',
         report_descriptions: 'initializeReportDescriptionsModule', orders: 'initializeOrdersModule', order_items: 'initializeOrderItemsModule',
         work_orders: 'initializeWorkOrdersModule', production_work_order_schedule: 'initializeProductionWorkOrderScheduleModule',

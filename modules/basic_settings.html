@@ -1,0 +1,125 @@
+<div data-module="basic_settings">
+    <div class="content-header">
+        <div>
+            <h2>基本設定</h2>
+            <p class="subtitle">調整目前瀏覽器的個人顯示偏好</p>
+        </div>
+    </div>
+
+    <div class="content-area">
+        <section class="sidebar-tabs-layout basic-settings-tabs">
+            <nav class="sidebar-tabs-nav" aria-label="基本設定分類" role="tablist" data-basic-settings-tab-nav>
+                <button type="button" class="sidebar-tab-btn active" role="tab" data-action="switch-basic-settings-tab" data-tab-value="font-size" aria-controls="basic-settings-font-size-panel" aria-selected="true">
+                    <i class="fas fa-font" aria-hidden="true"></i>
+                    <span>字體調整</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-tabs-content">
+                <section class="basic-settings-tab-panel" id="basic-settings-font-size-panel" role="tabpanel" data-basic-settings-tab-panel="font-size">
+                    <header class="basic-settings-panel-header">
+                        <div>
+                            <h3>字體調整</h3>
+                            <p>選擇後立即套用到系統畫面，並保存在這個瀏覽器中；列印版面與功能圖示不受影響。</p>
+                        </div>
+                        <button type="button" class="btn outline" data-action="reset-font-size">
+                            <i class="fas fa-undo-alt" aria-hidden="true"></i> 恢復標準
+                        </button>
+                    </header>
+
+                    <fieldset class="font-size-settings-fieldset">
+                        <legend>選擇字體大小</legend>
+                        <div class="font-size-option-grid">
+                            <label class="font-size-option" data-font-size-option="extra-small">
+                                <input class="sr-only" type="radio" name="font_size" value="extra-small">
+                                <span class="font-size-option-name">極小</span>
+                                <span class="font-size-option-scale">85%</span>
+                                <span class="font-size-option-description">顯示最多內容</span>
+                            </label>
+                            <label class="font-size-option" data-font-size-option="small">
+                                <input class="sr-only" type="radio" name="font_size" value="small">
+                                <span class="font-size-option-name">小</span>
+                                <span class="font-size-option-scale">90%</span>
+                                <span class="font-size-option-description">適合資料密集畫面</span>
+                            </label>
+                            <label class="font-size-option" data-font-size-option="standard">
+                                <input class="sr-only" type="radio" name="font_size" value="standard">
+                                <span class="font-size-option-name">標準</span>
+                                <span class="font-size-option-scale">100%</span>
+                                <span class="font-size-option-description">系統預設大小</span>
+                            </label>
+                            <label class="font-size-option" data-font-size-option="large">
+                                <input class="sr-only" type="radio" name="font_size" value="large">
+                                <span class="font-size-option-name">大</span>
+                                <span class="font-size-option-scale">110%</span>
+                                <span class="font-size-option-description">提升文字辨識度</span>
+                            </label>
+                            <label class="font-size-option" data-font-size-option="extra-large">
+                                <input class="sr-only" type="radio" name="font_size" value="extra-large">
+                                <span class="font-size-option-name">極大</span>
+                                <span class="font-size-option-scale">120%</span>
+                                <span class="font-size-option-description">最大顯示字級</span>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <section class="font-size-current-summary" aria-live="polite">
+                        <span>目前套用</span>
+                        <strong data-current-font-size>標準（100%）</strong>
+                    </section>
+
+                    <section class="font-size-preview" aria-labelledby="font-size-preview-title">
+                        <header class="font-size-preview-header">
+                            <div>
+                                <h4 id="font-size-preview-title">範例表格預覽</h4>
+                                <p>以下範例會跟著目前字體大小變化，方便立即確認實際閱讀效果。</p>
+                            </div>
+                            <span class="text-muted">僅供預覽</span>
+                        </header>
+
+                        <div class="table-responsive">
+                            <table class="data-table compact ui-compact-table font-size-preview-table">
+                                <thead>
+                                    <tr>
+                                        <th>序號</th>
+                                        <th>訂單編號</th>
+                                        <th>客戶名稱</th>
+                                        <th>預計交期</th>
+                                        <th>狀態</th>
+                                        <th class="text-right">預估總金額</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>1</td>
+                                        <td>ORDER-20260719-0001</td>
+                                        <td>精密光學有限公司</td>
+                                        <td>2026-07-21</td>
+                                        <td><span class="status-badge pending">待處理</span></td>
+                                        <td class="text-right">$12,500.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td>2</td>
+                                        <td>ORDER-20260718-0002</td>
+                                        <td>長曜企業有限公司</td>
+                                        <td>2026-07-22</td>
+                                        <td><span class="status-badge active">已確認</span></td>
+                                        <td class="text-right">$8,900.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td>3</td>
+                                        <td>ORDER-20260717-0003</td>
+                                        <td>弘吉螺絲工業有限公司</td>
+                                        <td>2026-07-24</td>
+                                        <td><span class="status-badge in-progress">生產中</span></td>
+                                        <td class="text-right">$25,680.00</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </section>
+            </div>
+        </section>
+    </div>
+</div>

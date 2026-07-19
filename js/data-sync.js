@@ -279,7 +279,7 @@ const DataSync = (function() {
         // 訂單變更
         'orders': ['order_items', 'work_orders', 'dashboard'],
         // 訂單項目變更
-        'order_items': ['orders', 'work_orders', 'inventory_items', 'defect_history_records'],
+        'order_items': ['orders', 'work_orders', 'inventory_items', 'shipping_order_items', 'return_order_items', 'defect_history_records'],
         // 工單變更
         'work_orders': ['order_items', 'orders', 'work_order_images', 'work_order_first_piece_dimensions', 'inventory_items', 'inventory_transactions', 'dashboard', 'production_records', 'production_work_order_schedule', 'defect_history_records', 'rescreen_batches'],
         // 出貨單變更
@@ -287,12 +287,12 @@ const DataSync = (function() {
         // 出貨單項目變更（會影響出貨單狀態、客戶批號出貨狀態與庫存紀錄）
         'shipping_order_items': ['shipping_orders', 'order_items', 'inventory_items', 'inventory_transactions', 'return_orders', 'return_order_items'],
         // 退貨單變更（會影響出貨單/出貨明細退貨狀態、庫存與異動紀錄）
-        'return_orders': ['return_order_items', 'inventory_items', 'inventory_transactions', 'shipping_orders', 'shipping_order_items', 'rescreen_batches'],
-        'return_order_items': ['return_orders', 'shipping_orders', 'shipping_order_items'],
+        'return_orders': ['return_order_items', 'order_items', 'inventory_items', 'inventory_transactions', 'shipping_orders', 'shipping_order_items', 'rescreen_batches'],
+        'return_order_items': ['return_orders', 'order_items', 'shipping_orders', 'shipping_order_items'],
         // 二次重篩案件變更（會影響退貨單追溯、工單掛點與後續庫存來源鏈）
         'rescreen_batches': ['return_orders', 'work_orders', 'inventory_items', 'defect_history_records'],
         // 庫存項目變更（會影響工單轉庫存按鈕、出貨可分配狀態與庫存異動紀錄）
-        'inventory_items': ['work_orders', 'inventory_transactions', 'shipping_orders', 'shipping_order_items'],
+        'inventory_items': ['work_orders', 'order_items', 'inventory_transactions', 'shipping_orders', 'shipping_order_items'],
         // 行事曆事件變更
         'dashboard_calendar_events': ['calendar_event_participants', 'calendar_event_reminders', 'dashboard'],
         // 每日機台檢驗變更

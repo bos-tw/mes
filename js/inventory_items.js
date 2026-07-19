@@ -47,7 +47,6 @@
     };
     let inventorySourceChainScriptPromise = null;
     init();
-
     function ensureInventorySourceChainScript() {
         if (window.InventoryItemsSourceChain) return Promise.resolve();
         if (!inventorySourceChainScriptPromise) inventorySourceChainScriptPromise = new Promise((resolve, reject) => {
@@ -572,6 +571,7 @@ function renderTable(items) {
             <tr data-id="${item.id}">
                 <td><strong>${escapeHtml(item.inventory_number) || '-'}</strong>${receiptTypeBadge}${partialReceiptTrace}</td>
                 <td>${escapeHtml(item.work_order_number) || '-'}</td>
+                <td>${escapeHtml(item.order_item_number) || '-'}</td>
                 <td>${Number.isInteger(normalizedCustomerId) && normalizedCustomerId > 0 && item.customer_name ? `<button type="button" class="record-link-button" data-action="open-customer" data-customer-id="${normalizedCustomerId}" title="${customerOpenLabel}" aria-label="${customerOpenLabel}">${escapeHtml(item.customer_name)}</button>` : escapeHtml(item.customer_name || '-')}${item.customer_name && !customerIsActive ? ' <span class="text-muted">(已停用)</span>' : ''}</td>
                 <td>${escapeHtml(item.customer_batch_number) || '-'}</td>
                 <td>${escapeHtml(item.screening_item_name) || '-'}</td>

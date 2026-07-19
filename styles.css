@@ -85,15 +85,15 @@
     --ui-section-gap: 8px;
     --ui-subsection-header-padding-y: 0;
     --ui-subsection-header-padding-bottom: 6px;
-    --ui-control-height: 32px;
-    --ui-control-padding-y: 4px;
+    --ui-control-height: 28px;
+    --ui-control-padding-y: 2px;
     --ui-control-padding-x: 8px;
     --ui-inline-label-width: 112px;
-    --ui-inline-label-padding-y: 4px;
+    --ui-inline-label-padding-y: 2px;
     --ui-inline-label-padding-x: 8px;
-    --ui-table-cell-padding-y: 4px;
+    --ui-table-cell-padding-y: 2px;
     --ui-table-cell-padding-x: 6px;
-    --ui-table-header-padding-y: 5px;
+    --ui-table-header-padding-y: 3px;
     --ui-table-header-padding-x: 6px;
     --ui-card-padding-y: 10px;
     --ui-card-padding-x: 12px;
@@ -138,6 +138,69 @@
     --ui-alert-modal-padding-x: 18px;
     --ui-alert-gap: 10px;
     --ui-alert-margin-bottom: 16px;
+}
+
+/* 使用者顯示偏好：只調整文字 token，圖示與控制項尺寸維持原規格。 */
+html[data-font-size="extra-small"] {
+    --font-xs: 11px;
+    --font-sm: 12px;
+    --font-base: 12px;
+    --font-md: 13px;
+    --font-lg: 14px;
+    --font-xl: 15px;
+    --font-2xl: 17px;
+    --font-3xl: 20px;
+    --font-4xl: 24px;
+}
+
+html[data-font-size="small"] {
+    --font-xs: 11px;
+    --font-sm: 12px;
+    --font-base: 13px;
+    --font-md: 14px;
+    --font-lg: 14px;
+    --font-xl: 16px;
+    --font-2xl: 18px;
+    --font-3xl: 22px;
+    --font-4xl: 25px;
+}
+
+html[data-font-size="large"] {
+    --font-xs: 12px;
+    --font-sm: 13px;
+    --font-base: 15px;
+    --font-md: 17px;
+    --font-lg: 18px;
+    --font-xl: 20px;
+    --font-2xl: 22px;
+    --font-3xl: 26px;
+    --font-4xl: 31px;
+}
+
+html[data-font-size="extra-large"] {
+    --font-xs: 13px;
+    --font-sm: 14px;
+    --font-base: 17px;
+    --font-md: 18px;
+    --font-lg: 19px;
+    --font-xl: 22px;
+    --font-2xl: 24px;
+    --font-3xl: 29px;
+    --font-4xl: 34px;
+}
+
+@media print {
+    html[data-font-size] {
+        --font-xs: 11px;
+        --font-sm: 12px;
+        --font-base: 14px;
+        --font-md: 15px;
+        --font-lg: 16px;
+        --font-xl: 18px;
+        --font-2xl: 20px;
+        --font-3xl: 24px;
+        --font-4xl: 28px;
+    }
 }
 
 /* 基本重置 */
@@ -495,8 +558,8 @@ span {
 /* 工單狀態徽章 */
 .status-badge {
     display: inline-block;
-    padding: 4px 12px;
-    border-radius: 6px;
+    padding: var(--ui-badge-padding-y) var(--ui-badge-padding-x);
+    border-radius: var(--ui-badge-radius);
     font-size: var(--font-sm);
     font-weight: 500;
     line-height: 1.4;
@@ -626,8 +689,8 @@ span.status-badge.pending {
 /* 庫存異動來源標籤 */
 .source-tag {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
+    padding: var(--ui-badge-padding-y) var(--ui-badge-padding-x);
+    border-radius: var(--ui-badge-radius);
     font-size: var(--font-sm);
     background-color: var(--color-bg-hover);
     color: var(--color-text-secondary);
@@ -1048,7 +1111,7 @@ span.status-badge.pending {
 
 .data-table th {
     font-weight: bold;
-    color: #555;
+    color: var(--color-text-body);
     white-space: nowrap; /* 防止標題換行 */
 }
 
@@ -1058,29 +1121,11 @@ span.status-badge.pending {
 }
 
 .data-table tbody tr:nth-child(even) {
-    background-color: #f9f9f9; /* 斑馬紋效果 */
+    background-color: var(--color-bg-light); /* 斑馬紋效果 */
 }
 
 .data-table tbody tr:hover {
-    background-color: #f0f0f0;
-}
-
-.icon-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: var(--font-xl);
-    margin: 0 2px;
-    padding: 5px;
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
-}
-
-.edit-btn { color: #007bff; }
-.delete-btn { color: var(--color-danger); }
-
-.icon-btn:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: var(--color-bg-hover);
 }
 
 .data-table th i {
@@ -1306,7 +1351,7 @@ body.login-page {
 .form-group .form-control {
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid #ced4da;
+    border: 1px solid var(--color-border-light);
     border-radius: 0;
     font-size: var(--font-md);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -1496,9 +1541,10 @@ body.login-page {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 6px 14px;
-    border-radius: 4px;
+    gap: var(--ui-control-padding-y);
+    min-height: var(--ui-control-height);
+    padding: var(--ui-control-padding-y) var(--ui-control-padding-x);
+    border-radius: var(--ui-radius-control);
     border: 1px solid transparent;
     font-size: var(--font-base);
     font-weight: 500;
@@ -1527,12 +1573,12 @@ body.login-page {
 
 .btn.outline {
     background-color: #fff;
-    color: #2f8a3b;
-    border-color: #2f8a3b;
+    color: var(--color-primary);
+    border-color: var(--color-primary);
 }
 
 .btn.outline:hover {
-    background-color: rgba(47, 138, 59, 0.08);
+    background-color: var(--color-primary-light);
 }
 
 .btn.success {
@@ -1777,9 +1823,9 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     background: var(--color-danger);
     color: #fff;
     font-size: var(--font-xs);
-    padding: 2px 6px;
-    border-radius: 6px;
-    margin-left: 4px;
+    padding: var(--ui-badge-padding-y) var(--ui-badge-padding-x);
+    border-radius: var(--ui-badge-radius);
+    margin-left: var(--ui-control-padding-y);
 }
 
 /* 按鈕下拉選單（用於批次匯出等） */
@@ -1851,66 +1897,14 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     font-variant-numeric: tabular-nums;
 }
 
-/*
- * 以下 btn-print-new / btn-print-done 樣式已棄用
- * 請改用 .btn.text[data-action="print-work-order"] 統一使用列印紫 (#7c3aed) 色系
- * 保留此區塊是為了向後兼容，未來版本可移除
- */
-
-/* 列印按鈕樣式 - 未列印狀態 (綠底白字) [已棄用] */
-.btn.btn-print-new {
-    padding: 6px;
-    border: none;
-    background-color: #28a745;
-    color: #fff;
-    border-radius: 4px;
-    font-weight: 500;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    margin-right: 0;
-    cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-}
-
-.btn.btn-print-new:hover {
-    background-color: #218838;
-    transform: translateY(-1px);
-}
-
-/* 列印按鈕樣式 - 已列印狀態 (綠框白底綠字) [已棄用] */
-.btn.btn-print-done {
-    padding: 6px;
-    border: 2px solid #28a745;
-    background-color: #fff;
-    color: #28a745;
-    border-radius: 4px;
-    font-weight: 500;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    margin-right: 0;
-    cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-}
-
-.btn.btn-print-done:hover {
-    background-color: #f0fff4;
-    transform: translateY(-1px);
-}
-
 .btn.ghost {
     background: none;
-    border: 1px solid #ced4da;
+    border: 1px solid var(--color-border-light);
     color: var(--color-text-body);
 }
 
 .btn.ghost:hover {
-    background-color: #f1f3f5;
+    background-color: var(--color-bg-light);
 }
 
 /* Summary Cards */
@@ -1982,7 +1976,7 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--ui-section-gap);
     min-width: 0;
 }
 
@@ -1990,11 +1984,11 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     display: inline-flex;
     align-items: center;
     max-width: 280px;
-    padding: 4px 8px;
+    padding: var(--ui-badge-padding-y) var(--ui-badge-padding-x);
     background: #e8f5e9;
     color: #1f5d2a;
     border: 1px solid #c9e7d1;
-    border-radius: 4px;
+    border-radius: var(--ui-badge-radius);
     font-size: var(--font-sm);
     line-height: 1.35;
     overflow: hidden;
@@ -2173,7 +2167,7 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     padding: var(--ui-inline-label-padding-y) var(--ui-inline-label-padding-x);
     margin-bottom: 0;
     background-color: var(--color-bg-disabled);
-    border: 1px solid #ced4da;
+    border: 1px solid var(--color-border-light);
     border-right: none;
     color: var(--color-text-body);
     font-weight: 500;
@@ -2413,7 +2407,7 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     padding: var(--ui-inline-label-padding-y) var(--ui-inline-label-padding-x);
     margin-bottom: 0;
     background-color: var(--color-bg-disabled);
-    border: 1px solid #ced4da;
+    border: 1px solid var(--color-border-light);
     border-right: none;
     font-weight: 500;
     color: var(--color-text-body);
@@ -2426,7 +2420,7 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     flex: 1;
     min-height: var(--ui-control-height);
     padding: var(--ui-control-padding-y) var(--ui-control-padding-x);
-    border: 1px solid #ced4da;
+    border: 1px solid var(--color-border-light);
     border-radius: 0;
     margin-bottom: 0;
     font-size: var(--font-base);
@@ -2453,7 +2447,7 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     width: 100%;
     min-height: var(--ui-control-height);
     padding: var(--ui-control-padding-y) var(--ui-control-padding-x);
-    border: 1px solid #ced4da;
+    border: 1px solid var(--color-border-light);
     border-radius: 0;
     font-size: var(--font-base);
     transition: border-color 0.2s ease;
@@ -2587,7 +2581,7 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     align-items: center;
     justify-content: flex-end;
     padding: var(--ui-inline-label-padding-y) var(--ui-inline-label-padding-x);
-    border: 1px solid #ced4da;
+    border: 1px solid var(--color-border-light);
     border-right: 0;
     background: var(--color-bg-disabled);
     line-height: 1.25;
@@ -2601,7 +2595,7 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
 .ui-compact-form-row label.inline-label > textarea {
     min-height: var(--ui-control-height);
     padding: var(--ui-control-padding-y) var(--ui-control-padding-x);
-    border: 1px solid #ced4da;
+    border: 1px solid var(--color-border-light);
     border-radius: var(--ui-radius-control);
 }
 
@@ -2794,7 +2788,7 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
 
 .table-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--ui-section-gap);
     align-items: center;
 }
 
@@ -2812,7 +2806,7 @@ td.actions-col {
     width: 30px;
     height: 30px;
     padding: 6px;
-    border-radius: 4px;
+    border-radius: var(--ui-radius-control);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -3036,65 +3030,20 @@ td.actions-col {
     background: #115e59;
 }
 
-/* 表格操作按鈕圖標樣式 */
-.btn-icon {
-    background: transparent;
-    border: 1px solid #ddd;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    padding: 6px;
-    border-radius: 4px;
-    font-size: var(--font-base);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-.btn-icon:hover {
-    background: #f0f0f0;
-    color: var(--color-text);
-    border-color: #ccc;
-}
-
-.btn-icon.primary {
-    background: #007bff;
-    border-color: #007bff;
-    color: #fff;
-}
-
-.btn-icon.primary:hover {
-    background: #0056b3;
-    border-color: #0056b3;
-}
-
-.btn-icon.danger {
-    background: transparent;
-    border-color: var(--color-danger);
-    color: var(--color-danger);
-}
-
-.btn-icon.danger:hover {
-    background: var(--color-danger);
-    color: #fff;
-}
-
 .link {
     background: #007bff;
     border: none;
     color: #fff;
     cursor: pointer;
-    padding: 6px;
-    margin-right: 4px;
-    border-radius: 4px;
+    padding: var(--ui-control-padding-y);
+    margin-right: var(--ui-control-padding-y);
+    border-radius: var(--ui-radius-control);
     font-size: var(--font-base);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: var(--ui-control-height);
+    height: var(--ui-control-height);
     transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
@@ -3200,7 +3149,7 @@ td.actions-col {
     width: 280px;
     background: #fff;
     border: 1px solid var(--color-border-light);
-    border-radius: 8px;
+    border-radius: var(--ui-radius-panel);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 900;
     display: flex;
@@ -3219,7 +3168,7 @@ td.actions-col {
     align-items: center;
     justify-content: space-between;
     background-color: var(--color-bg-light);
-    border-radius: 8px 8px 0 0;
+    border-radius: var(--ui-radius-panel) var(--ui-radius-panel) 0 0;
 }
 
 .column-selector-header h4 {
@@ -3234,12 +3183,12 @@ td.actions-col {
     font-size: var(--font-2xl);
     color: var(--color-text-muted);
     cursor: pointer;
-    width: 28px;
-    height: 28px;
+    width: var(--ui-control-height);
+    height: var(--ui-control-height);
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: var(--ui-radius-control);
     transition: all 0.2s ease;
 }
 
@@ -3309,7 +3258,7 @@ td.actions-col {
     width: 100%;
     min-height: var(--ui-control-height);
     padding: var(--ui-control-padding-y) var(--ui-control-padding-x);
-    border: 1px solid #ced4da;
+    border: 1px solid var(--color-border-light);
     border-radius: var(--ui-radius-control);
     font-size: var(--font-base);
     font-family: inherit;
@@ -4151,11 +4100,6 @@ td.actions-col {
 
 .modal-window.small {
     width: min(500px, 90%);
-}
-
-/* 舊版類別（為相容性保留，新開發請使用上方格式） */
-.modal-window-large {
-    width: min(1200px, 90%);
 }
 
 /* Detail Content Styles */
@@ -9034,6 +8978,178 @@ td.actions-col {
     min-width: 0;
     display: flex;
     flex-direction: column;
+}
+
+/* ====== 基本設定工作區 ====== */
+.basic-settings-tabs {
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--ui-radius-panel);
+    background: var(--color-bg);
+}
+
+.basic-settings-tab-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-section-gap);
+    padding: var(--ui-card-padding-y) var(--ui-card-padding-x);
+}
+
+.basic-settings-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--ui-section-gap);
+    padding-bottom: var(--ui-section-gap);
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.basic-settings-panel-header h3 {
+    color: var(--color-text-primary);
+    font-size: var(--font-xl);
+}
+
+.basic-settings-panel-header p {
+    color: var(--color-text-secondary);
+    font-size: var(--font-sm);
+}
+
+.font-size-settings-fieldset {
+    border: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-section-gap);
+}
+
+.font-size-settings-fieldset legend {
+    color: var(--color-text-primary);
+    font-size: var(--font-lg);
+    font-weight: 600;
+    padding-bottom: var(--ui-section-gap);
+}
+
+.font-size-option-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--ui-section-gap);
+}
+
+.font-size-option {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-section-gap);
+    min-width: 0;
+    padding: var(--ui-card-padding-y) var(--ui-card-padding-x);
+    border: 1px solid var(--color-border);
+    border-radius: var(--ui-radius-card);
+    background: var(--color-bg);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.font-size-option:hover {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.font-size-option.selected,
+.font-size-option:focus-within {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.font-size-option-name {
+    font-size: var(--font-lg);
+    font-weight: 600;
+}
+
+.font-size-option-scale {
+    color: var(--color-primary);
+    font-size: var(--font-2xl);
+    font-weight: 700;
+}
+
+.font-size-option-description {
+    color: var(--color-text-secondary);
+    font-size: var(--font-sm);
+}
+
+.font-size-current-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ui-section-gap);
+    padding: var(--ui-section-padding-y) var(--ui-section-padding-x);
+    border-radius: var(--ui-radius-card);
+    background: var(--color-bg-light);
+    color: var(--color-text-secondary);
+}
+
+.font-size-current-summary strong {
+    color: var(--color-primary);
+    font-size: var(--font-lg);
+}
+
+.font-size-preview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-section-gap);
+    padding: var(--ui-card-padding-y) var(--ui-card-padding-x);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--ui-radius-card);
+    background: var(--color-bg);
+}
+
+.font-size-preview-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--ui-section-gap);
+    padding-bottom: var(--ui-section-gap);
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.font-size-preview-header h4 {
+    color: var(--color-text-primary);
+    font-size: var(--font-lg);
+}
+
+.font-size-preview-header p {
+    color: var(--color-text-secondary);
+    font-size: var(--font-sm);
+}
+
+.font-size-preview-table th,
+.font-size-preview-table td {
+    white-space: nowrap;
+}
+
+.font-size-preview-table th:first-child,
+.font-size-preview-table td:first-child {
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .font-size-preview-header {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 1200px) {
+    .font-size-option-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .basic-settings-panel-header {
+        flex-direction: column;
+    }
+
+    .font-size-option-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* 內容區頂部的篩選列（搜尋 + 未讀勾選） */

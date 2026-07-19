@@ -32,6 +32,7 @@
  * | 庫存編號       | inventory_number        |
  * | 受篩產品       | screening_item_name     |
  * | 工單號         | work_order_number       |
+ * | 訂單明細       | order_item_number      |
  * | 訂單號         | order_number            |
  * | 客戶名稱       | customer_name           |
  * | 客戶批號       | customer_batch_number   |
@@ -86,6 +87,7 @@ $sql = "
         ii.inventory_number,
         si.name                     AS screening_item_name,
         wo.work_order_number,
+        oi.order_item_number,
         o.order_number,
         c.name                      AS customer_name,
         ii.customer_batch_number,
@@ -106,6 +108,7 @@ $sql = "
     LEFT JOIN screening_items si ON ii.screening_item_id = si.id
     LEFT JOIN work_orders     wo ON ii.work_order_id      = wo.id
     LEFT JOIN orders          o  ON ii.order_id           = o.id
+    LEFT JOIN order_items     oi ON ii.order_item_id      = oi.id
     WHERE {$whereClause}
     ORDER BY ii.id DESC
     LIMIT :limit
@@ -143,6 +146,7 @@ fputcsv($handle, [
     '庫存編號',
     '受篩產品',
     '工單號',
+    '訂單明細',
     '訂單號',
     '客戶名稱',
     '客戶批號',
@@ -166,6 +170,7 @@ foreach ($rows as $row) {
         $row['inventory_number'],
         $row['screening_item_name'] ?? '',
         $row['work_order_number'] ?? '',
+        $row['order_item_number'] ?? '',
         $row['order_number'] ?? '',
         $row['customer_name'] ?? '',
         $row['customer_batch_number'] ?? '',

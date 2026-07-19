@@ -113,6 +113,7 @@ ModuleConfig.register('work_orders', {
         { key: 'work_order_type', label: '工單類型', sortable: false, selectable: true },
         { key: 'second_screening', label: '二次篩選', sortable: false, selectable: true },
         { key: 'order_number', label: '訂單號碼', sortable: true, selectable: true },
+        { key: 'order_item_number', label: '訂單明細', sortable: true, selectable: true },
         { key: 'customer_name', label: '客戶名稱', sortable: true, selectable: true },
         { key: 'screening_item', label: '受篩產品', sortable: false, selectable: true },
         { key: 'machine_name', label: '機台', sortable: true, selectable: true },

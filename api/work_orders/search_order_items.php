@@ -11,7 +11,7 @@
  * @input GET 參數:
  * | 參數       | 類型   | 必填 | 說明                              |
  * |------------|--------|-----|-----------------------------------|
- * | keyword    | string | 否  | 搜尋訂單號/客戶PO/客戶批號/圖面編號/客戶名 |
+ * | keyword    | string | 否  | 搜尋訂單號/明細編號/客戶PO/客戶批號/圖面編號/客戶名 |
  * | start_date | date   | 否  | 訂單日期起                          |
  * | end_date   | date   | 否  | 訂單日期迄                          |
  *
@@ -63,6 +63,7 @@ $params = [];
 if ($keyword !== '') {
     $conditions[] = '(
         o.order_number LIKE :keyword
+        OR oi.order_item_number LIKE :keyword
         OR o.customer_po_number LIKE :keyword
         OR oi.customer_batch_number LIKE :keyword
         OR oi.drawing_number LIKE :keyword
@@ -93,6 +94,7 @@ $sql = "
     SELECT
         oi.id,
         oi.order_id,
+        oi.order_item_number,
         oi.customer_batch_number,
         oi.sub_item_number,
         oi.part_number,
@@ -129,6 +131,7 @@ try {
             'customer_id' => (int)$row['customer_id'],
             'customer_name' => $row['customer_name'],
             'order_number' => $row['order_number'],
+            'order_item_number' => $row['order_item_number'],
             'customer_po_number' => $row['customer_po_number'],
             'customer_batch_number' => $row['customer_batch_number'],
             'sub_item_number' => $row['sub_item_number'],
@@ -141,7 +144,8 @@ try {
             'total_units' => (float)$row['total_units'],
             'total_weight_kg' => (float)$row['total_weight_kg'],
             'display_label' => sprintf(
-                '%s - %s (批號: %s)',
+                '%s / %s - %s (客戶批號: %s)',
+                $row['order_item_number'] ?? '-',
                 $row['order_number'],
                 $row['customer_name'],
                 $row['customer_batch_number'] ?? '無'

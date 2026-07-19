@@ -76,6 +76,7 @@ try {
             si.name AS screening_item_name,
             si.weight_per_unit_g,
             oi.screening_item_id,
+            oi.order_item_number,
             oi.customer_batch_number,
             oi.sub_item_number,
             oi.part_number,

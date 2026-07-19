@@ -16,6 +16,7 @@ $ver = $cacheVersion['version'];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>精密光學篩選管理系統</title>
+    <script src="core/ui-preferences.js?v=<?= $ver ?>"></script>
     <link rel="stylesheet" href="styles/tokens.css?v=<?= $ver ?>">
     <link rel="stylesheet" href="styles/shell.css?v=<?= $ver ?>">
     <link rel="stylesheet" href="styles.css?v=<?= $ver ?>">
@@ -128,6 +129,7 @@ $ver = $cacheVersion['version'];
                                 <span class="menu-text">系統設定</span>
                             </a>
                             <ul class="submenu">
+                                <li><a href="#" data-page="basic_settings" data-title="基本設定"><i class="fas fa-sliders-h"></i> 基本設定</a></li>
                                 <li><a href="#" data-page="lookup_domains" data-title="代碼領域"><i class="fas fa-tag"></i> 代碼領域</a></li>
                                 <li><a href="#" data-page="lookup_values" data-title="代碼值"><i class="fas fa-tags"></i> 代碼值</a></li>
                                 <li><a href="#" data-page="number_sequences" data-title="流水號管理"><i class="fas fa-sort-numeric-up"></i> 流水號管理</a></li>

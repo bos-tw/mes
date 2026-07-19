@@ -22,6 +22,8 @@ const commands = [
     ['node', ['tools/audit/tests/frontend-xss.test.js']],
     ['node', ['tools/audit/tests/frontend-quality.test.js']],
     ['node', ['tools/audit/tests/governance-contracts.test.js']],
+    ['node', ['tools/audit/tests/basic-settings-font-preference.test.js']],
+    ['node', ['tools/audit/tests/order-item-editor-parity.test.js']],
     ['node', ['tools/audit/tests/version-checker-behavior.test.js']],
     ['node', ['tools/audit/tests/data-sync-adapter.test.js']]
 ];

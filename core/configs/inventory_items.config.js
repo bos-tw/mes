@@ -99,6 +99,7 @@ ModuleConfig.register('inventory_items', {
     columns: [
         { key: 'inventory_number', label: '庫存編號', sortable: true, selectable: true },
         { key: 'work_order_number', label: '工單號碼', sortable: true, selectable: true },
+        { key: 'order_item_number', label: '訂單明細', sortable: true, selectable: true },
         { key: 'customer_name', label: '客戶', sortable: true, selectable: true },
         { key: 'customer_batch_number', label: '客戶批號', sortable: true, selectable: true },
         { key: 'screening_item_name', label: '受篩產品', sortable: true, selectable: true },

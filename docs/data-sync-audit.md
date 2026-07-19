@@ -1,13 +1,13 @@
 # DataSync 稽核報告
 
-產生時間：2026-07-18T13:10:56.497Z
+產生時間：2026-07-19T09:50:40.828Z
 
 ## 摘要
 
 - P0: 0
 - P1: 0
 - P2: 0
-- 通過：50
+- 通過：51
 - 相依來源數：41
 - 狀態型介面刷新檢查數：37
 
@@ -16,6 +16,7 @@
 | 優先級 | 模組 | 輔助模組 | CRUD 方法 | 通知模組 | 相依刷新目標 | 相依來源 | 問題 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | OK | audit_logs | audit_logs | DELETE | (helper) | - | - | - |
+| OK | basic_settings | basic_settings | - | - | - | - | - |
 | OK | calendar_event_participants | calendar_event_participants | POST, DELETE | (helper) | - | dashboard_calendar_events, employees | - |
 | OK | calendar_event_reminders | calendar_event_reminders | DELETE | (helper) | dashboard_calendar_events | dashboard_calendar_events, employees | - |
 | OK | companies | companies | POST, PUT, DELETE | companies | employees, customers, suppliers | - | - |
@@ -28,7 +29,7 @@
 | OK | departments | departments | POST, PUT, DELETE | (helper) | employees, notifications, quality_issue_reports | - | - |
 | OK | employee_roles | employee_roles | POST, DELETE | (helper) | employees, roles | employees, roles | - |
 | OK | employees | employees | DELETE | (helper) | work_orders, orders, calendar_event_participants, calendar_event_reminders, work_order_first_piece_dimensions, messages, notifications, employee_roles, daily_machine_inspections, daily_machine_inspection_items, machine_maintenance_tasks, production_records, quality_issue_reports, shipping_quality_inspections | companies, departments, employee_roles, lookup_values | - |
-| OK | inventory_items | inventory_items | POST, PUT, DELETE | inventory_items, shipping_orders, work_orders | work_orders, inventory_transactions, shipping_orders, shipping_order_items | order_items, rescreen_batches, return_orders, screening_items, shipping_order_items, shipping_orders, suppliers, work_orders | - |
+| OK | inventory_items | inventory_items | POST, PUT, DELETE | inventory_items, shipping_orders, work_orders | work_orders, order_items, inventory_transactions, shipping_orders, shipping_order_items | order_items, rescreen_batches, return_orders, screening_items, shipping_order_items, shipping_orders, suppliers, work_orders | - |
 | OK | inventory_items_source_chain | - | - | - | - | - | - |
 | OK | inventory_transactions | inventory_transactions | - | - | - | inventory_items, return_orders, shipping_order_items, shipping_orders, work_orders | - |
 | OK | lookup_domains | lookup_domains | DELETE | (helper) | lookup_values | - | - |
@@ -39,7 +40,7 @@
 | OK | messages | messages | POST, DELETE | (helper) | - | employees | - |
 | OK | notifications | notifications | POST, DELETE | (helper) | dashboard | departments, employees, roles | - |
 | OK | number_sequences | number_sequences | DELETE | (helper) | - | - | - |
-| OK | order_items | order_items | POST, DELETE | order_items | orders, work_orders, inventory_items, defect_history_records | orders, screening_items, screening_services, shipping_order_items, shipping_orders, tools, work_orders | - |
+| OK | order_items | order_items | POST, DELETE | order_items | orders, work_orders, inventory_items, shipping_order_items, return_order_items, defect_history_records | inventory_items, orders, return_order_items, return_orders, screening_items, screening_services, shipping_order_items, shipping_orders, tools, work_orders | - |
 | OK | orders | orders | POST, DELETE | (helper), order_items | order_items, work_orders, dashboard | customers, employees, lookup_values, order_items, screening_services, suppliers, work_orders | - |
 | OK | permissions | permissions | DELETE | (helper) | role_permissions | role_permissions | - |
 | OK | production_quality_records | production_quality_records | POST, DELETE | production_quality_records | work_orders | - | - |
@@ -49,14 +50,14 @@
 | OK | report_descriptions | report_descriptions | DELETE | (helper) | - | - | - |
 | OK | rescreen_batches | rescreen_batches | - | (helper) | return_orders, work_orders, inventory_items, defect_history_records | customers, return_orders, work_orders | - |
 | OK | rescreen_batches_execution | - | - | rescreen_batches | - | - | - |
-| OK | return_order_items | return_order_items | DELETE | (helper) | return_orders, shipping_orders, shipping_order_items | return_orders, shipping_order_items, shipping_orders | - |
-| OK | return_orders | return_orders | DELETE | (helper) | return_order_items, inventory_items, inventory_transactions, shipping_orders, shipping_order_items, rescreen_batches | customers, rescreen_batches, return_order_items, shipping_order_items, shipping_orders | - |
+| OK | return_order_items | return_order_items | DELETE | (helper) | return_orders, order_items, shipping_orders, shipping_order_items | order_items, return_orders, shipping_order_items, shipping_orders | - |
+| OK | return_orders | return_orders | DELETE | (helper) | return_order_items, order_items, inventory_items, inventory_transactions, shipping_orders, shipping_order_items, rescreen_batches | customers, rescreen_batches, return_order_items, shipping_order_items, shipping_orders | - |
 | OK | role_permissions | role_permissions | PUT | (helper) | roles, permissions | permissions, roles | - |
 | OK | roles | roles | DELETE | (helper) | notifications, employee_roles, role_permissions | employee_roles, role_permissions | - |
 | OK | screening_items | screening_items | DELETE | screening_items | order_items, screening_services, inventory_items | lookup_values | - |
 | OK | screening_services | screening_services | POST, DELETE | screening_services | orders, order_items | customers, screening_items | - |
 | OK | security_settings | security_settings | POST | (helper) | - | - | - |
-| OK | shipping_order_items | shipping_order_items | - | - | shipping_orders, order_items, inventory_items, inventory_transactions, return_orders, return_order_items | inventory_items, return_order_items, return_orders, shipping_orders | - |
+| OK | shipping_order_items | shipping_order_items | - | - | shipping_orders, order_items, inventory_items, inventory_transactions, return_orders, return_order_items | inventory_items, order_items, return_order_items, return_orders, shipping_orders | - |
 | OK | shipping_orders | shipping_orders | POST, PUT, DELETE | return_orders, shipping_orders | shipping_order_items, inventory_items, order_items, inventory_transactions, return_orders, return_order_items, dashboard, shipping_quality_inspections, defect_history_records | inventory_items, return_order_items, return_orders, shipping_order_items, shipping_quality_inspections | - |
 | OK | shipping_quality_inspections | shipping_quality_inspections | POST, PUT, DELETE | (helper) | shipping_orders | employees, shipping_orders | - |
 | OK | suppliers | suppliers | POST, DELETE | suppliers | orders, inventory_items | companies, lookup_values | - |
@@ -92,20 +93,20 @@
 | machines | 快取, 編輯視窗, 按鈕狀態 | machine_capabilities, machine_maintenance_tasks | 是 | 請確認目前開啟狀態的刷新路徑 |
 | messages | 明細視窗, 編輯視窗, 按鈕狀態 | employees | 是 | 請確認目前開啟狀態的刷新路徑 |
 | notifications | 明細視窗, 編輯視窗, 按鈕狀態 | departments, employees, roles | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
-| order_items | 編輯視窗, 按鈕狀態 | orders, screening_items, screening_services, shipping_order_items, shipping_orders, tools, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| order_items | 編輯視窗, 按鈕狀態 | inventory_items, orders, return_order_items, return_orders, screening_items, screening_services, shipping_order_items, shipping_orders, tools, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | orders | 快取, 展開列, 編輯視窗, 按鈕狀態 | customers, employees, lookup_values, order_items, screening_services, suppliers, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | permissions | 快取, 編輯視窗, 按鈕狀態 | role_permissions | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | production_records | 快取, 明細視窗, 編輯視窗, 按鈕狀態 | employees, machines, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | production_work_order_schedule | 展開列, 編輯視窗, 按鈕狀態 | machine_capabilities, machines, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | quality_issue_reports | 明細視窗, 編輯視窗, 按鈕狀態 | departments, employees | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | rescreen_batches | 明細視窗, 編輯視窗, 按鈕狀態 | customers, return_orders, work_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
-| return_order_items | 編輯視窗, 按鈕狀態 | return_orders, shipping_order_items, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| return_order_items | 編輯視窗, 按鈕狀態 | order_items, return_orders, shipping_order_items, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | return_orders | 明細視窗, 編輯視窗, 按鈕狀態 | customers, rescreen_batches, return_order_items, shipping_order_items, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | role_permissions | 編輯視窗, 按鈕狀態 | permissions, roles | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | roles | 快取, 編輯視窗, 按鈕狀態 | employee_roles, role_permissions | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | screening_items | 編輯視窗, 按鈕狀態 | lookup_values | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
 | screening_services | 快取, 編輯視窗, 按鈕狀態 | customers, screening_items | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
-| shipping_order_items | 編輯視窗, 按鈕狀態 | inventory_items, return_order_items, return_orders, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
+| shipping_order_items | 編輯視窗, 按鈕狀態 | inventory_items, order_items, return_order_items, return_orders, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | shipping_orders | 明細視窗, 編輯視窗, 按鈕狀態 | inventory_items, return_order_items, return_orders, shipping_order_items, shipping_quality_inspections | 是 | 請確認目前開啟狀態的刷新路徑 |
 | shipping_quality_inspections | 快取, 明細視窗, 編輯視窗, 按鈕狀態 | employees, shipping_orders | 是 | 請確認目前開啟狀態的刷新路徑 |
 | suppliers | 快取, 編輯視窗, 按鈕狀態 | companies, lookup_values | 否 | 使用通用 onRefresh，需人工檢查開啟中的介面狀態 |
