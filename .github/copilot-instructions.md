@@ -2,6 +2,22 @@
 
 這是給 GitHub Copilot 和其他 AI 助手的開發指引，請在進行相關開發時遵循。
 
+## 規範治理（2026-07-19 統一）
+
+本檔負責工作流程與業務背景；程式風格、UI/UX、CSS 與前端契約的正式來源是 `.github/standards/`。
+
+規範優先順序如下：
+
+1. 實際執行契約：`styles.css` 的 `:root` token、共用元件、審計工具與測試。
+2. `.github/standards/*.md` 正式規範。
+3. `.github/instructions/*.instructions.md` 檔案類型入口。
+4. `.github/skills/*.md` 相容參考文件。
+5. 本檔一般說明與歷史背景。
+
+同一層若有衝突，禁止自行選擇或繼續擴大修改；先指出衝突，並以正式來源修正。
+
+除非需求明確要求，禁止順手全域替換色彩、字體、spacing、radius、按鈕或頁面結構；UI 需求不足時沿用既有共用 token/class，不得自行創造第二套視覺規格。
+
 ---
 
 ## 🎯 開發節奏與完成定義（2026-05-10 新增，強制遵循）
@@ -252,12 +268,12 @@ MES 是流程型系統，核心流程為：
 #### A. 必讀文件
 
 1. 修改 `*.css` 前，必須先讀：
-    - `.github/skills/css-style-guide.md`
-    - `.github/skills/ui-style.md`
+    - `.github/standards/ui-tokens.md`
+    - `.github/standards/ui-components.md`
 2. 修改 `modules/**/*.html`、`index.php`、`index.html` 或任何會影響畫面的 JS template 前，必須先讀：
-    - `.github/skills/html-module-style.md`
-    - `.github/skills/ui-style.md`
-3. 若本輪已讀 `.github/copilot-instructions.md`，仍必須依「Skills 全檔讀取規範」完整讀取 `.github/skills/` 全部檔案。
+    - `.github/standards/ui-components.md`
+    - `.github/standards/ui-tokens.md`
+3. `.github/skills/` 僅作相容參考；若內容與 `.github/standards/` 不一致，以正式規範為準。
 
 #### B. CSS Token 強制規則
 
@@ -270,7 +286,7 @@ MES 是流程型系統，核心流程為：
 ```
 
 4. 例外只允許用於列印模板、第三方套件相容、固定比例圖片/QR Code/Canvas、或已經有明確視覺限制的特殊元件。
-5. 不得新增與既有 token 意義重疊的變數；需要新增時應補到 `:root`，並同步更新 `.github/skills/css-style-guide.md`。
+5. 不得新增與既有 token 意義重疊的變數；需要新增時應補到 `styles.css` 的 `:root`，並同步更新 `.github/standards/ui-tokens.md`。
 
 #### C. UI 密度強制規則
 
@@ -1213,8 +1229,8 @@ modal: {
 
             <!-- 表單按鈕放在 form 內 -->
             <div class="form-actions">
-                <button type="button" class="outline" data-action="cancel">取消</button>
-                <button type="submit" class="primary">儲存</button>
+                <button type="button" class="btn outline" data-action="cancel">取消</button>
+                <button type="submit" class="btn primary" data-action="save">儲存</button>
             </div>
         </form>
     </div>
@@ -1236,8 +1252,8 @@ modal: {
         </div>
 
         <div class="form-actions">
-            <button type="button" class="outline" data-action="close-detail-modal">關閉</button>
-            <button type="button" class="primary" data-action="edit-from-detail">編輯</button>
+            <button type="button" class="btn outline" data-action="close-detail-modal">關閉</button>
+            <button type="button" class="btn primary" data-action="edit-from-detail">編輯</button>
         </div>
     </div>
 </div>
@@ -1256,9 +1272,9 @@ modal: {
 
 3. **按鈕規則**：
    - 按鈕放在 `<form>` 內的 `<div class="form-actions">`
-   - 取消按鈕：`class="outline"` + `type="button"`
-   - 儲存按鈕：`class="primary"` + `type="submit"`
-   - **不要使用** `btn` 前綴（如 `btn primary`）
+   - 取消按鈕：`class="btn outline"` + `type="button"` + `data-action="cancel"`
+   - 儲存按鈕：`class="btn primary"` + `type="submit"` + `data-action="save"`
+   - 所有按鈕都必須使用 `btn` 前綴，不得使用裸 `primary` 或 `outline`
 
 4. **Alert 區域**：
    - 必須有 `role="alert"` 屬性
@@ -1743,15 +1759,15 @@ window.ModuleRenderer
 - 如果移除表頭欄位，必須同步移除 JS row template 中對應的 `<td>`，並調整 loading/empty row 的 `colspan`，避免列表跑版。
 
 #### Modal 表單規範
-1. **不要**在 form 內自動加入 `<input type="hidden" name="id">`，讓模組 JS 自己處理
+1. 表單必須保留 `<input type="hidden" name="id">`，以支援配置 renderer 的新增/編輯辨識
 2. **form-actions** 必須加上 `align-right` 類別
 3. **submit 按鈕**必須有對應的 `data-action` 屬性
 
 ```html
 <!-- ✅ 正確 -->
 <div class="form-actions align-right">
-    <button type="button" class="outline" data-action="cancel">取消</button>
-    <button type="submit" class="primary" data-action="save">儲存</button>
+    <button type="button" class="btn outline" data-action="cancel">取消</button>
+    <button type="submit" class="btn primary" data-action="save">儲存</button>
 </div>
 ```
 
@@ -2007,38 +2023,38 @@ DataSync.subscribe('模組名稱', (event) => {
 
 ---
 
-## 📚 技能文件索引（Skills）
+## 📚 規範文件索引
 
-以下文件定義各技術領域的詳細規範。**在進行對應工作時，必須閱讀並遵循相關文件。**
+`.github/standards/` 是正式規範；`.github/instructions/` 是依檔案類型套用的短版入口；`.github/skills/` 僅保留相容參考，不得覆寫正式規範。
 
 > 各文件已同步為 `.github/instructions/*.instructions.md`，VS Code Copilot 會依編輯的檔案類型自動套用。
 
-### 🔒 Skills 全檔讀取規範（2026-05-31 新增，強制）
+### 🔒 Skills 讀取規範（2026-07-19 統一）
 
-1. 只要讀取本檔（`.github/copilot-instructions.md`），**必須先完整讀取 `.github/skills/` 目錄下所有檔案**，不得只讀與當前任務看似相關的單一檔案。
-2. 若 `.github/skills/` 有新增、刪除或改名，需先重新掃描清單並完整讀取後，才能開始實作。
-3. 交接給下一位 AI/工程師時，需明確註記：已讀取 `.github/skills/*` 全部內容。
+1. 只讀取與本輪修改範圍相關的 `.github/skills/` 相容入口，不要求為了開始任務而讀取全部歷史文件。
+2. UI/CSS/HTML/JS 工作必須先讀取 `.github/standards/` 對應正式規範。
+3. `.github/skills/` 若與 `.github/standards/`、實際 token 或審計結果衝突，必須以正式來源為準並回報衝突。
 
-| 文件 | 適用範圍 | 說明 |
+| 正式文件 | 適用範圍 | 說明 |
 |------|----------|------|
-| `.github/skills/php-api-style.md` | `api/**/*.php` | PHP API 程式碼撰寫風格（宣告、輸出、錯誤處理） |
-| `.github/skills/api-code-style-check.md` | `api/**/*.php` | API 風格一致性檢查清單（strict_types、中文訊息、句號） |
-| `.github/skills/api-doc-standard.md` | `api/**/*.php` | PHPDoc 註解規範（Doc-as-Code） |
-| `.github/skills/javascript-module-style.md` | `js/**/*.js` | 前端 JS 模組架構（IIFE、事件委派、防禦性函數） |
-| `.github/skills/html-module-style.md` | `modules/**`, `core/configs/**` | HTML 模組頁面結構規範 |
-| `.github/skills/css-style-guide.md` | `**/*.css` | CSS 撰寫規範（命名、按鈕類別、Modal 尺寸） |
-| `.github/skills/ui-style.md` | UI 相關檔案 | 整體 UI 風格（色彩系統、間距、狀態標籤） |
-| `.github/skills/order-print.md` | `print/**` | 列印範本規範（credentials、CSRF、report_code） |
-| `.github/skills/company-branding-skill.md` | 公司/列印相關 | 公司 LOGO 管理、上傳驗證、列印整合 |
+| `.github/standards/ui-tokens.md` | CSS/UI | 色彩、字體、spacing、radius、密度與例外 |
+| `.github/standards/ui-components.md` | HTML/CSS/UI | 按鈕、Modal、表格、表單、Icon 與 UX |
+| `.github/standards/frontend-contracts.md` | JS/HTML/config | 模組、CRUD、DataSync、XSS 與配置契約 |
+| `.github/standards/change-governance.md` | 所有修改 | 修改範圍、前後驗證與回報契約 |
+| `.github/instructions/html-module-style.instructions.md` | `modules/**`, `core/configs/**` | HTML 正式規範入口 |
+| `.github/instructions/css-style-guide.instructions.md` | `**/*.css` | CSS 正式規範入口 |
+| `.github/instructions/ui-style.instructions.md` | UI 相關檔案 | UI/UX 正式規範入口 |
+| `.github/instructions/order-print.instructions.md` | `print/**` | 列印範本規範入口 |
+| `.github/instructions/company-branding.instructions.md` | 公司/列印相關 | 公司 LOGO 規範入口 |
 
 ### 快速參照
 
-- **新增 PHP API 模組** → 閱讀 `php-api-style.md` + `api-doc-standard.md`
-- **新增前端 JS 模組** → 閱讀 `javascript-module-style.md`
-- **新增/修改 HTML 模組** → 閱讀 `html-module-style.md` + `ui-style.md`
-- **新增/修改 CSS** → 閱讀 `css-style-guide.md` + `ui-style.md`
-- **修改列印範本** → 閱讀 `order-print.md`
-- **修改公司資料/LOGO** → 閱讀 `company-branding-skill.md`
+- **新增 PHP API 模組** → 依 `.github/instructions/*api*.instructions.md` 及既有 API skill
+- **新增前端 JS 模組** → `.github/standards/frontend-contracts.md`
+- **新增/修改 HTML 模組** → `.github/standards/ui-components.md` + `frontend-contracts.md`
+- **新增/修改 CSS** → `.github/standards/ui-tokens.md` + `ui-components.md`
+- **修改列印範本** → 對應 `order-print.instructions.md` 與列印 skill
+- **修改公司資料/LOGO** → `company-branding.instructions.md` 與品牌 skill
 
 ---
 

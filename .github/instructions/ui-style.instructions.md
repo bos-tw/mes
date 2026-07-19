@@ -2,126 +2,21 @@
 applyTo: "**/*.css,modules/**,core/configs/**,js/**/*.js"
 ---
 
-# UI 風格指南
+# UI/UX 規範入口
 
-> 完整規範：`.github/skills/ui-style.md`
+正式規範：
 
-## 整體設計語言
+- `.github/standards/ui-tokens.md`
+- `.github/standards/ui-components.md`
+- `.github/standards/frontend-contracts.md`
 
-螺絲篩分管理系統採用**工業風格**，強調清晰、高密度的資訊呈現。
+MES 是資料密集型後台，預設採 compact density。新增 UI 必須沿用既有頁面 shell、共用 token、按鈕、Modal、表格與表單結構。
 
-## 色彩系統（CSS 變數）
+禁止：
 
-```css
-:root {
-    --primary:      #2563eb;   /* 主要藍色 */
-    --primary-dark: #1d4ed8;
-    --danger:       #dc2626;   /* 危險紅色 */
-    --success:      #16a34a;   /* 成功綠色 */
-    --warning:      #d97706;   /* 警告橘色 */
-    --text-primary: #111827;
-    --text-muted:   #6b7280;
-    --border:       #e5e7eb;
-    --bg-surface:   #f9fafb;
-}
-```
+- 自行創造色票、spacing、radius 或元件 class。
+- 使用 emoji 作正式 icon。
+- 使用 inline style、inline onclick、無 `btn` 前綴的按鈕。
+- 只用顏色傳達狀態。
 
-## 間距規範
-
-```css
-/* 使用 4px 基準單位的倍數 */
---space-1:  4px;
---space-2:  8px;
---space-3: 12px;
---space-4: 16px;
---space-6: 24px;
---space-8: 32px;
-```
-
-## 表單元素
-
-```css
-/* 標準 input 樣式 */
-input, select, textarea {
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 6px 10px;
-    font-size: 14px;
-}
-
-input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
-}
-```
-
-## 標準按鈕類別
-
-```css
-/* 務必使用以下標準類別，不可自定義顏色 */
-.btn.primary  { background: var(--primary); color: #fff; }
-.btn.outline  { border: 1px solid var(--border); background: transparent; }
-.btn.text     { background: transparent; border: none; }
-.btn.danger   { background: var(--danger); color: #fff; }
-.btn.text.danger { color: var(--danger); background: transparent; }
-```
-
-## 表格操作按鈕語意（強制）
-
-- 列印：紫色 `#7c3aed`，圖示 `fa-print`
-- 檢視：teal `#0f766e`，圖示 `fa-eye`
-- 編輯：藍色 `#2563eb`，圖示 `fa-edit`
-- 刪除：紅色 `#dc3545`，圖示 `fa-trash`
-- 新增：綠色，圖示 `fa-plus`
-- 流程操作：棕橘色
-- 灰色只允許 `disabled`、`aria-disabled="true"` 或阻擋操作
-- 顏色與圖示由 `data-action` 的共用映射控制，模組不得自行覆寫
-
-## 狀態標籤（Badge）
-
-```css
-/* 使用靜態 class，不要用 inline style 設定顏色 */
-.badge.active    { background: #dcfce7; color: #16a34a; }
-.badge.inactive  { background: #f1f5f9; color: #64748b; }
-.badge.pending   { background: #fef9c3; color: #a16207; }
-.badge.cancelled { background: #fee2e2; color: #dc2626; }
-```
-
-## 表格樣式
-
-```css
-table { border-collapse: collapse; width: 100%; }
-th    { background: var(--bg-surface); font-weight: 600; text-align: left; }
-th, td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
-tr:hover td { background: rgba(37, 99, 235, 0.04); }
-```
-
-## ICON 規範（強制）
-
-### 使用原則
-
-- 使用者可見圖示一律使用 Font Awesome，禁止 emoji / Unicode 圖案字元（例如：`📦`、`🚚`、`🛠`）。
-- 在 `core/configs/*.config.js` 的 `icon` 欄位使用短格式：`fa-*`（例：`icon: 'fa-plus'`）。
-- 在 HTML 或 JS 動態渲染時使用完整 class：`fas fa-*`（例：`<i class="fas fa-truck"></i>`）。
-- 同一語意在不同頁面/模組必須使用同一 icon，不可混用 emoji 與 FA icon。
-- icon 僅為輔助語意，必要文字標籤不得省略。
-
-### Dashboard 行事曆節點對照
-
-| 節點語意 | 指定 icon |
-|---------|-----------|
-| 訂單建立 | `fa-file-alt` |
-| 工單開始 | `fa-industry` |
-| 工單結束 | `fa-flag-checkered` |
-| 交期節點 | `fa-truck` |
-| 出貨節點 | `fa-shipping-fast` |
-
-## 禁止事項
-
-- ❌ `style="color: red"` — 使用 CSS class
-- ❌ 自定義 `btn-primary`、`btn-danger` 等連字號類別
-- ❌ `font-size: 10px` — 字體最小 12px
-- ❌ 僅用顏色傳遞資訊（需同時有文字/圖示）
-- ❌ 使用 emoji 作為正式 UI icon（例如列表圖例、日曆節點、工具列圖示）
-- ❌ 動畫時間超過 300ms
+若本需求不是 UI 變更，不得順手改變版面、色彩、字體或密度。

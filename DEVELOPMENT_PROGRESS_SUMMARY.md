@@ -1,6 +1,6 @@
 # MES Development Progress Summary
 
-更新日期：2026-07-18
+更新日期：2026-07-19
 
 ## 專案架構
 
@@ -53,6 +53,14 @@
 - Schema sync：Applied 36、Pending 0。
 - 更新包官方 verifier、正式 PHP manifest parser、ZIP 精確檔案清單、migration 順序與來源 SHA-256 均通過。
 - `git diff --check`：通過；僅有既有 LF／CRLF 轉換提示，無 whitespace error。
+
+## 本輪規範治理整理（2026-07-19）
+
+- 建立 `.github/standards/` 作為程式風格、UI/UX、CSS token、前端契約與修改治理的唯一正式規範來源。
+- 更新 `.github/copilot-instructions.md`，明確定義規範優先順序、修改範圍、驗證與提交／推送授權規則。
+- 將 UI/CSS/HTML/JavaScript 的 `.github/instructions/` 與 `.github/skills/` 重複內容收斂為一致入口，移除會誤導 AI 的舊色票、按鈕與 Modal 範例。
+- 本輪沒有 PHP、JavaScript、HTML、CSS、migration、API 或功能程式實質變更；未建立更新包。
+- 工作樹目前保留本輪未提交規範文件，尚未 commit 或 push；未經使用者明確授權不得執行提交、推送或歷史改寫。
 
 ## Git 交接
 

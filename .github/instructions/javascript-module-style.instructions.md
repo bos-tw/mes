@@ -2,126 +2,24 @@
 applyTo: "js/**/*.js"
 ---
 
-# JavaScript 模組撰寫風格指南
+# JavaScript 模組規範入口
 
-> 完整規範：`.github/skills/javascript-module-style.md`
+正式規範：`.github/standards/frontend-contracts.md`、`.github/standards/ui-components.md`。
 
-## 模組初始化架構（必須遵循）
+強制要求：
 
-```javascript
-(function () {
-    'use strict';
+- 使用 IIFE、`'use strict'` 與 `data-initialised` 防重複初始化。
+- DOM 查詢限定在 `moduleRoot`；欄位寫入需先確認元素存在。
+- 使用 `data-action` 事件委派，不使用 inline onclick。
+- CRUD 成功後必須通知 DataSync；不得自行重造共用 Column Manager 或 UI 元件。
+- 使用者資料插入 HTML 前必須 `escapeHtml()`；data JSON 使用 `encodeURIComponent()`。
+- 禁止新增 `alert()`、`confirm()`，流程型操作使用標準確認 Modal。
 
-    function initializeXxxModule(container) {
-        const moduleRoot = container.querySelector('[data-module="xxx"]');
-        if (!moduleRoot || moduleRoot.dataset.initialised === 'true') return;
-        moduleRoot.dataset.initialised = 'true';
+修改功能模組前後執行：
 
-        // ─── 元素綁定 ───────────────────────────────
-        const table      = moduleRoot.querySelector('[data-xxx-table]');
-        const filterForm = moduleRoot.querySelector('[data-xxx-filter]');
-        const modal      = moduleRoot.querySelector('[data-xxx-modal]');
-        const form       = moduleRoot.querySelector('[data-xxx-form]');
-        const alertEl    = moduleRoot.querySelector('[data-xxx-alert]');
-
-        // ─── 狀態 ────────────────────────────────────
-        let currentPage = 1;
-        let currentSort = { field: 'id', dir: 'desc' };
-
-        // ─── 初始化 ──────────────────────────────────
-        loadData();
-        bindEvents();
-    }
-
-    window.initializeXxxModule = initializeXxxModule;
-})();
+```text
+node tools/audit-system-health.js
+node tools/audit-system-health.js --changed --base origin/main
 ```
 
-## 防禦性函數（有 Modal 表單時必加）
-
-```javascript
-function setFieldValue(name, value) {
-    const field = form.querySelector(`[name="${name}"]`);
-    if (field) {
-        field.value = value ?? '';
-    } else {
-        console.warn(`[xxx] 欄位不存在: ${name}`);
-    }
-}
-```
-
-## API 呼叫標準範本
-
-```javascript
-async function loadData() {
-    try {
-        const params = new URLSearchParams({ page: currentPage, ...filters });
-        const res = await fetch(`../api/xxx/index.php?${params}`, {
-            credentials: 'include'
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message);
-        renderTable(data.data);
-        renderPagination(data.total, data.page, data.totalPages);
-    } catch (e) {
-        showAlert(e.message, 'error');
-    }
-}
-
-async function saveData(payload) {
-    const isEdit = !!payload.id;
-    const url    = isEdit ? '../api/xxx/update.php' : '../api/xxx/store.php';
-    const method = isEdit ? 'PUT' : 'POST';
-
-    const res = await fetch(url, {
-        method,
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': sessionStorage.getItem('csrfToken') || ''
-        },
-        body: JSON.stringify(payload)
-    });
-    return res.json();
-}
-```
-
-## 事件委派（統一使用 data-action）
-
-```javascript
-function bindEvents() {
-    moduleRoot.addEventListener('click', (e) => {
-        const action = e.target.closest('[data-action]')?.dataset.action;
-        if (!action) return;
-
-        const handlers = {
-            'create': openCreateModal,
-            'edit':   (el) => openEditModal(el.closest('tr').dataset.id),
-            'delete': (el) => confirmDelete(el.closest('tr').dataset.id),
-            'cancel': closeModal,
-        };
-
-        handlers[action]?.(e.target.closest('[data-action]'));
-    });
-}
-```
-
-## 欄位管理器
-
-```javascript
-// ❌ 不要手動初始化
-// window.initXxxColumnManager();
-
-// ✅ 只在表格資料更新後呼叫
-const manager = ColumnManagerAutoInit.getManager('xxx');
-if (manager) manager.onTableUpdated();
-```
-
-## 禁止事項
-
-- ❌ JS 檔案超過 2000 行 — 拆分為多個模組
-- ❌ `document.querySelector` — 改用 `moduleRoot.querySelector` 限定範圍
-- ❌ `form.querySelector('[name="id"]').value = x` — 沒有 null 檢查
-- ❌ 全域變數污染（必須用 IIFE 包裹）
-- ❌ `alert()` / `confirm()` — 使用自定義 Modal
+若涉及 DataSync，再執行正式規範列出的 syntax 與 DataSync audit。
