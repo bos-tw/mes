@@ -31,6 +31,8 @@ window.AppVersionChecker = (function () {
     let _lastCheckedAt = 0;
     let _lastAnnouncedVersion = '';
     let _channel = null;
+    let _reloadPromise = null;
+    let _reloadNavigationStarted = false;
 
     function readSession(key, fallback = '') {
         try {
@@ -107,7 +109,8 @@ window.AppVersionChecker = (function () {
                 confirmLabel: '放棄並更新'
             });
         }
-        return window.confirm('尚有未儲存的資料。更新頁面將放棄這些輸入，確定要繼續嗎？');
+        window.AppFeedback?.toast?.('偵測到未儲存資料，暫時無法安全更新頁面。請先儲存資料後再試。', 'error');
+        return false;
     }
 
     function normalizeVersion(value) {
@@ -143,6 +146,17 @@ window.AppVersionChecker = (function () {
         return button;
     }
 
+    function setUpdateReloadPending(isPending) {
+        if (typeof document.querySelectorAll !== 'function') {
+            return;
+        }
+        document.querySelectorAll('#app-update-banner [data-action="apply-update"]').forEach((button) => {
+            button.disabled = isPending;
+            button.setAttribute('aria-busy', String(isPending));
+            button.textContent = isPending ? '正在準備更新…' : '立即更新';
+        });
+    }
+
     function showUpdateBanner(targetVersion = _availableVersion, options = {}) {
         const normalizedTarget = normalizeVersion(targetVersion);
         if (!normalizedTarget || (!options.failed && isSnoozed(normalizedTarget))) {
@@ -167,8 +181,8 @@ window.AppVersionChecker = (function () {
         banner.className = `app-update-banner${options.failed ? ' app-update-banner-warning' : ''}`;
         banner.dataset.version = normalizedTarget;
         banner.dataset.failed = String(Boolean(options.failed));
-        banner.setAttribute('role', options.failed ? 'alert' : 'status');
-        banner.setAttribute('aria-live', options.failed ? 'assertive' : 'polite');
+        banner.setAttribute('role', 'alert');
+        banner.setAttribute('aria-live', 'assertive');
 
         const content = document.createElement('div');
         content.className = 'app-update-banner-content';
@@ -184,7 +198,7 @@ window.AppVersionChecker = (function () {
         const detail = document.createElement('span');
         detail.textContent = options.failed
             ? `版本 ${normalizedTarget} 載入失敗，已停止自動重試以避免循環。`
-            : `版本 ${normalizedTarget} 已發布，更新後即可看到最新功能與畫面。`;
+            : `版本 ${normalizedTarget} 已套用；請先儲存正在編輯的資料，再更新本頁取得最新功能與畫面。`;
         message.append(title, detail);
         content.append(icon, message);
 
@@ -275,20 +289,34 @@ window.AppVersionChecker = (function () {
 
     async function reloadNow(targetVersion = _availableVersion, options = {}) {
         const normalizedTarget = normalizeVersion(targetVersion);
-        if (!normalizedTarget) {
-            return false;
-        }
-        if (!options.skipUnsavedGuard && hasUnsavedChanges() && !(await confirmDiscardForUpdate())) {
+        if (!normalizedTarget || _reloadPromise || _reloadNavigationStarted) {
             return false;
         }
 
-        writeSession(EXPECTED_VERSION_KEY, normalizedTarget);
-        if (!options.preserveAttempts) {
-            writeSession(reloadAttemptKey(normalizedTarget), 0);
+        _reloadPromise = (async () => {
+            setUpdateReloadPending(true);
+            if (!options.skipUnsavedGuard && hasUnsavedChanges() && !(await confirmDiscardForUpdate())) {
+                return false;
+            }
+
+            writeSession(EXPECTED_VERSION_KEY, normalizedTarget);
+            if (!options.preserveAttempts) {
+                writeSession(reloadAttemptKey(normalizedTarget), 0);
+            }
+            _reloadNavigationStarted = true;
+            announce({ type: 'reload-started', version: normalizedTarget });
+            await performNavigation(normalizedTarget);
+            return true;
+        })();
+
+        try {
+            return await _reloadPromise;
+        } finally {
+            _reloadPromise = null;
+            if (!_reloadNavigationStarted) {
+                setUpdateReloadPending(false);
+            }
         }
-        announce({ type: 'reload-started', version: normalizedTarget });
-        await performNavigation(normalizedTarget);
-        return true;
     }
 
     function verifyExpectedVersion() {
@@ -644,6 +672,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const moduleInitializers = {};
     const moduleContexts = new Map();
     const unsavedChangesState = new Map();
+    let isClosingAllTabs = false;
+    let isUnsavedClosePromptOpen = false;
 
     // Storage keys for persistence
     const STORAGE_KEYS = {
@@ -1071,8 +1101,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         return evaluateTabUnsavedChanges(tabId);
     }
 
-    function confirmDiscardUnsavedTabChanges() {
-        return window.confirm('此分頁有尚未儲存的資料，若直接關閉將會遺失。確定要繼續關閉嗎？');
+    async function confirmDiscardUnsavedTabChanges(tabId) {
+        if (isUnsavedClosePromptOpen) {
+            return false;
+        }
+
+        const tab = openTabs.find((item) => item.id === tabId);
+        isUnsavedClosePromptOpen = true;
+        try {
+            if (window.AppFeedback && typeof window.AppFeedback.confirm === 'function') {
+                return await window.AppFeedback.confirm({
+                    stage: '關閉頁籤',
+                    title: '此頁籤有未儲存的資料',
+                    message: `「${tab?.title || '目前頁籤'}」的輸入尚未儲存。關閉後無法復原。`,
+                    impact: '本頁籤內尚未送出的表單、附件或編輯內容都會遺失。',
+                    guidance: '建議先取消、完成儲存，再關閉頁籤。',
+                    cancelLabel: '返回儲存',
+                    confirmLabel: '放棄並關閉'
+                });
+            }
+
+            window.AppFeedback?.toast?.('未能載入安全確認視窗；為保護資料，已取消關閉頁籤。', 'error');
+            return false;
+        } finally {
+            isUnsavedClosePromptOpen = false;
+        }
     }
 
     function normalizeOperationActionElement(actionElement) {
@@ -2313,9 +2366,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const closeAllTabsBtn = document.getElementById('close-all-tabs');
     if (closeAllTabsBtn) {
         closeAllTabsBtn.addEventListener('click', async () => {
-            if (await window.AppFeedback.confirm({ title: '關閉全部分頁', message: '確定要關閉所有分頁嗎？未儲存的分頁仍會逐一提示。', danger: false })) {
-                closeAllTabs();
-            }
+            await closeAllTabs();
         });
     }
 
@@ -2388,9 +2439,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         switchTab(pageId);
 
         // Add event listener for closing tab
-        tabHeader.querySelector('.close-tab').addEventListener('click', function(e) {
+        tabHeader.querySelector('.close-tab').addEventListener('click', async function(e) {
             e.stopPropagation(); // Prevent tab switch when closing
-            closeTab(pageId);
+            await closeTab(pageId);
         });
 
         // Add event listener for switching tab
@@ -2430,7 +2481,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Function to close a tab
-    function closeTab(tabId) {
+    async function closeTab(tabId, options = {}) {
         const tabHeaderToRemove = document.querySelector(`.tab-header[data-tab-id="${tabId}"]`);
         const tabContentToRemove = document.querySelector(`.tab-content[data-tab-id="${tabId}"]`);
 
@@ -2449,14 +2500,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        if (hasTrackedUnsavedChanges(tabId) && !confirmDiscardUnsavedTabChanges()) {
+        if (!options.skipUnsavedGuard
+            && hasTrackedUnsavedChanges(tabId)
+            && !(await confirmDiscardUnsavedTabChanges(tabId))) {
             return false;
         }
 
-    if (tabHeaderToRemove) tabHeadersContainer.removeChild(tabHeaderToRemove);
-    if (tabContentToRemove) tabContentArea.removeChild(tabContentToRemove);
-    moduleContexts.delete(tabId);
-    unsavedChangesState.delete(tabId);
+        if (tabHeaderToRemove) tabHeadersContainer.removeChild(tabHeaderToRemove);
+        if (tabContentToRemove) tabContentArea.removeChild(tabContentToRemove);
+        moduleContexts.delete(tabId);
+        unsavedChangesState.delete(tabId);
 
         // Remove from openTabs array
         openTabs = openTabs.filter(tab => tab.id !== tabId);
@@ -2486,15 +2539,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Function to close all tabs
-    function closeAllTabs() {
-        if (openTabs.length === 0) return;
+    async function closeAllTabs() {
+        if (openTabs.length === 0 || isClosingAllTabs) return false;
 
-        // Close all tabs
-        while (openTabs.length > 0) {
-            const closed = closeTab(openTabs[0].id);
-            if (closed === false) {
-                break;
+        isClosingAllTabs = true;
+        updateCloseAllButtonState();
+        try {
+            const dirtyTabs = openTabs.filter((tab) => hasTrackedUnsavedChanges(tab.id));
+            if (dirtyTabs.length > 0) {
+                if (!window.AppFeedback || typeof window.AppFeedback.confirm !== 'function') {
+                    window.AppFeedback?.toast?.('未能載入安全確認視窗；為保護資料，已取消關閉全部頁籤。', 'error');
+                    return false;
+                }
+
+                const confirmed = await window.AppFeedback.confirm({
+                    stage: '關閉全部頁籤',
+                    title: `有 ${dirtyTabs.length} 個頁籤含未儲存資料`,
+                    message: `即將關閉 ${openTabs.length} 個頁籤，其中 ${dirtyTabs.length} 個頁籤的輸入尚未儲存。`,
+                    impact: `未儲存資料：${dirtyTabs.map((tab) => tab.title || tab.id).join('、')}`,
+                    guidance: '建議先取消，逐一儲存需要保留的資料；確認後將一次關閉全部頁籤。',
+                    cancelLabel: '返回儲存',
+                    confirmLabel: '放棄並全部關閉'
+                });
+                if (!confirmed) {
+                    return false;
+                }
+            } else if (window.AppFeedback && typeof window.AppFeedback.confirm === 'function') {
+                const confirmed = await window.AppFeedback.confirm({
+                    stage: '關閉全部頁籤',
+                    title: '關閉全部頁籤',
+                    message: `確定要關閉目前的 ${openTabs.length} 個頁籤嗎？`,
+                    guidance: '關閉後會回到系統儀表板。',
+                    cancelLabel: '取消',
+                    confirmLabel: '關閉全部'
+                });
+                if (!confirmed) {
+                    return false;
+                }
             }
+
+            while (openTabs.length > 0) {
+                const closed = await closeTab(openTabs[0].id, { skipUnsavedGuard: dirtyTabs.length > 0 });
+                if (!closed) {
+                    window.AppFeedback?.toast?.('已停止關閉頁籤，請先處理目前頁面的作業。', 'info');
+                    return false;
+                }
+            }
+            return true;
+        } finally {
+            isClosingAllTabs = false;
+            updateCloseAllButtonState();
         }
     }
 
@@ -2502,7 +2596,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateCloseAllButtonState() {
         const closeAllBtn = document.getElementById('close-all-tabs');
         if (closeAllBtn) {
-            closeAllBtn.disabled = openTabs.length === 0;
+            closeAllBtn.disabled = openTabs.length === 0 || isClosingAllTabs;
+            closeAllBtn.setAttribute('aria-busy', String(isClosingAllTabs));
         }
     }
 

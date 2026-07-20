@@ -44,6 +44,8 @@
 ## 表格、表單與 inline style
 
 - 表格欄位、表單 control、section 與 card 使用共用 token/class。
+- 主資料表欄寬由 `TableColumnResizer` 共用管理：拖曳標題分隔線可調寬，雙擊分隔線依標題與目前資料自動適寬；序號、勾選、操作欄及 `data-no-column-resize` 欄位不開放調整。
+- 模組不得自行建立另一套欄寬拖曳邏輯；整張表不需此功能時使用 `data-no-column-resize="true"`。
 - `modules/` HTML 禁止新增 inline style；欄位寬度使用既有 utility class。
 - 只有 `display:none` 的歷史相容例外可保留，新增內容不得仿效。
 - 動態資料插入 `innerHTML` 前必須使用共用 `escapeHtml()`；data attribute 內嵌 JSON 必須使用 `encodeURIComponent()`。

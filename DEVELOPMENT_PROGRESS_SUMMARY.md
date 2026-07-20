@@ -5,48 +5,45 @@
 ## 最新架構與完成項目
 
 - 技術棧：PHP 8.4 API、MySQL 8、原生 JavaScript／HTML／CSS、PowerShell schema／更新工具、PHPUnit 12。
-- 修復儀表板工單狀態統計：改由 `work_orders.status_lookup_id` JOIN `lookup_values` 取得正式狀態，排除已淘汰的 `work_orders.status` 讀取。
-- 訂單與訂單明細新增流程在狀態未填時套用 `pending`；API 驗證失敗會回傳並由前端顯示具體欄位原因。
-- 訂單明細改為 `deleted_at` 軟刪除，訂單、工單、統計與公開查詢均排除已刪除明細，並保留識別與稽核追溯。
-- 全系統表格操作按鈕統一使用 24px 尺寸與 2px 間距；新增 `--ui-table-action-size`、`--ui-table-action-gap`，未新增 inline style 或固定值例外。
-- 移除生產工單六階段導引及相關資產，保留現場可彈性操作的連續表單；一次／二次篩分頁籤與生產排程標題已改為系統樣式。
-- 移除儀表板「我的工作佇列」，由既有「我的收藏」提供快速入口。
+- 主資料表欄寬由 `api/common/column_manager.js` 的 `TableColumnResizer` 單一共用入口管理；支援拖曳調寬、雙擊依標題與目前資料自動適寬、鍵盤調整及 localStorage 持久化。
+- 序號、勾選與操作欄依語意標記維持固定欄寬，不依欄位數量或欄位位置判斷；篩分服務的工單局部樣式已限制在建立／編輯工單 Modal，避免覆寫主表格序號欄。
+- 系統更新提示改為即時警示並明確提醒先儲存；更新與頁籤關閉流程具備未儲存資料確認、快速重複操作鎖定及安全失敗保護。
+- 新增 `--ui-table-column-min-width`、`--ui-table-column-max-width`、`--ui-table-resize-handle-width` 共用 token；模組 HTML 未新增 inline style，欄寬僅由共用 JavaScript 在執行時動態設定。
 
 ## Migration 與 schema
 
-- 新增並收錄 `migrations/2026_07_20_add_order_items_soft_delete.sql`，建立 `order_items.deleted_at` 與 `idx_order_items_order_active`。
-- migration 使用正式更新器的 PDO／SQL 分割執行路徑；舊 schema 完整執行、重複執行、只完成欄位後重試及舊資料保留均通過。
-- `tools/sync-local-schema.ps1` 已加入明確 migration check；本機 schema sync 為 Applied 39、Pending 0。
+- 本輪沒有新增或修改 migration，更新包的 `migrations` 與 `delete_files` 均為空陣列。
+- 本輪初始化 schema sync 為 Applied 39、Pending 0；功能完成後 schema 未再變更。
 
 ## 驗證狀態
 
-- `node tools/audit-system-health.js`：0 errors、13 項既有 F-1 大型 JS warning。
+- 使用者已完成本機實際畫面驗收，包含表格欄寬、序號欄與更新／未儲存資料警告。
+- `node tools/audit-system-health.js`：0 errors、13 項既有 F-1 大型 JavaScript warning。
 - `node tools/audit-system-health.js --changed --base origin/main`：0 new、0 blocking、4 resolved。
-- `node tools/validate-config-modules.js` 與 `node tools/test-audit-system.js`：通過。
-- DataSync：P0=0、P1=0、P2=0、OK=51；`docs/data-sync-audit.md` 已更新。
-- UI style audit：748 hardcoded spacing/radius、378 token candidates、370 needs review；未新增 blocking。
-- 本輪 12 個 JS 與 16 個 PHP 逐檔語法檢查通過；`git diff --check` 通過。
-- PHPUnit：40 tests、94 assertions、16 skipped；可執行測試均通過，跳過項目需要獨立 HTTP 測試環境。
-- 使用者已完成本機實際畫面驗收。
+- `node tools/validate-config-modules.js`：通過。
+- `script.js`、`api/common/column_manager.js`、`js/data-sync.js` 與 `tools/audit-data-sync.js` 語法檢查通過。
+- `tools/audit/tests/version-checker-behavior.test.js`：通過。
+- DataSync audit：P0=0、P1=0、P2=0、OK=51；`docs/data-sync-audit.md` 已更新。
+- UI style audit：748 hardcoded spacing/radius、378 token candidates、370 needs review；本輪未新增審計問題。
+- `git diff --check`、更新包驗證工具及正式 PHP manifest parser 均通過；ZIP 檔案缺漏 0、多包 0。
 
 ## 已知風險與下一輪優先事項
 
 - P0：無新增項目。
-- P1：獨立 HTTP 整合測試環境尚未建立，因此 16 個 HTTP 測試依既有條件跳過；部署後仍需依正式資料與權限做 smoke test。
-- P2：13 個既有大型 JavaScript 維護性警告；下一輪若進行技術債處理，第一優先為拆分 7,590 行的 `js/work_orders.js`，並維持行為回歸測試。
+- P1：無新增項目；部署後仍應以正式資料與權限執行更新、未存檔頁籤及主要表格 smoke test。
+- P2：13 個既有大型 JavaScript 維護性警告；下一輪若處理技術債，第一優先為拆分 7,590 行的 `js/work_orders.js`，並維持行為回歸測試。
 
 ## 更新包
 
-- 版本：`v3.1.5`／`FileVersion v3.1.5`／ReleaseDate `2026-07-20`。
-- 路徑：`dist/update_v3.1.5_20260720_155348.zip`；大小 272,231 bytes。
-- SHA-256：`8DAEEE8F3B4FA39BCB79B43239D869BC73132B384900497D96402669EF1345AE`。
-- 更新包包含 28 個一般檔案、1 個 migration、2 個刪除路徑；ZIP 根目錄 manifest、正式 PHP parser、精確檔案集合、migration 順序／hash 與 delete_files 均驗證通過。
-- 11 個僅供開發的 `.github`／PHPUnit／審計測試檔未納入正式部署包；未刪除任何既有更新包。
+- 版本：`v3.1.6`／`FileVersion v3.1.6`／ReleaseDate `2026-07-20`。
+- 路徑：`dist/update_v3.1.6_20260720_224301.zip`；大小 79,950 bytes。
+- SHA-256：`0DB9932BF90FFAC7296D24F65E2E0F9DF8C8C2ECECEE5D74D34FBB917A8A91A4`。
+- 更新包包含 4 個一般檔案、0 個 migration、0 個刪除路徑；ZIP 根目錄 manifest、版本、release note、正式 PHP parser 與精確檔案集合均驗證通過。
+- `.github` UI 規範與 `docs/data-sync-audit.md` 為開發／驗證文件，未納入正式部署包；未刪除任何既有更新包。
 
 ## Git 交接
 
 - 分支：`main`。
-- 本輪開始 commit／目前 HEAD：`ef7c0a6762f3f32b4e605b20e96b0239e7cf0c65`。
-- `origin/main`：`ef7c0a6762f3f32b4e605b20e96b0239e7cf0c65`；提交指標一致。
-- 工作樹保留本輪已確認但尚未提交的功能、migration、測試、文件與兩個刪除項目；沒有來源不明檔案。
-- 已取得本輪 commit 與 push 明確授權；收尾使用精確檔案清單 stage，禁止 rebase、merge、reset、force push 或其他歷史改寫，最終 commit／push 結果以收尾回報為準。
+- 本輪開始 commit：`1d7d8e1c1c70930bdf65bf3c59e3526b758ae7cc`。
+- 本輪 8 個功能、規範、驗證、release note 與交接檔案均已確認；沒有來源不明、憑證、dump、暫存或私人檔案。
+- 已取得 commit 與 push 明確授權；使用精確檔案清單 stage，禁止 rebase、merge、reset、force push 或其他歷史改寫，最終 commit、遠端指標與工作樹狀態以收尾回報為準。
