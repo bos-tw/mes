@@ -377,7 +377,7 @@ try {
         $setClauses[] = "$column = :$column";
     }
 
-    $stmt = $pdo->prepare('UPDATE order_items SET ' . implode(', ', $setClauses) . ' WHERE id = :id');
+    $stmt = $pdo->prepare('UPDATE order_items SET ' . implode(', ', $setClauses) . ' WHERE id = :id AND deleted_at IS NULL');
     foreach ($updateData as $column => $value) {
         if ($value === null) {
             $stmt->bindValue(':' . $column, null, PDO::PARAM_NULL);

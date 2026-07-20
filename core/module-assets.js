@@ -40,7 +40,7 @@
     ]);
 
     const extraScripts = {
-        work_orders: ['js/work-orders/api.js', 'js/work-orders/state-machine.js', 'js/work-orders/workspace.js']
+        work_orders: ['js/work-orders/api.js']
     };
     const afterScripts = {
         rescreen_batches: ['js/rescreen_batches_execution.js']

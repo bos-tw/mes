@@ -41,6 +41,12 @@ assert.strictEqual(scanMenuContracts({ ...menuFiles, 'core/module-assets.js': ''
 
 assert.strictEqual(scanStateContracts({}, schema).length, 0);
 assert.strictEqual(scanStateContracts({}, { tables: { work_orders: { status: {}, status_lookup_id: {} } } }).length, 1);
+assert.strictEqual(scanStateContracts({
+    'api/dashboard/charts_data.php': '$sql = "SELECT status, COUNT(*) FROM work_orders GROUP BY status";'
+}, schema).length, 1);
+assert.strictEqual(scanStateContracts({
+    'api/dashboard/charts_data.php': '$sql = "SELECT lv.value_key AS status, COUNT(*) FROM work_orders wo JOIN lookup_values lv ON lv.id = wo.status_lookup_id GROUP BY lv.value_key";'
+}, schema).length, 0);
 
 const inventoryFiles = {
     'api/inventory_items/index.php': 'ensureInventoryItemSource(',

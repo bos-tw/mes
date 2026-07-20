@@ -2,7 +2,7 @@
 /**
  * 訂單品項 API - 刪除
  *
- * 永久刪除指定訂單品項（硬刪除），同時重新計算訂單總金額。
+ * 軟刪除未進入後續流程的訂單品項，同時重新計算訂單總金額。
  *
  * @endpoint DELETE /api/order_items/delete.php?id={int}
  * @method POST + _method=delete (表單提交時使用)
@@ -16,7 +16,7 @@
  *
  * @logic 刪除流程:
  * 1. 驗證 ID 和品項存在性
- * 2. 從 order_items 表刪除記錄
+ * 2. 設定 order_items.deleted_at，保留歷史識別與稽核追溯
  * 3. 重新計算訂單總金額 (recalculateOrderTotalAmount)
  * 4. 記錄稽核日誌
  *
@@ -32,7 +32,7 @@
  * @error 404 訂單品項不存在
  * @error 500 刪除過程發生錯誤
  *
- * @warning 此操作為硬刪除，無法復原
+ * @warning 已進入工單、庫存、出貨或退貨流程的品項會由 workflow guard 阻擋
  */
 declare(strict_types=1);
 
@@ -172,8 +172,12 @@ if (!empty($relatedLabels)) {
 }
 
 try {
-    $stmt = $pdo->prepare('DELETE FROM order_items WHERE id = :id');
-    $stmt->execute(['id' => $id]);
+    if (!softDeleteOrderItem($pdo, $id)) {
+        jsonResponse([
+            'success' => false,
+            'message' => '找不到對應的訂單品項資料。',
+        ], 404);
+    }
 
     recalculateOrderTotalAmount($pdo, $orderId);
 

@@ -146,7 +146,7 @@ function assessOrderDelete(PDO $pdo, int $id): array
         return workflowBlocked('找不到該訂單。');
     }
 
-    $itemStmt = $pdo->prepare('SELECT COUNT(*) FROM order_items WHERE order_id = :id');
+    $itemStmt = $pdo->prepare('SELECT COUNT(*) FROM order_items WHERE order_id = :id AND deleted_at IS NULL');
     $itemStmt->execute(['id' => $id]);
     $itemCount = (int)$itemStmt->fetchColumn();
 
@@ -328,7 +328,7 @@ function assessOrderItemDelete(PDO $pdo, int $id): array
         SELECT oi.id, oi.order_id, oi.sub_item_number, oi.customer_batch_number, o.order_number
         FROM order_items oi
         LEFT JOIN orders o ON o.id = oi.order_id
-        WHERE oi.id = :id
+        WHERE oi.id = :id AND oi.deleted_at IS NULL
     ");
     $stmt->execute(['id' => $id]);
     $orderItem = $stmt->fetch(PDO::FETCH_ASSOC);

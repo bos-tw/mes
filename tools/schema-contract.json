@@ -1,7 +1,7 @@
 {
     "schemaVersion": 1,
     "database": "yucyuan",
-    "generatedAt": "2026-07-19T08:20:25+00:00",
+    "generatedAt": "2026-07-20T06:03:55+00:00",
     "tables": {
         "audit_logs": {
             "id": {
@@ -2225,6 +2225,12 @@
                 "nullable": true,
                 "key": "",
                 "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            },
+            "deleted_at": {
+                "type": "timestamp",
+                "nullable": true,
+                "key": "",
+                "extra": ""
             }
         },
         "orders": {

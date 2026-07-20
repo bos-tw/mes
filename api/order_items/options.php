@@ -74,6 +74,7 @@ if ($mode === 'order_items_list') {
             INNER JOIN orders o ON oi.order_id = o.id
             LEFT JOIN screening_items si ON oi.screening_item_id = si.id
             WHERE o.deleted_at IS NULL
+              AND oi.deleted_at IS NULL
             ORDER BY o.order_number DESC, oi.id ASC
         ");
 

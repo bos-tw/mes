@@ -195,7 +195,11 @@ function scanStateContracts(files, schema) {
     }
     for (const [file, source] of Object.entries(files)) {
         if (!file.startsWith('api/') || !file.endsWith('.php')) continue;
-        if (/\bwork_orders\s*\.\s*`?status`?\b/i.test(source) || /\bwo\s*\.\s*`?status`?\b/i.test(source)) {
+        const readsQualifiedLegacyStatus = /\bwork_orders\s*\.\s*`?status`?\b/i.test(source)
+            || /\bwo\s*\.\s*`?status`?\b/i.test(source);
+        const readsBareLegacyStatus = /\bSELECT\s+`?status`?\s*,[\s\S]{0,1000}?\bFROM\s+`?work_orders`?\b/i.test(source)
+            || /\bFROM\s+`?work_orders`?\b[\s\S]{0,1000}?\bGROUP\s+BY\s+`?status`?\b/i.test(source);
+        if (readsQualifiedLegacyStatus || readsBareLegacyStatus) {
             findings.push(issue('STATE-1 單一狀態來源', file, 'SQL 直接讀取已淘汰的 work_orders.status。', 'JOIN lookup_values 並使用 value_key 作為狀態。', '資料完整性'));
         }
     }

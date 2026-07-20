@@ -1056,6 +1056,9 @@
                     const today = new Date().toISOString().split('T')[0];
                     orderDateInput.value = today;
                 }
+                if (statusSelect) {
+                    statusSelect.value = 'pending';
+                }
 
             } else if (mode === 'edit' && data) {
                 modalTitle.textContent = '修改訂單';
@@ -1139,10 +1142,14 @@
                 }
 
                 const response = await fetch(url, requestOptions);
-                const result = await response.json();
+                const result = await readJsonResponse(response, '訂單資料儲存失敗');
 
                 if (!response.ok || !result.success) {
-                    throw new Error(result.message || '操作失敗，請稍後再試。');
+                    const validationDetails = result.errors && typeof result.errors === 'object'
+                        ? Object.values(result.errors).filter(Boolean).join('、')
+                        : '';
+                    const message = result.message || '操作失敗，請稍後再試。';
+                    throw new Error(validationDetails ? `${message} ${validationDetails}` : message);
                 }
 
                 const message = isEdit ? '訂單資料已更新。' : '訂單資料已建立。';

@@ -14,8 +14,6 @@
         }
 
         moduleRoot.dataset.initialised = 'true';
-        window.WorkOrderWorkspace?.enhance(moduleRoot);
-
     // DOM Elements
     const elements = {
         alert: moduleRoot.querySelector('[data-work-orders-alert]'),

@@ -78,7 +78,7 @@ if (!$workflowGuard['allowed']) {
 }
 
 // 檢查是否有關聯的訂單品項
-$checkStmt = $pdo->prepare('SELECT COUNT(*) FROM order_items WHERE order_id = ?');
+$checkStmt = $pdo->prepare('SELECT COUNT(*) FROM order_items WHERE order_id = ? AND deleted_at IS NULL');
 $checkStmt->execute([$id]);
 if ((int)$checkStmt->fetchColumn() > 0) {
     jsonResponse([

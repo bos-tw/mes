@@ -57,7 +57,7 @@ if ($keyword === '' && $startDate === '' && $endDate === '') {
     ]);
 }
 
-$conditions = ['o.deleted_at IS NULL'];
+$conditions = ['o.deleted_at IS NULL', 'oi.deleted_at IS NULL'];
 $params = [];
 
 if ($keyword !== '') {

@@ -126,12 +126,14 @@ function getWorkOrderStatusDistribution(PDO $pdo, int $year): array
 {
     $query = "
         SELECT 
-            status,
+            lv.value_key AS status,
+            lv.value_label AS label,
             COUNT(*) as count
-        FROM work_orders
-        WHERE YEAR(scheduled_start_date) = :year
-            AND deleted_at IS NULL
-        GROUP BY status
+        FROM work_orders wo
+        JOIN lookup_values lv ON lv.id = wo.status_lookup_id
+        WHERE YEAR(wo.scheduled_start_date) = :year
+            AND wo.deleted_at IS NULL
+        GROUP BY lv.id, lv.value_key, lv.value_label
         ORDER BY count DESC
     ";
 
@@ -151,7 +153,7 @@ function getWorkOrderStatusDistribution(PDO $pdo, int $year): array
     return array_map(function($item) use ($statusLabels) {
         return [
             'status' => $item['status'],
-            'label' => $statusLabels[$item['status']] ?? $item['status'],
+            'label' => $item['label'] ?? $statusLabels[$item['status']] ?? $item['status'],
             'count' => (int)$item['count']
         ];
     }, $results);

@@ -225,80 +225,12 @@
 .workspace-favorite-toggle:focus-visible {
     background: var(--color-primary-light);
 }
-.dashboard-work-queue { margin: var(--space-4) 0; }
-.dashboard-work-queue .section-header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
-.dashboard-work-queue .section-header span { color: var(--color-text-muted); }
-.dashboard-work-queue-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3); }
-.dashboard-work-queue-grid button {
-    display: grid;
-    gap: var(--space-1);
-    padding: var(--space-4);
-    border: 1px solid var(--color-border);
-    border-left: 0.3rem solid var(--color-primary);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    color: var(--color-text);
-    text-align: left;
-    cursor: pointer;
-}
-.dashboard-work-queue-grid button:hover { border-color: var(--color-primary); background: var(--color-surface-muted); }
-.dashboard-work-queue-grid span { color: var(--color-text-muted); font-size: 0.85rem; }
 .sidebar .submenu li { position: relative; }
 .sidebar .submenu li > a { padding-right: 2.25rem; }
 
-.work-order-stage-workspace {
-    position: sticky;
-    z-index: 4;
-    top: 0;
-    margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) var(--space-4);
-    padding: var(--space-3) var(--space-4);
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-surface);
-}
-
-.work-order-stage-tabs {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(7.5rem, 1fr));
-    gap: var(--space-1);
-    overflow-x: auto;
-}
-
-.work-order-stage-tabs button {
-    position: relative;
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface-muted);
-    color: var(--color-text);
-    cursor: pointer;
-}
-
-.work-order-stage-tabs button.active {
-    border-color: var(--color-primary);
-    background: var(--color-primary);
-    color: #fff;
-}
-
-.stage-marker {
-    display: inline-block;
-    width: 0.55rem;
-    height: 0.55rem;
-    margin-left: var(--space-2);
-    border-radius: 50%;
-    background: var(--color-warning);
-}
-.stage-complete .stage-marker { background: var(--color-success); }
-.work-order-stage-progress { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
-.work-order-stage-progress progress { flex: 1; accent-color: var(--color-success); }
-.work-order-stage-help { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: 0.8rem; }
 .work-orders-module .modal-content .form-actions { position: sticky; z-index: 5; bottom: 0; background: var(--color-surface); }
 
-@media (max-width: 70rem) {
-    .work-order-stage-tabs { grid-template-columns: repeat(6, minmax(8.5rem, 1fr)); }
-}
-
 @media (max-width: 48rem), (min-resolution: 192dpi) {
-    .work-order-stage-workspace { position: static; }
     .app-dialog-actions { flex-direction: column-reverse; }
     .app-dialog-actions button { width: 100%; min-height: 2.75rem; }
 }

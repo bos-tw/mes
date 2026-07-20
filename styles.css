@@ -95,6 +95,8 @@
     --ui-table-cell-padding-x: 6px;
     --ui-table-header-padding-y: 3px;
     --ui-table-header-padding-x: 6px;
+    --ui-table-action-size: 24px;
+    --ui-table-action-gap: 2px;
     --ui-card-padding-y: 10px;
     --ui-card-padding-x: 12px;
     --ui-metric-row-padding-y: 6px;
@@ -2788,7 +2790,7 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
 
 .table-actions {
     display: flex;
-    gap: var(--ui-section-gap);
+    gap: var(--ui-table-action-gap);
     align-items: center;
 }
 
@@ -2803,10 +2805,14 @@ td.actions-col {
     border: none;
     background: #64748b;
     color: #fff !important;
-    width: 30px;
-    height: 30px;
-    padding: 6px;
+    width: var(--ui-table-action-size);
+    min-width: var(--ui-table-action-size);
+    height: var(--ui-table-action-size);
+    min-height: var(--ui-table-action-size);
+    flex: 0 0 var(--ui-table-action-size);
+    padding: var(--ui-control-padding-y);
     border-radius: var(--ui-radius-control);
+    font-size: var(--font-sm);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -5438,19 +5444,49 @@ td.actions-col {
 
 .work-order-screening-tabs-section {
     grid-column: 1 / -1;
-    padding: 10px 14px;
-    border: 1px solid #d7e4f2;
-    background: linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%);
+    padding: var(--ui-section-padding-y) var(--ui-section-padding-x);
+    border: 1px solid var(--color-border-light);
+    background: var(--color-bg-light);
 }
 
 .work-order-screening-stage-tabs {
     margin: 0;
+    padding: 0;
+    gap: var(--spacing-xs);
+}
+
+.work-order-screening-stage-tabs .tab-btn,
+.work-order-screening-stage-tabs .tab-btn.active {
+    min-width: 96px;
+    min-height: var(--ui-control-height);
+    padding: var(--ui-control-padding-y) var(--ui-control-padding-x);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--ui-radius-control);
+    box-shadow: none;
+    font-size: var(--font-base);
 }
 
 .work-order-screening-stage-tabs .tab-btn.active {
-    color: #1d4ed8;
-    border-color: #93c5fd;
-    box-shadow: 0 2px 10px rgba(29, 78, 216, 0.18);
+    background: var(--color-primary);
+    color: var(--color-bg);
+}
+
+[data-work-orders-create-modal] .work-order-edit-schedule-section > .subsection-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--ui-section-gap);
+}
+
+[data-work-orders-create-modal] .work-order-edit-schedule-section > .subsection-header h4 {
+    flex: 0 1 auto;
+    margin: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+[data-work-orders-create-modal] .work-order-edit-schedule-section .subsection-actions {
+    margin-bottom: 0;
 }
 
 .work-order-screening-stage-panel {

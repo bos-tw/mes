@@ -25,6 +25,8 @@
 
 表格操作的顏色與 icon 必須符合既有 `data-action` 映射；若新增 action，先更新共用映射與本文件，再使用於模組。
 
+表格操作欄統一使用 `.table-actions` 與 `.op-action-btn`：按鈕尺寸使用 `var(--ui-table-action-size)`，圖示字級使用 `var(--font-sm)`，按鈕間距使用 `var(--ui-table-action-gap)`。模組不得自行放大、縮小或改寫間距。
+
 ## Icon 與可用性
 
 - 使用 Font Awesome：配置檔使用 `fa-*`，HTML/JS 渲染使用 `fas fa-*`。

@@ -44,4 +44,22 @@ final class P1SchemaContractTest extends TestCase
             )")->fetchColumn();
         self::assertSame(0, (int)$missing);
     }
+
+    public function testOrderItemsSupportSoftDelete(): void
+    {
+        $pdo = getTestDb();
+        $database = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();
+
+        $columnStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_schema = ? AND table_name = 'order_items'
+              AND column_name = 'deleted_at' AND is_nullable = 'YES'");
+        $columnStmt->execute([$database]);
+        self::assertSame(1, (int)$columnStmt->fetchColumn());
+
+        $indexStmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.statistics
+            WHERE table_schema = ? AND table_name = 'order_items'
+              AND index_name = 'idx_order_items_order_active'");
+        $indexStmt->execute([$database]);
+        self::assertGreaterThanOrEqual(1, (int)$indexStmt->fetchColumn());
+    }
 }

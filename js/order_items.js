@@ -998,9 +998,7 @@
                     option.textContent = item.label ?? item.value ?? '';
                     statusSelect.appendChild(option);
                 });
-                if (previous) {
-                    statusSelect.value = previous;
-                }
+                statusSelect.value = previous || 'pending';
             }
 
             if (sampleStatusSelect) {
@@ -2113,26 +2111,58 @@
 
         function applyServerValidationErrors(errors) {
             if (!errors || typeof errors !== 'object') {
-                return;
+                return [];
             }
 
             const messages = [];
+            const fieldMap = {
+                screening_item_id: screeningItemSelect,
+                total_weight_kg: totalWeightInput,
+                unit_price_per_thousand: unitPriceInput,
+                status: statusSelect,
+                customer_sample_status: sampleStatusSelect,
+                sub_item_number: subItemNumberInput,
+                part_number: partNumberInput,
+                customer_batch_number: customerBatchNumberInput,
+                customer_provided_weight: customerProvidedWeightInput,
+                confirmed_weight: confirmedWeightInput,
+                actual_production_weight: actualProductionWeightInput,
+                delivery_location: deliveryLocationInput,
+                notes: notesInput,
+            };
+            let firstInvalidField = null;
+
+            const collectMessages = (value) => {
+                if (typeof value === 'string' && value.trim() !== '') {
+                    messages.push(value.trim());
+                    return;
+                }
+                if (Array.isArray(value)) {
+                    value.forEach(collectMessages);
+                    return;
+                }
+                if (value && typeof value === 'object') {
+                    Object.values(value).forEach(collectMessages);
+                }
+            };
+
             Object.keys(errors).forEach((key) => {
                 const value = errors[key];
-                if (typeof value === 'string') {
-                    messages.push(value);
-                } else if (Array.isArray(value)) {
-                    value.forEach((item) => {
-                        if (typeof item === 'string') {
-                            messages.push(item);
-                        }
-                    });
+                collectMessages(value);
+
+                const field = fieldMap[key];
+                if (field) {
+                    field.classList.add('has-error');
+                    field.setAttribute('aria-invalid', 'true');
+                    firstInvalidField = firstInvalidField || field;
                 }
             });
 
-            if (messages.length > 0) {
-                showModalAlert('error', messages[0], false);
+            if (firstInvalidField && typeof firstInvalidField.focus === 'function') {
+                firstInvalidField.focus();
             }
+
+            return [...new Set(messages)];
         }
 
         async function submitForm() {
@@ -2267,8 +2297,9 @@
 
                 if (!response.ok || !result.success) {
                     const message = result?.message || `HTTP ${response.status}`;
-                    applyServerValidationErrors(result?.errors);
-                    showModalAlert('error', message, false);
+                    const validationMessages = applyServerValidationErrors(result?.errors);
+                    const details = validationMessages.length > 0 ? ` ${validationMessages.join('、')}` : '';
+                    showModalAlert('error', `${message}${details}`, false);
                     return;
                 }
 

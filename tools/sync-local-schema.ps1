@@ -329,6 +329,10 @@ $migrationChecks = [ordered]@{
         CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'order_items' AND column_name = 'order_item_sequence' AND is_nullable = 'NO') AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'order_items' AND column_name = 'order_item_number' AND is_nullable = 'NO') AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'order_items' AND index_name = 'uk_order_items_order_item_number' AND non_unique = 0) AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'order_items' AND index_name = 'uk_order_items_order_sequence' AND non_unique = 0), 1, 0);"
         Description = 'stable order detail identifier and per-order sequence'
     }
+    '2026_07_20_add_order_items_soft_delete.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'order_items' AND column_name = 'deleted_at' AND is_nullable = 'YES') AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'order_items' AND index_name = 'idx_order_items_order_active'), 1, 0);"
+        Description = 'order item soft-delete column and active-order index'
+    }
     '2026_07_19_add_basic_settings_permission.sql' = @{
         CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM permissions WHERE name = 'basic_settings.read'), 1, 0);"
         Description = 'basic_settings.read permission exists'

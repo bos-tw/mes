@@ -214,18 +214,6 @@
     // ===========================
 
     function bindEvents() {
-        moduleRoot.querySelectorAll('[data-dashboard-open]').forEach(button => {
-            button.addEventListener('click', () => {
-                const moduleId = button.dataset.dashboardOpen;
-                const link = document.querySelector(`.sidebar [data-page="${moduleId}"]`);
-                if (link && !link.closest('li')?.hidden && !link.closest('li')?.classList.contains('hidden')) {
-                    link.click();
-                } else {
-                    window.AppFeedback?.toast('您目前沒有此工作區的瀏覽權限。', 'warning');
-                }
-            });
-        });
-
         // 刷新按鈕
         const refreshBtn = moduleRoot.querySelector('[data-action="refresh"]') || getElement('refresh-btn');
         if (refreshBtn) {

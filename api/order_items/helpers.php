@@ -140,12 +140,18 @@ function validateOrderItemData(array $payload, bool $isUpdate = false): array
         }
     }
 
-    // status
-    if (array_key_exists('status', $payload)) {
-        $status = trim((string)$payload['status']);
+    // status - 新增時為選填，未提供或空白時套用資料庫契約的 pending 預設值。
+    if (!$isUpdate && !array_key_exists('status', $payload)) {
+        $data['status'] = 'pending';
+    } elseif (array_key_exists('status', $payload)) {
+        $status = trim((string)($payload['status'] ?? ''));
         $allowedStatuses = array_keys(getWorkflowTransitionDefinitions()['order_items']);
-        if (!in_array($status, $allowedStatuses, true)) {
-            $errors['status'] = '訂單品項狀態不在允許清單中。';
+        if ($status === '' && !$isUpdate) {
+            $data['status'] = 'pending';
+        } elseif ($status === '') {
+            $errors['status'] = '生產狀態不可為空。';
+        } elseif (!in_array($status, $allowedStatuses, true)) {
+            $errors['status'] = '生產狀態不在允許清單中。';
         } else {
             $data['status'] = $status;
         }
@@ -640,9 +646,22 @@ function recalculateOrderTotalAmount(PDO $pdo, int $orderId): void
     $stmt = $pdo->prepare('UPDATE orders SET total_amount = (
         SELECT COALESCE(SUM(total_price), 0)
         FROM order_items
-        WHERE order_id = ?
+        WHERE order_id = ? AND deleted_at IS NULL
     ) WHERE id = ?');
     $stmt->execute([$orderId, $orderId]);
+}
+
+/**
+ * Soft-delete an active order item while preserving its stable identifier.
+ */
+function softDeleteOrderItem(PDO $pdo, int $id): bool
+{
+    $stmt = $pdo->prepare(
+        'UPDATE order_items SET deleted_at = NOW() WHERE id = :id AND deleted_at IS NULL'
+    );
+    $stmt->execute(['id' => $id]);
+
+    return $stmt->rowCount() === 1;
 }
 
 /**
@@ -668,7 +687,7 @@ function findOrderItem(PDO $pdo, int $id): ?array
         . ' AND lv_status.domain_id = (SELECT id FROM lookup_domains WHERE domain_key = :statusDomain) '
         . 'LEFT JOIN lookup_values lv_sample ON oi.customer_sample_status = lv_sample.value_key '
         . ' AND lv_sample.domain_id = (SELECT id FROM lookup_domains WHERE domain_key = :sampleDomain) '
-        . 'WHERE oi.id = :id';
+        . 'WHERE oi.id = :id AND oi.deleted_at IS NULL';
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
@@ -705,7 +724,7 @@ function findOrderItemsByOrder(PDO $pdo, int $orderId): array
         . ' AND lv_status.domain_id = (SELECT id FROM lookup_domains WHERE domain_key = :statusDomain) '
         . 'LEFT JOIN lookup_values lv_sample ON oi.customer_sample_status = lv_sample.value_key '
         . ' AND lv_sample.domain_id = (SELECT id FROM lookup_domains WHERE domain_key = :sampleDomain) '
-        . 'WHERE oi.order_id = :order_id '
+        . 'WHERE oi.order_id = :order_id AND oi.deleted_at IS NULL '
         . 'ORDER BY oi.id DESC';
 
     $stmt = $pdo->prepare($sql);
@@ -1109,12 +1128,14 @@ function findAllOrderItems(PDO $pdo, ?string $keyword = null): array
         'sampleDomain' => ORDER_ITEM_SAMPLE_STATUS_DOMAIN,
     ];
 
+    $sql .= 'WHERE oi.deleted_at IS NULL ';
+
     if ($keyword !== null && trim($keyword) !== '') {
-        $sql .= 'WHERE oi.order_item_number LIKE :keyword '
+        $sql .= 'AND (oi.order_item_number LIKE :keyword '
             . ' OR oi.customer_batch_number LIKE :keyword '
             . ' OR o.order_number LIKE :keyword '
             . ' OR c.name LIKE :keyword '
-            . ' OR EXISTS (SELECT 1 FROM work_orders wo_search WHERE wo_search.order_item_id = oi.id AND wo_search.work_order_number LIKE :keyword) ';
+            . ' OR EXISTS (SELECT 1 FROM work_orders wo_search WHERE wo_search.order_item_id = oi.id AND wo_search.work_order_number LIKE :keyword)) ';
         $params['keyword'] = '%' . trim($keyword) . '%';
     }
 

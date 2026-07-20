@@ -150,6 +150,7 @@ try {
             LEFT JOIN inventory_items ii ON ii.order_item_id = oi.id AND ii.deleted_at IS NULL
             LEFT JOIN shipping_order_items soi ON soi.order_item_id = oi.id
             WHERE oi.order_id = :id
+              AND oi.deleted_at IS NULL
               AND (wo.id IS NOT NULL OR ii.id IS NOT NULL OR soi.id IS NOT NULL)
         )");
         $flowStmt->execute(['id' => (int)$id]);

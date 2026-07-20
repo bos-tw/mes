@@ -57,6 +57,7 @@ $stmt = $pdo->prepare('
     FROM order_items oi
     LEFT JOIN screening_items si ON oi.screening_item_id = si.id
     WHERE oi.order_id = ?
+      AND oi.deleted_at IS NULL
     ORDER BY oi.id ASC
 ');
 $stmt->execute([$orderId]);

@@ -55,6 +55,7 @@ try {
         INNER JOIN orders o ON oi.order_id = o.id
         WHERE o.customer_id = :id
         AND o.deleted_at IS NULL
+        AND oi.deleted_at IS NULL
     ");
     $orderItemStmt->execute([':id' => $id]);
     $orderItemCount = (int)$orderItemStmt->fetchColumn();

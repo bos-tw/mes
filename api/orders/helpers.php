@@ -160,7 +160,12 @@ function validateOrderData(array $payload, bool $isUpdate = false): array
     if (array_key_exists('status', $payload)) {
         $status = normalizeOrderNullableString($payload['status'] ?? '');
         $allowedStatuses = array_keys(getWorkflowTransitionDefinitions()['orders']);
-        if (!in_array($status, $allowedStatuses, true)) {
+        if ($status === '' && !$isUpdate) {
+            // HTML select 會送出空字串；新增時依 API 契約套用預設狀態。
+            $data['status'] = 'pending';
+        } elseif ($status === '') {
+            $errors['status'] = '訂單狀態不可為空。';
+        } elseif (!in_array($status, $allowedStatuses, true)) {
             $errors['status'] = '訂單狀態不在允許清單中。';
         } else {
             $data['status'] = $status;
