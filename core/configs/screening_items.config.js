@@ -73,6 +73,7 @@
         // Modal 配置 - 使用 formRows 模式（並排 section）
         modal: {
             title: '新增受篩產品',
+            size: 'medium',
             hiddenFields: ['id'],
             // formRows: 每個 row 內的 sections 會並排顯示
             formRows: [

@@ -33,20 +33,12 @@ ModuleConfig.register('order_items', {
     // ========================================
     // 標題區按鈕
     // ========================================
-    // 新增與匯出仍需在訂單明細脈絡中執行；全域頁面負責查詢與追蹤。
+    // 客戶批號由訂單明細建立；全域頁面提供查詢、追蹤與匯出。
     actions: [
-        { 
-            label: '新增品項', 
-            icon: 'fa-plus', 
-            action: 'create', 
-            style: 'primary', 
-            disabled: true, 
-            wrapLabel: true 
-        },
-        { 
-            label: '匯出', 
-            icon: 'fa-file-export', 
-            action: 'export', 
+        {
+            label: '批次匯出',
+            icon: 'fa-download',
+            action: 'batch-export',
             style: 'outline', 
             disabled: true, 
             wrapLabel: true 
@@ -59,6 +51,17 @@ ModuleConfig.register('order_items', {
     hasColumnSelector: true,
     tableHeaderActions: true,
     tableHeaderActionsInHeader: true,
+    filterLayout: 'drawer',
+    useGenericFilterDrawer: true,
+
+    filters: [
+        {
+            name: 'keyword',
+            label: '關鍵字',
+            type: 'text',
+            placeholder: '明細編號／客戶批號／訂單／客戶／工單'
+        }
+    ],
 
     // ========================================
     // 自訂 HTML：訂單資訊橫幅
@@ -77,18 +80,7 @@ ModuleConfig.register('order_items', {
             </div>
         </div>
     </section>
-    <div class="module-toolbar compact hidden" data-order-items-global-filter>
-        <form class="filter-form" data-order-items-global-filter-form>
-            <label class="inline-label">
-                <span>關鍵字</span>
-                <input type="search" data-order-items-global-keyword placeholder="明細編號／客戶批號／訂單／客戶／工單">
-            </label>
-            <div class="form-actions">
-                <button type="submit" class="btn primary small">搜尋</button>
-                <button type="button" class="btn outline small" data-action="reset-global-filter">重設</button>
-            </div>
-        </form>
-    </div>`,
+    `,
 
     // ========================================
     // 資料表格欄位定義

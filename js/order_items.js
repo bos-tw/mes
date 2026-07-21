@@ -21,9 +21,8 @@
 
         const alertBox = moduleRoot.querySelector('[data-order-items-alert]');
         const bannerElement = moduleRoot.querySelector('[data-order-items-banner]');
-        const globalFilter = moduleRoot.querySelector('[data-order-items-global-filter]');
-        const globalFilterForm = moduleRoot.querySelector('[data-order-items-global-filter-form]');
-        const globalKeywordInput = moduleRoot.querySelector('[data-order-items-global-keyword]');
+        const filterForm = moduleRoot.querySelector('[data-order-items-filter]');
+        const filterKeywordInput = filterForm ? filterForm.querySelector('[name="keyword"]') : null;
     const tableElement = moduleRoot.querySelector('[data-order-items-table]');
     const tableHead = tableElement ? tableElement.querySelector('thead') : null;
     const tableBody = tableElement ? tableElement.querySelector('tbody') : null;
@@ -46,8 +45,7 @@
         const toolTypeSummary = modalOverlay ? modalOverlay.querySelector('[data-tool-type-summary]') : null;
         const toolTypeContent = modalOverlay ? modalOverlay.querySelector('[data-tool-type-content]') : null;
         const metricsPanel = modalOverlay ? modalOverlay.querySelector('[data-metrics]') : null;
-        const headerCreateButton = moduleRoot.querySelector('.content-header [data-action="create"]');
-        const exportButton = moduleRoot.querySelector('.content-header [data-action="export"]');
+        const batchExportButton = moduleRoot.querySelector('.content-header [data-action="batch-export"]');
 
         const screeningItemSelect = modalForm ? modalForm.querySelector('select[name="screening_item_id"]') : null;
         const screeningCreatePanel = modalForm ? modalForm.querySelector('[data-screening-create-panel]') : null;
@@ -701,20 +699,9 @@
     
         function updateButtons() {
             const hasOrder = Boolean(state.orderContext);
-            const disableCreate = !hasOrder || state.isLoading;
-
-            if (headerCreateButton) {
-                headerCreateButton.disabled = disableCreate;
-                headerCreateButton.title = hasOrder ? '新增客戶批號' : '請先選擇訂單';
-            }
-
-            if (exportButton) {
-                exportButton.disabled = !hasOrder;
-                exportButton.title = hasOrder ? '匯出客戶批號' : '請先選擇訂單';
-            }
-
-            if (globalFilter) {
-                globalFilter.classList.toggle('hidden', hasOrder);
+            if (batchExportButton) {
+                batchExportButton.disabled = !hasOrder;
+                batchExportButton.title = hasOrder ? '批次匯出客戶批號' : '請先選擇訂單';
             }
         }
 
@@ -782,9 +769,9 @@
                     'fully_shipped': '已全部出貨'
                 };
                 const shippingStatusClass = {
-                    'not_shipped': '',
-                    'partial_shipped': 'text-warning',
-                    'fully_shipped': 'text-success'
+                    'not_shipped': 'pending',
+                    'partial_shipped': 'warning',
+                    'fully_shipped': 'shipped'
                 };
                 const shippingStatus = item.shipping_status || 'not_shipped';
                 const shippingStatusLabel = shippingStatusMap[shippingStatus] || shippingStatus;
@@ -810,7 +797,7 @@
                         <td>${escapeHtml(sampleLabel)}</td>
                         <td>${escapeHtml(updatedAtLabel)}</td>
                         <td class="text-right">${formatNumber(item.total_shipped_quantity ?? 0, 0)}</td>
-                        <td class="${shippingStatusCls}">${escapeHtml(shippingStatusLabel)}</td>
+                        <td><span class="status-badge ${shippingStatusCls}">${escapeHtml(shippingStatusLabel)}</span></td>
                         <td>${item.work_order_count ? `${escapeHtml(item.work_order_count)} 筆` : '-'}</td>
                         <td>${item.inventory_item_count ? `${escapeHtml(item.inventory_item_count)} 筆` : '-'}</td>
                         <td>${item.shipping_order_item_count ? `${escapeHtml(item.shipping_order_item_count)} 筆` : '-'}</td>
@@ -1016,8 +1003,8 @@
             }
         }
 
-        async function loadOptionsIfNeeded() {
-            if (state.optionsLoaded) {
+        async function loadOptionsIfNeeded(forceRefresh = false) {
+            if (state.optionsLoaded && !forceRefresh) {
                 return state.options;
             }
 
@@ -1025,6 +1012,7 @@
                 const response = await fetch('api/order_items/options.php', {
                     method: 'GET',
                     credentials: 'include',
+                    cache: 'no-store',
                     headers: {
                         'Accept': 'application/json',
                     },
@@ -1414,22 +1402,26 @@
                 row.setAttribute('data-drawing-id', String(fileData.id));
             }
 
-            // 圖面編號
-            const numberCell = document.createElement('td');
+            // 圖面編號併入檔案名稱欄，讓圖面與一般檔案附件使用一致的表格欄位。
             const numberInput = document.createElement('input');
             numberInput.type = 'text';
-            numberInput.placeholder = '請輸入圖面編號';
+            numberInput.placeholder = '圖面編號（選填）';
             numberInput.maxLength = 100;
             numberInput.setAttribute('data-field', 'drawing-number');
+            numberInput.setAttribute('aria-label', '圖面編號');
             if (fileData && fileData.drawing_number) {
                 numberInput.value = fileData.drawing_number;
             }
-            numberCell.appendChild(numberInput);
 
             // 檔案名稱
             const nameCell = document.createElement('td');
+            const nameStack = document.createElement('div');
+            nameStack.classList.add('stacked-inputs');
+            nameStack.appendChild(numberInput);
+            const fileName = document.createElement('span');
+            fileName.setAttribute('data-field', 'drawing-file-name');
             if (fileData) {
-                nameCell.textContent = fileData.name || '未命名檔案';
+                fileName.textContent = fileData.name || '未命名檔案';
                 row.setAttribute('data-file-name', fileData.name || '');
                 if (!isExisting) {
                     // 新檔案需要有 file input (隱藏的)
@@ -1437,11 +1429,19 @@
                     fileInput.type = 'file';
                     fileInput.style.display = 'none';
                     fileInput.setAttribute('data-field', 'drawing-file');
-                    nameCell.appendChild(fileInput);
+                    nameStack.appendChild(fileInput);
                 }
             } else {
-                nameCell.innerHTML = '<input type="file" accept="image/*,.pdf" data-field="drawing-file" />';
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'image/*,.pdf';
+                fileInput.setAttribute('data-field', 'drawing-file');
+                nameStack.appendChild(fileInput);
             }
+            if (fileData) {
+                nameStack.appendChild(fileName);
+            }
+            nameCell.appendChild(nameStack);
 
             // 檔案大小
             const sizeCell = document.createElement('td');
@@ -1487,7 +1487,6 @@
             removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
             actionCell.appendChild(removeBtn);
 
-            row.appendChild(numberCell);
             row.appendChild(nameCell);
             row.appendChild(sizeCell);
             row.appendChild(timeCell);
@@ -1524,13 +1523,23 @@
                 return;
             }
 
-            // 更新行顯示 (注意:現在第一欄是圖面編號)
-            const nameCell = row.querySelector('td:nth-child(2)');
-            const sizeCell = row.querySelector('td:nth-child(3)');
-            const timeCell = row.querySelector('td:nth-child(4)');
-            const previewCell = row.querySelector('td:nth-child(5)');
+            // 圖面與檔案附件使用一致欄位：檔案名稱、大小、時間、預覽、操作。
+            const fileName = row.querySelector('[data-field="drawing-file-name"]');
+            const sizeCell = row.querySelector('td:nth-child(2)');
+            const timeCell = row.querySelector('td:nth-child(3)');
+            const previewCell = row.querySelector('td:nth-child(4)');
 
-            if (nameCell) nameCell.textContent = file.name;
+            if (fileName) {
+                fileName.textContent = file.name;
+            } else {
+                const nameStack = row.querySelector('td:first-child .stacked-inputs');
+                if (nameStack) {
+                    const generatedFileName = document.createElement('span');
+                    generatedFileName.setAttribute('data-field', 'drawing-file-name');
+                    generatedFileName.textContent = file.name;
+                    nameStack.appendChild(generatedFileName);
+                }
+            }
             if (sizeCell) sizeCell.textContent = formatFileSize(file.size);
             if (timeCell) timeCell.textContent = new Date().toLocaleString('zh-TW');
 
@@ -1796,7 +1805,7 @@
             resetServicesTable();
 
             const services = Array.isArray(state.options?.screening_services)
-                ? state.options.screening_services
+                ? state.options.screening_services.filter((service) => Number(service.is_default) === 1)
                 : [];
 
             if (services.length === 0) {
@@ -2801,8 +2810,8 @@
 
             state.orderContext = normalized;
             state.globalKeyword = '';
-            if (globalKeywordInput) {
-                globalKeywordInput.value = '';
+            if (filterKeywordInput) {
+                filterKeywordInput.value = '';
             }
             updateBanner();
             updateButtons();
@@ -2852,6 +2861,7 @@
         const orderItemsController = Object.freeze({
             async openCreate(context) {
                 await prepareEditorContext(context);
+                await loadOptionsIfNeeded(true);
                 openModal('create');
             },
             async openEdit(context, orderItemId) {
@@ -2868,46 +2878,24 @@
         });
         moduleRoot.orderItemsController = orderItemsController;
 
-        if (globalFilterForm) {
-            globalFilterForm.addEventListener('submit', async (event) => {
+        if (filterForm) {
+            filterForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
-                if (state.orderContext) {
-                    return;
-                }
-                state.globalKeyword = globalKeywordInput ? globalKeywordInput.value.trim() : '';
+                state.globalKeyword = filterKeywordInput ? filterKeywordInput.value.trim() : '';
                 await loadItems();
             });
         }
 
-        const resetGlobalFilterButton = moduleRoot.querySelector('[data-action="reset-global-filter"]');
-        if (resetGlobalFilterButton) {
-            resetGlobalFilterButton.addEventListener('click', async () => {
-                if (globalKeywordInput) {
-                    globalKeywordInput.value = '';
-                }
+        const resetFilterButton = moduleRoot.querySelector('[data-action="reset-filter"]');
+        if (resetFilterButton) {
+            resetFilterButton.addEventListener('click', async () => {
                 state.globalKeyword = '';
-                if (!state.orderContext) {
-                    await loadItems();
-                }
+                await loadItems();
             });
         }
 
-        if (headerCreateButton) {
-            headerCreateButton.addEventListener('click', async () => {
-                if (!state.orderContext || state.isLoading) {
-                    return;
-                }
-                try {
-                    await loadOptionsIfNeeded();
-                    openModal('create');
-                } catch {
-                    // 錯誤已於 loadOptionsIfNeeded 顯示
-                }
-            });
-        }
-
-        if (exportButton) {
-            exportButton.addEventListener('click', downloadExport);
+        if (batchExportButton) {
+            batchExportButton.addEventListener('click', downloadExport);
         }
 
         if (tableHead) {

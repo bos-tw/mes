@@ -71,6 +71,7 @@
             { key: 'tolerance_minus_value', label: '公差(-)', sortable: false, selectable: true },
             { key: 'ppm_standard', label: 'PPM 標準', sortable: true, selectable: true },
             { key: 'is_active', label: '狀態', sortable: true, selectable: true },
+            { key: 'is_default', label: '預設項目', sortable: true, selectable: true },
             { key: 'updated_at', label: '更新時間', sortable: true, selectable: true },
             { key: 'actions', label: '操作', sortable: false, selectable: false }
         ],
@@ -108,6 +109,7 @@
                             title: '公差與啟用設定',
                             fields: [
                                 { name: 'is_active', label: '啟用', type: 'checkbox', checked: true },
+                                { name: 'is_default', label: '預設項目', type: 'checkbox', checked: false },
                                 { name: 'tolerance_plus_value', label: '公差(+)', type: 'number', step: 0.0001, placeholder: '請輸入正公差值' },
                                 { name: 'tolerance_plus_over', label: '正值(+)', type: 'number', step: 0.0001, placeholder: '請輸入正值' },
                                 { name: 'tolerance_minus_value', label: '公差(-)', type: 'number', step: 0.0001, placeholder: '請輸入負公差值' },

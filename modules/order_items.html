@@ -68,13 +68,9 @@
         <p class="subtitle">全域追蹤客戶批號、訂單明細與下游流程</p>
     </div>
     <div class="header-actions">
-        <button type="button" class="btn primary" data-action="create" disabled title="請先選擇訂單">
-            <i class="fas fa-plus"></i>
-            <span>新增品項</span>
-        </button>
-        <button type="button" class="btn outline" data-action="export" disabled title="請先選擇訂單">
-            <i class="fas fa-file-export"></i>
-            <span>匯出</span>
+        <button type="button" class="btn outline" data-action="batch-export" disabled title="請先選擇訂單">
+            <i class="fas fa-download"></i>
+            <span>批次匯出</span>
         </button>
     </div>
 </div>
@@ -219,19 +215,6 @@
             </div>
         </div>
     </section>
-    <div class="module-toolbar compact hidden" data-order-items-global-filter>
-        <form class="filter-form" data-order-items-global-filter-form>
-            <label class="inline-label">
-                <span>關鍵字</span>
-                <input type="search" data-order-items-global-keyword placeholder="明細編號／客戶批號／訂單／客戶／工單">
-            </label>
-            <div class="form-actions">
-                <button type="submit" class="btn primary small">搜尋</button>
-                <button type="button" class="btn outline small" data-action="reset-global-filter">重設</button>
-            </div>
-        </form>
-    </div>
-
     <section class="table-section">
         <div class="table-header-actions">
             <button type="button" class="btn outline small" data-action="toggle-column-selector">
@@ -477,7 +460,6 @@
                                 <table class="data-table compact ui-compact-table">
                                     <thead>
                                         <tr>
-                                        <th class="col-w-180">圖面編號</th>
                                             <th>檔案名稱</th>
                                         <th class="col-w-100">檔案大小</th>
                                         <th class="col-w-150">上傳時間</th>

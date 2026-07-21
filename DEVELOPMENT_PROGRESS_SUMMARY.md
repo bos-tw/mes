@@ -1,49 +1,46 @@
 # MES Development Progress Summary
 
-更新日期：2026-07-20
+更新日期：2026-07-21
 
-## 最新架構與完成項目
+## 本輪完成項目
 
-- 技術棧：PHP 8.4 API、MySQL 8、原生 JavaScript／HTML／CSS、PowerShell schema／更新工具、PHPUnit 12。
-- 主資料表欄寬由 `api/common/column_manager.js` 的 `TableColumnResizer` 單一共用入口管理；支援拖曳調寬、雙擊依標題與目前資料自動適寬、鍵盤調整及 localStorage 持久化。
-- 序號、勾選與操作欄依語意標記維持固定欄寬，不依欄位數量或欄位位置判斷；篩分服務的工單局部樣式已限制在建立／編輯工單 Modal，避免覆寫主表格序號欄。
-- 系統更新提示改為即時警示並明確提醒先儲存；更新與頁籤關閉流程具備未儲存資料確認、快速重複操作鎖定及安全失敗保護。
-- 新增 `--ui-table-column-min-width`、`--ui-table-column-max-width`、`--ui-table-resize-handle-width` 共用 token；模組 HTML 未新增 inline style，欄寬僅由共用 JavaScript 在執行時動態設定。
+- 篩分服務新增 `is_default`／「預設項目」；新增客戶批號時只自動帶入啟用中的預設服務，且每次開啟新增表單都重新載入服務選項避免快取過期。
+- 客戶批號的篩分服務依服務編號排序；圖面附件與檔案附件統一為五欄表格；出貨狀態改用共用 `status-badge`。
+- 客戶批號工具列移除「新增品項」與大型搜尋框，改為批次匯出、抽屜式搜尋與欄位設定；新增／編輯仍由訂單明細脈絡進入。
+- 客戶編輯 Modal 移除非編輯用途的載具分析；員工與受篩產品 Modal 統一為 `medium` 尺寸。
+- 共用表格欄寬管理器修正操作欄按鈕溢出與序號欄過寬；未新增 token、inline style 或固定值例外。
 
 ## Migration 與 schema
 
-- 本輪沒有新增或修改 migration，更新包的 `migrations` 與 `delete_files` 均為空陣列。
-- 本輪初始化 schema sync 為 Applied 39、Pending 0；功能完成後 schema 未再變更。
+- 新增 `migrations/2026_07_21_add_screening_service_default_flag.sql`，並同步 `tools/sync-local-schema.ps1` 與 `tools/schema-contract.json`。
+- migration 以正式 PDO SQL 分割／執行器驗證：舊 schema 含既有服務資料可套用，DDL 已提交後以新 PDO 連線重試亦可安全完成。
+- 本機 schema sync：Applied 40、Pending 0。
 
 ## 驗證狀態
 
-- 使用者已完成本機實際畫面驗收，包含表格欄寬、序號欄與更新／未儲存資料警告。
-- `node tools/audit-system-health.js`：0 errors、13 項既有 F-1 大型 JavaScript warning。
+- 使用者已完成本機實際畫面驗收。
+- `node tools/audit-system-health.js`：0 errors、13 項既有大型 JavaScript warning。
 - `node tools/audit-system-health.js --changed --base origin/main`：0 new、0 blocking、4 resolved。
-- `node tools/validate-config-modules.js`：通過。
-- `script.js`、`api/common/column_manager.js`、`js/data-sync.js` 與 `tools/audit-data-sync.js` 語法檢查通過。
-- `tools/audit/tests/version-checker-behavior.test.js`：通過。
-- DataSync audit：P0=0、P1=0、P2=0、OK=51；`docs/data-sync-audit.md` 已更新。
+- `node tools/validate-config-modules.js`、本輪 JS／PHP 語法檢查、`git diff --check`：通過。
+- DataSync audit：P0=0、P1=0、P2=0、OK=51。
+- `php tools/test-p0-workflow-integrity.php`：35 assertions 通過；PHPUnit：40 tests、94 assertions 通過、16 skipped。
 - UI style audit：748 hardcoded spacing/radius、378 token candidates、370 needs review；本輪未新增審計問題。
-- `git diff --check`、更新包驗證工具及正式 PHP manifest parser 均通過；ZIP 檔案缺漏 0、多包 0。
+
+## 更新包
+
+- 版本：`v3.1.7`／`FileVersion v3.1.7`／ReleaseDate `2026-07-21`。
+- 路徑：`dist/update_v3.1.7_20260721_221127.zip`；大小 90,375 bytes。
+- SHA-256：`CFEB47A6DDBAF46FAAF1A307C8EB532EB7938884069B28837C4717665D8A4EAE`。
+- 包含 14 個正式檔案、1 個 migration、0 個刪除路徑；更新包驗證、正式 PHP manifest parser、檔案清單與 migration SHA-256 比對均通過。
 
 ## 已知風險與下一輪優先事項
 
 - P0：無新增項目。
-- P1：無新增項目；部署後仍應以正式資料與權限執行更新、未存檔頁籤及主要表格 smoke test。
-- P2：13 個既有大型 JavaScript 維護性警告；下一輪若處理技術債，第一優先為拆分 7,590 行的 `js/work_orders.js`，並維持行為回歸測試。
-
-## 更新包
-
-- 版本：`v3.1.6`／`FileVersion v3.1.6`／ReleaseDate `2026-07-20`。
-- 路徑：`dist/update_v3.1.6_20260720_224301.zip`；大小 79,950 bytes。
-- SHA-256：`0DB9932BF90FFAC7296D24F65E2E0F9DF8C8C2ECECEE5D74D34FBB917A8A91A4`。
-- 更新包包含 4 個一般檔案、0 個 migration、0 個刪除路徑；ZIP 根目錄 manifest、版本、release note、正式 PHP parser 與精確檔案集合均驗證通過。
-- `.github` UI 規範與 `docs/data-sync-audit.md` 為開發／驗證文件，未納入正式部署包；未刪除任何既有更新包。
+- P1：部署後以正式資料與權限驗證新增客戶批號的預設服務帶入與抽屜搜尋。
+- P2：13 個既有大型 JavaScript 維護性 warning；優先拆分 `js/work_orders.js`。
 
 ## Git 交接
 
-- 分支：`main`。
-- 本輪開始 commit：`1d7d8e1c1c70930bdf65bf3c59e3526b758ae7cc`。
-- 本輪 8 個功能、規範、驗證、release note 與交接檔案均已確認；沒有來源不明、憑證、dump、暫存或私人檔案。
-- 已取得 commit 與 push 明確授權；使用精確檔案清單 stage，禁止 rebase、merge、reset、force push 或其他歷史改寫，最終 commit、遠端指標與工作樹狀態以收尾回報為準。
+- 分支：`main`；本輪開始 commit 與 `origin/main` 基線：`519204b0ac366b6d0e3bd58ba0525a323183664c`。
+- 本輪功能、migration、驗證文件與 release note 均尚未提交；未取得 commit 或 push 授權。
+- 工作樹含本輪已確認變更，以及本次 PHPUnit 自動產生的 `.phpunit.result.cache` 暫存檔；暫存檔未納入更新包，也未刪除。

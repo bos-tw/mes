@@ -154,6 +154,57 @@
             return tableStates.get(table);
         }
 
+        function getFixedColumnMinimumWidth(table, header, index) {
+            const headerWidth = Math.ceil(header.scrollWidth || header.getBoundingClientRect().width || 0);
+            const columnKey = getColumnKey(header, index);
+            if (columnKey === '__row_number') {
+                const rowNumberWidth = Number.parseFloat(getComputedStyle(header).minWidth);
+                return Number.isFinite(rowNumberWidth) && rowNumberWidth > 0
+                    ? Math.ceil(rowNumberWidth)
+                    : headerWidth;
+            }
+
+            if (columnKey !== '__actions') {
+                return Math.max(1, headerWidth);
+            }
+
+            const actionSize = readCssPixel('--ui-table-action-size', 24);
+            const actionGap = readCssPixel('--ui-table-action-gap', 2);
+            const cellPadding = readCssPixel('--ui-table-cell-padding-x', 6) * 2;
+            const actionCells = Array.from(table.tBodies)
+                .flatMap((body) => Array.from(body.rows))
+                .map((row) => row.cells[index])
+                .filter((cell) => cell && cell.colSpan === 1);
+
+            const requiredWidth = actionCells.reduce((maximum, cell) => {
+                const actionCount = cell.querySelectorAll('button, a').length;
+                const buttonWidth = actionCount > 0
+                    ? (actionCount * actionSize) + (Math.max(actionCount - 1, 0) * actionGap) + cellPadding
+                    : 0;
+                return Math.max(maximum, Math.ceil(cell.scrollWidth || 0), buttonWidth);
+            }, headerWidth);
+
+            return Math.max(getMinimumWidth(), requiredWidth);
+        }
+
+        function enforceFixedColumnWidths(table, headers, columns) {
+            const state = getState(table);
+            columns.forEach((column, index) => {
+                const header = headers[index];
+                if (!header || !isFixedHeader(header)) {
+                    return;
+                }
+
+                const minimumWidth = getFixedColumnMinimumWidth(table, header, index);
+                const currentWidth = Number.parseFloat(column.style.width) || 0;
+                const isRowNumber = getColumnKey(header, index) === '__row_number';
+                if ((isRowNumber && minimumWidth !== currentWidth) || (!isRowNumber && minimumWidth > currentWidth)) {
+                    column.style.width = `${minimumWidth}px`;
+                    state.currentWidths.set(getColumnKey(header, index), minimumWidth);
+                }
+            });
+        }
+
         function createColgroup(table, headers, measuredWidths) {
             const state = getState(table);
             table.querySelector('colgroup[data-column-resizer-group]')?.remove();
@@ -165,8 +216,14 @@
                 const savedWidth = Number(state.savedWidths[key]);
                 const currentWidth = Number(state.currentWidths.get(key));
                 const measuredWidth = Number(measuredWidths[index]);
+                const fixedMinimumWidth = getFixedColumnMinimumWidth(table, header, index);
                 const width = isFixedHeader(header)
-                    ? Math.max(1, Math.round(measuredWidth || currentWidth || savedWidth || getMinimumWidth()))
+                    ? key === '__row_number'
+                        ? fixedMinimumWidth
+                        : Math.max(
+                            fixedMinimumWidth,
+                            Math.round(measuredWidth || currentWidth || savedWidth || getMinimumWidth())
+                        )
                     : currentWidth > 0
                         ? currentWidth
                         : savedWidth > 0
@@ -210,6 +267,8 @@
             const headers = getHeaders(table);
             const columns = Array.from(table.querySelectorAll('colgroup[data-column-resizer-group] > col'));
             let visibleWidth = 0;
+
+            enforceFixedColumnWidths(table, headers, columns);
 
             columns.forEach((column, index) => {
                 const header = headers[index];

@@ -158,6 +158,21 @@ function validateScreeningServiceData(array $payload, bool $isUpdate = false): a
         $data['is_active'] = 1;
     }
 
+    if (array_key_exists('is_default', $payload)) {
+        $isDefault = $payload['is_default'];
+        if (is_string($isDefault)) {
+            $isDefault = trim($isDefault);
+        }
+        if ($isDefault === '' || $isDefault === null) {
+            $data['is_default'] = 0;
+        } else {
+            $truthy = ['1', 'true', 'on', 'yes'];
+            $data['is_default'] = in_array(strtolower((string)$isDefault), $truthy, true) ? 1 : 0;
+        }
+    } elseif (!$isUpdate) {
+        $data['is_default'] = 0;
+    }
+
     return ['data' => $data, 'errors' => $errors];
 }
 
@@ -183,6 +198,7 @@ function transformScreeningService(array $row): array
         'tolerance_minus_over' => $row['tolerance_minus_over'] !== null ? (float)$row['tolerance_minus_over'] : null,
         'ppm_standard' => $row['ppm_standard'] !== null ? (float)$row['ppm_standard'] : null,
         'is_active' => isset($row['is_active']) ? (int)$row['is_active'] : 0,
+        'is_default' => isset($row['is_default']) ? (int)$row['is_default'] : 0,
         'created_at' => $row['created_at'] ?? null,
         'updated_at' => $row['updated_at'] ?? null,
     ];

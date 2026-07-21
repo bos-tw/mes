@@ -65,7 +65,7 @@ function handleShowScreeningService(int $id): void
 {
     $pdo = db();
 
-    $stmt = $pdo->prepare('SELECT id, service_number, name, name_en, category, description, default_price_per_unit, tolerance_plus_value, tolerance_plus_over, tolerance_minus_value, tolerance_minus_over, ppm_standard, is_active, created_at, updated_at FROM screening_services WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, service_number, name, name_en, category, description, default_price_per_unit, tolerance_plus_value, tolerance_plus_over, tolerance_minus_value, tolerance_minus_over, ppm_standard, is_active, is_default, created_at, updated_at FROM screening_services WHERE id = ?');
     $stmt->execute([$id]);
 
     $service = $stmt->fetch();

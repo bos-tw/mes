@@ -333,6 +333,10 @@ $migrationChecks = [ordered]@{
         CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'order_items' AND column_name = 'deleted_at' AND is_nullable = 'YES') AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'order_items' AND index_name = 'idx_order_items_order_active'), 1, 0);"
         Description = 'order item soft-delete column and active-order index'
     }
+    '2026_07_21_add_screening_service_default_flag.sql' = @{
+        CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'screening_services' AND column_name = 'is_default' AND column_default = '0'), 1, 0);"
+        Description = 'screening service default preload flag'
+    }
     '2026_07_19_add_basic_settings_permission.sql' = @{
         CheckSql = "SELECT IF(EXISTS(SELECT 1 FROM permissions WHERE name = 'basic_settings.read'), 1, 0);"
         Description = 'basic_settings.read permission exists'

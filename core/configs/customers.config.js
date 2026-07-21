@@ -260,12 +260,6 @@ ModuleConfig.register('customers', {
                         <span>備註</span>
                         <textarea name="notes" rows="3" placeholder="請輸入備註"></textarea>
                     </label>
-                    <div class="inline-label full-width customer-tool-analysis-panel" data-customer-tool-analysis-panel>
-                        <span>客戶載具紀錄與遺留分析</span>
-                        <div class="customer-tool-analysis-content text-muted" data-customer-tool-analysis>
-                            開啟既有客戶後顯示分析結果。
-                        </div>
-                    </div>
                 </div>`
                     }
                 ]

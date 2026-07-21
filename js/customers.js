@@ -73,7 +73,6 @@
     const clearInvoiceStampButton = modalForm ? modalForm.querySelector('[data-action="clear-invoice-stamp"]') : null;
     const notesTextarea = modalForm ? modalForm.querySelector('textarea[name="notes"]') : null;
     const isActiveSelect = modalForm ? modalForm.querySelector('select[name="is_active"]') : null;
-    const customerToolAnalysisContainer = modalForm ? modalForm.querySelector('[data-customer-tool-analysis]') : null;
 
         const customersCache = new Map();
         const state = {
@@ -285,74 +284,6 @@ function setFieldValue(name, value, form = modalForm) {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 2
             })}%`;
-        }
-
-        function renderCustomerToolAnalysis(analysis) {
-            if (!customerToolAnalysisContainer) {
-                return;
-            }
-
-            if (!analysis) {
-                customerToolAnalysisContainer.classList.add('text-muted');
-                customerToolAnalysisContainer.innerHTML = '儲存客戶後，這裡會顯示載具紀錄與遺留分析。';
-                return;
-            }
-
-            const outstandingRecords = Array.isArray(analysis.outstanding_records)
-                ? analysis.outstanding_records.filter((record) =>
-                    Number(record.incoming_quantity || 0) > 0 || Number(record.returned_quantity || 0) > 0
-                )
-                : [];
-
-            customerToolAnalysisContainer.classList.remove('text-muted');
-            customerToolAnalysisContainer.innerHTML = `
-                <div class="detail-grid" style="margin-bottom: 0.75rem;">
-                    <div class="detail-item">
-                        <div class="detail-label">進場載具紀錄</div>
-                        <div class="detail-value">${escapeHtml(String(analysis.incoming_total_quantity || 0))} 個</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">歷史已歸還</div>
-                        <div class="detail-value">${escapeHtml(String(analysis.returned_total_quantity || 0))} 個</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">可能仍留廠</div>
-                        <div class="detail-value ${Number(analysis.outstanding_total_quantity || 0) > 0 ? 'text-danger' : 'text-success'}">${escapeHtml(String(analysis.outstanding_total_quantity || 0))} 個</div>
-                    </div>
-                    <div class="detail-item full-width">
-                        <div class="detail-label">分析口徑</div>
-                        <div class="detail-value">${escapeHtml(analysis.basis_note || '-')}</div>
-                    </div>
-                </div>
-                ${outstandingRecords.length > 0 ? `
-                <div class="table-responsive">
-                    <table class="data-table compact">
-                        <thead>
-                            <tr>
-                                <th>載具名稱</th>
-                                <th>類型</th>
-                                <th>進場</th>
-                                <th>已歸還</th>
-                                <th>可能留廠</th>
-                                <th>狀態</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${outstandingRecords.slice(0, 10).map((record) => `
-                            <tr>
-                                <td>${escapeHtml(record.tool_name || '-')}</td>
-                                <td>${escapeHtml(record.tool_type || '-')}</td>
-                                <td class="text-right">${escapeHtml(String(record.incoming_quantity || 0))}</td>
-                                <td class="text-right">${escapeHtml(String(record.returned_quantity || 0))}</td>
-                                <td class="text-right ${Number(record.outstanding_quantity || 0) > 0 ? 'text-danger' : ''}">${escapeHtml(String(record.outstanding_quantity || 0))}</td>
-                                <td>${escapeHtml(record.status_label || '-')}</td>
-                            </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                ` : '<div class="text-muted">目前沒有可分析的客戶載具進出紀錄。</div>'}
-            `;
         }
 
         // Modal 內部錯誤訊息顯示
@@ -1117,7 +1048,6 @@ function setFieldValue(name, value, form = modalForm) {
             }
             updateInvoiceStampPreviewFromPath(customer.invoice_attachment_path || '');
             if (notesTextarea) notesTextarea.value = customer.notes || '';
-            renderCustomerToolAnalysis(customer.customer_tool_analysis || null);
         }
 
         function openModal(mode, customer = null) {
@@ -1139,7 +1069,6 @@ function setFieldValue(name, value, form = modalForm) {
             if (invoiceStampFileInput) {
                 invoiceStampFileInput.value = '';
             }
-            renderCustomerToolAnalysis(null);
 
             if (modalTitle) {
                 modalTitle.textContent = mode === 'edit' ? '編輯客戶基本資料' : '新增客戶基本資料';
@@ -1183,7 +1112,6 @@ function setFieldValue(name, value, form = modalForm) {
                 invoiceStampFileInput.value = '';
             }
             resetInvoiceStampPreview();
-            renderCustomerToolAnalysis(null);
             hideModalAlert(); // 關閉 modal 時清除錯誤訊息
             modalOverlay.classList.add('hidden');
             state.currentEditingId = null;

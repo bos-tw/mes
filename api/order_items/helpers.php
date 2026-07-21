@@ -1175,7 +1175,7 @@ function fetchOrderItemOptions(PDO $pdo): array
     $toolsStmt = $pdo->query('SELECT id, tool_number, name, type, weight_kg FROM tools ORDER BY tool_number');
     $tools = $toolsStmt ? $toolsStmt->fetchAll() : [];
 
-    $servicesStmt = $pdo->query('SELECT id, service_number, name, category, default_price_per_unit FROM screening_services WHERE is_active = 1 ORDER BY name');
+    $servicesStmt = $pdo->query('SELECT id, service_number, name, category, default_price_per_unit, is_default FROM screening_services WHERE is_active = 1 ORDER BY service_number IS NULL, service_number, name, id');
     $services = $servicesStmt ? $servicesStmt->fetchAll() : [];
 
     $sampleLookupStmt = $pdo->prepare('SELECT lv.value_key, lv.value_label FROM lookup_domains ld JOIN lookup_values lv ON ld.id = lv.domain_id WHERE ld.domain_key = :domain ORDER BY lv.sort_order, lv.id');
@@ -1207,6 +1207,7 @@ function fetchOrderItemOptions(PDO $pdo): array
             'name' => $row['name'],
             'category' => $row['category'],
             'default_price_per_unit' => isset($row['default_price_per_unit']) ? (float)$row['default_price_per_unit'] : null,
+            'is_default' => isset($row['is_default']) ? (int)$row['is_default'] : 0,
         ], $services ?: []),
         'customer_sample_statuses' => array_map(static fn(array $row): array => [
             'value' => $row['value_key'],

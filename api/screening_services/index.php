@@ -108,7 +108,7 @@ function handleListScreeningServices(): void
 
     $sql = 'SELECT s.id, s.service_number, s.name, s.name_en, s.category, s.description, s.default_price_per_unit, ' .
         's.tolerance_plus_value, s.tolerance_plus_over, s.tolerance_minus_value, s.tolerance_minus_over, ' .
-        's.ppm_standard, s.is_active, s.created_at, s.updated_at ' .
+        's.ppm_standard, s.is_active, s.is_default, s.created_at, s.updated_at ' .
         "FROM screening_services s WHERE $where ORDER BY s.id DESC LIMIT :limit OFFSET :offset";
 
     $stmt = $pdo->prepare($sql);
@@ -153,7 +153,7 @@ function handleCreateScreeningService(): void
     try {
         $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare('INSERT INTO screening_services (service_number, name, name_en, category, description, default_price_per_unit, tolerance_plus_value, tolerance_plus_over, tolerance_minus_value, tolerance_minus_over, ppm_standard, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt = $pdo->prepare('INSERT INTO screening_services (service_number, name, name_en, category, description, default_price_per_unit, tolerance_plus_value, tolerance_plus_over, tolerance_minus_value, tolerance_minus_over, ppm_standard, is_active, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([
             $data['service_number'] ?? null,
             $data['name'] ?? null,
@@ -167,6 +167,7 @@ function handleCreateScreeningService(): void
             $data['tolerance_minus_over'] ?? null,
             $data['ppm_standard'] ?? null,
             $data['is_active'] ?? 1,
+            $data['is_default'] ?? 0,
         ]);
 
         $serviceId = (int)$pdo->lastInsertId();

@@ -1,7 +1,7 @@
 {
     "schemaVersion": 1,
     "database": "yucyuan",
-    "generatedAt": "2026-07-20T06:03:55+00:00",
+    "generatedAt": "2026-07-21T12:48:38+00:00",
     "tables": {
         "audit_logs": {
             "id": {
@@ -4356,6 +4356,12 @@
                 "type": "tinyint",
                 "nullable": true,
                 "key": "MUL",
+                "extra": ""
+            },
+            "is_default": {
+                "type": "tinyint",
+                "nullable": false,
+                "key": "",
                 "extra": ""
             },
             "created_at": {

@@ -41,6 +41,7 @@
         const toleranceMinusOverInput = modalForm ? modalForm.querySelector('input[name="tolerance_minus_over"]') : null;
         const ppmStandardInput = modalForm ? modalForm.querySelector('input[name="ppm_standard"]') : null;
         const isActiveCheckbox = modalForm ? modalForm.querySelector('input[name="is_active"]') : null;
+        const isDefaultCheckbox = modalForm ? modalForm.querySelector('input[name="is_default"]') : null;
         const descriptionInput = modalForm ? modalForm.querySelector('textarea[name="description"]') : null;
 
         const servicesCache = new Map();
@@ -53,6 +54,7 @@
             'tolerance_minus_over',
             'ppm_standard',
             'is_active',
+            'is_default',
         ]);
         const state = {
             page: 1,
@@ -180,6 +182,7 @@ function formatDecimal(value, decimals = 2) {
                 tolerance_minus_over: toleranceMinusOverInput ? toleranceMinusOverInput.value.trim() : '',
                 ppm_standard: ppmStandardInput ? ppmStandardInput.value.trim() : '',
                 is_active: isActiveCheckbox ? (isActiveCheckbox.checked ? '1' : '0') : '0',
+                is_default: isDefaultCheckbox ? (isDefaultCheckbox.checked ? '1' : '0') : '0',
                 description: descriptionInput ? descriptionInput.value.trim() : '',
             };
         }
@@ -293,6 +296,7 @@ function formatDecimal(value, decimals = 2) {
                         <td>${formatDecimal(service.tolerance_minus_value, 4)}</td>
                         <td>${formatPpm(service.ppm_standard)}</td>
                         <td>${formatStatus(service.is_active)}</td>
+                        <td>${Number(service.is_default) === 1 ? '是' : '否'}</td>
                         <td>${escapeHtml(formatDateTime(service.updated_at))}</td>
                         <td class="table-actions">
                             <button type="button" class="btn text" data-action="edit" title="修改"><i class="fas fa-edit"></i></button>
@@ -422,9 +426,11 @@ function formatDecimal(value, decimals = 2) {
                 if (toleranceMinusOverInput) toleranceMinusOverInput.value = service.tolerance_minus_over != null ? String(service.tolerance_minus_over) : '';
                 if (ppmStandardInput) ppmStandardInput.value = service.ppm_standard != null ? String(service.ppm_standard) : '';
                 if (isActiveCheckbox) isActiveCheckbox.checked = Number(service.is_active) === 1;
+                if (isDefaultCheckbox) isDefaultCheckbox.checked = Number(service.is_default) === 1;
                 if (descriptionInput) descriptionInput.value = service.description || '';
-            } else if (isActiveCheckbox) {
-                isActiveCheckbox.checked = true;
+            } else {
+                if (isActiveCheckbox) isActiveCheckbox.checked = true;
+                if (isDefaultCheckbox) isDefaultCheckbox.checked = false;
             }
 
             modalOverlay.classList.remove('hidden');
@@ -582,6 +588,7 @@ function formatDecimal(value, decimals = 2) {
                 const toleranceMinusOverValue = toleranceMinusOverInput ? toleranceMinusOverInput.value.trim() : '';
                 const ppmStandardValue = ppmStandardInput ? ppmStandardInput.value.trim() : '';
                 const isActiveValue = isActiveCheckbox ? (isActiveCheckbox.checked ? '1' : '0') : '0';
+                const isDefaultValue = isDefaultCheckbox ? (isDefaultCheckbox.checked ? '1' : '0') : '0';
                 const descriptionValue = descriptionInput ? descriptionInput.value.trim() : '';
 
                 if (nameValue === '') {
@@ -653,6 +660,7 @@ function formatDecimal(value, decimals = 2) {
                     ppm_standard: ppmStandardValue,
                     description: descriptionValue,
                     is_active: isActiveValue,
+                    is_default: isDefaultValue,
                 };
 
                 hideAlert();

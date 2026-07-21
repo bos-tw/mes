@@ -65,7 +65,7 @@ ModuleConfig.register('employees', {
     // Modal 表單 - 使用 formRows 二欄佈局
     modal: {
         title: '新增員工',
-        size: 'large',
+        size: 'medium',
         hiddenFields: ['id'],
         formRows: [
             {
