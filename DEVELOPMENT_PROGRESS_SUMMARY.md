@@ -1,46 +1,74 @@
 # MES Development Progress Summary
 
-更新日期：2026-07-21
+更新日期：2026-07-22
 
 ## 本輪完成項目
 
-- 篩分服務新增 `is_default`／「預設項目」；新增客戶批號時只自動帶入啟用中的預設服務，且每次開啟新增表單都重新載入服務選項避免快取過期。
-- 客戶批號的篩分服務依服務編號排序；圖面附件與檔案附件統一為五欄表格；出貨狀態改用共用 `status-badge`。
-- 客戶批號工具列移除「新增品項」與大型搜尋框，改為批次匯出、抽屜式搜尋與欄位設定；新增／編輯仍由訂單明細脈絡進入。
-- 客戶編輯 Modal 移除非編輯用途的載具分析；員工與受篩產品 Modal 統一為 `medium` 尺寸。
-- 共用表格欄寬管理器修正操作欄按鈕溢出與序號欄過寬；未新增 token、inline style 或固定值例外。
+- 訂單主表展開明細的工具列統一為「複製 → 新增 → 批號一覽」；`open-order-items` 使用者文字同步改為「批號一覽」。
+- 訂單細項序號改由共用 `TableRowNumbers` 單一產生，解除內嵌表格重複序號；右側保留單筆勾選欄，每張訂單只允許選取一筆來源明細。
+- 新增 `api/order_items/copy.php` 直接複製端點：在同一訂單交易內配置下一個 `Lxx`，複製可編輯欄位、載具、篩分服務、圖面及附件關聯，不複製工單、庫存、出貨或退貨流程資料。
+- 操作欄保留標準編輯按鈕，直接載入 `modules/order_items.html` 與 `js/order_items.js` 的完整「編輯客戶批號」Modal；parity 測試已補上工具列、勾選、複製 API 與完整編輯器契約。
+- 因 `js/orders.js` 已超過 2,000 行，新增勾選與複製控制器拆至 `js/orders/order-item-selection.js`，由 `core/module-assets.js` 在訂單主模組前按需載入。
+- 訂單主表內嵌細項改為「客戶批號」全域頁面的訂單範圍檢視；27 個業務欄位的名稱、順序與可選契約完全一致，並補齊庫存、出貨明細與退貨明細的真實關聯統計。
+- 可排序欄位支援升冪／降冪；文字使用繁體中文數字自然排序，數值使用數值排序，並保留每張訂單的排序狀態。
+- 「批號一覽」右側新增「欄位設定」，內嵌表格接入共用 `ColumnManager` 與 `TableColumnResizer`；欄位顯示、拖曳欄寬、雙擊自動貼合與本機偏好儲存皆沿用系統既有契約，序號、選取與操作欄保持固定。
+- 訂單主列原「批號一覽」操作改為眼睛圖示的「詳細檢視」，以右側抽屜即時載入完整資料；訂單基本資料只顯示訂單號碼、客戶名稱、訂單日期、預計交期，各筆訂單明細則以 8 組唯讀表格完整顯示客戶批號 Modal 的產品、重量狀態、重量追蹤、備註、指標、載具、篩分服務與附件資訊；圖面與檔案附件只列檔名。展開明細工具列的「批號一覽」保留原功能。
+- 詳細檢視抽屜的資訊層級已重整：抽屜訂單號碼與基本資料值放大為重要資訊，明細編號降為一般資訊字級；桌面抽屜寬度改為畫面 50%，表格允許欄名與內容換行，避免計算指標產生水平捲軸，小螢幕則保持 96vw。
+- 訂單內嵌明細將歷史按鈕併入「受篩品項」欄位右側，不另設歷史欄；`api/orders/screening-item-history.php` 依目前訂單的客戶限制查詢範圍並排除目前訂單。歷史 Modal 以訂單日期與受篩產品表格呈現、可依日期／料號／規格即時搜尋，點選產品後開啟完整新增訂單細項 Modal，僅預填受篩產品，不修改或複製既有明細交易資料。
+- 歷史按鈕改為共用 `op-action-btn` 24px 表格操作樣式；搜尋改用既有 `form-grid`／`inline-label`／`ui-compact-form-row` 元件，並移除歷史 Modal 的自訂寬度、標題與搜尋尺寸覆寫。
+- 受篩產品歷史 Modal 固定引用「編輯受篩產品」的 `.modal-window.medium` 尺寸（`min(800px, 90%)`），並由 parity 測試鎖定兩者一致。
+- 訂單新增／修改 Modal 同步改為「編輯受篩產品」的 `.modal-window.medium` 尺寸（`min(800px, 90%)`），移除原本 `large` 尺寸差異。
+- 訂單主表與展開訂單細項的狀態欄改用工單頁相同的共用 `status-badge`：待處理／待開始為藍色、已確認／進行中為綠色、已完成為灰色、已取消為紅色、暫停為橘色。
+- 展開訂單明細表格原本只有上方 `--ui-section-gap`；已在同一內層表格補上左、下相同間距，並撤回外層儲存格／panel 的錯層 spacing，避免表格 box model 三側不一致，由 parity 測試鎖定。
+- 縮小側邊欄改為純圖示導覽：搜尋與我的收藏保留圖示觸發器，點擊後使用既有工作區快顯框；各含子項目的主選單也改為同型快顯功能清單，不再自動展開完整側欄或溢出瀏覽器。側欄同步禁止水平溢出與縮小狀態下的功能收藏星號重疊。
+- 訂單展開明細區的灰色背景改用既有 `--color-bg-disabled`，提高與訂單主表的識別度。
+- 受篩產品列表將原本附在「產品規格」下方的備註獨立成可排序、可由欄位設定切換的「備註」欄；空白與載入列改依實際表頭跨欄數渲染。
+- 「編輯客戶批號」Modal 依作業關聯重整為「秤重與數量／生產與服務／交付與附件」三頁籤，完整沿用生產工單綠色篩分階段頁籤的 `.work-order-screening-stage-tabs` 與 `.btn.outline.small.tab-btn`；受篩產品、品項編號、料號及客戶批號固定在頁籤外，載具設定與總重、載具重、淨重、單支重、總支數維持在同一秤重頁籤。
+- Modal 底部固定摘要改為總重量（含載具）、載具重量合計、淨重、單支重、總支數、單價及預估總金額七項，移除「單價合計（參考）」；切換頁籤不清除輸入，驗證失敗會切回錯誤頁籤並聚焦欄位。
+- 客戶批號 Modal 建立開啟時表單快照；取消、右上角關閉、點擊遮罩與 `Esc` 在資料異動時皆透過共用 `AppFeedback.confirm` 詢問「繼續編輯／放棄變更」，未異動時直接關閉，儲存成功後安全略過詢問。
+- 客戶批號 Modal 修正共用 `.modal-window form .form-grid` 單欄規則覆蓋問題；桌面品項識別改為 5:2:2:3，秤重頁籤的「重量與數量／重量追蹤／載具設定」使用獨立 grid 3:3:6，生產頁籤的「生產狀態／計價資料／篩分服務」則使用 2:2:8，避開共用 `.modal-window .form-row` 的強制二欄規則並避免服務表頭溢出；新增受篩產品改為四欄兩列，響應式寬度下降時再依序換行。
+- 篩分服務的公差（+）與公差（−）各自保留主要值輸入，兩個 `Over` 輸入暫時改為隱藏欄位；既有值仍會載入並隨表單送出，不破壞資料庫與 API 契約。
+- 全系統標準 `.modal-overlay` 由垂直置中改為固定上緣排列，統一使用 `--ui-modal-top-offset`；頁籤或內容高度切換時上緣維持不動、只向下緣增減，並保留小螢幕 overlay 垂直捲動與捲動鏈隔離。
+- 修正生產工單編輯儲存 HTTP 500：`api/work_orders/update.php` 改為先建立 PDO 再執行嚴格型別驗證，完整處理 `Throwable` 並只在交易仍開啟時 rollback；共用 `safeErrorMessage()` 同步接受 PHP `Error`，確保後端錯誤仍回傳標準 JSON，而非前端顯示「伺服器回應格式異常」。
+- 正式 UI 規範與工作流程指令已新增「既有元件優先與視覺驗收」守門：遇到比照系統需求，開工前須列出實際引用來源，禁止局部仿製；無可用瀏覽器時不得宣稱 UI DoD 完成。
 
 ## Migration 與 schema
 
-- 新增 `migrations/2026_07_21_add_screening_service_default_flag.sql`，並同步 `tools/sync-local-schema.ps1` 與 `tools/schema-contract.json`。
-- migration 以正式 PDO SQL 分割／執行器驗證：舊 schema 含既有服務資料可套用，DDL 已提交後以新 PDO 連線重試亦可安全完成。
-- 本機 schema sync：Applied 40、Pending 0。
+- 本輪未變更資料表結構，不需要 migration 或 schema contract 調整。
+- 初始化 schema sync：Applied 40、Pending 0。
 
 ## 驗證狀態
 
-- 使用者已完成本機實際畫面驗收。
+- 複製 SQL 已在本機資料庫交易內完成回滾測試：新 `Lxx`、主資料、載具、篩分服務與下游不複製契約均通過，未留下測試明細。
 - `node tools/audit-system-health.js`：0 errors、13 項既有大型 JavaScript warning。
 - `node tools/audit-system-health.js --changed --base origin/main`：0 new、0 blocking、4 resolved。
-- `node tools/validate-config-modules.js`、本輪 JS／PHP 語法檢查、`git diff --check`：通過。
+- `node tools/validate-config-modules.js`、`node tools/test-audit-system.js`、前端資產審計、本輪 JS／PHP 語法檢查與 `git diff --check`：通過。
+- 內嵌細項 parity 測試已加入按鈕順序、單一共用序號、27 欄與正式客戶批號配置的逐欄同步、共用欄寬管理接線，以及客戶批號自然排序與數值降冪的可執行測試：通過。
+- 訂單詳細檢視契約測試已覆蓋按鈕名稱、`fa-eye` 圖示、右側抽屜、基本資料四欄限制、8 組 Modal 資訊表、附件僅顯示檔名、客戶／明細完整 API 載入與 DOM API 安全渲染：通過。
+- 歷史受篩產品契約測試已覆蓋按鈕位置、固定工具欄、Modal 搜尋與兩欄表格、客戶範圍隔離、排除目前訂單及點選後開啟完整新增明細 Modal：通過；本機資料庫另以無歷史及有 2 筆歷史的訂單實查，回傳結構與範圍均正確。
+- 客戶批號編輯器契約測試已覆蓋固定識別區、三頁籤順序、載具與重量同頁、七項固定摘要、錯誤頁籤導引、共用未儲存確認及儲存後強制安全關閉：通過。
+- 客戶批號版面契約測試已鎖定品項識別 5:2:2:3、秤重三區 3:3:6、生產三區 2:2:8、新增受篩產品四欄兩列與 Over 欄位隱藏但保留資料往返，避免再次被共用 Modal 單欄規則覆蓋：通過。
+- 全系統標準 Modal 上緣定位契約測試已鎖定共用 `--ui-modal-top-offset`、`.modal-overlay` 上緣排列、overlay 垂直捲動及捲動鏈隔離，避免頁籤切換時恢復垂直置中：通過。
+- 生產工單更新回應契約測試已鎖定 PDO 必須在驗證前初始化、驗證後才開啟交易、捕捉 `Throwable`、安全 rollback 與標準 JSON 錯誤訊息；另以不存在工單直接執行更新端點，已正常回傳 `{"success":false,"message":"找不到該工單。"}`，不再發生無格式 HTTP 500。
 - DataSync audit：P0=0、P1=0、P2=0、OK=51。
-- `php tools/test-p0-workflow-integrity.php`：35 assertions 通過；PHPUnit：40 tests、94 assertions 通過、16 skipped。
 - UI style audit：748 hardcoded spacing/radius、378 token candidates、370 needs review；本輪未新增審計問題。
+- Apache 資產版本 `6a606e55` 可正常載入新版 Modal HTML、控制器及樣式（均 HTTP 200），並已確認三頁籤完整引用既有工單綠色頁籤、沒有客戶批號專屬頁籤 CSS、七項摘要、未儲存確認、品項識別 5:2:2:3、秤重三區獨立 grid 3:3:6、生產三區獨立 grid 2:2:8、Over 欄位隱藏但保留資料契約、新增受篩產品四欄配置，以及全域標準 `.modal-overlay` 使用固定上緣 token、取消垂直置中並保留 overlay 捲動；未登入呼叫複製 API 正確回傳 HTTP 401。
+- 按鈕排列、欄寬、勾選、直接複製、歷史搜尋／帶入、客戶批號頁籤與全系統 Modal 固定上緣的實機畫面及互動，已由使用者確認驗收通過。
 
 ## 更新包
 
-- 版本：`v3.1.7`／`FileVersion v3.1.7`／ReleaseDate `2026-07-21`。
-- 路徑：`dist/update_v3.1.7_20260721_221127.zip`；大小 90,375 bytes。
-- SHA-256：`CFEB47A6DDBAF46FAAF1A307C8EB532EB7938884069B28837C4717665D8A4EAE`。
-- 包含 14 個正式檔案、1 個 migration、0 個刪除路徑；更新包驗證、正式 PHP manifest parser、檔案清單與 migration SHA-256 比對均通過。
+- 版本：`v3.1.8`；release note：`release-notes/2026-07-22-v3.1.8.txt`。
+- 更新包：`dist/update_v3.1.8_20260722_153759.zip`；18 個正式執行期檔案、0 migration、0 delete file。
+- 官方 PowerShell verifier、正式更新器 PHP manifest parser 與 ZIP 精確清單比對均通過；SHA-256：`E044392489BAC16FDEBB3662EE6253AFC937E34D494A8CB1A5E35C43AE633CCE`。
 
 ## 已知風險與下一輪優先事項
 
 - P0：無新增項目。
-- P1：部署後以正式資料與權限驗證新增客戶批號的預設服務帶入與抽屜搜尋。
+- P1：無新增項目。
 - P2：13 個既有大型 JavaScript 維護性 warning；優先拆分 `js/work_orders.js`。
 
 ## Git 交接
 
-- 分支：`main`；本輪開始 commit 與 `origin/main` 基線：`519204b0ac366b6d0e3bd58ba0525a323183664c`。
-- 本輪功能、migration、驗證文件與 release note 均尚未提交；未取得 commit 或 push 授權。
-- 工作樹含本輪已確認變更，以及本次 PHPUnit 自動產生的 `.phpunit.result.cache` 暫存檔；暫存檔未納入更新包，也未刪除。
+- 分支：`main`；本輪開始 commit 與 `origin/main` 基線：`9565394e156af71e331a707a6813cadf131b8df7`。
+- 本輪功能、API、按需資產、契約測試、DataSync 報告與交接摘要均尚未提交；未取得 commit 或 push 授權。
+- 工作樹變更均屬本輪，沒有來源不明檔案；未建立 migration；`v3.1.8` release note 與更新包已建立並完成驗證。

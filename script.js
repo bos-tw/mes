@@ -711,6 +711,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         view: 'view',
         'view-detail': 'view',
         'view-details': 'view',
+        'view-order-details': 'view',
         detail: 'view',
         details: 'expand',
         show: 'view',
@@ -722,6 +723,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         'open-attachment': 'view',
         'open-invoice-stamp': 'view',
         'open-order-items': 'order-items',
+        'open-screening-history': 'view',
         'open-order': 'order',
         'open-work-order': 'work-order',
         'open-shipping-order': 'shipping',
@@ -772,6 +774,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         view: 'fa-eye',
         'view-detail': 'fa-eye',
         'view-details': 'fa-eye',
+        'view-order-details': 'fa-eye',
         detail: 'fa-eye',
         show: 'fa-eye',
         preview: 'fa-eye',
@@ -782,6 +785,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         'open-attachment': 'fa-external-link-alt',
         'open-invoice-stamp': 'fa-external-link-alt',
         'open-order-items': 'fa-list-ul',
+        'open-screening-history': 'fa-history',
         'open-order': 'fa-file-invoice',
         'open-work-order': 'fa-clipboard',
         'open-shipping-order': 'fa-shipping-fast',
@@ -830,6 +834,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         view: '檢視',
         'view-detail': '檢視',
         'view-details': '檢視',
+        'view-order-details': '詳細檢視',
         detail: '檢視',
         show: '檢視',
         preview: '檢視',
@@ -839,7 +844,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         'view-return-orders': '檢視退貨單',
         'open-attachment': '開啟附件',
         'open-invoice-stamp': '開啟附件',
-        'open-order-items': '客戶批號',
+        'open-order-items': '批號一覽',
+        'open-screening-history': '受篩產品歷史',
         'open-order': '開啟訂單',
         'open-work-order': '開啟工單',
         'open-shipping-order': '開啟出貨單',
@@ -1374,6 +1380,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         appContainer.classList.toggle('sidebar-collapsed', collapsed);
+        window.WorkspaceNavigation?.closeAll();
 
         if (sidebarToggleButton) {
             const expanded = !collapsed;
@@ -2708,6 +2715,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (parentMenuItem.classList.contains('has-submenu')) {
                 if (isSidebarCollapsed()) {
+                    if (window.WorkspaceNavigation?.openCollapsedMenu(this)) {
+                        return;
+                    }
                     setSidebarCollapsed(false);
                 }
                 clearActiveMenuStates();

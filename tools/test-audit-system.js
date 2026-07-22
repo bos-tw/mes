@@ -27,6 +27,10 @@ const commands = [
     ['node', ['tools/audit/tests/governance-contracts.test.js']],
     ['node', ['tools/audit/tests/basic-settings-font-preference.test.js']],
     ['node', ['tools/audit/tests/order-item-editor-parity.test.js']],
+    ['node', ['tools/audit/tests/modal-top-alignment.test.js']],
+    ['node', ['tools/audit/tests/work-order-update-response.test.js']],
+    ['node', ['tools/audit/tests/screening-items-notes-column.test.js']],
+    ['node', ['tools/audit/tests/workspace-navigation-collapsed.test.js']],
     ['node', ['tools/audit/tests/version-checker-behavior.test.js']],
     ['node', ['tools/audit/tests/data-sync-adapter.test.js']]
 ];

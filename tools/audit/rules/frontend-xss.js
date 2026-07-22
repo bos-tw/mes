@@ -44,6 +44,7 @@ const REVIEWED_SAFE_FUNCTIONS_BY_FILE = {
     ]),
     'inventory_transactions.js': new Set(['buildSourceDisplay', 'getRefTypeLabel']),
     'order_items.js': new Set(['getWeightVarianceCell']),
+    'orders.js': new Set(['renderOrderStatusBadge']),
     'production_quality_records.js': new Set(['truncate']),
     'production_work_order_schedule.js': new Set(['renderScheduleWorkOrderLabel']),
     'return_orders.js': new Set(['getStatusBadge']),

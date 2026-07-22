@@ -27,6 +27,16 @@
 
 表格操作欄統一使用 `.table-actions` 與 `.op-action-btn`：按鈕尺寸使用 `var(--ui-table-action-size)`，圖示字級使用 `var(--font-sm)`，按鈕間距使用 `var(--ui-table-action-gap)`。模組不得自行放大、縮小或改寫間距。
 
+## 既有元件優先與視覺驗收（強制）
+
+只要需求包含「比照系統」、「沿用既有風格／元件」、「相同大小」或提供既有畫面，以下規則一律適用：
+
+1. 實作前必須先找出至少一個同類既有畫面或共用元件，並在開工回報中列出實際引用的檔案、selector／class 與適用原因。
+2. 必須直接沿用既有 HTML 結構、共用 class、token、`data-action` 映射與互動契約；禁止以新增局部 CSS、固定 px、inline style 或近似配色／間距來模仿既有元件。
+3. 表格內的 icon-only 操作必須使用共用 `.op-action-btn` 與既有角色樣式；搜尋與表單欄位必須沿用既有 `form-grid`、`inline-label`、`ui-compact-form-row` 或該目標畫面實際使用的共用結構。
+4. 若確認不存在可重用元件，必須先回報缺口與預計新增的共用契約，取得使用者同意後才能新增；不得在模組內私自建立第二套樣式。
+5. UI/CSS 驗收必須以實際可登入畫面與引用畫面逐項比較大小、間距、顏色、icon、欄位結構與互動；靜態檢查不能取代視覺驗收。無法取得可用瀏覽器時，必須明確標示「視覺驗收未完成」，不得宣稱 UI DoD 完成。
+
 ## Icon 與可用性
 
 - 使用 Font Awesome：配置檔使用 `fa-*`，HTML/JS 渲染使用 `fas fa-*`。
@@ -37,6 +47,7 @@
 ## Modal
 
 - 尺寸使用 `.modal-window.small|medium|large|xlarge`，不得使用 `modal-window-large`。
+- 所有標準 Modal 必須由共用 `.modal-overlay` 與 `--ui-modal-top-offset` 固定上緣；禁止模組自行改回垂直置中，避免內容或頁籤高度改變時整個視窗上下跳動。
 - 關閉按鈕使用 `data-action="close-modal"` 並提供 `aria-label`。
 - 表單必須有 hidden `id`，欄位操作需先確認元素存在。
 - 危險或流程型操作使用自訂確認 Modal，內容要說明流程節點、影響與合法動作；不得只顯示無上下文的原生 `confirm()`。

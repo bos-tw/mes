@@ -40,6 +40,7 @@
     ]);
 
     const extraScripts = {
+        orders: ['js/orders/order-item-selection.js'],
         work_orders: ['js/work-orders/api.js']
     };
     const afterScripts = {

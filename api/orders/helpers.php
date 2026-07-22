@@ -9,6 +9,7 @@
  * - orderExists()                   檢查訂單是否存在
  * - orderNumberExists()             檢查訂單號碼是否重複
  * - customerExists()                檢查客戶是否存在
+ * - findCustomerScreeningItemHistory() 查詢同客戶歷史受篩產品
  * - transformOrder()                轉換訂單資料為 API 回應格式
  * - generateOrderNumber()           產生訂單號碼
  * - handleOrderPdoWriteException()  統一處理 PDO 寫入例外
@@ -441,6 +442,69 @@ function transformOrder(array $row): array
 function generateOrderNumber(PDO $pdo, ?string $date = null): string
 {
     return generateManagedDocumentNumber($pdo, 'ORDER', $date);
+}
+
+/**
+ * 查詢指定訂單所屬客戶過往使用的受篩產品。
+ *
+ * @return array<string,mixed>|null 訂單不存在時回傳 null
+ */
+function findCustomerScreeningItemHistory(PDO $pdo, int $orderId): ?array
+{
+    $orderStmt = $pdo->prepare(
+        'SELECT o.customer_id, c.name AS customer_name
+         FROM orders o
+         INNER JOIN customers c ON c.id = o.customer_id AND c.deleted_at IS NULL
+         WHERE o.id = :order_id AND o.deleted_at IS NULL'
+    );
+    $orderStmt->execute(['order_id' => $orderId]);
+    $order = $orderStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$order) {
+        return null;
+    }
+
+    $historyStmt = $pdo->prepare(
+        'SELECT o.order_date,
+                si.id AS screening_item_id,
+                si.item_number,
+                si.name AS screening_item_name,
+                si.weight_per_unit_g,
+                si.unit_price
+         FROM orders o
+         INNER JOIN order_items oi ON oi.order_id = o.id AND oi.deleted_at IS NULL
+         INNER JOIN screening_items si ON si.id = oi.screening_item_id
+         WHERE o.customer_id = :customer_id
+           AND o.id <> :order_id
+           AND o.deleted_at IS NULL
+         ORDER BY o.order_date DESC, oi.id DESC
+         LIMIT 300'
+    );
+    $historyStmt->execute([
+        'customer_id' => (int)$order['customer_id'],
+        'order_id' => $orderId,
+    ]);
+
+    $items = [];
+    foreach ($historyStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $items[] = [
+            'order_date' => $row['order_date'],
+            'screening_item' => [
+                'id' => (int)$row['screening_item_id'],
+                'item_number' => $row['item_number'],
+                'name' => $row['screening_item_name'],
+                'weight_per_unit_g' => $row['weight_per_unit_g'] !== null ? (float)$row['weight_per_unit_g'] : null,
+                'unit_price' => $row['unit_price'] !== null ? (float)$row['unit_price'] : null,
+            ],
+        ];
+    }
+
+    return [
+        'customer' => [
+            'id' => (int)$order['customer_id'],
+            'name' => $order['customer_name'],
+        ],
+        'items' => $items,
+    ];
 }
 
 /**

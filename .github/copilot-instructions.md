@@ -851,7 +851,7 @@ iconClass: 'fas fa-search'
 | 列印篩分檢驗結果報表 | `print-screening-report` | emerald `#059669`，hover `#047857` |
 | 編輯 | `edit`, `edit-from-detail`, `edit-order-item`, `edit-order-item-inline`, `edit-screening-item`, `edit-work-order`, `edit-draft` | blue `#2563eb`，hover `#1d4ed8` |
 | 展開/收合細項 | `details` | cyan `#0891b2`，hover `#0e7490` |
-| 客戶批號/訂單細項入口 | `open-order-items` | sky `#0369a1`，hover `#075985` |
+| 批號一覽/訂單細項入口 | `open-order-items` | sky `#0369a1`，hover `#075985` |
 | 開啟訂單 | `open-order` / `op-role-order` | sky `#0369a1`，hover `#075985` |
 | 開啟工單 / 工作流程文件 | `open-work-order` / `op-role-work-order` | brown-orange `#b45309`，hover `#92400e` |
 | 退貨單 / 退回流程入口 | `open-return-orders` / `op-role-return` | orange `#f97316`，hover `#ea580c` |
@@ -911,7 +911,7 @@ iconClass: 'fas fa-search'
 |------------------|----------|
 | `view`, `view-detail`, `view-details`, `detail`, `show`, `preview`, `preview-logo` | `檢視` |
 | `details` | 依狀態使用 `展開細項` / `收合細項` |
-| `open-order-items` | `客戶批號` |
+| `open-order-items` | `批號一覽` |
 | `open-order` | `開啟訂單` |
 | `open-work-order` | `開啟工單` |
 | `open-shipping-order` | `開啟出貨單` |

@@ -319,11 +319,11 @@ function parseDuplicateField(string $errorMessage): ?string
  * 將例外訊息過濾為安全的使用者友善訊息。
  * 移除可能包含 SQL 結構、表名、欄位名的技術細節。
  *
- * @param Exception $e 原始例外
+ * @param Throwable $e 原始例外或 PHP 執行錯誤
  * @param string $fallback 預設回傳訊息
  * @return string 安全的錯誤訊息
  */
-function safeErrorMessage(Exception $e, string $fallback = '操作發生錯誤，請稍後重試或聯繫管理員。'): string
+function safeErrorMessage(Throwable $e, string $fallback = '操作發生錯誤，請稍後重試或聯繫管理員。'): string
 {
     $msg = $e->getMessage();
 

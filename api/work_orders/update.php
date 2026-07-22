@@ -115,33 +115,34 @@ foreach ([
     }
 }
 
-$validation = validateWorkOrderData($pdo, $payload, true);
-
-if (!empty($validation['errors'])) {
-    jsonResponse([
-        'success' => false,
-        'message' => '資料驗證失敗。',
-        'errors' => $validation['errors']
-    ], 400);
-    return;
-}
-
-$data = $validation['data'];
-
-// 提取 first_piece_dimensions (如果存在)
-$firstPieceDimensions = $data['first_piece_dimensions'] ?? null;
-unset($data['first_piece_dimensions']); // 從主 data 中移除
-if (!is_array($firstPieceDimensions) || !isMeaningfulFirstPieceDimension($firstPieceDimensions)) {
-    $firstPieceDimensions = null;
-}
-
-if (empty($data) && empty($screeningDefects) && empty($firstPieceDimensions) && empty($productionRecords) && !$machineRunsProvided) {
-    jsonResponse(['success' => false, 'message' => '沒有可更新的資料。'], 400);
-}
-
 $pdo = db();
+$data = [];
 
 try {
+    $validation = validateWorkOrderData($pdo, $payload, true);
+
+    if (!empty($validation['errors'])) {
+        jsonResponse([
+            'success' => false,
+            'message' => '資料驗證失敗。',
+            'errors' => $validation['errors']
+        ], 400);
+        return;
+    }
+
+    $data = $validation['data'];
+
+    // 提取 first_piece_dimensions (如果存在)
+    $firstPieceDimensions = $data['first_piece_dimensions'] ?? null;
+    unset($data['first_piece_dimensions']); // 從主 data 中移除
+    if (!is_array($firstPieceDimensions) || !isMeaningfulFirstPieceDimension($firstPieceDimensions)) {
+        $firstPieceDimensions = null;
+    }
+
+    if (empty($data) && empty($screeningDefects) && empty($firstPieceDimensions) && empty($productionRecords) && !$machineRunsProvided) {
+        jsonResponse(['success' => false, 'message' => '沒有可更新的資料。'], 400);
+    }
+
     $pdo->beginTransaction();
 
     // Check if work order exists and get current status
@@ -827,10 +828,17 @@ try {
         ],
     ]);
 
-} catch (Exception $e) {
-    $pdo->rollBack();
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     logAuditAction('Error: 更新工單失敗。', 'WorkOrders', $id, $data);
-    error_log('Work order update failed: ' . $e->getMessage());
+    error_log(sprintf(
+        'Work order update failed (id=%d, %s): %s',
+        $id,
+        get_class($e),
+        $e->getMessage()
+    ));
     jsonResponse([
         'success' => false,
         'message' => safeErrorMessage($e, '更新工單失敗，請稍後重試。')

@@ -64,6 +64,62 @@ ModuleConfig.register('orders', {
         }
     ],
 
+    customHtml: `
+    <div class="filter-drawer-overlay hidden" data-orders-detail-overlay></div>
+    <aside class="filter-drawer order-detail-drawer hidden" data-orders-detail-drawer aria-hidden="true" aria-labelledby="orders-detail-title">
+        <div class="filter-drawer-header">
+            <div>
+                <h3 id="orders-detail-title"><i class="fas fa-eye"></i> 訂單詳細檢視</h3>
+                <p data-orders-detail-subtitle>載入訂單完整資料</p>
+            </div>
+            <button type="button" class="filter-drawer-close" data-action="close-order-detail" aria-label="關閉訂單詳細檢視">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="order-detail-drawer-content" data-orders-detail-content>
+            <div class="order-items-inline-state" data-orders-detail-loading>請選擇訂單。</div>
+            <div class="hidden" data-orders-detail-sections>
+                <section class="detail-section">
+                    <h4>訂單基本資料</h4>
+                    <div class="table-responsive">
+                        <table class="data-table compact order-detail-basic-table" data-no-hard-row-number="true" data-no-column-resize="true">
+                            <thead><tr><th>訂單號碼</th><th>客戶名稱</th><th>訂單日期</th><th>預計交期</th></tr></thead>
+                            <tbody><tr><td data-order-detail-field="order_number">-</td><td data-order-detail-field="customer_name">-</td><td data-order-detail-field="order_date">-</td><td data-order-detail-field="expected_delivery">-</td></tr></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="detail-section">
+                    <h4>訂單明細</h4>
+                    <div class="order-detail-item-list" data-orders-detail-items></div>
+                </section>
+            </div>
+        </div>
+    </aside>
+    <div class="modal-overlay hidden" data-orders-screening-history-modal>
+        <div class="modal-window medium screening-history-modal" role="dialog" aria-modal="true" aria-labelledby="orders-screening-history-title">
+            <button type="button" class="modal-close" data-action="close-screening-history" aria-label="關閉受篩產品歷史">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 id="orders-screening-history-title"><i class="fas fa-history"></i> 受篩產品歷史</h3>
+            <p class="screening-history-customer" data-orders-screening-history-customer>載入客戶資料</p>
+            <form data-orders-screening-history-form>
+                <div class="form-grid">
+                    <label class="inline-label ui-compact-form-row">
+                        <span>搜尋</span>
+                        <input type="search" data-orders-screening-history-search placeholder="搜尋訂單日期、產品料號或規格" autocomplete="off">
+                    </label>
+                </div>
+            </form>
+            <div class="order-items-inline-state" data-orders-screening-history-state>請選擇訂單。</div>
+            <div class="table-responsive hidden" data-orders-screening-history-results>
+                <table class="data-table compact" data-no-hard-row-number="true" data-no-column-resize="true">
+                    <thead><tr><th>訂單日期</th><th>受篩產品</th></tr></thead>
+                    <tbody data-orders-screening-history-rows></tbody>
+                </table>
+            </div>
+        </div>
+    </div>`,
+
     // 資料表格欄位
     columns: [
         { key: 'checkbox', label: '', sortable: false, isCheckbox: true },
@@ -81,7 +137,7 @@ ModuleConfig.register('orders', {
     // Modal 表單 - 使用 formRows 模式
     modal: {
         title: '新增訂單',
-        size: 'large',
+        size: 'medium',
         hiddenFields: ['id'],
         formRows: [
             {

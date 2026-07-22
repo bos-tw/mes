@@ -37,6 +37,8 @@ MES 是資料密集型後台，預設為 `compact`。優先使用下列 token：
 - 表格：`--ui-table-cell-padding-*`、`--ui-table-header-padding-*`
 - 表格操作：`--ui-table-action-size`、`--ui-table-action-gap`
 - 表格欄寬：`--ui-table-column-min-width`、`--ui-table-column-max-width`、`--ui-table-resize-handle-width`
+- 詳細檢視抽屜：`--ui-detail-drawer-width`
+- Modal 上緣：`--ui-modal-top-offset`
 - 卡片/統計：`--ui-card-padding-*`、`--ui-metric-*`
 - shell：`--ui-shell-*`
 

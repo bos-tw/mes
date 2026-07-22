@@ -100,6 +100,7 @@
     --ui-table-column-min-width: 72px;
     --ui-table-column-max-width: 480px;
     --ui-table-resize-handle-width: 10px;
+    --ui-detail-drawer-width: 50vw;
     --ui-card-padding-y: 10px;
     --ui-card-padding-x: 12px;
     --ui-metric-row-padding-y: 6px;
@@ -143,6 +144,7 @@
     --ui-alert-modal-padding-x: 18px;
     --ui-alert-gap: 10px;
     --ui-alert-margin-bottom: 16px;
+    --ui-modal-top-offset: clamp(var(--spacing-xl), 7.5vh, calc(var(--spacing-3xl) * 2));
 }
 
 /* 使用者顯示偏好：只調整文字 token，圖示與控制項尺寸維持原規格。 */
@@ -845,6 +847,7 @@ span.status-badge.pending {
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
     flex-shrink: 0; /* 不讓它縮小 */
     transition: width 0.3s ease;
+    overflow-x: hidden;
     overflow-y: auto; /* 側邊欄可獨立滾動 */
     height: 100%; /* 填滿高度 */
 }
@@ -1225,7 +1228,7 @@ body.is-resizing-table-column * {
 
 .data-table tr.order-items-detail-row,
 .data-table tr.order-items-detail-row:hover {
-    background: #f8fafc !important;
+    background: var(--color-bg-disabled) !important;
 }
 
 .data-table tr.order-items-detail-row > td {
@@ -1236,7 +1239,7 @@ body.is-resizing-table-column * {
 .order-items-inline-panel {
     padding: var(--ui-card-padding-y) var(--ui-card-padding-x) calc(var(--ui-card-padding-y) + var(--ui-subsection-header-padding-bottom));
     border-left: 4px solid #0f766e;
-    background: #f8fafc;
+    background: var(--color-bg-disabled);
 }
 
 .order-items-inline-header {
@@ -1269,6 +1272,7 @@ body.is-resizing-table-column * {
 .order-items-inline-table {
     width: 100%;
     min-width: 980px;
+    margin: var(--ui-section-gap) 0 var(--ui-section-gap) var(--ui-section-gap);
     border-collapse: collapse;
     font-size: var(--font-sm);
 }
@@ -1285,6 +1289,21 @@ body.is-resizing-table-column * {
     color: #374151;
     font-weight: 700;
     white-space: nowrap;
+}
+
+.order-items-inline-table .screening-item-cell-main {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-section-gap);
+}
+
+.order-items-inline-table .screening-item-cell-main .table-primary {
+    min-width: 0;
+    flex: 1;
+}
+
+.order-items-inline-table .screening-item-cell-main .btn.text {
+    flex: 0 0 auto;
 }
 
 .order-items-inline-table .table-actions {
@@ -1304,6 +1323,16 @@ body.is-resizing-table-column * {
 .order-items-inline-table th.order-items-inline-actions {
     z-index: 2;
     background: #eef2f7;
+}
+
+.screening-history-customer {
+    margin: 0 0 var(--ui-section-gap);
+    color: var(--color-text-muted);
+}
+
+.screening-history-modal .table-responsive {
+    max-height: min(52vh, 520px);
+    overflow-y: auto;
 }
 
 .hidden {
@@ -2147,6 +2176,79 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     background: var(--color-bg-disabled);
 }
 
+.order-detail-drawer {
+    width: min(var(--ui-detail-drawer-width), 96vw);
+}
+
+.order-detail-drawer-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: calc(var(--ui-card-padding-y) + 8px) calc(var(--ui-card-padding-x) + 6px);
+}
+
+.order-detail-drawer [data-orders-detail-subtitle] {
+    color: var(--color-text-body);
+    font-size: var(--font-lg);
+    font-weight: 600;
+}
+
+.order-detail-basic-table,
+.order-detail-item-card .data-table {
+    width: 100%;
+}
+
+.order-detail-basic-table tbody td {
+    font-size: var(--font-lg);
+    font-weight: 600;
+}
+
+.order-detail-item-card {
+    padding: var(--ui-card-padding-y) var(--ui-card-padding-x);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--ui-radius-panel);
+    background: #fff;
+}
+
+.order-detail-item-card + .order-detail-item-card {
+    margin-top: calc(var(--ui-section-gap) * 2);
+}
+
+.order-detail-drawer .order-detail-item-card > h4 {
+    margin: 0 0 var(--ui-section-gap);
+    padding-bottom: var(--ui-subsection-header-padding-bottom);
+    border-bottom: 2px solid var(--color-bg-disabled);
+    color: #2f3b4c;
+    font-size: var(--font-base);
+    font-weight: 500;
+}
+
+.order-detail-subtable + .order-detail-subtable {
+    margin-top: calc(var(--ui-section-gap) * 2);
+}
+
+.order-detail-subtable h5 {
+    margin: 0 0 var(--ui-subsection-header-padding-bottom);
+    color: var(--color-text-body);
+    font-size: var(--font-base);
+}
+
+.order-detail-subtable .data-table {
+    min-width: 100%;
+    table-layout: auto;
+}
+
+.order-detail-drawer .data-table th,
+.order-detail-drawer .data-table td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+    .order-detail-drawer {
+        width: 96vw;
+    }
+}
+
 .filter-form.filter-form-drawer {
     flex: 1;
     overflow-y: auto;
@@ -2380,11 +2482,6 @@ tr:has(.status-badge.completed) .btn.text[data-action="delete-work-order"]:hover
     grid-template-columns: 1fr 1fr;
     gap: var(--ui-section-gap);
     margin-bottom: var(--ui-section-gap);
-}
-
-/* 載具設定與篩分服務的特殊比例 */
-.form-row.tools-services-row {
-    grid-template-columns: 2fr 3fr;
 }
 
 @media (max-width: 768px) {
@@ -2860,7 +2957,7 @@ td.actions-col {
 }
 
 /* 操作欄位按鈕標準化（由 script.js 自動套用 .op-action-btn / .op-role-*） */
-:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn {
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col, td.screening-item-cell) .op-action-btn {
     border: none;
     background: #64748b;
     color: #fff !important;
@@ -2885,14 +2982,14 @@ td.actions-col {
     align-items: center;
 }
 
-:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn:hover {
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col, td.screening-item-cell) .op-action-btn:hover {
     background: #475569;
     transform: translateY(-1px);
 }
 
-:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn:disabled,
-:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn[aria-disabled="true"],
-:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.disabled {
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col, td.screening-item-cell) .op-action-btn:disabled,
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col, td.screening-item-cell) .op-action-btn[aria-disabled="true"],
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col, td.screening-item-cell) .op-action-btn.disabled {
     background: #6c757d !important;
     color: #fff !important;
     opacity: 0.65;
@@ -2901,11 +2998,11 @@ td.actions-col {
     transform: none;
 }
 
-:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-view {
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col, td.screening-item-cell) .op-action-btn.op-role-view {
     background: #0f766e;
 }
 
-:is(td.table-actions, td.actions, td.actions-cell, td.actions-col) .op-action-btn.op-role-view:hover {
+:is(td.table-actions, td.actions, td.actions-cell, td.actions-col, td.screening-item-cell) .op-action-btn.op-role-view:hover {
     background: #115e59;
 }
 
@@ -3154,9 +3251,11 @@ td.actions-col {
     inset: 0;
     background: rgba(33, 37, 41, 0.55);
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    padding: 20px;
+    padding: var(--ui-modal-top-offset) var(--spacing-xl) var(--spacing-xl);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     z-index: 1000;
 }
 
@@ -3783,11 +3882,6 @@ td.actions-col {
     grid-template-columns: 1fr 1fr 1fr !important;
 }
 
-/* 客戶批號 Modal 首列: 受篩產品/重量與狀態/重量追蹤 = 6/3/3 */
-.modal-window.order-items-modal .form-row.screening-weight-row {
-    grid-template-columns: 2fr 1fr 1fr !important;
-}
-
 .modal-window .form-row > .form-section {
     margin-bottom: 0;
     min-width: 0;
@@ -3801,10 +3895,6 @@ td.actions-col {
     .modal-window .form-row.three-columns {
         grid-template-columns: 1fr 1fr !important;
     }
-
-    .modal-window.order-items-modal .form-row.screening-weight-row {
-        grid-template-columns: 1fr 1fr !important;
-    }
 }
 
 @media (max-width: 900px) {
@@ -3813,10 +3903,6 @@ td.actions-col {
         gap: var(--ui-section-gap);
     }
     .modal-window .form-row.three-columns {
-        grid-template-columns: 1fr !important;
-    }
-
-    .modal-window.order-items-modal .form-row.screening-weight-row {
         grid-template-columns: 1fr !important;
     }
 }
@@ -4425,6 +4511,102 @@ td.actions-col {
     gap: var(--ui-section-gap);
     padding: 0 var(--ui-card-padding-x) var(--ui-card-padding-y) 0;
     margin-right: calc(var(--ui-control-height) * -0.5);
+}
+
+/* 客戶批號編輯器只補充分組版面；頁籤直接沿用工單篩分階段元件。 */
+.modal-window.order-items-modal form .order-items-identity-grid {
+    grid-template-columns: minmax(360px, 5fr) minmax(0, 2fr) minmax(0, 2fr) minmax(220px, 3fr);
+}
+
+.modal-window.order-items-modal form .screening-create-body {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.modal-window.order-items-modal form .order-items-weight-grid,
+.modal-window.order-items-modal form .order-items-tracking-grid {
+    grid-template-columns: 1fr;
+}
+
+.order-items-modal .order-items-editor-panel {
+    display: none;
+    flex-direction: column;
+    gap: var(--ui-section-gap);
+    min-width: 0;
+}
+
+.order-items-modal .order-items-editor-panel.active {
+    display: flex;
+}
+
+.order-items-modal .order-items-weight-row {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 3fr) minmax(0, 6fr);
+    gap: var(--ui-section-gap);
+    margin-bottom: var(--ui-section-gap);
+}
+
+.order-items-modal .order-items-weight-row > .form-section {
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+.order-items-modal .order-items-attachments-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.order-items-modal .order-items-production-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 8fr);
+    gap: var(--ui-section-gap);
+    margin-bottom: var(--ui-section-gap);
+}
+
+.order-items-modal .order-items-production-row > .form-section {
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+@media (max-width: 1200px) {
+    .modal-window.order-items-modal form .order-items-identity-grid,
+    .modal-window.order-items-modal form .screening-create-body {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .order-items-modal .order-items-weight-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .order-items-modal .order-items-carrier-section {
+        grid-column: 1 / -1;
+    }
+
+    .order-items-modal .order-items-production-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .order-items-modal .order-items-services-section {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 900px) {
+    .modal-window.order-items-modal form .order-items-identity-grid,
+    .modal-window.order-items-modal form .screening-create-body,
+    .modal-window.order-items-modal form .order-items-weight-grid,
+    .modal-window.order-items-modal form .order-items-tracking-grid,
+    .order-items-modal .order-items-weight-row,
+    .order-items-modal .order-items-production-row,
+    .order-items-modal .order-items-attachments-row {
+        grid-template-columns: 1fr;
+    }
+
+    .order-items-modal .order-items-carrier-section {
+        grid-column: auto;
+    }
+
+    .order-items-modal .order-items-services-section {
+        grid-column: auto;
+    }
 }
 
 .order-items-modal .order-items-modal-body::-webkit-scrollbar {

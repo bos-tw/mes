@@ -45,6 +45,9 @@
         const toolTypeSummary = modalOverlay ? modalOverlay.querySelector('[data-tool-type-summary]') : null;
         const toolTypeContent = modalOverlay ? modalOverlay.querySelector('[data-tool-type-content]') : null;
         const metricsPanel = modalOverlay ? modalOverlay.querySelector('[data-metrics]') : null;
+        const editorTabList = modalOverlay ? modalOverlay.querySelector('.order-items-editor-tabs') : null;
+        const editorTabButtons = modalOverlay ? Array.from(modalOverlay.querySelectorAll('[data-order-items-tab]')) : [];
+        const editorTabPanels = modalOverlay ? Array.from(modalOverlay.querySelectorAll('[data-order-items-tab-panel]')) : [];
         const batchExportButton = moduleRoot.querySelector('.content-header [data-action="batch-export"]');
 
         const screeningItemSelect = modalForm ? modalForm.querySelector('select[name="screening_item_id"]') : null;
@@ -89,7 +92,6 @@
             unitWeight: metricsPanel.querySelector('[data-metric="unit-weight"]'),
             totalUnits: metricsPanel.querySelector('[data-metric="total-units"]'),
             unitPrice: metricsPanel.querySelector('[data-metric="unit-price"]'),
-            unitPriceSum: metricsPanel.querySelector('[data-metric="unit-price-sum"]'),
             totalPrice: metricsPanel.querySelector('[data-metric="total-price"]'),
         } : null;
 
@@ -162,6 +164,9 @@
             deletedAttachmentIds: [], // 追蹤要刪除的檔案附件 ID
             isCopyMode: false, // 標記是否為複製模式
             customerWeightTolerance: 3.0, // 客戶重量公差百分比，預設 3%
+            activeEditorTab: 'weight',
+            formInitialSnapshot: null,
+            isCloseConfirming: false,
         };
 
         function formatScreeningItemLabel(item) {
@@ -894,6 +899,83 @@
             });
         }
 
+        function switchEditorTab(tabName, { focusTab = false } = {}) {
+            if (!editorTabButtons.length || !editorTabPanels.length) {
+                return;
+            }
+
+            const nextTab = editorTabButtons.some((button) => button.dataset.orderItemsTab === tabName)
+                ? tabName
+                : 'weight';
+            state.activeEditorTab = nextTab;
+
+            editorTabButtons.forEach((button) => {
+                const isActive = button.dataset.orderItemsTab === nextTab;
+                button.classList.toggle('active', isActive);
+                button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                button.tabIndex = isActive ? 0 : -1;
+                if (isActive && focusTab) {
+                    button.focus();
+                }
+            });
+
+            editorTabPanels.forEach((panel) => {
+                const isActive = panel.dataset.orderItemsTabPanel === nextTab;
+                panel.classList.toggle('active', isActive);
+                panel.hidden = !isActive;
+            });
+        }
+
+        function revealFieldTab(field) {
+            if (!(field instanceof Element)) {
+                return;
+            }
+            const panel = field.closest('[data-order-items-tab-panel]');
+            if (panel && panel.dataset.orderItemsTabPanel) {
+                switchEditorTab(panel.dataset.orderItemsTabPanel);
+            }
+        }
+
+        function createModalFormSnapshot() {
+            if (!modalForm) {
+                return '';
+            }
+
+            const controls = Array.from(modalForm.querySelectorAll('input, select, textarea')).map((element, index) => {
+                const key = element.getAttribute('name') || element.dataset.field || `control-${index}`;
+                const type = String(element.getAttribute('type') || element.tagName).toLowerCase();
+                let value = element.value;
+
+                if (type === 'checkbox' || type === 'radio') {
+                    value = element.checked ? '1' : '0';
+                } else if (type === 'file') {
+                    value = Array.from(element.files || []).map((file) => ({
+                        name: file.name,
+                        size: file.size,
+                        lastModified: file.lastModified,
+                    }));
+                }
+
+                return { key, type, value };
+            });
+
+            return JSON.stringify({
+                controls,
+                deletedDrawingIds: [...state.deletedDrawingIds],
+                deletedAttachmentIds: [...state.deletedAttachmentIds],
+            });
+        }
+
+        function captureModalFormBaseline() {
+            state.formInitialSnapshot = createModalFormSnapshot();
+        }
+
+        function hasUnsavedModalChanges() {
+            return state.formInitialSnapshot !== null
+                && createModalFormSnapshot() !== state.formInitialSnapshot;
+        }
+
         function resetToolsTable() {
             if (toolsTableBody) {
                 toolsTableBody.innerHTML = defaultToolsTableHtml;
@@ -915,8 +997,10 @@
                 return;
             }
 
+            state.formInitialSnapshot = null;
             modalForm.reset();
             clearFormValidation();
+            switchEditorTab('weight');
             modalForm.querySelectorAll('[data-user-edited]').forEach((element) => {
                 delete element.dataset.userEdited;
             });
@@ -1300,7 +1384,8 @@
                 tolerancePlusValueInput.value = String(initialData.tolerance_plus_value);
             }
             const tolerancePlusOverInput = document.createElement('input');
-            tolerancePlusOverInput.type = 'number';
+            // 暫停 Over 欄位的畫面編輯，但保留既有資料的載入與送出契約。
+            tolerancePlusOverInput.type = 'hidden';
             tolerancePlusOverInput.step = '0.0001';
             tolerancePlusOverInput.placeholder = 'Over';
             tolerancePlusOverInput.setAttribute('data-field', 'tolerance-plus-over');
@@ -1324,7 +1409,8 @@
                 toleranceMinusValueInput.value = String(initialData.tolerance_minus_value);
             }
             const toleranceMinusOverInput = document.createElement('input');
-            toleranceMinusOverInput.type = 'number';
+            // 暫停 Over 欄位的畫面編輯，但保留既有資料的載入與送出契約。
+            toleranceMinusOverInput.type = 'hidden';
             toleranceMinusOverInput.step = '0.0001';
             toleranceMinusOverInput.placeholder = 'Over';
             toleranceMinusOverInput.setAttribute('data-field', 'tolerance-minus-over');
@@ -1982,18 +2068,6 @@
                 totalUnits = (netWeight * 1000) / weightPerUnitG;
             }
 
-            let unitPriceSum = 0;
-            if (servicesTableBody) {
-                const rows = Array.from(servicesTableBody.querySelectorAll('tr.service-row'));
-                rows.forEach((row) => {
-                    const priceInput = row.querySelector('[data-field="service-price"]');
-                    const value = priceInput ? Number.parseFloat(priceInput.value) : NaN;
-                    if (Number.isFinite(value)) {
-                        unitPriceSum += value;
-                    }
-                });
-            }
-
             // 獲取單價(元/M)
             const unitPrice = unitPriceInput ? Number.parseFloat(unitPriceInput.value) : NaN;
             const unitPriceValue = Number.isFinite(unitPrice) ? unitPrice : 0;
@@ -2019,9 +2093,6 @@
             if (metricsFields.unitPrice) {
                 metricsFields.unitPrice.textContent = formatNumber(unitPriceValue, 2);
             }
-            if (metricsFields.unitPriceSum) {
-                metricsFields.unitPriceSum.textContent = formatNumber(unitPriceSum, 2);
-            }
             if (metricsFields.totalPrice) {
                 metricsFields.totalPrice.textContent = formatCurrency(totalPrice);
             }
@@ -2045,6 +2116,7 @@
                 if (screeningItemSelect) {
                     screeningItemSelect.classList.add('has-error');
                     screeningItemSelect.setAttribute('aria-invalid', 'true');
+                    revealFieldTab(screeningItemSelect);
                     screeningItemSelect.focus();
                 }
                 showModalAlert('error', '請選擇受篩產品，或新增一筆受篩產品。', false);
@@ -2056,6 +2128,7 @@
                 if (totalWeightInput) {
                     totalWeightInput.classList.add('has-error');
                     totalWeightInput.setAttribute('aria-invalid', 'true');
+                    revealFieldTab(totalWeightInput);
                     totalWeightInput.focus();
                 }
                 showModalAlert('error', '請輸入大於 0 的總重量 (kg)。', false);
@@ -2067,6 +2140,10 @@
 
             const services = readServiceRows();
             if (services.length === 0) {
+                switchEditorTab('production');
+                if (addServiceButton) {
+                    addServiceButton.focus();
+                }
                 showModalAlert('error', '至少需要設定一項篩分服務。', false);
                 return null;
             }
@@ -2168,6 +2245,7 @@
             });
 
             if (firstInvalidField && typeof firstInvalidField.focus === 'function') {
+                revealFieldTab(firstInvalidField);
                 firstInvalidField.focus();
             }
 
@@ -2323,7 +2401,7 @@
                     const eventType = isEdit ? DataSync.EVENT_TYPES.UPDATED : DataSync.EVENT_TYPES.CREATED;
                     DataSync.notifyWithDependencies('order_items', eventType, result.data);
                 }
-                closeModal();
+                await closeModal(true);
                 if (editorOnly) {
                     moduleRoot.dispatchEvent(new CustomEvent('order-items:editor-saved', {
                         bubbles: true,
@@ -2352,13 +2430,49 @@
 
         function handleEscapeKey(event) {
             if (event.key === 'Escape') {
-                closeModal();
+                event.preventDefault();
+                void closeModal();
             }
         }
 
-        function closeModal() {
-            if (!modalOverlay) {
-                return;
+        async function confirmDiscardModalChanges() {
+            if (state.isCloseConfirming) {
+                return false;
+            }
+
+            state.isCloseConfirming = true;
+            try {
+                if (window.AppFeedback && typeof window.AppFeedback.confirm === 'function') {
+                    return await window.AppFeedback.confirm({
+                        stage: '關閉編輯視窗',
+                        title: '目前有尚未儲存的變更',
+                        message: '關閉後，本次修改的欄位、載具、服務與附件內容都不會保留。',
+                        impact: '本次尚未儲存的客戶批號編輯內容將會遺失。',
+                        guidance: '若仍需保留內容，請選擇「繼續編輯」並完成儲存。',
+                        cancelLabel: '繼續編輯',
+                        confirmLabel: '放棄變更',
+                    });
+                }
+
+                window.AppFeedback?.toast?.('未能載入安全確認視窗；為保護資料，已取消關閉。', 'error');
+                return false;
+            } finally {
+                state.isCloseConfirming = false;
+            }
+        }
+
+        async function closeModal(force = false) {
+            if (!modalOverlay || modalOverlay.classList.contains('hidden')) {
+                return false;
+            }
+            if (!force && state.isSubmitting) {
+                return false;
+            }
+            if (!force && hasUnsavedModalChanges()) {
+                const shouldDiscard = await confirmDiscardModalChanges();
+                if (!shouldDiscard) {
+                    return false;
+                }
             }
 
             modalOverlay.classList.add('hidden');
@@ -2371,6 +2485,7 @@
             state.deletedAttachmentIds = []; // 清空待刪除的檔案附件 ID
             state.isCopyMode = false; // 清除複製模式標記
             resetModalForm();
+            return true;
         }
 
         function openModal(mode, data = null) {
@@ -2495,6 +2610,8 @@
             }
 
             updateMetrics();
+            switchEditorTab('weight');
+            captureModalFormBaseline();
 
             modalOverlay.classList.remove('hidden');
             document.addEventListener('keydown', handleEscapeKey);
@@ -2859,10 +2976,14 @@
         }
 
         const orderItemsController = Object.freeze({
-            async openCreate(context) {
+            async openCreate(context, initialData = null) {
                 await prepareEditorContext(context);
                 await loadOptionsIfNeeded(true);
-                openModal('create');
+                openModal('create', initialData);
+                if (initialData?.screening_item?.id && screeningItemSelect) {
+                    screeningItemSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    captureModalFormBaseline();
+                }
             },
             async openEdit(context, orderItemId) {
                 await prepareEditorContext(context);
@@ -2873,7 +2994,7 @@
                 await openEditModal(normalizedId);
             },
             close() {
-                closeModal();
+                void closeModal();
             },
         });
         moduleRoot.orderItemsController = orderItemsController;
@@ -2973,22 +3094,55 @@
             });
         }
 
-        // 移除點擊外部關閉功能，避免用戶在填寫複雜客戶批號資料時誤觸關閉
-        // 僅允許透過「儲存」、「取消」按鈕或右上角「X」關閉 modal
-        // if (modalOverlay) {
-        //     modalOverlay.addEventListener('click', (event) => {
-        //         if (event.target === modalOverlay) {
-        //             closeModal();
-        //         }
-        //     });
-        // }
+        if (modalOverlay) {
+            modalOverlay.addEventListener('click', (event) => {
+                if (event.target === modalOverlay) {
+                    void closeModal();
+                }
+            });
+        }
 
         if (modalCloseButton) {
-            modalCloseButton.addEventListener('click', closeModal);
+            modalCloseButton.addEventListener('click', () => {
+                void closeModal();
+            });
         }
 
         if (modalCancelButton) {
-            modalCancelButton.addEventListener('click', closeModal);
+            modalCancelButton.addEventListener('click', () => {
+                void closeModal();
+            });
+        }
+
+        if (editorTabList) {
+            editorTabList.addEventListener('click', (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+                const button = target.closest('[data-order-items-tab]');
+                if (button?.dataset.orderItemsTab) {
+                    switchEditorTab(button.dataset.orderItemsTab);
+                }
+            });
+
+            editorTabList.addEventListener('keydown', (event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+                    return;
+                }
+                event.preventDefault();
+                const currentIndex = editorTabButtons.indexOf(document.activeElement);
+                const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+                let nextIndex = safeIndex;
+                if (event.key === 'ArrowLeft') nextIndex = (safeIndex - 1 + editorTabButtons.length) % editorTabButtons.length;
+                if (event.key === 'ArrowRight') nextIndex = (safeIndex + 1) % editorTabButtons.length;
+                if (event.key === 'Home') nextIndex = 0;
+                if (event.key === 'End') nextIndex = editorTabButtons.length - 1;
+                const nextTab = editorTabButtons[nextIndex]?.dataset.orderItemsTab;
+                if (nextTab) {
+                    switchEditorTab(nextTab, { focusTab: true });
+                }
+            });
         }
 
         if (screeningCreateToggleButton) {

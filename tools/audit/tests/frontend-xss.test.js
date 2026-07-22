@@ -69,6 +69,8 @@ assert.strictEqual(isProvablySafeExpression('safeEscapeHtml(item.name)'), true);
 assert.strictEqual(isProvablySafeExpression('item.notes'), false);
 assert.strictEqual(isProvablySafeExpression('valueOrDash(item.name)', 'customers.js'), true);
 assert.strictEqual(isProvablySafeExpression('valueOrDash(item.name)', 'unknown.js'), false);
+assert.strictEqual(isProvablySafeExpression('renderOrderStatusBadge(item.status, item.status_label)', 'orders.js'), true);
+assert.strictEqual(isProvablySafeExpression('renderOrderStatusBadge(item.status, item.status_label)', 'unknown.js'), false);
 assert.strictEqual(isProvablySafeExpression('statusBadge', 'customers.js'), true);
 assert.strictEqual(isProvablySafeExpression('statusBadge', 'unknown.js'), false);
 

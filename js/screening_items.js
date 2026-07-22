@@ -145,14 +145,18 @@ function formatNumber(value, fractionDigits = 4) {
             if (!tableBody) {
                 return;
             }
-            tableBody.innerHTML = '<tr><td colspan="10" class="text-center">資料載入中...</td></tr>';
+            tableBody.innerHTML = `<tr><td colspan="${getTableColumnCount()}" class="text-center">資料載入中...</td></tr>`;
         }
 
         function renderEmptyRow(message) {
             if (!tableBody) {
                 return;
             }
-            tableBody.innerHTML = `<tr><td colspan="10" class="text-center">${escapeHtml(message)}</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="${getTableColumnCount()}" class="text-center">${escapeHtml(message)}</td></tr>`;
+        }
+
+        function getTableColumnCount() {
+            return tableElement?.querySelectorAll('thead th').length || 11;
         }
 
         function getSortValue(item, field) {
@@ -257,8 +261,8 @@ function formatNumber(value, fractionDigits = 4) {
                         <td>${escapeHtml(item.item_number ?? '-')}</td>
                         <td>
                             <div class="table-primary">${escapeHtml(item.name ?? '-')}</div>
-                            ${item.notes ? `<div class="table-secondary">${escapeHtml(item.notes)}</div>` : ''}
                         </td>
+                        <td>${escapeHtml(item.notes ?? '-')}</td>
                         <td>${escapeHtml(item.material ?? '-')}</td>
                         <td>${escapeHtml(item.thread_type ?? '-')}</td>
                         <td class="text-right">${weight}</td>

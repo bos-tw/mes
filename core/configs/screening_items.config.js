@@ -61,6 +61,7 @@
         columns: [
             { key: 'item_number', label: '料號', sortable: true, selectable: true },
             { key: 'name', label: '產品規格', sortable: true, selectable: true },
+            { key: 'notes', label: '備註', sortable: true, selectable: true },
             { key: 'material', label: '材質', sortable: true, selectable: true },
             { key: 'thread_type', label: '螺紋類型', sortable: true, selectable: true },
             { key: 'weight_per_unit_g', label: '單支重量(g)', sortable: true, selectable: true },

@@ -32,6 +32,21 @@
         const filterOverlay = moduleRoot.querySelector('[data-orders-filter-overlay]');
         const filterSummary = moduleRoot.querySelector('[data-orders-filter-summary]');
         const filterCountBadge = moduleRoot.querySelector('[data-orders-filter-count]');
+        const orderDetailDrawer = moduleRoot.querySelector('[data-orders-detail-drawer]');
+        const orderDetailOverlay = moduleRoot.querySelector('[data-orders-detail-overlay]');
+        const orderDetailCloseButton = moduleRoot.querySelector('[data-action="close-order-detail"]');
+        const orderDetailSubtitle = moduleRoot.querySelector('[data-orders-detail-subtitle]');
+        const orderDetailLoading = moduleRoot.querySelector('[data-orders-detail-loading]');
+        const orderDetailSections = moduleRoot.querySelector('[data-orders-detail-sections]');
+        const orderDetailItemsBody = moduleRoot.querySelector('[data-orders-detail-items]');
+        const screeningHistoryModal = moduleRoot.querySelector('[data-orders-screening-history-modal]');
+        const screeningHistoryCloseButton = moduleRoot.querySelector('[data-action="close-screening-history"]');
+        const screeningHistoryCustomer = moduleRoot.querySelector('[data-orders-screening-history-customer]');
+        const screeningHistoryForm = moduleRoot.querySelector('[data-orders-screening-history-form]');
+        const screeningHistorySearch = moduleRoot.querySelector('[data-orders-screening-history-search]');
+        const screeningHistoryState = moduleRoot.querySelector('[data-orders-screening-history-state]');
+        const screeningHistoryResults = moduleRoot.querySelector('[data-orders-screening-history-results]');
+        const screeningHistoryRows = moduleRoot.querySelector('[data-orders-screening-history-rows]');
 
         const headerCreateButton = moduleRoot.querySelector('.content-header [data-action="create"]');
         const batchPrintButton = moduleRoot.querySelector('.content-header [data-action="batch-print"]');
@@ -94,6 +109,18 @@
         };
         let isFormDirty = false;
         let dataSyncHelper = null;
+        let orderDetailRequestSequence = 0;
+        let screeningHistoryRequestSequence = 0;
+        let screeningHistoryOrderId = null;
+        let screeningHistoryItems = [];
+        const orderItemSelection = window.OrdersOrderItemSelection?.create({
+            showAlert,
+            onCopied: async (orderId) => {
+                await loadOrders(state.page);
+                expandedOrderIds.add(orderId);
+                await loadOrderItemsForOrder(orderId, true);
+            },
+        }) || null;
 
         // Modal 內部錯誤訊息顯示
         function showModalAlert(type, message, autoHide = true) {
@@ -346,6 +373,385 @@
             return item.customer_batch_number || getOrderItemScreeningLabel(item) || `ID ${item.id}`;
         }
 
+        function setOrderDetailDrawerOpen(isOpen) {
+            if (!orderDetailDrawer || !orderDetailOverlay) return;
+            orderDetailDrawer.classList.toggle('hidden', !isOpen);
+            orderDetailOverlay.classList.toggle('hidden', !isOpen);
+            orderDetailDrawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+            if (isOpen) {
+                orderDetailCloseButton?.focus();
+            }
+        }
+
+        function closeOrderDetailDrawer() {
+            orderDetailRequestSequence += 1;
+            setOrderDetailDrawerOpen(false);
+        }
+
+        function closeScreeningHistoryModal() {
+            screeningHistoryRequestSequence += 1;
+            screeningHistoryOrderId = null;
+            screeningHistoryItems = [];
+            screeningHistoryModal?.classList.add('hidden');
+        }
+
+        function getScreeningHistoryLabel(item) {
+            const screeningItem = item?.screening_item || {};
+            return [screeningItem.item_number, screeningItem.name].filter(Boolean).join(' - ') || '-';
+        }
+
+        function renderScreeningHistoryRows() {
+            if (!screeningHistoryRows || !screeningHistoryResults || !screeningHistoryState) return;
+            const keyword = String(screeningHistorySearch?.value || '').trim().toLocaleLowerCase('zh-Hant');
+            const filteredItems = screeningHistoryItems.filter((item) => {
+                const haystack = `${item.order_date || ''} ${getScreeningHistoryLabel(item)}`.toLocaleLowerCase('zh-Hant');
+                return !keyword || haystack.includes(keyword);
+            });
+
+            screeningHistoryRows.replaceChildren();
+            if (filteredItems.length === 0) {
+                screeningHistoryResults.classList.add('hidden');
+                screeningHistoryState.textContent = keyword ? '找不到符合搜尋條件的歷史受篩產品。' : '此客戶尚無其他訂單的受篩產品歷史。';
+                screeningHistoryState.classList.remove('hidden');
+                return;
+            }
+
+            filteredItems.forEach((item) => {
+                const row = document.createElement('tr');
+                const dateCell = document.createElement('td');
+                const productCell = document.createElement('td');
+                const selectButton = document.createElement('button');
+
+                dateCell.textContent = item.order_date || '-';
+                selectButton.type = 'button';
+                selectButton.className = 'record-link-button';
+                selectButton.dataset.action = 'select-screening-history';
+                selectButton.dataset.screeningItemId = String(item.screening_item?.id || '');
+                selectButton.textContent = getScreeningHistoryLabel(item);
+                selectButton.title = '帶入新的訂單細項';
+                productCell.appendChild(selectButton);
+                row.append(dateCell, productCell);
+                screeningHistoryRows.appendChild(row);
+            });
+
+            screeningHistoryState.classList.add('hidden');
+            screeningHistoryResults.classList.remove('hidden');
+        }
+
+        async function openScreeningHistoryModal(orderId) {
+            if (!screeningHistoryModal) {
+                showAlert('error', '受篩產品歷史視窗尚未載入，請重新整理後再試。');
+                return;
+            }
+
+            const requestSequence = ++screeningHistoryRequestSequence;
+            screeningHistoryOrderId = orderId;
+            screeningHistoryItems = [];
+            if (screeningHistorySearch) screeningHistorySearch.value = '';
+            if (screeningHistoryCustomer) screeningHistoryCustomer.textContent = '客戶資料載入中…';
+            if (screeningHistoryState) {
+                screeningHistoryState.textContent = '歷史受篩產品載入中…';
+                screeningHistoryState.classList.remove('hidden');
+            }
+            screeningHistoryResults?.classList.add('hidden');
+            screeningHistoryModal.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`api/orders/screening-item-history.php?order_id=${encodeURIComponent(orderId)}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Accept': 'application/json' },
+                });
+                const result = await readJsonResponse(response, '載入受篩產品歷史失敗');
+                if (!response.ok || !result.success || !result.data) {
+                    throw new Error(result.message || '載入受篩產品歷史失敗。');
+                }
+                if (requestSequence !== screeningHistoryRequestSequence) return;
+                screeningHistoryItems = Array.isArray(result.data.items) ? result.data.items : [];
+                if (screeningHistoryCustomer) screeningHistoryCustomer.textContent = `客戶：${result.data.customer?.name || '-'}`;
+                renderScreeningHistoryRows();
+                screeningHistorySearch?.focus();
+            } catch (error) {
+                if (requestSequence !== screeningHistoryRequestSequence) return;
+                if (screeningHistoryCustomer) screeningHistoryCustomer.textContent = '客戶：-';
+                if (screeningHistoryState) {
+                    screeningHistoryState.textContent = error instanceof Error ? error.message : '載入受篩產品歷史失敗。';
+                    screeningHistoryState.classList.remove('hidden');
+                }
+            }
+        }
+
+        function setOrderDetailField(name, value) {
+            const field = orderDetailSections?.querySelector(`[data-order-detail-field="${name}"]`);
+            if (field) {
+                field.textContent = value === null || value === undefined || String(value).trim() === '' ? '-' : String(value);
+            }
+        }
+
+        function formatOrderDetailValue(value, decimals = null) {
+            if (value === null || value === undefined || String(value).trim() === '') return '-';
+            return decimals === null ? String(value) : formatNumber(value, decimals);
+        }
+
+        function appendOrderDetailTable(container, title, headers, rows) {
+            const section = document.createElement('section');
+            const heading = document.createElement('h5');
+            const responsive = document.createElement('div');
+            const table = document.createElement('table');
+            const tableHead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            const tableBody = document.createElement('tbody');
+
+            section.className = 'order-detail-subtable';
+            heading.textContent = title;
+            responsive.className = 'table-responsive';
+            table.className = 'data-table compact';
+            table.dataset.noHardRowNumber = 'true';
+            table.dataset.noColumnResize = 'true';
+            headers.forEach((header) => {
+                const cell = document.createElement('th');
+                cell.textContent = header;
+                headerRow.appendChild(cell);
+            });
+            tableHead.appendChild(headerRow);
+
+            const safeRows = Array.isArray(rows) && rows.length > 0 ? rows : [['無資料']];
+            safeRows.forEach((values) => {
+                const row = document.createElement('tr');
+                values.forEach((value) => {
+                    const cell = document.createElement('td');
+                    cell.textContent = formatOrderDetailValue(value);
+                    row.appendChild(cell);
+                });
+                if (values.length === 1 && headers.length > 1) {
+                    row.firstElementChild.colSpan = headers.length;
+                    row.firstElementChild.className = 'text-center';
+                }
+                tableBody.appendChild(row);
+            });
+
+            table.append(tableHead, tableBody);
+            responsive.appendChild(table);
+            section.append(heading, responsive);
+            container.appendChild(section);
+        }
+
+        function renderOrderDetailItems(items, order) {
+            if (!orderDetailItemsBody) return;
+            orderDetailItemsBody.replaceChildren();
+
+            if (!Array.isArray(items) || items.length === 0) {
+                const emptyState = document.createElement('div');
+                emptyState.className = 'order-items-inline-state';
+                emptyState.textContent = '此訂單尚無明細。';
+                orderDetailItemsBody.appendChild(emptyState);
+                return;
+            }
+
+            items.forEach((item) => {
+                const itemSection = document.createElement('article');
+                const itemHeading = document.createElement('h4');
+                const totals = item.totals || {};
+                const screeningItem = item.screening_item || {};
+                const tools = Array.isArray(item.tools) ? item.tools : [];
+                const services = Array.isArray(item.screening_details) ? item.screening_details : [];
+                const drawings = Array.isArray(item.drawings) ? item.drawings : [];
+                const attachments = Array.isArray(item.attachments) ? item.attachments : [];
+                const weightTolerance = order?.customer?.weight_tolerance_percentage;
+
+                itemSection.className = 'order-detail-item-card';
+                itemHeading.textContent = item.order_item_number || '訂單明細';
+                itemSection.appendChild(itemHeading);
+
+                appendOrderDetailTable(itemSection, '受篩產品、重量與狀態', ['欄位', '內容', '欄位', '內容'], [
+                    ['受篩產品', getOrderItemScreeningLabel(item), '單價 (元/M)', formatOrderDetailValue(item.unit_price_per_thousand, 2)],
+                    ['總重量(含桶重) (kg)', formatOrderDetailValue(item.total_weight_kg, 2), '生產狀態', item.status_label || item.status],
+                    ['單支重量 (g)', formatOrderDetailValue(screeningItem.weight_per_unit_g, 4), '客戶樣品狀態', getOrderItemSampleStatusLabel(item)],
+                    ['品項編號', item.sub_item_number, '料號', item.part_number],
+                    ['客戶批號', item.customer_batch_number, '訂單明細編號', item.order_item_number],
+                ]);
+
+                appendOrderDetailTable(itemSection, '重量追蹤', ['客戶提供重量 (kg)', '我方確認重量 (kg)', '實際生產重量 (kg)', '重量公差限制'], [[
+                    formatOrderDetailValue(item.customer_provided_weight, 2),
+                    formatOrderDetailValue(item.confirmed_weight, 2),
+                    formatOrderDetailValue(item.actual_production_weight, 2),
+                    weightTolerance != null ? `±${formatNumber(weightTolerance, 2)}%` : '-',
+                ]]);
+
+                appendOrderDetailTable(itemSection, '備註資訊', ['指送地點', '備註'], [[item.delivery_location, item.notes]]);
+                appendOrderDetailTable(itemSection, '計算指標', [
+                    '總重量(含桶重) (kg)', '載具重量合計 (kg)', '淨重 (kg)', '單支重 (g)',
+                    '總支數', '單價 (元/M)', '單價合計 (參考)', '預估總金額',
+                ], [[
+                    formatOrderDetailValue(item.total_weight_kg, 2),
+                    formatOrderDetailValue(totals.tool_weight_kg, 2),
+                    formatOrderDetailValue(totals.net_weight_kg, 2),
+                    formatOrderDetailValue(screeningItem.weight_per_unit_g, 4),
+                    formatOrderDetailValue(item.total_units, 0),
+                    formatOrderDetailValue(item.unit_price_per_thousand, 2),
+                    formatOrderDetailValue(totals.service_unit_price_sum, 4),
+                    formatOrderDetailValue(item.total_price, 2),
+                ]]);
+
+                appendOrderDetailTable(itemSection, '載具設定', ['載具', '類型', '數量', '單件重量(kg)', '小計重量(kg)'], tools.map((tool) => [
+                    [tool.tool_number, tool.tool_name].filter(Boolean).join(' - ') || '-',
+                    tool.tool_type,
+                    formatOrderDetailValue(tool.quantity, 0),
+                    formatOrderDetailValue(tool.weight_kg, 4),
+                    formatOrderDetailValue(tool.total_weight_kg, 4),
+                ]));
+
+                appendOrderDetailTable(itemSection, '篩分服務', ['服務項目', '服務名稱 (客製)', '實際單價 (每支)', '公差 (+)', '公差 (-)', 'PPM', '備註', '描述'], services.map((service) => [
+                    service.defaults?.name,
+                    service.service_name,
+                    formatOrderDetailValue(service.actual_price_per_unit, 4),
+                    `${formatOrderDetailValue(service.tolerance_plus_value, 4)} / Over ${formatOrderDetailValue(service.tolerance_plus_over, 4)}`,
+                    `${formatOrderDetailValue(service.tolerance_minus_value, 4)} / Over ${formatOrderDetailValue(service.tolerance_minus_over, 4)}`,
+                    formatOrderDetailValue(service.ppm_standard, 3),
+                    service.notes,
+                    service.description,
+                ]));
+
+                appendOrderDetailTable(itemSection, '圖面附件', ['檔案名稱'], drawings.map((drawing) => [drawing.file_name]));
+                appendOrderDetailTable(itemSection, '檔案附件', ['檔案名稱'], attachments.map((attachment) => [attachment.file_name]));
+                orderDetailItemsBody.appendChild(itemSection);
+            });
+        }
+
+        function populateOrderDetailDrawer(order) {
+            const customer = order.customer || {};
+            const periodLabels = {
+                morning: '上午',
+                noon: '中午',
+                afternoon: '下午',
+                evening: '晚間',
+            };
+            const deliveryDate = order.expected_delivery_date || '-';
+            const deliveryPeriod = periodLabels[order.expected_delivery_period] || order.expected_delivery_period || '';
+            const expectedDelivery = deliveryPeriod ? `${deliveryDate} ${deliveryPeriod}` : deliveryDate;
+
+            setOrderDetailField('order_number', order.order_number);
+            setOrderDetailField('customer_name', customer.name || order.customer_name);
+            setOrderDetailField('order_date', order.order_date);
+            setOrderDetailField('expected_delivery', expectedDelivery);
+            renderOrderDetailItems(order.items, order);
+
+            if (orderDetailSubtitle) orderDetailSubtitle.textContent = order.order_number || '訂單詳細資料';
+            orderDetailLoading?.classList.add('hidden');
+            orderDetailSections?.classList.remove('hidden');
+        }
+
+        async function openOrderDetailDrawer(orderId) {
+            if (!orderDetailDrawer || !orderDetailOverlay) {
+                showAlert('error', '訂單詳細檢視尚未載入，請重新整理後再試。');
+                return;
+            }
+
+            const requestSequence = ++orderDetailRequestSequence;
+            orderDetailSections?.classList.add('hidden');
+            if (orderDetailLoading) {
+                orderDetailLoading.textContent = '訂單詳細資料載入中…';
+                orderDetailLoading.classList.remove('hidden');
+            }
+            if (orderDetailSubtitle) orderDetailSubtitle.textContent = '載入訂單完整資料';
+            setOrderDetailDrawerOpen(true);
+
+            try {
+                const response = await fetch(`api/orders/show.php?id=${encodeURIComponent(orderId)}&include=customer,items`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Accept': 'application/json' },
+                });
+                const result = await readJsonResponse(response, '載入訂單詳細資料失敗');
+                if (!response.ok || !result.success || !result.data) {
+                    throw new Error(result.message || '載入訂單詳細資料失敗。');
+                }
+                if (requestSequence !== orderDetailRequestSequence) return;
+                ordersCache.set(orderId, result.data);
+                populateOrderDetailDrawer(result.data);
+            } catch (error) {
+                if (requestSequence !== orderDetailRequestSequence) return;
+                orderDetailSections?.classList.add('hidden');
+                if (orderDetailLoading) {
+                    orderDetailLoading.textContent = error instanceof Error ? error.message : '載入訂單詳細資料失敗。';
+                    orderDetailLoading.classList.remove('hidden');
+                }
+            }
+        }
+
+        function getOrderItemSampleStatusLabel(item) {
+            const label = item?.customer_sample_status_label;
+            if (label !== null && label !== undefined && String(label).trim() !== '') {
+                return String(label).trim();
+            }
+
+            const raw = String(item?.customer_sample_status || '').trim();
+            const normalized = raw.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+            if (normalized === 'yes') return '有';
+            if (normalized === 'no') return '無';
+            if (['yes_return', 'yes_need_return', 'need_return', 'return', 'return_required'].includes(normalized)) return '有，須歸還';
+            if (['no_return', 'return_not_required', 'no_need_return'].includes(normalized)) return '有，不須歸還';
+            return raw || '-';
+        }
+
+        function getOrderItemShippingStatus(item) {
+            const status = item?.shipping_status || 'not_shipped';
+            const definitions = {
+                not_shipped: { label: '未出貨', className: 'pending' },
+                partial_shipped: { label: '部分出貨', className: 'warning' },
+                fully_shipped: { label: '已全部出貨', className: 'shipped' },
+            };
+            return definitions[status] || { label: status, className: '' };
+        }
+
+        function getOrderStatusBadge(status, statusLabel = null) {
+            const normalizedStatus = String(status || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+            const normalizedLabel = String(statusLabel || '').trim();
+            const classByStatus = {
+                pending: 'pending',
+                confirmed: 'active',
+                in_progress: 'in-progress',
+                completed: 'completed',
+                cancelled: 'cancelled',
+                scheduled: 'scheduled',
+                paused: 'paused',
+            };
+            const classByLabel = {
+                待處理: 'pending',
+                待開始: 'scheduled',
+                已確認: 'active',
+                進行中: 'in-progress',
+                已完成: 'completed',
+                已取消: 'cancelled',
+                暫停: 'paused',
+            };
+
+            return {
+                label: normalizedLabel || String(status || '-'),
+                className: classByStatus[normalizedStatus] || classByLabel[normalizedLabel] || 'secondary',
+            };
+        }
+
+        function renderOrderStatusBadge(status, statusLabel = null) {
+            const badge = getOrderStatusBadge(status, statusLabel);
+            return `<span class="status-badge ${badge.className}">${escapeHtml(badge.label)}</span>`;
+        }
+
+        function getOrderItemWeightVarianceText(orderId, item) {
+            const confirmedWeight = Number(item?.confirmed_weight);
+            const actualWeight = Number(item?.actual_production_weight);
+            if (!Number.isFinite(confirmedWeight) || !Number.isFinite(actualWeight)) return '-';
+
+            const variance = actualWeight - confirmedWeight;
+            const variancePercent = confirmedWeight > 0 ? (variance / confirmedWeight) * 100 : 0;
+            const order = ordersCache.get(orderId) || {};
+            const toleranceValue = Number(order.customer?.weight_tolerance_percentage ?? order.weight_tolerance_percentage ?? 3);
+            const tolerance = Number.isFinite(toleranceValue) ? toleranceValue : 3;
+            const sign = variance >= 0 ? '+' : '';
+            const display = `${sign}${formatNumber(variance, 2)} kg (${sign}${formatNumber(variancePercent, 2)}%)`;
+            return Math.abs(variancePercent) > tolerance ? `⚠ ${display}` : display;
+        }
+
         function renderCurrentOrders() {
             renderTableRows(state.currentRows);
             updateSortIndicators();
@@ -374,34 +780,70 @@
             } else if (items.length === 0) {
                 bodyHtml = '<div class="order-items-inline-state">此訂單尚無細項。</div>';
             } else {
-                const rowsHtml = items.map((item, index) => {
+                const sortedItems = orderItemSelection?.sortItems(orderId, items) || items;
+                const sortableHeader = (field, label, className = '') => {
+                    const sortClass = orderItemSelection?.getSortClass(orderId, field) || '';
+                    const ariaSort = orderItemSelection?.getAriaSort(orderId, field) || 'none';
+                    return `<th class="${escapeHtml(`${className} ${sortClass}`.trim())}" data-column="${escapeHtml(field)}" data-sort="${escapeHtml(field)}" aria-sort="${escapeHtml(ariaSort)}">${escapeHtml(label)}<i class="fas fa-sort" aria-hidden="true"></i></th>`;
+                };
+                const plainHeader = (field, label, className = '') => `<th class="${escapeHtml(className)}" data-column="${escapeHtml(field)}">${escapeHtml(label)}</th>`;
+                const rowsHtml = sortedItems.map((item, index) => {
                     const totals = item.totals || {};
                     const screeningLabel = getOrderItemScreeningLabel(item);
                     const statusLabel = item.status_label || item.status || '-';
-                    const hasWorkOrder = item.has_work_order == 1;
-                    const workOrderLabel = hasWorkOrder ? (item.work_order_number || '已建立') : '尚未建立';
+                    const sampleStatusLabel = getOrderItemSampleStatusLabel(item);
+                    const shippingStatus = getOrderItemShippingStatus(item);
+                    const isSelected = orderItemSelection?.isSelected(orderId, item.id) || false;
+                    const tools = Array.isArray(item.tools) ? item.tools : [];
+                    const toolTypes = [...new Set(tools.map((tool) => String(tool.tool_type || '').trim()).filter(Boolean))];
+                    const toolTypesLabel = toolTypes.length > 0 ? toolTypes.join(', ') : '-';
 
                     return `
                         <tr data-order-item-id="${escapeHtml(item.id)}">
-                            <td class="text-center">${escapeHtml(String(index + 1))}</td>
+                            <td class="checkbox-col">
+                                <input type="checkbox" data-action="select-order-item-inline" data-order-id="${orderId}" data-order-item-id="${escapeHtml(item.id)}" aria-label="選取訂單細項 ${escapeHtml(item.order_item_number || String(index + 1))}" ${isSelected ? 'checked' : ''}>
+                            </td>
+                            <td>${escapeHtml(item.order_item_number || '-')}</td>
                             <td>${escapeHtml(item.customer_batch_number || '-')}</td>
-                            <td>
-                                <div class="table-primary">${escapeHtml(screeningLabel)}</div>
+                            <td>${escapeHtml(item.order_number || '-')}</td>
+                            <td>${escapeHtml(item.customer_name || '-')}</td>
+                            <td class="screening-item-cell">
+                                <div class="screening-item-cell-main">
+                                    <div class="table-primary">${escapeHtml(screeningLabel)}</div>
+                                    <button type="button" class="btn text op-action-btn op-role-view" data-action="open-screening-history" data-order-id="${orderId}" title="受篩產品歷史" aria-label="查看此客戶的受篩產品歷史">
+                                        <i class="fas fa-history" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                                 ${item.drawing_number ? `<div class="table-secondary">圖面：${escapeHtml(item.drawing_number)}</div>` : ''}
                             </td>
                             <td class="text-right">${formatNumber(item.total_weight_kg ?? 0, 2)}</td>
+                            <td class="text-right">${formatNumber(totals.tool_weight_kg ?? 0, 2)}</td>
                             <td class="text-right">${formatNumber(totals.net_weight_kg ?? 0, 2)}</td>
                             <td class="text-right">${formatNumber(item.total_units ?? 0, 0)}</td>
                             <td class="text-right">${formatNumber(item.unit_price_per_thousand ?? 0, 2)}</td>
-                            <td class="text-right">$${formatCurrency(item.total_price ?? 0)}</td>
-                            <td>${escapeHtml(statusLabel)}</td>
-                            <td>${escapeHtml(workOrderLabel)}</td>
+                            <td class="text-right">${formatCurrency(item.total_price ?? 0)}</td>
+                            <td>${renderOrderStatusBadge(item.status, statusLabel)}</td>
+                            <td>${escapeHtml(sampleStatusLabel)}</td>
+                            <td>${escapeHtml(formatDateTime(item.updated_at))}</td>
+                            <td class="text-right">${formatNumber(item.total_shipped_quantity ?? 0, 0)}</td>
+                            <td><span class="status-badge ${shippingStatus.className}">${escapeHtml(shippingStatus.label)}</span></td>
+                            <td>${item.work_order_count ? `${escapeHtml(item.work_order_count)} 筆` : '-'}</td>
+                            <td>${item.inventory_item_count ? `${escapeHtml(item.inventory_item_count)} 筆` : '-'}</td>
+                            <td>${item.shipping_order_item_count ? `${escapeHtml(item.shipping_order_item_count)} 筆` : '-'}</td>
+                            <td>${item.return_order_item_count ? `${escapeHtml(item.return_order_item_count)} 筆` : '-'}</td>
+                            <td class="text-right">${item.customer_provided_weight != null ? formatNumber(item.customer_provided_weight, 2) : '-'}</td>
+                            <td class="text-right">${item.confirmed_weight != null ? formatNumber(item.confirmed_weight, 2) : '-'}</td>
+                            <td class="text-right">${item.actual_production_weight != null ? formatNumber(item.actual_production_weight, 2) : '-'}</td>
+                            <td class="text-right">${escapeHtml(getOrderItemWeightVarianceText(orderId, item))}</td>
+                            <td>${escapeHtml(toolTypesLabel)}</td>
+                            <td class="text-right">${tools.length > 0 ? tools.map((tool) => formatNumber(tool.weight_kg ?? 0, 4)).join(', ') : '-'}</td>
+                            <td class="text-right">${tools.length > 0 ? tools.map((tool) => formatNumber(tool.quantity ?? 0, 0)).join(', ') : '-'}</td>
                             <td class="table-actions order-items-inline-actions">
-                                <button type="button" class="btn text" data-action="edit-order-item-inline" data-order-id="${orderId}" data-order-item-id="${item.id}" title="編輯客戶批號">
-                                    <i class="fas fa-edit"></i>
+                                <button type="button" class="btn text" data-action="edit-order-item-inline" data-order-id="${orderId}" data-order-item-id="${item.id}" title="編輯客戶批號" aria-label="編輯客戶批號">
+                                    <i class="fas fa-edit" aria-hidden="true"></i>
                                 </button>
-                                <button type="button" class="btn text danger" data-action="delete-order-item-inline" data-order-id="${orderId}" data-order-item-id="${item.id}" title="刪除客戶批號">
-                                    <i class="fas fa-trash"></i>
+                                <button type="button" class="btn text danger" data-action="delete-order-item-inline" data-order-id="${orderId}" data-order-item-id="${item.id}" title="刪除客戶批號" aria-label="刪除客戶批號">
+                                    <i class="fas fa-trash" aria-hidden="true"></i>
                                 </button>
                             </td>
                         </tr>
@@ -409,20 +851,38 @@
                 }).join('');
 
                 bodyHtml = `
-                    <div class="order-items-inline-table-wrap">
-                        <table class="order-items-inline-table">
+                    <div class="table-section order-items-inline-table-wrap">
+                        <table class="data-table order-items-inline-table" data-order-items-order-context-table>
                             <thead>
                                 <tr>
-                                    <th>序號</th>
-                                    <th>客戶批號</th>
-                                    <th>受篩產品</th>
-                                    <th class="text-right">總重(kg)</th>
-                                    <th class="text-right">淨重(kg)</th>
-                                    <th class="text-right">支數</th>
-                                    <th class="text-right">單價/M</th>
-                                    <th class="text-right">金額</th>
-                                    <th>狀態</th>
-                                    <th>工單</th>
+                                    <th class="checkbox-col">選取</th>
+                                    ${sortableHeader('order_item_number', '訂單明細')}
+                                    ${sortableHeader('customer_batch_number', '客戶批號')}
+                                    ${sortableHeader('order_number', '訂單號碼')}
+                                    ${sortableHeader('customer_name', '客戶名稱')}
+                                    ${sortableHeader('screening_label', '受篩品項')}
+                                    ${sortableHeader('total_weight_kg', '總重量(kg)', 'text-right')}
+                                    ${sortableHeader('tool_weight_kg', '載具重量(kg)', 'text-right')}
+                                    ${sortableHeader('net_weight_kg', '淨重(kg)', 'text-right')}
+                                    ${sortableHeader('total_units', '總支數', 'text-right')}
+                                    ${sortableHeader('unit_price_per_thousand', '單價 (元/M)', 'text-right')}
+                                    ${sortableHeader('total_price', '預估總金額', 'text-right')}
+                                    ${sortableHeader('status_label', '狀態')}
+                                    ${sortableHeader('sample_status_label', '客戶樣品狀態')}
+                                    ${sortableHeader('updated_at', '更新時間')}
+                                    ${sortableHeader('total_shipped_quantity', '已出貨數量', 'text-right')}
+                                    ${sortableHeader('shipping_status', '出貨狀態')}
+                                    ${sortableHeader('work_order_count', '工單')}
+                                    ${sortableHeader('inventory_item_count', '庫存')}
+                                    ${sortableHeader('shipping_order_item_count', '出貨明細')}
+                                    ${sortableHeader('return_order_item_count', '退貨明細')}
+                                    ${sortableHeader('customer_provided_weight', '客戶提供重量', 'text-right')}
+                                    ${sortableHeader('confirmed_weight', '我方確認重量', 'text-right')}
+                                    ${sortableHeader('actual_production_weight', '實際生產重量', 'text-right')}
+                                    ${plainHeader('weight_variance', '重量差異', 'text-right')}
+                                    ${plainHeader('tool_types', '載具類型')}
+                                    ${plainHeader('tool_unit_weight', '載具單重(kg)', 'text-right')}
+                                    ${plainHeader('tool_quantity', '載具數量', 'text-right')}
                                     <th class="order-items-inline-actions">操作</th>
                                 </tr>
                             </thead>
@@ -432,20 +892,72 @@
                 `;
             }
 
+            const selectedOrderItemId = orderItemSelection?.getSelected(orderId) || null;
+
             return `
                 <tr class="order-items-detail-row" data-parent-id="${orderId}" data-skip-row-number="true" data-column-manager-skip="true">
                     <td colspan="${colspan}">
-                        <div class="order-items-inline-panel">
+                        <div class="order-items-inline-panel" data-module="order_items_order_context">
                             <div class="order-items-inline-header">
                                 <strong>訂單細項</strong>
-                                <button type="button" class="btn primary small op-action-btn op-role-order-items" data-action="add-order-item" data-order-id="${orderId}" title="新增訂單細項">
-                                    <i class="fas fa-plus"></i> 新增明細
-                                </button>
-                                <button type="button" class="btn text op-action-btn op-role-order-items" data-action="open-order-items" data-order-id="${orderId}" title="客戶批號" aria-label="客戶批號">
-                                    <i class="fas fa-external-link-alt"></i>
-                                </button>
+                                <div class="header-actions">
+                                    <button type="button" class="btn outline small" data-action="copy-order-item" data-order-id="${orderId}" title="${selectedOrderItemId ? '複製已選取的訂單細項' : '請先勾選一筆訂單細項'}" aria-disabled="${selectedOrderItemId ? 'false' : 'true'}">
+                                        <i class="fas fa-copy" aria-hidden="true"></i> 複製
+                                    </button>
+                                    <button type="button" class="btn primary small" data-action="add-order-item" data-order-id="${orderId}" title="新增訂單細項">
+                                        <i class="fas fa-plus" aria-hidden="true"></i> 新增
+                                    </button>
+                                    <button type="button" class="btn outline small" data-action="open-order-items" data-order-id="${orderId}" title="批號一覽">
+                                        <i class="fas fa-list-ul" aria-hidden="true"></i> 批號一覽
+                                    </button>
+                                    <button type="button" class="btn outline small" data-action="toggle-column-selector" title="欄位設定" aria-label="開啟訂單細項欄位設定">
+                                        <i class="fas fa-columns" aria-hidden="true"></i> 欄位設定
+                                    </button>
+                                </div>
                             </div>
                             ${bodyHtml}
+                            <div class="column-selector hidden" data-order-items-order-context-column-selector>
+                                <div class="column-selector-header">
+                                    <h4>顯示欄位設定</h4>
+                                    <button type="button" class="close-btn" data-action="close-column-selector" title="關閉" aria-label="關閉欄位設定">
+                                        <i class="fas fa-times" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <div class="column-selector-body">
+                                    <label class="column-option"><input type="checkbox" data-column="order_item_number" checked><span>訂單明細</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="customer_batch_number" checked><span>客戶批號</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="order_number" checked><span>訂單號碼</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="customer_name" checked><span>客戶名稱</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="screening_label" checked><span>受篩品項</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="total_weight_kg" checked><span>總重量(kg)</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="tool_weight_kg" checked><span>載具重量(kg)</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="net_weight_kg" checked><span>淨重(kg)</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="total_units" checked><span>總支數</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="unit_price_per_thousand" checked><span>單價 (元/M)</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="total_price" checked><span>預估總金額</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="status_label" checked><span>狀態</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="sample_status_label" checked><span>客戶樣品狀態</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="updated_at" checked><span>更新時間</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="total_shipped_quantity"><span>已出貨數量</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="shipping_status"><span>出貨狀態</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="work_order_count" checked><span>工單</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="inventory_item_count" checked><span>庫存</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="shipping_order_item_count" checked><span>出貨明細</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="return_order_item_count" checked><span>退貨明細</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="customer_provided_weight"><span>客戶提供重量</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="confirmed_weight"><span>我方確認重量</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="actual_production_weight"><span>實際生產重量</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="weight_variance"><span>重量差異</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="tool_types"><span>載具類型</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="tool_unit_weight"><span>載具單重(kg)</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="tool_quantity"><span>載具數量</span></label>
+                                </div>
+                                <div class="column-selector-footer">
+                                    <button type="button" class="btn outline small" data-action="select-all-columns">全選</button>
+                                    <button type="button" class="btn outline small" data-action="deselect-all-columns">全不選</button>
+                                    <button type="button" class="btn primary small" data-action="apply-column-settings">套用</button>
+                                </div>
+                            </div>
                         </div>
                     </td>
                 </tr>
@@ -497,13 +1009,13 @@
                         <td>${formatDateTime(order.order_date)}${order.order_date ? ` <span class="weekday-text">${getWeekdayText(order.order_date)}</span>` : ''}</td>
                         <td>${formatDateTime(order.expected_delivery_date)}${order.expected_delivery_date ? ` <span class="weekday-text">${getWeekdayText(order.expected_delivery_date)}</span>` : ''}</td>
                         <td>${escapeHtml(displayNullableText(order.customer_po_number))}</td>
-                        <td>${escapeHtml(statusLabel)}</td>
+                        <td>${renderOrderStatusBadge(order.status, statusLabel)}</td>
                         <td class="text-right">$${formatCurrency(order.total_amount)} ${amountWarning}</td>
                         <td>${formatDateTime(order.created_at)}</td>
                         <td class="table-actions">
                             <button type="button" class="btn text op-action-btn op-role-print" data-action="print-single" title="列印"><i class="fas fa-print"></i></button>
                             <button type="button" class="btn text op-action-btn op-role-expand" data-action="details" title="${detailsTitle}" aria-label="${detailsTitle}" aria-expanded="${isExpanded ? 'true' : 'false'}"><i class="fas ${detailsIcon}"></i></button>
-                            <button type="button" class="btn text op-action-btn op-role-order-items" data-action="open-order-items" data-order-id="${orderId}" title="客戶批號" aria-label="客戶批號"><i class="fas fa-list-ul"></i></button>
+                            <button type="button" class="btn text op-action-btn op-role-view" data-action="view-order-details" data-order-id="${orderId}" title="詳細檢視" aria-label="詳細檢視"><i class="fas fa-eye" aria-hidden="true"></i></button>
                             <button type="button" class="btn text op-action-btn op-role-edit" data-action="edit" title="編輯"><i class="fas fa-edit"></i></button>
                             <button type="button" class="btn text danger op-action-btn op-role-delete" data-action="delete" title="刪除"><i class="fas fa-trash"></i></button>
                         </td>
@@ -802,6 +1314,7 @@
 
                 const items = Array.isArray(result.data.items) ? result.data.items : [];
                 orderItemsCache.set(orderId, items);
+                orderItemSelection?.reconcile(orderId, items);
                 if (result.data.id) {
                     ordersCache.set(Number.parseInt(result.data.id, 10), result.data);
                 }
@@ -1277,10 +1790,10 @@
             }
         }
 
-        async function openCreateOrderItemEditor(orderId) {
+        async function openCreateOrderItemEditor(orderId, initialData = null) {
             try {
                 const editor = await loadOrderItemEditor();
-                await editor.openCreate(getOrderContext(orderId));
+                await editor.openCreate(getOrderContext(orderId), initialData);
             } catch (error) {
                 console.error(error);
                 showAlert('error', error.message || '完整客戶批號編輯器尚未載入。');
@@ -2137,6 +2650,17 @@ ${pages}
 
         if (tableBody) {
             tableBody.addEventListener('click', (event) => {
+                const inlineSortHeader = event.target.closest('.order-items-inline-table th[data-sort]');
+                if (inlineSortHeader) {
+                    const detailRow = inlineSortHeader.closest('.order-items-detail-row');
+                    const orderId = Number.parseInt(detailRow?.dataset.parentId || '', 10);
+                    if (Number.isInteger(orderId) && orderItemSelection) {
+                        orderItemSelection.toggleSort(orderId, inlineSortHeader.dataset.sort);
+                        renderCurrentOrders();
+                    }
+                    return;
+                }
+
                 const target = event.target.closest('button[data-action]');
 
                 // 處理 checkbox 點擊
@@ -2148,13 +2672,36 @@ ${pages}
                     return;
                 }
 
+                if (event.target.matches('input[data-action="select-order-item-inline"]')) {
+                    orderItemSelection?.select(event.target);
+                    return;
+                }
+
                 if (!target) return;
 
                 const action = target.dataset.action;
+                if (action === 'copy-order-item') {
+                    const orderId = Number.parseInt(target.dataset.orderId || '', 10);
+                    if (Number.isInteger(orderId) && orderItemSelection) {
+                        orderItemSelection.copy(orderId, target);
+                    } else if (!orderItemSelection) {
+                        showAlert('error', '訂單細項複製功能尚未載入，請重新整理後再試。');
+                    }
+                    return;
+                }
+
                 if (action === 'add-order-item') {
                     const orderId = Number.parseInt(target.dataset.orderId || '', 10);
                     if (Number.isInteger(orderId)) {
                         openCreateOrderItemEditor(orderId);
+                    }
+                    return;
+                }
+
+                if (action === 'open-screening-history') {
+                    const orderId = Number.parseInt(target.dataset.orderId || '', 10);
+                    if (Number.isInteger(orderId)) {
+                        openScreeningHistoryModal(orderId);
                     }
                     return;
                 }
@@ -2173,6 +2720,14 @@ ${pages}
                     const orderItemId = Number.parseInt(target.dataset.orderItemId || '', 10);
                     if (Number.isInteger(orderId) && Number.isInteger(orderItemId)) {
                         deleteOrderItemInline(orderId, orderItemId);
+                    }
+                    return;
+                }
+
+                if (action === 'view-order-details') {
+                    const orderId = Number.parseInt(target.dataset.orderId || '', 10);
+                    if (Number.isInteger(orderId)) {
+                        openOrderDetailDrawer(orderId);
                     }
                     return;
                 }
@@ -2216,6 +2771,35 @@ ${pages}
                 }
             });
         }
+
+        orderDetailCloseButton?.addEventListener('click', closeOrderDetailDrawer);
+        orderDetailOverlay?.addEventListener('click', closeOrderDetailDrawer);
+        screeningHistoryCloseButton?.addEventListener('click', closeScreeningHistoryModal);
+        screeningHistoryModal?.addEventListener('click', (event) => {
+            if (event.target === screeningHistoryModal) {
+                closeScreeningHistoryModal();
+                return;
+            }
+            const selectButton = event.target.closest('button[data-action="select-screening-history"]');
+            if (!selectButton || !screeningHistoryOrderId) return;
+            const screeningItemId = Number.parseInt(selectButton.dataset.screeningItemId || '', 10);
+            const selected = screeningHistoryItems.find((item) => Number.parseInt(item.screening_item?.id, 10) === screeningItemId);
+            if (!selected) return;
+            const orderId = screeningHistoryOrderId;
+            closeScreeningHistoryModal();
+            openCreateOrderItemEditor(orderId, { screening_item: selected.screening_item });
+        });
+        screeningHistoryForm?.addEventListener('submit', (event) => event.preventDefault());
+        screeningHistorySearch?.addEventListener('input', renderScreeningHistoryRows);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && screeningHistoryModal && !screeningHistoryModal.classList.contains('hidden')) {
+                closeScreeningHistoryModal();
+                return;
+            }
+            if (event.key === 'Escape' && orderDetailDrawer && !orderDetailDrawer.classList.contains('hidden')) {
+                closeOrderDetailDrawer();
+            }
+        });
 
         if (paginationContainer) {
             paginationContainer.addEventListener('click', (event) => {
