@@ -70,5 +70,5 @@
 ## Git 交接
 
 - 分支：`main`；本輪開始 commit 與 `origin/main` 基線：`9565394e156af71e331a707a6813cadf131b8df7`。
-- 本輪功能、API、按需資產、契約測試、DataSync 報告與交接摘要均尚未提交；未取得 commit 或 push 授權。
+- 本輪功能、API、按需資產、契約測試、DataSync 報告與交接摘要已提交並推送；功能提交為 `51be09a1a2f6a0713d82e60929296cc7d9698755`。
 - 工作樹變更均屬本輪，沒有來源不明檔案；未建立 migration；`v3.1.8` release note 與更新包已建立並完成驗證。
