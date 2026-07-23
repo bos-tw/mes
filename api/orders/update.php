@@ -23,7 +23,7 @@
  * | _method                | string | 否   | 'PUT' 或 'PATCH'         | HTTP 方法覆蓋         |
  * | customer_id            | int    | 否   | > 0，客戶必須存在         | 客戶 ID              |
  * | order_date             | string | 否   | YYYY-MM-DD 格式          | 訂單日期              |
- * | expected_delivery_date | string | 否   | YYYY-MM-DD 格式          | 預計交期              |
+ * | expected_delivery_date | string | 否   | YYYY-MM-DD 格式          | 預訂交期              |
  * | customer_po_number     | string | 否   | 最大 100 字             | 客戶訂單號            |
  * | status                 | string | 否   | 最大 50 字              | 訂單狀態              |
  * | total_amount           | float  | 否   | >= 0                     | 訂單總金額            |

@@ -5738,6 +5738,23 @@ td.actions-col {
     display: contents;
 }
 
+.work-order-main-tabs-section {
+    grid-column: 1 / -1;
+    padding: var(--ui-section-padding-y) var(--ui-section-padding-x);
+    border: 1px solid var(--color-border-light);
+    background: var(--color-bg-light);
+}
+
+.work-order-main-tabs {
+    flex-wrap: wrap;
+    margin: 0;
+}
+
+[data-work-order-main-tab-section][hidden],
+[data-work-order-main-tab-container][hidden] {
+    display: none !important;
+}
+
 .work-order-secondary-screening-placeholder {
     grid-column: 1 / -1;
 }
@@ -6052,7 +6069,7 @@ td.actions-col {
     display: grid;
     grid-column: 1 / -1;
     order: 30;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--ui-section-gap);
     margin: 0 0 var(--ui-section-gap);
     width: 100%;
@@ -8057,6 +8074,57 @@ td.actions-col {
 [data-work-orders-edit-modal] .split-machine-service-section .subsection-body,
 [data-work-orders-edit-modal] .split-machine-settings-card .subsection-body {
     padding-top: 0;
+}
+
+[data-work-orders-edit-modal] [data-work-order-main-tab-section~="flow"],
+[data-work-order-production-flow] .work-order-flow-stage,
+[data-work-order-production-flow] .work-order-flow-panel,
+[data-work-order-production-flow] .split-machine-tab,
+[data-work-order-production-flow] .empty-state {
+    border-radius: 0;
+}
+
+[data-work-order-production-flow] .work-order-flow-inline-form {
+    margin-bottom: var(--ui-section-gap);
+    padding-bottom: var(--ui-section-gap);
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+[data-work-order-production-flow] .work-order-flow-panel {
+    margin: 0 0 var(--ui-section-gap);
+    border: 1px solid var(--color-border-light);
+    background: var(--color-bg);
+}
+
+[data-work-order-production-flow] .work-order-flow-panel > summary {
+    padding: var(--ui-section-padding-y) var(--ui-section-padding-x);
+    background: var(--color-bg-disabled);
+    color: var(--color-text-body);
+    cursor: pointer;
+    font-size: var(--font-base);
+    font-weight: 600;
+}
+
+[data-work-order-production-flow] .work-order-flow-panel[open] > summary {
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+[data-work-order-production-flow] .work-order-flow-panel-body {
+    padding: var(--ui-section-padding-y) var(--ui-section-padding-x);
+}
+
+[data-work-order-production-flow] .form-actions {
+    grid-column: 1 / -1;
+    margin-top: 0;
+}
+
+[data-work-order-production-flow] input,
+[data-work-order-production-flow] select,
+[data-work-order-production-flow] textarea,
+[data-work-order-production-flow] .ui-compact-form-row input,
+[data-work-order-production-flow] .ui-compact-form-row select,
+[data-work-order-production-flow] .ui-compact-form-row textarea {
+    border-radius: 0;
 }
 
 .split-work-order-panel {

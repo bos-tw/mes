@@ -104,7 +104,8 @@ $sql = "
         o.order_number,
         o.customer_po_number,
         o.order_date,
-        o.expected_delivery_date,
+        oi.expected_delivery_date,
+        oi.expected_delivery_period,
         c.id AS customer_id,
         c.name AS customer_name,
         si.name AS screening_item_name,
@@ -141,6 +142,7 @@ try {
             'screening_item_number' => $row['screening_item_number'],
             'order_date' => $row['order_date'],
             'expected_delivery_date' => $row['expected_delivery_date'],
+            'expected_delivery_period' => $row['expected_delivery_period'],
             'total_units' => (float)$row['total_units'],
             'total_weight_kg' => (float)$row['total_weight_kg'],
             'display_label' => sprintf(

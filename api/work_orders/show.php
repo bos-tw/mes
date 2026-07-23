@@ -41,6 +41,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/flow_helpers.php';
 require_once __DIR__ . '/../rescreen_batches/helpers.php';
 require_once __DIR__ . '/../work_order_operation_logs_helper.php';
 require_once __DIR__ . '/../shipping_orders/helpers.php';
@@ -71,7 +72,6 @@ try {
             o.order_number,
             o.customer_id AS customer_id,
             o.customer_po_number,
-            o.expected_delivery_date,
             c.name AS customer_name,
             si.name AS screening_item_name,
             si.weight_per_unit_g,
@@ -85,6 +85,8 @@ try {
             oi.total_weight_kg,
             oi.total_units,
             oi.customer_sample_status,
+            oi.expected_delivery_date,
+            oi.expected_delivery_period,
             lv_sample.value_label AS customer_sample_status_label,
             rb.rescreen_batch_number,
             m.machine_number,
@@ -426,6 +428,7 @@ try {
         $secondScreeningBatchIds
     )));
     $workOrder['second_screening_count'] = count($workOrder['second_screening_batches']);
+    $workOrder['production_flow'] = fetchWorkOrderFlow($pdo, $id);
 
     jsonResponse([
         'success' => true,

@@ -364,6 +364,8 @@ try {
         'part_number' => $data['part_number'] ?? $orderItem['part_number'],
         'customer_batch_number' => $data['customer_batch_number'] ?? $orderItem['customer_batch_number'],
         'customer_sample_status' => $data['customer_sample_status'] ?? $orderItem['customer_sample_status'],
+        'expected_delivery_date' => array_key_exists('expected_delivery_date', $data) ? $data['expected_delivery_date'] : ($orderItem['expected_delivery_date'] ?? null),
+        'expected_delivery_period' => array_key_exists('expected_delivery_period', $data) ? $data['expected_delivery_period'] : ($orderItem['expected_delivery_period'] ?? null),
         'delivery_location' => $data['delivery_location'] ?? $orderItem['delivery_location'],
         'notes' => $data['notes'] ?? $orderItem['notes'],
         // 重量追蹤欄位

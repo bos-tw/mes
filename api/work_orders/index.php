@@ -56,6 +56,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/flow_helpers.php';
 
 requireAuth();
 
@@ -368,6 +369,14 @@ function handleCreateWorkOrder(PDO $pdo): void
         $firstPieceDimensions = null;
     }
 
+    if ($firstPieceDimensions !== null || !empty($screeningDefects) || !empty($productionRecords)) {
+        jsonResponse([
+            'success' => false,
+            'message' => '新增工單僅能建立工單與機台規劃；首件、卡號實秤、不良實績與完成結果請在工單建立後，於「生產與篩分」按機台記錄。',
+        ], 422);
+        return;
+    }
+
     // Check if order item exists and keep order metrics as a fallback.
     $orderItemDetails = fetchOrderItemDetailsForWorkOrder($pdo, (int)$data['order_item_id']);
     if (!$orderItemDetails) {
@@ -481,9 +490,16 @@ function handleCreateWorkOrder(PDO $pdo): void
             $machineIdForSequence,
             $requestedMachineSequence
         );
+        $flow = ensureWorkOrderFlowInitialized($pdo, $workOrderId, $workOrderType !== 'split');
 
         // 處理首件尺寸檢驗 (First Piece Dimensions)
         if (!empty($firstPieceDimensions)) {
+            $firstPieceDimensions['stage_id'] = $flow['stage_id'];
+            if ($flow['machine_run_id'] !== null) {
+                $firstPieceDimensions['machine_run_id'] = $flow['machine_run_id'];
+            }
+            $firstPieceDimensions['inspection_round'] = (int)($firstPieceDimensions['inspection_round'] ?? 1);
+            $firstPieceDimensions['inspection_result'] = (string)($firstPieceDimensions['inspection_result'] ?? 'passed');
             $fpColumns = array_keys($firstPieceDimensions);
             $fpColumns[] = 'work_order_id';
             $firstPieceDimensions['work_order_id'] = $workOrderId;
@@ -543,7 +559,13 @@ function handleCreateWorkOrder(PDO $pdo): void
         // 處理一般工單生產紀錄；拆分工單的履歷由各機台頁籤明細寫入。
         $productionRecordCount = 0;
         if ($workOrderType !== 'split' && !empty($productionRecords) && is_array($productionRecords)) {
-            $productionRecordCount = insertWorkOrderProductionRecords($pdo, $workOrderId, $productionRecords);
+            $productionRecordCount = insertWorkOrderProductionRecords(
+                $pdo,
+                $workOrderId,
+                $productionRecords,
+                $flow['machine_run_id'],
+                $machineIdForSequence
+            );
         }
 
         if ($workOrderType === 'split') {

@@ -92,6 +92,7 @@ ModuleConfig.register('order_items', {
         { key: 'order_number', label: '訂單號碼', sortable: true, selectable: true },
         { key: 'customer_name', label: '客戶名稱', sortable: true, selectable: true },
         { key: 'screening_label', label: '受篩品項', sortable: true, selectable: true },
+        { key: 'expected_delivery_date', label: '細項交期', sortable: true, selectable: true },
         { key: 'total_weight_kg', label: '總重量(kg)', sortable: true, selectable: true, className: 'text-right' },
         { key: 'tool_weight_kg', label: '載具重量(kg)', sortable: true, selectable: true, className: 'text-right' },
         { key: 'net_weight_kg', label: '淨重(kg)', sortable: true, selectable: true, className: 'text-right' },

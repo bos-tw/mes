@@ -81,6 +81,7 @@ function handleGetInventoryItems(PDO $pdo): void
     $screeningItemId = $_GET['screening_item_id'] ?? '';
     $status = $_GET['status'] ?? '';
     $qualityStatus = $_GET['quality_status'] ?? '';
+    $stockCategory = $_GET['stock_category'] ?? '';
     $startDate = $_GET['start_date'] ?? '';
     $endDate = $_GET['end_date'] ?? '';
     $page = max(1, (int)($_GET['page'] ?? 1));
@@ -97,6 +98,7 @@ function handleGetInventoryItems(PDO $pdo): void
         'screening_item_id' => $screeningItemId,
         'status' => $status,
         'quality_status' => $qualityStatus,
+        'stock_category' => $stockCategory,
         'start_date' => $startDate,
         'end_date' => $endDate,
     ];
@@ -109,7 +111,7 @@ function handleGetInventoryItems(PDO $pdo): void
     $allowedSortColumns = [
         'id', 'inventory_number', 'customer_name', 'screening_item_name',
         'work_order_number', 'order_item_number', 'customer_batch_number', 'quantity_on_hand',
-        'net_weight_kg', 'status', 'quality_status', 'received_at'
+        'net_weight_kg', 'stock_category', 'status', 'quality_status', 'received_at'
     ];
 
     $sortColumn = in_array($sortBy, $allowedSortColumns) ? $sortBy : 'id';
@@ -124,6 +126,7 @@ function handleGetInventoryItems(PDO $pdo): void
         'customer_batch_number' => 'ii.customer_batch_number',
         'quantity_on_hand' => 'ii.quantity_on_hand',
         'net_weight_kg' => 'ii.net_weight_kg',
+        'stock_category' => 'ii.stock_category',
         'status' => 'ii.status',
         'quality_status' => 'ii.quality_status',
         'received_at' => 'ii.received_at',
@@ -151,6 +154,7 @@ function handleGetInventoryItems(PDO $pdo): void
             ii.id,
             ii.inventory_number,
             ii.receipt_type,
+            ii.stock_category,
             ii.screening_item_id,
             si.name AS screening_item_name,
             ii.work_order_id,
@@ -194,6 +198,9 @@ function handleGetInventoryItems(PDO $pdo): void
             ii.shelf_number,
             ii.received_at,
             ii.created_at
+            ,
+            COALESCE(packages.package_count, 0) AS package_count,
+            COALESCE(packages.package_quantity, 0) AS package_quantity
         FROM inventory_items ii
         LEFT JOIN customers c ON ii.customer_id = c.id
         LEFT JOIN screening_items si ON ii.screening_item_id = si.id
@@ -203,6 +210,14 @@ function handleGetInventoryItems(PDO $pdo): void
         LEFT JOIN work_order_partial_receipts wopr ON wopr.inventory_item_id = ii.id
         LEFT JOIN work_order_machine_runs wopr_run ON wopr_run.id = wopr.machine_run_id
         LEFT JOIN machines wopr_machine ON wopr_machine.id = wopr_run.machine_id
+        LEFT JOIN (
+            SELECT inventory_item_id,
+                   COUNT(*) AS package_count,
+                   COALESCE(SUM(package_quantity), 0) AS package_quantity
+            FROM inventory_packages
+            WHERE package_status <> 'voided'
+            GROUP BY inventory_item_id
+        ) packages ON packages.inventory_item_id = ii.id
         WHERE {$whereClause}
         ORDER BY {$orderByColumn} {$sortOrder}
         LIMIT :limit OFFSET :offset

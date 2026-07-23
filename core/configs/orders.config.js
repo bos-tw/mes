@@ -83,7 +83,7 @@ ModuleConfig.register('orders', {
                     <h4>訂單基本資料</h4>
                     <div class="table-responsive">
                         <table class="data-table compact order-detail-basic-table" data-no-hard-row-number="true" data-no-column-resize="true">
-                            <thead><tr><th>訂單號碼</th><th>客戶名稱</th><th>訂單日期</th><th>預計交期</th></tr></thead>
+                            <thead><tr><th>訂單號碼</th><th>客戶名稱</th><th>訂單日期</th><th>預訂交期</th></tr></thead>
                             <tbody><tr><td data-order-detail-field="order_number">-</td><td data-order-detail-field="customer_name">-</td><td data-order-detail-field="order_date">-</td><td data-order-detail-field="expected_delivery">-</td></tr></tbody>
                         </table>
                     </div>
@@ -126,7 +126,7 @@ ModuleConfig.register('orders', {
         { key: 'order_number', label: '訂單號碼', sortable: true, selectable: true },
         { key: 'customer.name', label: '客戶名稱', sortable: true, selectable: true },
         { key: 'order_date', label: '訂單日期', sortable: true, selectable: true },
-        { key: 'expected_delivery_date', label: '預計交期', sortable: true, selectable: true },
+        { key: 'expected_delivery_date', label: '預訂交期', sortable: true, selectable: true },
         { key: 'customer_po_number', label: '客戶訂單編號', sortable: true, selectable: true },
         { key: 'status_label', label: '狀態', sortable: true, selectable: true },
         { key: 'total_amount', label: '預估總金額', sortable: true, selectable: true },
@@ -162,12 +162,12 @@ ModuleConfig.register('orders', {
                         <span class="weekday-badge" data-weekday-for="order_date"></span>
                     </label>
                     <label class="inline-label">
-                        <span>預計交期</span>
+                        <span>預訂交期</span>
                         <input type="date" name="expected_delivery_date">
                         <span class="weekday-badge" data-weekday-for="expected_delivery_date"></span>
                     </label>
                     <label class="inline-label">
-                        <span>預計交期時段</span>
+                        <span>預訂交期時段</span>
                         <select name="expected_delivery_period">
                             <option value="">-- 請選擇時段 --</option>
                             <option value="morning">上午</option>
@@ -176,6 +176,7 @@ ModuleConfig.register('orders', {
                             <option value="evening">晚間</option>
                         </select>
                     </label>
+                    <small class="field-hint full-width">預訂交期由使用者自行維護；新增訂單細項時會預帶此值，細項後續變更不會回寫訂單主表。</small>
                     <label class="inline-label">
                         <span>客戶訂單號碼</span>
                         <input type="text" name="customer_po_number" maxlength="100" placeholder="請輸入客戶訂單號碼" autocomplete="off">

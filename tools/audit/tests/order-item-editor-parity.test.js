@@ -105,6 +105,12 @@ assert.ok(
 );
 assert.ok(globalScript.includes("'view-order-details': '詳細檢視'"), '共用操作語意必須登錄詳細檢視名稱');
 assert.ok(ordersScript.includes('data-action="select-order-item-inline"'), '訂單細項必須在系統序號右側提供單筆勾選欄');
+assert.ok(ordersScript.includes('data-action="create-work-order" data-order-id="${orderId}" data-order-item-id="${item.id}"'), '訂單細項操作欄必須提供轉為工單按鈕');
+assert.ok(ordersScript.includes('class="btn text" data-action="create-work-order"'), '轉為工單必須沿用客戶批號頁面的標準按鈕 class');
+assert.ok(ordersScript.includes('<i class="fas fa-cogs" aria-hidden="true"></i>'), '轉為工單必須沿用 fa-cogs 圖示');
+assert.ok(ordersScript.includes('function handleCreateWorkOrder(orderItemId)'), '訂單細項必須沿用既有轉為工單流程入口');
+assert.ok(ordersScript.includes('window.openWorkOrderFromOrderItem(orderItemId)'), '訂單細項轉為工單必須呼叫既有客戶批號預填流程');
+assert.ok(ordersScript.includes("此客戶批號已轉成工單，請勿重複建立。"), '已建立工單的客戶批號必須阻擋重複建立');
 assert.ok(ordersScript.includes('function renderOrderStatusBadge'), '訂單狀態必須使用共用 status-badge 渲染器');
 assert.ok(ordersScript.includes("pending: 'pending'"), '待處理訂單必須沿用系統預設 pending badge');
 assert.ok(ordersScript.includes("in_progress: 'in-progress'"), '進行中訂單必須沿用系統預設 in-progress badge');

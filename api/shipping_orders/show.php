@@ -86,6 +86,7 @@ try {
         SELECT
             soi.*,
             ii.inventory_number,
+            COALESCE(soi.stock_category_snapshot, ii.stock_category, 'good') AS stock_category,
             ii.receipt_type,
             ii.customer_batch_number,
             ii.internal_lot_number,
@@ -96,6 +97,14 @@ try {
             ii.weight_per_unit_g,
             ii.tool_statistics,
             ii.total_tool_quantity,
+            (
+                SELECT GROUP_CONCAT(
+                    CONCAT(output_tool.tool_name, ' ', output_tool.quantity, '個')
+                    ORDER BY output_tool.id SEPARATOR '、'
+                )
+                FROM work_order_machine_output_tools output_tool
+                WHERE output_tool.inventory_item_id = ii.id
+            ) AS output_tool_summary,
             ii.quality_status,
             si.name AS screening_item_name,
             si.item_number AS screening_item_number,
@@ -140,6 +149,36 @@ try {
     $itemsStmt->execute(['shipping_order_id' => $id]);
     $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    $shippingOrderItemIds = array_values(array_filter(array_map(
+        static fn(array $item): int => (int)($item['id'] ?? 0),
+        $items
+    )));
+    $packageMap = [];
+    if ($shippingOrderItemIds !== []) {
+        $packagePlaceholders = implode(',', array_fill(0, count($shippingOrderItemIds), '?'));
+        $packageStmt = $pdo->prepare("
+            SELECT
+                link.shipping_order_item_id,
+                link.inventory_package_id,
+                link.shipped_units,
+                link.shipped_package_quantity,
+                package_row.package_number,
+                package_row.package_unit,
+                package_row.content_weight_kg,
+                package_row.package_status
+            FROM shipping_order_item_packages link
+            INNER JOIN inventory_packages package_row
+                ON package_row.id = link.inventory_package_id
+            WHERE link.shipping_order_item_id IN ({$packagePlaceholders})
+            ORDER BY link.shipping_order_item_id ASC, package_row.package_number ASC, package_row.id ASC
+        ");
+        $packageStmt->execute($shippingOrderItemIds);
+        foreach ($packageStmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $package) {
+            $shippingOrderItemId = (int)$package['shipping_order_item_id'];
+            $packageMap[$shippingOrderItemId][] = $package;
+        }
+    }
+
     $inventoryItemIds = array_values(array_unique(array_filter(array_map(
         static fn(array $item): int => (int)($item['inventory_item_id'] ?? 0),
         $items
@@ -152,8 +191,18 @@ try {
     foreach ($items as &$item) {
         $sourceOrderItemId = (int)($item['source_order_item_id'] ?? 0);
         $inventoryItemId = (int)($item['inventory_item_id'] ?? 0);
+        $itemPackages = $packageMap[(int)($item['id'] ?? 0)] ?? [];
         $item['order_item_tools'] = $sourceOrderItemId > 0 ? ($orderItemToolMap[$sourceOrderItemId] ?? []) : [];
         $item['rescreen_sources'] = $inventoryItemId > 0 ? ($rescreenSourceMap[$inventoryItemId] ?? []) : [];
+        $item['packages'] = $itemPackages;
+        $item['package_quantity'] = array_sum(array_map(
+            static fn(array $package): int => (int)($package['shipped_package_quantity'] ?? 0),
+            $itemPackages
+        ));
+        $item['package_content_weight_kg'] = array_sum(array_map(
+            static fn(array $package): float => (float)($package['content_weight_kg'] ?? 0),
+            $itemPackages
+        ));
     }
     unset($item);
 
@@ -195,13 +244,18 @@ try {
     $returnOrders = $returnOrdersStmt->fetchAll(PDO::FETCH_ASSOC);
     $order['return_orders'] = $returnOrders;
     $defectSummary = fetchShippingOrderDefectSummary($pdo, (int)$id);
+    $actualDefectSummary = fetchShippingOrderActualDefectSummary($pdo, (int)$id);
     $toolSummaries = fetchShippingOrderToolSummaries($pdo, (int)$id);
     $summarySuggestions = fetchShippingOrderSummarySuggestions($pdo, (int)$id);
-    $effectiveDefectSummary = $defectSummary ?: ($summarySuggestions['defect_summary'] ?? null);
+    $effectiveDefectSummary = $actualDefectSummary
+        ?: ($defectSummary ?: ($summarySuggestions['defect_summary'] ?? null));
     $effectiveToolSummaries = $toolSummaries !== [] ? $toolSummaries : ($summarySuggestions['tool_summaries'] ?? []);
 
     $order['shipment_purpose'] = $order['shipment_purpose'] ?? 'normal';
     $order['defect_summary'] = $effectiveDefectSummary;
+    $order['defect_summary_source'] = $actualDefectSummary
+        ? 'inventory_items'
+        : ($defectSummary ? 'snapshot' : 'legacy_suggestion');
     $order['tool_summaries'] = $effectiveToolSummaries;
     $order['customer_tool_analysis'] = fetchCustomerToolAnalysis($pdo, (int)($order['customer_id'] ?? 0), (int)$id);
     $order['defect_quantity'] = $effectiveDefectSummary['defect_quantity'] ?? null;

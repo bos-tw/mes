@@ -65,7 +65,8 @@ if ($mode === 'order_items_list') {
                 oi.id,
                 oi.order_id,
                 o.order_number,
-                o.expected_delivery_date,
+                oi.expected_delivery_date,
+                oi.expected_delivery_period,
                 si.item_number AS screening_item_number,
                 si.name AS screening_item_name,
                 oi.total_weight_kg,
@@ -95,7 +96,8 @@ if ($mode === 'order_items_list') {
                 'screening_item_name' => $screeningName,
                 'total_weight_kg' => $item['total_weight_kg'] ? (float)$item['total_weight_kg'] : null,
                 'total_units' => $item['total_units'] ? (int)$item['total_units'] : null,
-                'expected_delivery_date' => $item['expected_delivery_date']
+                'expected_delivery_date' => $item['expected_delivery_date'],
+                'expected_delivery_period' => $item['expected_delivery_period']
             ];
         }, $items);
 

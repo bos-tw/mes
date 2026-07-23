@@ -70,8 +70,8 @@
  * |------------------------|--------|------|--------------------------|----------------------|
  * | customer_id            | int    | 是   | > 0，客戶必須存在         | 客戶 ID              |
  * | order_date             | string | 是   | YYYY-MM-DD 格式          | 訂單日期              |
- * | expected_delivery_date | string | 否   | YYYY-MM-DD 格式          | 預計交期              |
- * | expected_delivery_period | string | 否 | morning/noon/afternoon/evening | 預計交期時段       |
+ * | expected_delivery_date | string | 否   | YYYY-MM-DD 格式          | 預訂交期              |
+ * | expected_delivery_period | string | 否 | morning/noon/afternoon/evening | 預訂交期時段       |
  * | customer_po_number     | string | 否   | 最大 100 字             | 客戶訂單號（客戶PO號） |
  * | status                 | string | 否   | 最大 50 字，預設 pending | 訂單狀態              |
  * | total_amount           | float  | 否   | >= 0，預設 0             | 訂單總金額            |

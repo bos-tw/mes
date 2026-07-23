@@ -104,7 +104,7 @@ try {
     try {
         // 取得所有出貨項目以釋放已分配的數量
         $stmt = $pdo->prepare("
-            SELECT inventory_item_id, shipped_quantity, order_item_id
+            SELECT id, inventory_item_id, shipped_quantity, order_item_id
             FROM shipping_order_items
             WHERE shipping_order_id = ? AND inventory_item_id IS NOT NULL
         ");
@@ -151,6 +151,13 @@ try {
             }
 
             recalculateInventoryStatus($pdo, $invId);
+            $pdo->prepare("
+                UPDATE inventory_packages package_row
+                JOIN shipping_order_item_packages link
+                  ON link.inventory_package_id = package_row.id
+                SET package_row.package_status = 'available'
+                WHERE link.shipping_order_item_id = ?
+            ")->execute([(int)$item['id']]);
         }
 
         // 重新計算相關訂單品項的出貨統計

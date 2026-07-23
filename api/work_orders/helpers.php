@@ -955,6 +955,7 @@ function validateWorkOrderMachineRuns(array $machineRuns, float $expectedNetWeig
         }
 
         $normalisedRuns[] = [
+            'id' => isset($run['id']) && (int)$run['id'] > 0 ? (int)$run['id'] : null,
             'run_label' => trim((string)($run['run_label'] ?? ('機台 ' . $rowNo))),
             'machine_id' => $machineIdInt === false ? null : $machineIdInt,
             'machine_sequence' => $rowNo,
@@ -1069,6 +1070,7 @@ function insertWorkOrderProductionRecords(PDO $pdo, int $workOrderId, array $pro
     $currentUserId = $currentEmployee ? (int)$currentEmployee['id'] : null;
 
     $hasMachineRunIdColumn = workOrderTableHasColumn($pdo, 'production_records', 'machine_run_id');
+    $hasStageIdColumn = workOrderTableHasColumn($pdo, 'production_records', 'stage_id');
     $hasSourceModeColumn = workOrderTableHasColumn($pdo, 'production_records', 'production_source_mode');
     $hasToolNameColumn = workOrderTableHasColumn($pdo, 'production_records', 'tool_name');
     $hasToolWeightColumn = workOrderTableHasColumn($pdo, 'production_records', 'tool_weight_kg');
@@ -1077,6 +1079,10 @@ function insertWorkOrderProductionRecords(PDO $pdo, int $workOrderId, array $pro
     if ($hasMachineRunIdColumn) {
         $columns[] = 'machine_run_id';
         $params[] = ':machine_run_id';
+    }
+    if ($hasStageIdColumn) {
+        $columns[] = 'stage_id';
+        $params[] = ':stage_id';
     }
     if ($hasSourceModeColumn) {
         $columns[] = 'production_source_mode';
@@ -1118,6 +1124,13 @@ function insertWorkOrderProductionRecords(PDO $pdo, int $workOrderId, array $pro
     );
     $prodRecordStmt = $pdo->prepare($prodRecordSql);
     $machineStmt = $pdo->prepare("SELECT name FROM machines WHERE id = :id");
+    $stageId = null;
+    if ($hasStageIdColumn && $machineRunId !== null) {
+        $stageStmt = $pdo->prepare("SELECT stage_id FROM work_order_machine_runs WHERE id = :id LIMIT 1");
+        $stageStmt->execute(['id' => $machineRunId]);
+        $stageId = $stageStmt->fetchColumn();
+        $stageId = $stageId !== false && $stageId !== null ? (int)$stageId : null;
+    }
     $inserted = 0;
 
     foreach ($productionRecords as $record) {
@@ -1148,6 +1161,9 @@ function insertWorkOrderProductionRecords(PDO $pdo, int $workOrderId, array $pro
         ];
         if ($hasMachineRunIdColumn) {
             $insertParams['machine_run_id'] = $machineRunId;
+        }
+        if ($hasStageIdColumn) {
+            $insertParams['stage_id'] = $stageId;
         }
         if (!$hasSourceModeColumn) {
             unset($insertParams['production_source_mode']);
@@ -1182,6 +1198,20 @@ function replaceWorkOrderMachineRuns(PDO $pdo, int $workOrderId, array $machineR
     $currentEmployee = $_SESSION['employee'] ?? null;
     $currentUserId = $currentEmployee ? (int)$currentEmployee['id'] : null;
     $now = date('Y-m-d H:i:s');
+    $stageId = null;
+    if (workOrderTableHasColumn($pdo, 'work_order_machine_runs', 'stage_id')) {
+        $stageStmt = $pdo->prepare("
+            SELECT id
+            FROM work_order_stages
+            WHERE work_order_id = :work_order_id
+              AND stage_sequence = 1
+              AND stage_instance_no = 1
+            LIMIT 1
+        ");
+        $stageStmt->execute(['work_order_id' => $workOrderId]);
+        $stageId = $stageStmt->fetchColumn();
+        $stageId = $stageId !== false ? (int)$stageId : null;
+    }
 
     $runColumns = [
         'work_order_id',
@@ -1197,6 +1227,10 @@ function replaceWorkOrderMachineRuns(PDO $pdo, int $workOrderId, array $machineR
         ':machine_sequence',
         ':assigned_employee_id',
     ];
+    if ($stageId !== null) {
+        array_splice($runColumns, 1, 0, ['stage_id']);
+        array_splice($runParams, 1, 0, [':stage_id']);
+    }
 
     if (workOrderTableHasColumn($pdo, 'work_order_machine_runs', 'calibration_employee_id')) {
         $runColumns[] = 'calibration_employee_id';
@@ -1281,6 +1315,9 @@ function replaceWorkOrderMachineRuns(PDO $pdo, int $workOrderId, array $machineR
             'notes' => $run['notes'] === '' ? null : $run['notes'],
             'created_by_employee_id' => $currentUserId,
         ];
+        if ($stageId !== null) {
+            $runParams['stage_id'] = $stageId;
+        }
         if (in_array('calibration_employee_id', $runColumns, true)) {
             $runParams['calibration_employee_id'] = $run['calibration_employee_id'];
         }
@@ -1885,6 +1922,8 @@ function fetchOrderItemDetailsForWorkOrder(PDO $pdo, int $orderItemId): ?array
             oi.unit_price_per_thousand,
             oi.status AS order_item_status,
             oi.customer_sample_status,
+            oi.expected_delivery_date,
+            oi.expected_delivery_period,
             oi.delivery_location,
             oi.notes AS order_item_notes,
             lv_status.value_label AS order_item_status_label,
@@ -1892,7 +1931,6 @@ function fetchOrderItemDetailsForWorkOrder(PDO $pdo, int $orderItemId): ?array
             o.order_number,
             o.customer_id,
             o.customer_po_number,
-            o.expected_delivery_date,
             c.name AS customer_name,
             si.name AS screening_item_name,
             si.weight_per_unit_g

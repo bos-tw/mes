@@ -62,6 +62,9 @@ $shippingOrderId = $data['shipping_order_id'] ?? null;
 $createNew = $data['create_new'] ?? false;
 $shippedQuantity = $data['shipped_quantity'] ?? ($data['quantity'] ?? null);
 $shippedUnit = $data['shipped_unit'] ?? '支';
+$packageIds = is_array($data['package_ids'] ?? null)
+    ? array_values(array_unique(array_filter(array_map('intval', $data['package_ids']))))
+    : [];
 
 if (!$inventoryItemId) {
     jsonResponse(['success' => false, 'message' => '請提供庫存項目 ID。'], 400);
@@ -95,6 +98,7 @@ try {
     }
 
     $receiptType = strtolower(trim((string)($inventoryItem['receipt_type'] ?? 'standard')));
+    $stockCategory = strtolower(trim((string)($inventoryItem['stock_category'] ?? 'good')));
     if ($inventoryItem['quality_status'] !== 'qualified' && $receiptType !== 'partial') {
         jsonResponse(['success' => false, 'message' => '該庫存項目未通過品質檢驗，無法出貨。'], 400);
     }
@@ -124,8 +128,35 @@ try {
 
     $pdo->beginTransaction();
 
+    // 鎖定庫存後重算可用量，避免多張草稿出貨單同時配貨超額。
+    $lockedInventoryStmt = $pdo->prepare("
+        SELECT *
+        FROM inventory_items
+        WHERE id = ? AND deleted_at IS NULL
+        FOR UPDATE
+    ");
+    $lockedInventoryStmt->execute([(int)$inventoryItemId]);
+    $lockedInventory = $lockedInventoryStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$lockedInventory) {
+        $pdo->rollBack();
+        jsonResponse(['success' => false, 'message' => '庫存項目已不存在，請重新載入。'], 409);
+    }
+    $lockedAvailableQty = (float)$lockedInventory['quantity_on_hand'] - (float)$lockedInventory['quantity_allocated'];
+    if ($lockedAvailableQty <= 0 || (float)$shippedQuantity > $lockedAvailableQty) {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => "庫存已被其他出貨單配用，目前可用數量: {$lockedAvailableQty}",
+        ], 409);
+    }
+    if ((string)$lockedInventory['status'] === 'shipped') {
+        $pdo->rollBack();
+        jsonResponse(['success' => false, 'message' => '該庫存項目已完全出貨。'], 409);
+    }
+
     // 如果需要建立新的出貨單
     if ($createNew || !$shippingOrderId) {
+        $shipmentPurpose = $stockCategory === 'defect' ? 'defect_return' : 'normal';
         // Generate shipping order number
         $prefix = 'SO';
         $date = date('Ymd');
@@ -144,9 +175,11 @@ try {
 
         $createSql = "
             INSERT INTO shipping_orders (
-                shipping_order_number, customer_id, order_id, shipping_date, status, status_lookup_id
+                shipping_order_number, customer_id, order_id, shipping_date,
+                shipment_purpose, status, status_lookup_id
             ) VALUES (
-                :shipping_order_number, :customer_id, :order_id, :shipping_date, :status, :status_lookup_id
+                :shipping_order_number, :customer_id, :order_id, :shipping_date,
+                :shipment_purpose, :status, :status_lookup_id
             )
         ";
         $createStmt = $pdo->prepare($createSql);
@@ -155,13 +188,14 @@ try {
             'customer_id' => $inventoryItem['customer_id'],
             'order_id' => $inventoryItem['order_id'],
             'shipping_date' => date('Y-m-d'),
+            'shipment_purpose' => $shipmentPurpose,
             'status' => 'draft',
             'status_lookup_id' => getShippingOrderStatusLookupId($pdo, 'draft'),
         ]);
         $shippingOrderId = (int)$pdo->lastInsertId();
     } else {
         // 驗證出貨單存在且為草稿狀態
-        $checkSql = "SELECT id, status, customer_id FROM shipping_orders WHERE id = :id AND deleted_at IS NULL";
+        $checkSql = "SELECT id, status, customer_id, shipment_purpose FROM shipping_orders WHERE id = :id AND deleted_at IS NULL";
         $checkStmt = $pdo->prepare($checkSql);
         $checkStmt->execute(['id' => $shippingOrderId]);
         $shippingOrder = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -180,6 +214,62 @@ try {
         if ($shippingOrder['customer_id'] != $inventoryItem['customer_id']) {
             $pdo->rollBack();
             jsonResponse(['success' => false, 'message' => '庫存項目的客戶與出貨單的客戶不一致。'], 400);
+        }
+        $shipmentPurpose = (string)($shippingOrder['shipment_purpose'] ?? 'normal');
+    }
+
+    $allowedCategory = match ($shipmentPurpose) {
+        'normal' => $stockCategory === 'good',
+        'defect_return' => $stockCategory === 'defect',
+        'mixed' => in_array($stockCategory, ['good', 'defect'], true),
+        default => false,
+    };
+    if (!$allowedCategory) {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => match ($shipmentPurpose) {
+                'normal' => '一般出貨只允許加入良品庫存。',
+                'defect_return' => '不良回送只允許加入不良品庫存。',
+                'tool_return' => '載具歸還不可加入產品庫存。',
+                default => '此出貨性質不允許加入該庫存類別。',
+            },
+        ], 409);
+    }
+
+    $selectedPackages = [];
+    if ($stockCategory === 'defect') {
+        if ($packageIds === []) {
+            $pdo->rollBack();
+            jsonResponse(['success' => false, 'message' => '不良品出貨必須選擇實際包／袋。'], 400);
+        }
+        $placeholders = implode(',', array_fill(0, count($packageIds), '?'));
+        $packageStmt = $pdo->prepare("
+            SELECT *
+            FROM inventory_packages
+            WHERE id IN ({$placeholders})
+              AND inventory_item_id = ?
+              AND package_status = 'available'
+            FOR UPDATE
+        ");
+        $packageStmt->execute([...$packageIds, (int)$inventoryItemId]);
+        $selectedPackages = $packageStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (count($selectedPackages) !== count($packageIds)) {
+            $pdo->rollBack();
+            jsonResponse(['success' => false, 'message' => '所選不良品包裝已被使用或不屬於此庫存。'], 409);
+        }
+        $packageUnits = array_sum(array_map(
+            static fn(array $package): float => (float)$package['contained_units'],
+            $selectedPackages
+        ));
+        if (abs($packageUnits - (float)$shippedQuantity) > 0.0001) {
+            $pdo->rollBack();
+            jsonResponse([
+                'success' => false,
+                'message' => '不良品出貨數量必須等於所選包／袋的實際支數，不可拆袋估算。',
+                'package_units' => $packageUnits,
+                'shipped_quantity' => (float)$shippedQuantity,
+            ], 409);
         }
     }
 
@@ -202,9 +292,11 @@ try {
     // 新增出貨品項
     $insertSql = "
         INSERT INTO shipping_order_items (
-            shipping_order_id, order_item_id, inventory_item_id, shipped_quantity, shipped_unit
+            shipping_order_id, order_item_id, inventory_item_id,
+            stock_category_snapshot, shipped_quantity, shipped_unit
         ) VALUES (
-            :shipping_order_id, :order_item_id, :inventory_item_id, :shipped_quantity, :shipped_unit
+            :shipping_order_id, :order_item_id, :inventory_item_id,
+            :stock_category_snapshot, :shipped_quantity, :shipped_unit
         )
     ";
     $insertStmt = $pdo->prepare($insertSql);
@@ -212,10 +304,38 @@ try {
         'shipping_order_id' => $shippingOrderId,
         'order_item_id' => $inventoryItem['order_item_id'],
         'inventory_item_id' => $inventoryItemId,
+        'stock_category_snapshot' => $stockCategory,
         'shipped_quantity' => $shippedQuantity,
         'shipped_unit' => $shippedUnit,
     ]);
     $itemId = (int)$pdo->lastInsertId();
+
+    if ($stockCategory === 'defect') {
+        $packageLinkStmt = $pdo->prepare("
+            INSERT INTO shipping_order_item_packages (
+                shipping_order_item_id, inventory_package_id,
+                shipped_units, shipped_package_quantity
+            ) VALUES (
+                :shipping_order_item_id, :inventory_package_id,
+                :shipped_units, :shipped_package_quantity
+            )
+        ");
+        $reservePackageStmt = $pdo->prepare("
+            UPDATE inventory_packages
+            SET package_status = 'reserved'
+            WHERE id = :id
+              AND package_status = 'available'
+        ");
+        foreach ($selectedPackages as $package) {
+            $packageLinkStmt->execute([
+                'shipping_order_item_id' => $itemId,
+                'inventory_package_id' => (int)$package['id'],
+                'shipped_units' => (float)$package['contained_units'],
+                'shipped_package_quantity' => (int)$package['package_quantity'],
+            ]);
+            $reservePackageStmt->execute(['id' => (int)$package['id']]);
+        }
+    }
 
     // 更新庫存項目的配貨數量
     $updateInvSql = "
@@ -232,6 +352,11 @@ try {
     // 重新計算庫存狀態
     require_once __DIR__ . '/helpers.php';
     recalculateInventoryStatus($pdo, (int)$inventoryItemId);
+    saveShippingOrderDefectSummary(
+        $pdo,
+        (int)$shippingOrderId,
+        fetchShippingOrderActualDefectSummary($pdo, (int)$shippingOrderId)
+    );
 
     // 注意：order_items.total_shipped_quantity 不在此更新
     // 只有在出貨單確認（status → shipped）時才更新

@@ -41,9 +41,11 @@
 
     const extraScripts = {
         orders: ['js/orders/order-item-selection.js'],
-        work_orders: ['js/work-orders/api.js']
+        work_orders: ['js/work-orders/api.js'],
+        inventory_items: ['js/inventory-items/shipping-packages.js']
     };
     const afterScripts = {
+        work_orders: ['js/work-orders/production-flow.js'],
         rescreen_batches: ['js/rescreen_batches_execution.js']
     };
     const thirdParty = {

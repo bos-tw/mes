@@ -282,6 +282,14 @@ const DataSync = (function() {
         'order_items': ['orders', 'work_orders', 'inventory_items', 'shipping_order_items', 'return_order_items', 'defect_history_records'],
         // 工單變更
         'work_orders': ['order_items', 'orders', 'work_order_images', 'work_order_first_piece_dimensions', 'inventory_items', 'inventory_transactions', 'dashboard', 'production_records', 'production_work_order_schedule', 'defect_history_records', 'rescreen_batches'],
+        // 工單製程子資源變更（階段、機台、結果、圖片與轉流都必須回刷工單及其下游）
+        'work_order_stages': ['work_orders', 'production_work_order_schedule'],
+        'work_order_machine_runs': ['work_orders', 'production_work_order_schedule'],
+        'work_order_machine_results': ['work_orders', 'inventory_items', 'inventory_transactions', 'defect_history_records'],
+        'work_order_stage_transfers': ['work_orders', 'inventory_items', 'inventory_transactions', 'shipping_orders', 'shipping_order_items'],
+        'work_order_machine_result_images': ['work_orders'],
+        'inventory_packages': ['inventory_items', 'shipping_orders', 'shipping_order_items'],
+        'shipping_order_item_packages': ['shipping_orders', 'shipping_order_items', 'inventory_items'],
         // 出貨單變更
         'shipping_orders': ['shipping_order_items', 'inventory_items', 'order_items', 'inventory_transactions', 'return_orders', 'return_order_items', 'dashboard', 'shipping_quality_inspections', 'defect_history_records'],
         // 出貨單項目變更（會影響出貨單狀態、客戶批號出貨狀態與庫存紀錄）

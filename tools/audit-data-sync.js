@@ -497,6 +497,14 @@ function checkSplitWorkOrderDataSync(dependencies) {
     requireDependency(dependencies, 'inventory_items', 'shipping_order_items', issues);
     requireDependency(dependencies, 'inventory_items', 'work_orders', issues);
     requireDependency(dependencies, 'shipping_orders', 'inventory_items', issues);
+    requireDependency(dependencies, 'work_order_stages', 'work_orders', issues);
+    requireDependency(dependencies, 'work_order_machine_runs', 'production_work_order_schedule', issues);
+    requireDependency(dependencies, 'work_order_machine_results', 'inventory_items', issues);
+    requireDependency(dependencies, 'work_order_stage_transfers', 'inventory_transactions', issues);
+    requireDependency(dependencies, 'work_order_stage_transfers', 'shipping_orders', issues);
+    requireDependency(dependencies, 'work_order_machine_result_images', 'work_orders', issues);
+    requireDependency(dependencies, 'inventory_packages', 'shipping_orders', issues);
+    requireDependency(dependencies, 'shipping_order_item_packages', 'inventory_items', issues);
 
     requireFilePattern(
         path.join(JS_DIR, 'work_orders.js'),
@@ -520,6 +528,24 @@ function checkSplitWorkOrderDataSync(dependencies) {
         path.join(JS_DIR, 'production_work_order_schedule.js'),
         /schedule_nodes\.php[\s\S]*node_key/,
         'production schedule must persist split machine-run nodes',
+        issues
+    );
+    requireFilePattern(
+        path.join(JS_DIR, 'work-orders', 'production-flow.js'),
+        /eventSourceForPath[\s\S]*work_order_machine_results[\s\S]*work_order_stage_transfers[\s\S]*notifyWithDependencies/,
+        'production flow mutations must publish typed DataSync events',
+        issues
+    );
+    requireFilePattern(
+        path.join(JS_DIR, 'shipping_orders.js'),
+        /package_ids/,
+        'shipping orders must submit defect-package linkage',
+        issues
+    );
+    requireFilePattern(
+        path.join(JS_DIR, 'shipping_orders.js'),
+        /inventory_items\/packages\.php/,
+        'shipping orders must load available defect packages',
         issues
     );
 

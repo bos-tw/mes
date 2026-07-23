@@ -78,12 +78,21 @@ try {
     $transStmt->execute(['inventory_item_id' => $id]);
     $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
     $sourceChain = getInventoryItemSourceChain($pdo, $id);
+    $packageStmt = $pdo->prepare("
+        SELECT *
+        FROM inventory_packages
+        WHERE inventory_item_id = :inventory_item_id
+        ORDER BY id
+    ");
+    $packageStmt->execute(['inventory_item_id' => $id]);
+    $packages = $packageStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     jsonResponse([
         'success' => true,
         'item' => $item,
         'transactions' => $transactions,
         'source_chain' => $sourceChain,
+        'packages' => $packages,
     ]);
 
 } catch (Throwable $e) {

@@ -223,16 +223,10 @@
                 <div class="work-orders-modal-main">
                 <div class="work-orders-modal-body">
 
-                    <div class="source-selection-section work-order-type-top-section">
-                        <div class="tabs" data-work-order-type-switch role="tablist" aria-label="工單類型">
-                            <input type="hidden" name="work_order_type" value="normal">
-                            <button type="button" class="tab-btn active" data-action="set-work-order-type" data-value="normal" aria-pressed="true">一般工單</button>
-                            <button type="button" class="tab-btn" data-action="set-work-order-type" data-value="split" aria-pressed="false">拆分工單</button>
-                        </div>
-                    </div>
+                    <input type="hidden" name="work_order_type" value="normal">
 
                     <div class="work-order-source-mode-hint hidden" data-work-order-source-mode-hint>
-                        此工單由訂單品項直接帶入，無需再選客戶或訂單；請先選擇工單類型後繼續填寫。
+                        此工單由訂單品項直接帶入，無需再選客戶或訂單；建立後可在同一生產與篩分流程加開平行機台。
                     </div>
 
                     <!-- 來源選擇區塊 -->
@@ -300,10 +294,18 @@
                         </div>
                     </div>
 
+                    <section class="form-section work-order-main-tabs-section">
+                        <div class="work-order-production-mode-tabs work-order-screening-stage-tabs work-order-main-tabs" role="tablist" aria-label="新增生產工單項目">
+                            <button type="button" class="btn outline small tab-btn active" data-action="switch-work-order-main-tab" data-work-order-main-tab="settings" role="tab" aria-selected="true" tabindex="0">工單設定</button>
+                            <button type="button" class="btn outline small tab-btn" data-action="switch-work-order-main-tab" data-work-order-main-tab="flow" role="tab" aria-selected="false" tabindex="-1">生產與篩分</button>
+                            <button type="button" class="btn outline small tab-btn" data-action="switch-work-order-main-tab" data-work-order-main-tab="notes" role="tab" aria-selected="false" tabindex="-1">交辦與備註</button>
+                        </div>
+                    </section>
+
                     <hr class="divider">
 
                     <!-- 基本資訊 -->
-                    <section class="form-section">
+                    <section class="form-section" data-work-order-main-tab-section="settings">
                         <h4>工單資訊</h4>
                         <div class="form-grid form-grid-three-columns">
                             <label class="inline-label">
@@ -320,7 +322,7 @@
                     </section>
 
                     <!-- 訂單資訊 (唯讀，由上方選擇帶入) -->
-                    <section class="form-section info-section work-order-collapsible-section" data-collapsible-section>
+                    <section class="form-section info-section work-order-collapsible-section" data-collapsible-section data-work-order-main-tab-section="settings">
                         <details open>
                             <summary>訂單詳細資訊 <span class="text-muted small">(自動帶入)</span></summary>
                         <div class="form-grid form-grid-four-columns">
@@ -361,8 +363,12 @@
                                 <input type="text" name="customer_sample_status" readonly class="readonly-field">
                             </label>
                             <label class="inline-label">
-                                <span>預計交期</span>
+                                <span>細項預計交期</span>
                                 <input type="date" name="expected_delivery_date" readonly class="readonly-field">
+                            </label>
+                            <label class="inline-label">
+                                <span>細項交期時段</span>
+                                <input type="text" name="expected_delivery_period" readonly class="readonly-field">
                             </label>
                             <label class="inline-label">
                                 <span>訂單總支數</span>
@@ -384,7 +390,7 @@
                         </details>
                     </section>
 
-                    <section class="form-section work-order-screening-tabs-section">
+                    <section class="form-section work-order-screening-tabs-section hidden" aria-hidden="true">
                         <div class="work-order-production-mode-tabs work-order-screening-stage-tabs" role="tablist" aria-label="篩分階段">
                             <button type="button" class="btn outline small tab-btn active" data-action="switch-screening-stage" data-screening-stage="primary" aria-pressed="true">一次篩分</button>
                             <button type="button" class="btn outline small tab-btn" data-action="switch-screening-stage" data-screening-stage="secondary" aria-pressed="false">二次篩分</button>
@@ -392,10 +398,10 @@
                     </section>
 
                     <div class="work-order-screening-stage-panel active" data-screening-stage-panel="primary">
-                    <div class="work-orders-section-layout">
+                    <div class="work-orders-section-layout" data-work-order-main-tab-container>
                         <div class="work-orders-section-left">
                             <!-- 工單生產資訊 -->
-                            <section class="form-section work-order-collapsible-section work-order-production-section" data-collapsible-section>
+                            <section class="form-section work-order-collapsible-section work-order-production-section" data-collapsible-section data-work-order-main-tab-section="settings">
                                 <details open>
                                     <summary>工單生產資訊</summary>
                                 <div class="form-grid form-grid-four-columns work-orders-force-vertical">
@@ -419,7 +425,7 @@
                                 </details>
                             </section>
 
-                            <section class="form-section work-order-edit-schedule-section" data-split-mode-hidden data-collapsible-section>
+                            <section class="form-section work-order-edit-schedule-section" data-split-mode-hidden data-collapsible-section data-work-order-main-tab-section="flow" hidden>
                                 <header class="subsection-header">
                                     <div class="subsection-actions">
                                         <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-schedule-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
@@ -432,8 +438,8 @@
                                         <label class="inline-label"><span>預定結束日期</span><input type="datetime-local" name="scheduled_end_date"><span class="weekday-badge" data-weekday-for="create_scheduled_end_date"></span></label>
                                         <label class="inline-label"><span>指派員工</span><select name="assigned_employee_id" data-field="assigned-employee"><option value="">-- 請選擇 --</option></select></label>
                                         <label class="inline-label" data-primary-machine-field><span>指定機台</span><div class="machine-picker-combobox"><select name="machine_id" data-field="machine" class="machine-picker-native"><option value="">-- 請選擇 --</option></select><button type="button" class="machine-picker-trigger" data-action="open-machine-picker"><span data-machine-picker-label>-- 請選擇 --</span><i class="fas fa-th-large" aria-hidden="true"></i></button></div></label>
-                                        <label class="inline-label"><span>實際開始日期</span><input type="datetime-local" name="actual_start_date"><span class="weekday-badge" data-weekday-for="create_actual_start_date"></span></label>
-                                        <label class="inline-label"><span>實際結束日期</span><input type="datetime-local" name="actual_end_date"><span class="weekday-badge" data-weekday-for="create_actual_end_date"></span></label>
+                                        <label class="inline-label hidden" aria-hidden="true"><span>實際開始日期</span><input type="datetime-local" name="actual_start_date" disabled><span class="weekday-badge" data-weekday-for="create_actual_start_date"></span></label>
+                                        <label class="inline-label hidden" aria-hidden="true"><span>實際結束日期</span><input type="datetime-local" name="actual_end_date" disabled><span class="weekday-badge" data-weekday-for="create_actual_end_date"></span></label>
                                         <label class="inline-label"><span>校機人員</span><select name="calibration_employee_id" data-field="calibration-employee"><option value="">-- 請選擇 --</option></select></label>
                                         <label class="inline-label"><span>生產數量</span><input type="number" name="quantity_to_produce" min="0" step="0.01" placeholder="請輸入生產數量"></label>
                                         <label class="inline-label"><span>篩選速度</span><input type="text" name="screening_speed" maxlength="50" placeholder="例如: 300支/分"></label>
@@ -442,7 +448,7 @@
                             </section>
                         </div>
 
-                        <section class="form-section split-work-order-panel hidden" data-split-work-order-panel>
+                        <section class="form-section split-work-order-panel hidden" data-split-work-order-panel data-work-order-main-tab-section="flow" hidden>
                             <header class="split-work-order-header">
                                 <div>
                                     <h4>拆分機台</h4>
@@ -459,8 +465,9 @@
                         </section>
 
                         <!-- 篩分服務明細 -->
-                        <section class="form-section info-section work-orders-section-right" data-split-mode-hidden>
-                            <h4>篩分服務明細 (自動帶入)</h4>
+                        <section class="form-section info-section work-orders-section-right" data-split-mode-hidden data-work-order-main-tab-section="flow" hidden>
+                            <h4>篩分服務需求 (自動帶入)</h4>
+                            <p class="text-muted small">此處只確認工單建立時的服務與公差快照；實際不良支數、首件、卡號與秤重請於工單建立後按機台記錄。</p>
                             <div class="table-responsive">
                                 <table class="data-table compact" data-screening-services-table>
                                     <thead>
@@ -469,8 +476,8 @@
                                             <th class="col-80">公差(+)</th>
                                             <th class="col-80">公差(-)</th>
                                             <th class="col-50">PPM</th>
-                                            <th class="col-80">不良品數量</th>
-                                            <th class="col-120">備註</th>
+                                        <th class="col-80">實績</th>
+                                        <th class="col-120">說明</th>
                                         </tr>
                                     </thead>
                                     <tbody data-screening-services-body>
@@ -484,7 +491,7 @@
                     </div>
 
                     <!-- 首件尺寸檢驗與工單圖片 (並排兩欄) -->
-                    <div class="form-row">
+                    <div class="form-row single-column hidden" aria-hidden="true">
                         <!-- 首件尺寸檢驗 -->
                         <section class="subsection">
                             <header class="subsection-header">
@@ -560,7 +567,7 @@
                         </section>
                     </div>
 
-                    <div class="work-order-image-sections-grid">
+                    <div class="work-order-image-sections-grid hidden" aria-hidden="true">
                         <section class="form-section work-order-edit-pre-production-images" data-collapsible-section>
                             <header class="subsection-header">
                                 <div class="subsection-actions">
@@ -609,7 +616,7 @@
                     </div>
 
                     <!-- 交辦事項與備註 -->
-                    <section class="form-section">
+                    <section class="form-section" data-work-order-main-tab-section="notes" hidden>
                         <h4>交辦事項與備註</h4>
                         <div class="form-grid form-grid-two-columns">
                             <label class="inline-label">
@@ -623,7 +630,7 @@
                         </div>
                     </section>
 
-                    <section class="subsection work-order-edit-production-records" data-split-mode-hidden data-collapsible-section>
+                    <section class="subsection work-order-edit-production-records hidden" data-split-mode-hidden data-collapsible-section aria-hidden="true">
                         <header class="subsection-header">
                             <div class="subsection-actions">
                                 <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-production-records-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
@@ -740,7 +747,7 @@
         </div>
     </div>
 
-    <!-- 編輯工單 Modal (不含頁籤,直接編輯) -->
+    <!-- 編輯工單 Modal（依作業階段分組） -->
     <div class="modal-overlay hidden" data-work-orders-edit-modal>
         <div class="modal-window xlarge work-orders-modal">
             <button type="button" class="modal-close" data-action="close-edit-modal" aria-label="關閉">
@@ -758,13 +765,7 @@
             <form data-work-orders-edit-form novalidate>
                 <div class="work-orders-modal-main">
                 <div class="work-orders-modal-body">
-                    <div class="source-selection-section work-order-type-top-section">
-                        <div class="tabs" data-work-order-type-switch role="tablist" aria-label="工單類型">
-                            <input type="hidden" name="work_order_type" value="normal">
-                            <button type="button" class="tab-btn active" data-action="set-work-order-type" data-value="normal" aria-pressed="true">一般工單</button>
-                            <button type="button" class="tab-btn" data-action="set-work-order-type" data-value="split" aria-pressed="false">拆分工單</button>
-                        </div>
-                    </div>
+                    <input type="hidden" name="work_order_type" value="normal">
 
                     <section class="form-section work-order-edit-summary-section">
                         <div class="work-order-edit-summary-grid">
@@ -787,7 +788,41 @@
                         </div>
                     </section>
 
-                    <section class="form-section info-section work-order-collapsible-section work-order-edit-detail-section" data-collapsible-section>
+                    <section class="form-section work-order-main-tabs-section">
+                        <div class="work-order-production-mode-tabs work-order-screening-stage-tabs work-order-main-tabs" role="tablist" aria-label="編輯生產工單項目">
+                            <button type="button" class="btn outline small tab-btn active" data-action="switch-work-order-main-tab" data-work-order-main-tab="settings" role="tab" aria-selected="true" tabindex="0">工單設定</button>
+                            <button type="button" class="btn outline small tab-btn" data-action="switch-work-order-main-tab" data-work-order-main-tab="flow" role="tab" aria-selected="false" tabindex="-1">生產與篩分</button>
+                            <button type="button" class="btn outline small tab-btn hidden" data-action="switch-work-order-main-tab" data-work-order-main-tab="secondary" data-work-order-secondary-tab role="tab" aria-selected="false" aria-hidden="true" tabindex="-1">二次篩分</button>
+                            <button type="button" class="btn outline small tab-btn" data-action="switch-work-order-main-tab" data-work-order-main-tab="inventory" role="tab" aria-selected="false" tabindex="-1">庫存與結案</button>
+                            <button type="button" class="btn outline small tab-btn" data-action="switch-work-order-main-tab" data-work-order-main-tab="notes" role="tab" aria-selected="false" tabindex="-1">交辦與備註</button>
+                        </div>
+                    </section>
+
+                    <section class="form-section" data-work-order-main-tab-section="flow secondary" hidden>
+                        <header class="subsection-header">
+                            <div>
+                                <h4>生產與篩分</h4>
+                                <p class="text-muted small">每台機台分別記錄卡號、載具、首件、100／99雙數量、圖片、包裝及輸出處置；二次篩分只在轉流後出現。</p>
+                            </div>
+                        </header>
+                        <div data-work-order-production-flow>
+                            <p class="text-muted">開啟工單後載入製程資料。</p>
+                        </div>
+                    </section>
+
+                    <section class="form-section" data-work-order-main-tab-section="inventory" hidden>
+                        <header class="subsection-header">
+                            <div>
+                                <h4>庫存與結案</h4>
+                                <p class="text-muted small">彙整各機台良品、不良品、二次篩分與終點入庫狀態；所有輸出完成處置後由系統自動結案。</p>
+                            </div>
+                        </header>
+                        <div data-work-order-flow-inventory>
+                            <p class="text-muted">開啟工單後載入庫存與結案資料。</p>
+                        </div>
+                    </section>
+
+                    <section class="form-section info-section work-order-collapsible-section work-order-edit-detail-section" data-work-order-main-tab-section="settings" data-collapsible-section>
                         <header class="subsection-header">
                             <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-detail-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
                             <h4>訂單詳細資訊 <span class="text-muted small">(唯讀)</span></h4>
@@ -800,7 +835,8 @@
                                 <label class="inline-label"><span>客戶批號</span><input type="text" name="customer_batch_number" readonly class="readonly-field"></label>
                                 <label class="inline-label"><span>細項編號</span><input type="text" name="sub_item_number" readonly class="readonly-field"></label>
                                 <label class="inline-label"><span>受篩產品</span><input type="text" name="screening_item_name" readonly class="readonly-field"></label>
-                                <label class="inline-label"><span>預計交期</span><input type="date" name="expected_delivery_date" readonly class="readonly-field"></label>
+                                <label class="inline-label"><span>細項預計交期</span><input type="date" name="expected_delivery_date" readonly class="readonly-field"></label>
+                                <label class="inline-label"><span>細項交期時段</span><input type="text" name="expected_delivery_period" readonly class="readonly-field"></label>
                                 <label class="inline-label"><span>客戶樣品狀態</span><input type="text" name="customer_sample_status" readonly class="readonly-field"></label>
                                 <label class="inline-label"><span>工單狀態</span><select name="status_lookup_id" data-field="status"><option value="">-- 請選擇 --</option></select></label>
                                 <label class="inline-label work-order-detail-field-part-number"><span>料號</span><input type="text" name="part_number" readonly class="readonly-field"></label>
@@ -809,8 +845,20 @@
                         </div>
                     </section>
 
-                    <div class="work-order-edit-order-support-row">
-                        <section class="form-section ui-compact-section work-order-collapsible-section work-order-edit-drawing-card" data-collapsible-section>
+                    <section class="form-section info-section work-order-edit-source-metrics-section" data-work-order-main-tab-section="settings">
+                        <header class="subsection-header">
+                            <h4>工單數量來源 <span class="text-muted small">(依客戶批號)</span></h4>
+                        </header>
+                        <div class="form-grid form-grid-four-columns">
+                            <label class="inline-label"><span>總重量 (kg)</span><input type="number" name="total_weight_kg" readonly class="readonly-field"></label>
+                            <label class="inline-label"><span>單支重量 (g)</span><input type="number" name="weight_per_unit_g" readonly class="readonly-field"></label>
+                            <label class="inline-label"><span>總支數</span><input type="number" name="total_units" readonly class="readonly-field"></label>
+                            <label class="inline-label"><span>載具統計</span><input type="text" name="tool_statistics" readonly class="readonly-field"></label>
+                        </div>
+                    </section>
+
+                    <div class="work-order-edit-order-support-row" data-work-order-main-tab-container hidden>
+                        <section class="form-section ui-compact-section work-order-collapsible-section work-order-edit-drawing-card" data-work-order-main-tab-section="settings" data-collapsible-section>
                             <header class="subsection-header">
                                 <div class="subsection-actions">
                                     <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-order-drawings-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
@@ -841,7 +889,7 @@
                             </div>
                         </section>
 
-                        <section class="form-section ui-compact-section work-order-collapsible-section work-order-edit-drawing-card" data-collapsible-section>
+                        <section class="form-section ui-compact-section work-order-collapsible-section work-order-edit-drawing-card" data-work-order-main-tab-section="inventory" data-collapsible-section hidden>
                             <header class="subsection-header">
                                 <div class="subsection-actions">
                                     <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-customer-tool-analysis-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
@@ -854,15 +902,15 @@
                         </section>
                     </div>
 
-                    <section class="form-section work-order-screening-tabs-section">
-                        <div class="work-order-production-mode-tabs work-order-screening-stage-tabs" role="tablist" aria-label="篩分階段">
-                            <button type="button" class="btn outline small tab-btn active" data-action="switch-screening-stage" data-screening-stage="primary" aria-pressed="true">一次篩分</button>
+                    <section class="form-section work-order-screening-tabs-section hidden" aria-hidden="true">
+                        <div class="work-order-production-mode-tabs work-order-screening-stage-tabs" role="tablist" aria-label="圖片與二次篩分追蹤">
+                            <button type="button" class="btn outline small tab-btn active" data-action="switch-screening-stage" data-screening-stage="primary" aria-pressed="true">圖片附件</button>
                             <button type="button" class="btn outline small tab-btn" data-action="switch-screening-stage" data-screening-stage="secondary" aria-pressed="false">二次篩分</button>
                         </div>
                     </section>
 
                     <div class="work-order-screening-stage-panel active" data-screening-stage-panel="primary">
-                    <section class="form-section work-order-edit-schedule-section" data-split-mode-hidden data-collapsible-section>
+                    <section class="form-section work-order-edit-schedule-section hidden" data-legacy-work-order-execution aria-hidden="true" data-split-mode-hidden data-collapsible-section hidden>
                         <header class="subsection-header">
                             <div class="subsection-actions">
                                 <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-schedule-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
@@ -884,7 +932,7 @@
                         </div>
                     </section>
 
-                    <section class="form-section split-work-order-panel hidden" data-split-work-order-panel>
+                    <section class="form-section split-work-order-panel hidden" data-legacy-work-order-execution aria-hidden="true" data-split-work-order-panel hidden>
                         <header class="split-work-order-header">
                             <div><h4>拆分機台</h4><p class="text-muted small">各機台明細分別輸入，右側統計仍彙總整張工單。</p></div>
                             <button type="button" class="btn outline small" data-action="add-machine-run"><i class="fas fa-plus"></i> 選擇機台新增</button>
@@ -895,7 +943,7 @@
                         </div>
                     </section>
 
-                    <section class="form-section ui-compact-section work-order-partial-history-section" data-collapsible-section>
+                    <section class="form-section ui-compact-section work-order-partial-history-section" data-work-order-main-tab-section="inventory" data-collapsible-section hidden>
                         <header class="subsection-header">
                             <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-partial-history-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
                             <h4>部分入庫歷程 / 結清追蹤</h4>
@@ -926,7 +974,7 @@
                         </div>
                     </section>
 
-                    <section class="form-section work-order-edit-inspection-section" data-split-mode-hidden data-collapsible-section>
+                    <section class="form-section work-order-edit-inspection-section hidden" data-legacy-work-order-execution aria-hidden="true" data-split-mode-hidden data-collapsible-section hidden>
                         <header class="subsection-header">
                             <div class="subsection-actions">
                                 <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-inspection-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
@@ -986,7 +1034,7 @@
                         </div>
                     </section>
 
-                    <div class="work-order-image-sections-grid">
+                    <div class="work-order-image-sections-grid" data-work-order-main-tab-section="inventory" hidden>
                         <section class="form-section work-order-edit-pre-production-images" data-collapsible-section>
                             <header class="subsection-header">
                                 <div class="subsection-actions">
@@ -1104,7 +1152,7 @@
                         </section>
                     </div>
 
-                    <section class="subsection work-order-edit-production-records" data-split-mode-hidden data-collapsible-section>
+                    <section class="subsection work-order-edit-production-records hidden" data-legacy-work-order-execution aria-hidden="true" data-split-mode-hidden data-collapsible-section hidden>
                         <header class="subsection-header">
                             <div class="subsection-actions">
                                 <button type="button" class="btn ghost small section-toggle-box" data-action="toggle-production-records-section" title="展開/收合"><i class="fas fa-chevron-down"></i></button>
@@ -1187,9 +1235,19 @@
                         </div>
                     </section>
 
+                    <section class="form-section info-section work-order-edit-notes-section" data-work-order-main-tab-section="notes" hidden>
+                        <header class="subsection-header">
+                            <h4>交辦與備註</h4>
+                        </header>
+                        <div class="form-grid">
+                            <label><span>客戶交辦事項</span><textarea name="customer_instructions" rows="4" maxlength="2000" placeholder="輸入客戶指定的生產、包裝或交付事項"></textarea></label>
+                            <label><span>其他備註</span><textarea name="other_notes" rows="4" maxlength="2000" placeholder="輸入工單內部備註"></textarea></label>
+                        </div>
+                    </section>
+
                     </div>
 
-                    <div class="work-order-screening-stage-panel" data-screening-stage-panel="secondary">
+                    <div class="work-order-screening-stage-panel hidden" data-legacy-work-order-execution aria-hidden="true" data-screening-stage-panel="secondary" hidden>
                         <section class="form-section info-section work-order-second-screening-section" data-work-order-second-screening-section>
                             <header class="subsection-header">
                                 <h4>二次篩分追蹤</h4>

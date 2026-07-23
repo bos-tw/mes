@@ -42,6 +42,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/flow_helpers.php';
 require_once __DIR__ . '/../rescreen_batches/helpers.php';
 require_once __DIR__ . '/../work_order_operation_logs_helper.php';
 
@@ -80,10 +81,12 @@ if (array_key_exists('delete_inventory_on_reopen', $payload)) {
     unset($payload['delete_inventory_on_reopen']);
 }
 
+$screeningDefectsProvided = array_key_exists('screening_defects', $payload);
 // 提取 screening_defects (如果存在)
 $screeningDefects = $payload['screening_defects'] ?? [];
 unset($payload['screening_defects']); // 從主 payload 中移除
 
+$productionRecordsProvided = array_key_exists('production_records', $payload);
 // 提取 production_records (如果存在)
 $productionRecords = $payload['production_records'] ?? [];
 unset($payload['production_records']); // 從主 payload 中移除
@@ -139,7 +142,11 @@ try {
         $firstPieceDimensions = null;
     }
 
-    if (empty($data) && empty($screeningDefects) && empty($firstPieceDimensions) && empty($productionRecords) && !$machineRunsProvided) {
+    if (empty($data)
+        && !$screeningDefectsProvided
+        && empty($firstPieceDimensions)
+        && !$productionRecordsProvided
+        && !$machineRunsProvided) {
         jsonResponse(['success' => false, 'message' => '沒有可更新的資料。'], 400);
     }
 
@@ -152,6 +159,22 @@ try {
     if (!$existingWorkOrder) {
         $pdo->rollBack();
         jsonResponse(['success' => false, 'message' => '找不到該工單。'], 404);
+    }
+    $flowStageStmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM work_order_stages
+        WHERE work_order_id = :work_order_id
+    ");
+    $flowStageStmt->execute(['work_order_id' => $id]);
+    $hasProductionFlow = (int)$flowStageStmt->fetchColumn() > 0;
+    if ($hasProductionFlow
+        && ($screeningDefectsProvided || $productionRecordsProvided || $firstPieceDimensions !== null)) {
+        $pdo->rollBack();
+        jsonResponse([
+            'success' => false,
+            'message' => '此工單已使用正式製程；不良明細、卡號重量與首件尺寸必須在「製程執行」依機台新增，不可由舊工單欄位刪除重建或覆寫。',
+        ], 409);
+        return;
     }
 
     $oldStatusLookupId = (int)$existingWorkOrder['status_lookup_id'];
@@ -177,6 +200,17 @@ try {
     $oldIsCompleted = $oldStatusKey === 'completed';
     $newIsCompleted = $newStatusKey === 'completed';
     $hasCompletedAt = !empty($existingWorkOrder['completed_at']);
+
+    if ($newIsCompleted && !$oldIsCompleted) {
+        if ($hasProductionFlow) {
+            $pdo->rollBack();
+            jsonResponse([
+                'success' => false,
+                'message' => '新製程工單不可由狀態欄直接完成。請到「製程執行」依序確認各機台結果，並處理良品與不良品的入庫或二次篩分；所有輸出閉環後系統會自動完成工單。',
+            ], 409);
+            return;
+        }
+    }
 
     if ($newIsCompleted && !$hasCompletedAt) {
         $data['completed_at'] = date('Y-m-d H:i:s');
@@ -291,7 +325,7 @@ try {
     }
 
     // 處理篩分服務缺陷數量更新
-    if (is_array($screeningDefects)) {
+    if ($screeningDefectsProvided && is_array($screeningDefects)) {
         // 先刪除現有的缺陷記錄
         $deleteStmt = $pdo->prepare("DELETE FROM work_order_screening_defects WHERE work_order_id = :work_order_id");
         $deleteStmt->execute(['work_order_id' => $id]);
@@ -338,7 +372,7 @@ try {
 
     // 處理一般工單生產紀錄；拆分工單的履歷由各機台頁籤明細寫入。
     $productionRecordCount = 0;
-    if (is_array($productionRecords)) {
+    if ($productionRecordsProvided && is_array($productionRecords)) {
         // 先刪除現有的生產紀錄
         $deletePrStmt = $pdo->prepare("DELETE FROM production_records WHERE work_order_id = :work_order_id");
         $deletePrStmt->execute(['work_order_id' => $id]);
@@ -349,23 +383,8 @@ try {
         }
     }
 
-    if ($machineRunsProvided || $targetWorkOrderType === 'split' || (array_key_exists('work_order_type', $data) && $targetWorkOrderType === 'normal')) {
-        $machineRunReplacement = canReplaceWorkOrderMachineRuns($pdo, $id);
-        if (!$machineRunReplacement['allowed']) {
-            $pdo->rollBack();
-            jsonResponse([
-                'success' => false,
-                'message' => $machineRunReplacement['message'],
-                'workflow_guard' => [
-                    'allowed' => false,
-                    'recommended_action' => 'partial_receipt_reversal_or_settlement',
-                    'impacts' => $machineRunReplacement['details'],
-                ],
-            ], 409);
-            return;
-        }
-
-        replaceWorkOrderMachineRuns($pdo, $id, $validatedMachineRuns);
+    if ($machineRunsProvided) {
+        syncWorkOrderMachineRunsStable($pdo, $id, $validatedMachineRuns);
         if ($targetWorkOrderType === 'split') {
             foreach ($validatedMachineRuns as $machineRun) {
                 $productionRecordCount += count(filterMeaningfulProductionRecords($machineRun['production_records'] ?? []));

@@ -8,6 +8,7 @@
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/../work_orders/helpers.php';
+require_once __DIR__ . '/../work_orders/flow_helpers.php';
 
 requireAuth();
 
@@ -55,12 +56,13 @@ try {
             oi.total_units AS oi_total_units,
             oi.part_number,
             oi.drawing_number,
+            oi.expected_delivery_date,
+            oi.expected_delivery_period,
             -- 訂單資訊
             o.id AS order_id,
             o.order_number,
             o.order_date,
             o.customer_po_number,
-            o.expected_delivery_date,
             -- 客戶資訊
             c.id AS customer_id,
             c.name AS customer_name,
@@ -327,6 +329,7 @@ try {
         $finalInventorySummary
     );
     $workOrder['partial_receipts'] = $partialReceiptLedger['partial_receipts'];
+    $productionFlow = fetchWorkOrderFlow($pdo, $workOrderId);
 
     // 8. 準備圓餅圖數據（只包含有不良品的項目）
     $chartLabels = [];
@@ -414,7 +417,8 @@ try {
                 'order_date' => $workOrder['order_date'],
                 'incoming_date' => $workOrder['order_date'],
                 'customer_po_number' => $workOrder['customer_po_number'],
-                'expected_delivery_date' => $workOrder['expected_delivery_date']
+                'expected_delivery_date' => $workOrder['expected_delivery_date'],
+                'expected_delivery_period' => $workOrder['expected_delivery_period']
             ],
             // 訂單品項資訊
             'order_item' => [
@@ -444,6 +448,8 @@ try {
             'screening_results' => $screeningResults,
             // 拆分工單機台分頁明細
             'machine_runs' => $machineRuns,
+            // 正式製程階段／機台／100與99／轉流追溯
+            'production_flow' => $productionFlow,
             // 統計摘要
             'summary' => [
                 'total_units' => $totalUnits,

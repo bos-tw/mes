@@ -38,6 +38,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/../common/workflow_guard.php';
+require_once __DIR__ . '/helpers.php';
 requireAuth();
 
 // 只接受 DELETE 請求
@@ -92,9 +93,24 @@ try {
             recalculateInventoryStatus($pdo, (int)$item['inventory_item_id']);
         }
 
+        $pdo->prepare("
+            UPDATE inventory_packages package_row
+            JOIN shipping_order_item_packages link
+              ON link.inventory_package_id = package_row.id
+            SET package_row.package_status = 'available'
+            WHERE link.shipping_order_item_id = ?
+        ")->execute([$itemId]);
+        $pdo->prepare("DELETE FROM shipping_order_item_packages WHERE shipping_order_item_id = ?")
+            ->execute([$itemId]);
+
         // 刪除出貨項目
         $stmt = $pdo->prepare("DELETE FROM shipping_order_items WHERE id = ?");
         $stmt->execute([$itemId]);
+        saveShippingOrderDefectSummary(
+            $pdo,
+            (int)$item['shipping_order_id'],
+            fetchShippingOrderActualDefectSummary($pdo, (int)$item['shipping_order_id'])
+        );
 
         // 注意：order_items.total_shipped_quantity 不在此更新
         // 只有出貨確認/取消時才重新計算（與 add_item 對稱）

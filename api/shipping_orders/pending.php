@@ -56,6 +56,7 @@ try {
             so.shipping_order_number,
             so.shipping_date,
             so.status,
+            so.shipment_purpose,
             so.consignee_name,
             so.notes,
             so.created_at,
@@ -77,6 +78,7 @@ try {
     jsonResponse([
         'success' => true,
         'data' => $orders,
+        'orders' => $orders,
     ]);
 
 } catch (Exception $e) {

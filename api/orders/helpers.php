@@ -43,8 +43,8 @@ function getOrderStatusLookupId(PDO $pdo, string $status): int
  * @return array<string,mixed> 請求資料，可能的欄位包含：
  *   - customer_id: int              客戶 ID
  *   - order_date: string            訂單日期 (YYYY-MM-DD)
- *   - expected_delivery_date: string 預計交期 (YYYY-MM-DD)
- *   - expected_delivery_period: string 預計交期時段 (morning/noon/afternoon/evening)
+ *   - expected_delivery_date: string 預訂交期 (YYYY-MM-DD)
+ *   - expected_delivery_period: string 預訂交期時段 (morning/noon/afternoon/evening)
  *   - customer_po_number: string    客戶訂單號
  *   - status: string                訂單狀態
  *   - total_amount: float           訂單總金額
@@ -136,7 +136,7 @@ function validateOrderData(array $payload, bool $isUpdate = false): array
         }
     }
 
-    // 預計交期 - 可選
+    // 預訂交期 - 可選，由使用者自行維護
     if (array_key_exists('expected_delivery_date', $payload)) {
         $expectedDeliveryDate = normalizeOrderNullableString($payload['expected_delivery_date'] ?? '');
         if ($expectedDeliveryDate === '') {
@@ -144,7 +144,7 @@ function validateOrderData(array $payload, bool $isUpdate = false): array
         } else {
             $date = DateTime::createFromFormat('Y-m-d', $expectedDeliveryDate);
             if (!$date || $date->format('Y-m-d') !== $expectedDeliveryDate) {
-                $errors['expected_delivery_date'] = '預計交期格式不正確。';
+                $errors['expected_delivery_date'] = '預訂交期格式不正確。';
             } else {
                 $data['expected_delivery_date'] = $expectedDeliveryDate;
             }
@@ -203,7 +203,7 @@ function validateOrderData(array $payload, bool $isUpdate = false): array
         }
     }
 
-    // 預計交期時段 - 可選
+    // 預訂交期時段 - 可選，由使用者自行維護
     if (array_key_exists('expected_delivery_period', $payload)) {
         $expectedDeliveryPeriod = normalizeOrderNullableString($payload['expected_delivery_period'] ?? '');
         if ($expectedDeliveryPeriod === '') {
@@ -211,7 +211,7 @@ function validateOrderData(array $payload, bool $isUpdate = false): array
         } else {
             $allowedPeriods = ['morning', 'noon', 'afternoon', 'evening'];
             if (!in_array($expectedDeliveryPeriod, $allowedPeriods, true)) {
-                $errors['expected_delivery_period'] = '預計交期時段格式不正確。';
+                $errors['expected_delivery_period'] = '預訂交期時段格式不正確。';
             } else {
                 $data['expected_delivery_period'] = $expectedDeliveryPeriod;
             }

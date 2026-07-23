@@ -669,7 +669,7 @@
         <div class="order-info">
             <div class="order-no" id="orderNo">載入中...</div>
             <div class="order-date">訂單日期：<span id="orderDate"></span></div>
-            <div class="delivery-date">預計交期：<span id="expectedDeliveryDate"></span></div>
+            <div class="delivery-date">預訂交期：<span id="expectedDeliveryDate"></span></div>
         </div>
     </div>
     <div class="customer-po-row">
@@ -981,7 +981,7 @@
                     orderDateEl.textContent = '';
                 }
 
-                // 設定預計交期（民國年 + 星期）
+                // 設定預訂交期（民國年 + 星期）
                 if (expectedDeliveryDateEl) {
                     const dateText = order.expected_delivery_date
                         ? formatRocDateWithWeekday(order.expected_delivery_date)

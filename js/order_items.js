@@ -74,6 +74,8 @@
         const subItemNumberInput = modalForm ? modalForm.querySelector('input[name="sub_item_number"]') : null;
         const partNumberInput = modalForm ? modalForm.querySelector('input[name="part_number"]') : null;
         const customerBatchNumberInput = modalForm ? modalForm.querySelector('input[name="customer_batch_number"]') : null;
+        const expectedDeliveryDateInput = modalForm ? modalForm.querySelector('input[name="expected_delivery_date"]') : null;
+        const expectedDeliveryPeriodSelect = modalForm ? modalForm.querySelector('select[name="expected_delivery_period"]') : null;
         const deliveryLocationInput = modalForm ? modalForm.querySelector('[name="delivery_location"]') : null;
         const notesInput = modalForm ? modalForm.querySelector('textarea[name="notes"]') : null;
 
@@ -138,6 +140,8 @@
                 orderNumber: context.orderNumber ?? null,
                 customerName: context.customerName ?? null,
                 createdAt: context.createdAt ?? null,
+                expectedDeliveryDate: context.expectedDeliveryDate ?? null,
+                expectedDeliveryPeriod: context.expectedDeliveryPeriod ?? null,
                 editItemId: context.editItemId ?? null,
             };
         }
@@ -181,6 +185,23 @@
                 parts.push(item.name);
             }
             return parts.length > 0 ? parts.join(' - ') : `#${item.id}`;
+        }
+
+        function getExpectedDeliveryPeriodLabel(period) {
+            const labels = {
+                morning: '上午',
+                noon: '中午',
+                afternoon: '下午',
+                evening: '晚間',
+            };
+            const normalized = String(period || '').trim();
+            return labels[normalized] || normalized;
+        }
+
+        function getExpectedDeliveryLabel(item) {
+            const date = String(item?.expected_delivery_date || '').trim();
+            const period = getExpectedDeliveryPeriodLabel(item?.expected_delivery_period);
+            return [date, period].filter(Boolean).join(' ') || '-';
         }
 
         function getOrderItemScreeningLabel(item) {
@@ -792,6 +813,7 @@
                             <div class="table-primary">${escapeHtml(screeningLabel)}</div>
                             ${item.drawing_number ? `<div class="table-secondary">圖面：${escapeHtml(item.drawing_number)}</div>` : ''}
                         </td>
+                        <td>${escapeHtml(getExpectedDeliveryLabel(item))}</td>
                         <td class="text-right">${formatNumber(item.total_weight_kg ?? 0, 2)}</td>
                         <td class="text-right">${formatNumber(totals.tool_weight_kg ?? 0, 2)}</td>
                         <td class="text-right">${formatNumber(totals.net_weight_kg ?? 0, 2)}</td>
@@ -2182,6 +2204,8 @@
                 sub_item_number: subItemNumberInput && subItemNumberInput.value.trim() !== '' ? subItemNumberInput.value.trim() : null,
                 part_number: partNumberInput && partNumberInput.value.trim() !== '' ? partNumberInput.value.trim() : null,
                 customer_batch_number: customerBatchNumberInput && customerBatchNumberInput.value.trim() !== '' ? customerBatchNumberInput.value.trim() : null,
+                expected_delivery_date: expectedDeliveryDateInput && expectedDeliveryDateInput.value !== '' ? expectedDeliveryDateInput.value : null,
+                expected_delivery_period: expectedDeliveryPeriodSelect && expectedDeliveryPeriodSelect.value !== '' ? expectedDeliveryPeriodSelect.value : null,
                 delivery_location: deliveryLocationInput && deliveryLocationInput.value.trim() !== '' ? deliveryLocationInput.value.trim() : null,
                 notes: notesInput && notesInput.value.trim() !== '' ? notesInput.value.trim() : null,
                 // 三階段重量追蹤
@@ -2210,6 +2234,8 @@
                 sub_item_number: subItemNumberInput,
                 part_number: partNumberInput,
                 customer_batch_number: customerBatchNumberInput,
+                expected_delivery_date: expectedDeliveryDateInput,
+                expected_delivery_period: expectedDeliveryPeriodSelect,
                 customer_provided_weight: customerProvidedWeightInput,
                 confirmed_weight: confirmedWeightInput,
                 actual_production_weight: actualProductionWeightInput,
@@ -2506,6 +2532,19 @@
             resetModalForm();
             populateModalSelects();
 
+            const hasDeliveryDate = data && Object.prototype.hasOwnProperty.call(data, 'expected_delivery_date');
+            const hasDeliveryPeriod = data && Object.prototype.hasOwnProperty.call(data, 'expected_delivery_period');
+            if (expectedDeliveryDateInput) {
+                expectedDeliveryDateInput.value = hasDeliveryDate
+                    ? (data.expected_delivery_date || '')
+                    : (state.orderContext?.expectedDeliveryDate || '');
+            }
+            if (expectedDeliveryPeriodSelect) {
+                expectedDeliveryPeriodSelect.value = hasDeliveryPeriod
+                    ? (data.expected_delivery_period || '')
+                    : (state.orderContext?.expectedDeliveryPeriod || '');
+            }
+
             const formatWeightInput = (value) => {
                 const numericValue = Number.parseFloat(String(value));
                 if (!Number.isFinite(numericValue)) {
@@ -2636,6 +2675,10 @@
                 });
                 const result = await response.json();
                 if (response.ok && result.success && result.data) {
+                    if (state.orderContext) {
+                        state.orderContext.expectedDeliveryDate = result.data.expected_delivery_date || null;
+                        state.orderContext.expectedDeliveryPeriod = result.data.expected_delivery_period || null;
+                    }
                     const customer = result.data.customer;
                     if (customer && customer.weight_tolerance_percentage != null) {
                         state.customerWeightTolerance = customer.weight_tolerance_percentage;

@@ -431,6 +431,80 @@ function fetchShippingOrderDefectSummary(PDO $pdo, int $shippingOrderId): ?array
 }
 
 /**
+ * 由出貨單實際加入的不良品庫存與包／袋關聯計算權威摘要。
+ *
+ * @return array<string,mixed>|null
+ */
+function fetchShippingOrderActualDefectSummary(PDO $pdo, int $shippingOrderId): ?array
+{
+    $stmt = $pdo->prepare("
+        SELECT
+            soi.inventory_item_id,
+            soi.shipped_quantity,
+            ii.work_order_id,
+            ii.weight_per_unit_g,
+            COALESCE(package_totals.package_quantity, 0) AS package_quantity,
+            COALESCE(package_totals.package_weight_kg, 0) AS package_weight_kg
+        FROM shipping_order_items soi
+        INNER JOIN inventory_items ii ON ii.id = soi.inventory_item_id
+        LEFT JOIN (
+            SELECT
+                link.shipping_order_item_id,
+                SUM(link.shipped_package_quantity) AS package_quantity,
+                SUM(package_row.content_weight_kg) AS package_weight_kg
+            FROM shipping_order_item_packages link
+            INNER JOIN inventory_packages package_row
+                ON package_row.id = link.inventory_package_id
+            GROUP BY link.shipping_order_item_id
+        ) package_totals ON package_totals.shipping_order_item_id = soi.id
+        WHERE soi.shipping_order_id = :shipping_order_id
+          AND COALESCE(soi.stock_category_snapshot, ii.stock_category, 'good') = 'defect'
+        ORDER BY soi.id
+    ");
+    $stmt->execute(['shipping_order_id' => $shippingOrderId]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($rows === []) {
+        return null;
+    }
+
+    $quantity = 0.0;
+    $weightKg = 0.0;
+    $packageQuantity = 0;
+    $workOrderIds = [];
+    $inventoryItemIds = [];
+    foreach ($rows as $row) {
+        $rowQuantity = (float)($row['shipped_quantity'] ?? 0);
+        $rowPackageWeight = (float)($row['package_weight_kg'] ?? 0);
+        $unitWeightG = (float)($row['weight_per_unit_g'] ?? 0);
+        $quantity += $rowQuantity;
+        $weightKg += $rowPackageWeight > 0
+            ? $rowPackageWeight
+            : round($rowQuantity * $unitWeightG / 1000, 3);
+        $packageQuantity += (int)($row['package_quantity'] ?? 0);
+        if ((int)($row['work_order_id'] ?? 0) > 0) {
+            $workOrderIds[(int)$row['work_order_id']] = true;
+        }
+        if ((int)($row['inventory_item_id'] ?? 0) > 0) {
+            $inventoryItemIds[(int)$row['inventory_item_id']] = true;
+        }
+    }
+    $quantity = round($quantity, 2);
+    $weightKg = round($weightKg, 3);
+
+    return [
+        'defect_quantity' => $quantity,
+        'weight_per_unit_g' => $quantity > 0 ? round($weightKg * 1000 / $quantity, 3) : 0,
+        'total_weight_kg' => $weightKg,
+        'package_quantity' => $packageQuantity,
+        'notes' => '由實際加入出貨單的不良品庫存與包／袋自動彙總',
+        'source_shipping_order_id' => null,
+        'source_work_order_id' => count($workOrderIds) === 1 ? (int)array_key_first($workOrderIds) : null,
+        'source_inventory_item_id' => count($inventoryItemIds) === 1 ? (int)array_key_first($inventoryItemIds) : null,
+        'summary_source' => 'inventory_items',
+    ];
+}
+
+/**
  * 取得出貨單載具摘要
  *
  * @return array<int,array<string,mixed>>

@@ -37,8 +37,10 @@
  * | 客戶名稱       | customer_name           |
  * | 客戶批號       | customer_batch_number   |
  * | 內部批號       | internal_lot_number     |
+ * | 庫存類別       | stock_category          |
  * | 良品總支數     | total_good_units        |
  * | 不良品支數     | total_defect_units      |
+ * | 包／袋數       | inventory_packages      |
  * | 現有庫存       | quantity_on_hand        |
  * | 已分配數量     | quantity_allocated      |
  * | 淨重(kg)      | net_weight_kg           |
@@ -71,6 +73,7 @@ $filters = [
     'keyword'           => trim((string)($_GET['keyword'] ?? '')),
     'customer_id'       => (string)($_GET['customer_id'] ?? ''),
     'screening_item_id' => (string)($_GET['screening_item_id'] ?? ''),
+    'stock_category'    => (string)($_GET['stock_category'] ?? ''),
     'status'            => (string)($_GET['status'] ?? ''),
     'quality_status'    => (string)($_GET['quality_status'] ?? ''),
     'start_date'        => (string)($_GET['start_date'] ?? ''),
@@ -85,6 +88,7 @@ $sql = "
     SELECT
         ii.id,
         ii.inventory_number,
+        ii.stock_category,
         si.name                     AS screening_item_name,
         wo.work_order_number,
         oi.order_item_number,
@@ -103,6 +107,11 @@ $sql = "
         ii.warehouse_location,
         ii.received_at,
         ii.created_at
+        ,
+        COALESCE((SELECT SUM(ip.package_quantity)
+                  FROM inventory_packages ip
+                  WHERE ip.inventory_item_id = ii.id
+                    AND ip.package_status <> 'voided'), 0) AS package_quantity
     FROM inventory_items ii
     LEFT JOIN customers       c  ON ii.customer_id       = c.id
     LEFT JOIN screening_items si ON ii.screening_item_id = si.id
@@ -144,6 +153,7 @@ if ($handle === false) {
 fputcsv($handle, [
     '庫存ID',
     '庫存編號',
+    '庫存類別',
     '受篩產品',
     '工單號',
     '訂單明細',
@@ -162,12 +172,14 @@ fputcsv($handle, [
     '倉位',
     '入庫時間',
     '建立時間',
+    '包／袋數',
 ]);
 
 foreach ($rows as $row) {
     fputcsv($handle, [
         $row['id'],
         $row['inventory_number'],
+        ($row['stock_category'] ?? 'good') === 'defect' ? '不良品' : '良品',
         $row['screening_item_name'] ?? '',
         $row['work_order_number'] ?? '',
         $row['order_item_number'] ?? '',
@@ -186,6 +198,7 @@ foreach ($rows as $row) {
         $row['warehouse_location'] ?? '',
         $row['received_at'] ?? '',
         $row['created_at'] ?? '',
+        $row['package_quantity'] ?? 0,
     ]);
 }
 

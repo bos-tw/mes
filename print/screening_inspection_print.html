@@ -699,7 +699,8 @@
                 qrcode_url: '',
                 generated_at: '',
                 report_description: reportDesc?.description || '',
-                machine_runs: []
+                machine_runs: [],
+                production_flow: { stages: [] }
             });
         } catch (error) {
             console.error('載入預覽報表失敗:', error);
@@ -810,7 +811,15 @@
     async function renderReport(data) {
         const { work_order, order, order_item, customer, screening_item,
                 screening_results, summary, chart_data, company, qrcode_url, generated_at,
-                report_description, machine_runs = [] } = data;
+                report_description, machine_runs = [], production_flow = { stages: [] } } = data;
+        const productionStages = Array.isArray(production_flow?.stages) ? production_flow.stages : [];
+        const productionResultRows = productionStages.flatMap((stage) =>
+            (stage.machine_runs || []).flatMap((run) =>
+                (run.results || [])
+                    .filter((result) => result.result_status === 'confirmed')
+                    .map((result) => ({ stage, run, result }))
+            )
+        );
         const defectDistributionUnits = Number(summary.defect_units_distribution ?? summary.defect_units ?? 0);
         const displayTotalUnits = Number(summary.total_units ?? 0);
         const displayGoodUnits = Math.max(displayTotalUnits - defectDistributionUnits, 0);
@@ -1002,6 +1011,63 @@
                         </tr>
                         ` : ''}
                     `).join('')}
+                </tbody>
+            </table>
+            ` : ''}
+
+            ${productionResultRows.length > 0 ? `
+            <h3>製程結果與轉流追溯 <span class="title-en">Production Flow Trace</span></h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>階段／方式</th>
+                        <th>機台</th>
+                        <th>來源品質</th>
+                        <th>原始良品</th>
+                        <th>原始不良(100)</th>
+                        <th>實秤入庫不良(99)</th>
+                        <th>差異</th>
+                        <th>圖片</th>
+                        <th>出料載具／袋</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${productionResultRows.map(({ stage, run, result }) => {
+                        const secondaryMode = stage.stage_type === 'secondary'
+                            ? (stage.secondary_mode === 'second_process' ? '第二道工序' : '放寬標準')
+                            : '一般';
+                        const imageCount = (result.images || []).length;
+                        const imageStatus = stage.image_requirement === 'required'
+                            ? `必填${formatNumber(stage.image_min_count || 0)}張／已上傳${formatNumber(imageCount)}張`
+                            : (imageCount > 0 ? `選填／已上傳${formatNumber(imageCount)}張` : '未要求／未上傳');
+                        const toolCount = (result.output_tools || []).reduce((sum, tool) => sum + Number(tool.quantity || 0), 0);
+                        const packageCount = (result.packages || []).reduce((sum, itemPackage) => sum + Number(itemPackage.package_quantity || 0), 0);
+                        return `
+                        <tr>
+                            <td>${escapeHtml(stage.display_name || '生產與篩分')}／${escapeHtml(secondaryMode)}</td>
+                            <td>${escapeHtml(run.run_label || run.machine_name || '-')}</td>
+                            <td>${escapeHtml(stage.source_quality === 'defect' ? '不良品' : '良品')}</td>
+                            <td class="text-right">${formatNumber(result.machine_good_units || 0)}</td>
+                            <td class="text-right">${formatNumber(result.machine_defect_units || 0)}</td>
+                            <td class="text-right">${formatNumber(result.settled_defect_units || 0)}</td>
+                            <td class="text-right">${formatNumber(result.defect_difference_units || 0)}</td>
+                            <td class="text-center">${escapeHtml(imageStatus)}</td>
+                            <td>${toolCount > 0 ? `${formatNumber(toolCount)}個載具` : '-'}${packageCount > 0 ? `／${formatNumber(packageCount)}袋` : ''}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="9">
+                                不良實秤 ${formatNumber(result.defect_actual_net_weight_kg || 0, 3)} kg；
+                                單支重快照 ${formatNumber(result.weight_per_unit_g || 0, 3)} g；
+                                篩分不良：${(result.defects || []).map((defect) => `${escapeHtml(defect.service_name || '')} ${formatNumber(defect.defect_quantity || 0)}`).join('、') || '無'}；
+                                圖片：${(result.images || []).map((imageRow, imageIndex) => `<a href="../${escapeHtml(imageRow.file_path || '')}" target="_blank" rel="noopener">${escapeHtml(imageRow.file_name || `圖片${imageIndex + 1}`)}</a>`).join('、') || '未上傳'}；
+                                轉流：${(stage.transfers || [])
+                                    .filter((transfer) => Number(transfer.source_machine_result_id) === Number(result.id))
+                                    .map((transfer) => `${transfer.source_quality === 'defect' ? '不良品' : '良品'} ${formatNumber(transfer.transferred_units || 0)}支 → ${transfer.destination_type === 'inventory' ? '庫存' : '二次篩分'}`)
+                                    .join('、') || '尚未轉流'}
+                            </td>
+                        </tr>
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
             ` : ''}

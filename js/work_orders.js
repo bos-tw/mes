@@ -66,6 +66,8 @@
         mobileQuickEntryCopyButton: moduleRoot.querySelector('[data-action="copy-mobile-quick-entry"]')
     };
 
+    window.initializeWorkOrderProductionFlow?.(moduleRoot);
+
     const createModalAlertBox = elements.createModal?.querySelector('[data-work-orders-create-modal-alert]');
     const editModalAlertBox = elements.editModal?.querySelector('[data-work-orders-edit-modal-alert]');
 
@@ -167,6 +169,17 @@
         }
 
         return raw;
+    }
+
+    function getExpectedDeliveryPeriodLabel(period) {
+        const labels = {
+            morning: '上午',
+            noon: '中午',
+            afternoon: '下午',
+            evening: '晚間'
+        };
+        const normalized = String(period || '').trim();
+        return labels[normalized] || normalized;
     }
 
     function getMobileQuickEntryBaseUrl() {
@@ -1090,6 +1103,13 @@
             return;
         }
 
+        if (stage === 'secondary' && form === elements.editModalForm) {
+            const secondaryTab = form.querySelector('[data-work-order-secondary-tab]');
+            if (secondaryTab && !secondaryTab.hidden) {
+                switchWorkOrderMainTab('secondary', true);
+            }
+        }
+
         form.querySelectorAll('[data-action="switch-screening-stage"]').forEach((tab) => {
             const isActive = tab.getAttribute('data-screening-stage') === stage;
             tab.classList.toggle('active', isActive);
@@ -1413,12 +1433,122 @@
         }
     }
 
+    function switchWorkOrderMainTab(tabName = 'settings', isEditMode = false, options = {}) {
+        const form = isEditMode ? elements.editModalForm : elements.createModalForm;
+        if (!form) {
+            return 'settings';
+        }
+
+        const allButtons = Array.from(form.querySelectorAll('.work-order-main-tabs [data-work-order-main-tab]'));
+        const buttons = allButtons.filter(button => !button.hidden && !button.classList.contains('hidden'));
+        const normalizedTab = buttons.some(button => button.dataset.workOrderMainTab === tabName)
+            ? tabName
+            : 'settings';
+
+        allButtons.forEach((button) => {
+            const isActive = button.dataset.workOrderMainTab === normalizedTab;
+            button.classList.toggle('active', isActive);
+            button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            button.tabIndex = isActive ? 0 : -1;
+        });
+
+        form.querySelectorAll('[data-work-order-main-tab-section]').forEach((section) => {
+            const sectionTabs = (section.dataset.workOrderMainTabSection || '')
+                .split(/\s+/)
+                .filter(Boolean);
+            section.hidden = !sectionTabs.includes(normalizedTab);
+        });
+
+        form.querySelectorAll('[data-work-order-main-tab-container]').forEach((container) => {
+            container.hidden = !Array.from(container.querySelectorAll('[data-work-order-main-tab-section]'))
+                .some(section => !section.hidden);
+        });
+
+        if (options.focusTab) {
+            buttons.find(button => button.dataset.workOrderMainTab === normalizedTab)?.focus();
+        }
+
+        form.dispatchEvent(new CustomEvent('work-order:main-tab-changed', {
+            bubbles: true,
+            detail: {
+                tabName: normalizedTab,
+                isEditMode
+            }
+        }));
+
+        return normalizedTab;
+    }
+
+    function revealWorkOrderMainTabForField(field, isEditMode) {
+        const section = field?.closest?.('[data-work-order-main-tab-section]');
+        if (!section) {
+            return;
+        }
+
+        const tabName = (section.dataset.workOrderMainTabSection || 'settings')
+            .split(/\s+/)
+            .filter(Boolean)[0] || 'settings';
+        switchWorkOrderMainTab(tabName, isEditMode);
+        if (isEditMode && field.closest('[data-screening-stage-panel="secondary"]')) {
+            switchScreeningStage('secondary', field);
+        }
+    }
+
+    function bindWorkOrderMainTabs(form, isEditMode) {
+        const tabList = form?.querySelector('.work-order-main-tabs');
+        if (!tabList) {
+            return;
+        }
+
+        tabList.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-action="switch-work-order-main-tab"]');
+            if (!button) {
+                return;
+            }
+            event.preventDefault();
+            switchWorkOrderMainTab(button.dataset.workOrderMainTab || 'settings', isEditMode);
+        });
+
+        tabList.addEventListener('keydown', (event) => {
+            const currentButton = event.target.closest('[data-work-order-main-tab]');
+            if (!currentButton || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+                return;
+            }
+
+            const buttons = Array.from(tabList.querySelectorAll('[data-work-order-main-tab]'))
+                .filter(button => !button.hidden && !button.classList.contains('hidden'));
+            const currentIndex = buttons.indexOf(currentButton);
+            let nextIndex = currentIndex;
+            if (event.key === 'Home') {
+                nextIndex = 0;
+            } else if (event.key === 'End') {
+                nextIndex = buttons.length - 1;
+            } else {
+                const offset = event.key === 'ArrowRight' ? 1 : -1;
+                nextIndex = (currentIndex + offset + buttons.length) % buttons.length;
+            }
+
+            event.preventDefault();
+            switchWorkOrderMainTab(buttons[nextIndex]?.dataset.workOrderMainTab || 'settings', isEditMode, { focusTab: true });
+        });
+    }
+
     function syncSplitPanelVisibility(form, isEditMode) {
         if (!form) return;
         const type = form.querySelector('[name="work_order_type"]')?.value || 'normal';
         const panel = form.querySelector('[data-split-work-order-panel]');
         const isSplit = type === 'split';
         if (!panel) return;
+        if (panel.hasAttribute('data-legacy-work-order-execution')) {
+            panel.hidden = true;
+            panel.classList.add('hidden');
+            form.querySelectorAll('[data-legacy-work-order-execution]').forEach((section) => {
+                section.hidden = true;
+                section.classList.add('hidden');
+            });
+            return;
+        }
         panel.classList.toggle('hidden', !isSplit);
 
         form.querySelectorAll('[data-primary-machine-field]').forEach((field) => {
@@ -2203,6 +2333,7 @@
 
     function collectSplitMachineRuns(isEditMode) {
         return getSplitRuns(isEditMode).map((run, index) => ({
+            id: run.id || null,
             run_label: run.run_label || '',
             machine_id: run.machine_id || null,
             scheduled_start_date: run.scheduled_start_date || null,
@@ -2317,9 +2448,10 @@
             }
         }
 
-        // 建立工單 Modal (含頁籤)
+        // 建立工單 Modal（來源選擇與作業分組頁籤）
         if (elements.createModalForm) {
             elements.createModalForm.addEventListener('submit', handleFormSubmit);
+            bindWorkOrderMainTabs(elements.createModalForm, false);
 
             const cancelButton = elements.createModalForm.querySelector('[data-action="cancel"]');
             if (cancelButton) {
@@ -2508,9 +2640,10 @@
             });
         }
 
-        // 編輯工單 Modal (不含頁籤)
+        // 編輯工單 Modal（依作業階段分組）
         if (elements.editModalForm) {
             elements.editModalForm.addEventListener('submit', handleFormSubmit);
+            bindWorkOrderMainTabs(elements.editModalForm, true);
 
             const cancelButton = elements.editModalForm.querySelector('[data-action="cancel"]');
             if (cancelButton) {
@@ -4953,6 +5086,17 @@
         const { form, isEditMode } = getCurrentModal();
         if (!form) return;
 
+        if (!form.checkValidity()) {
+            const invalidField = form.querySelector(':invalid');
+            revealWorkOrderMainTabForField(invalidField, isEditMode);
+            showModalAlert('error', '請完成目前頁籤中的必填欄位。', false, isEditMode);
+            window.requestAnimationFrame(() => {
+                invalidField?.focus();
+                invalidField?.reportValidity?.();
+            });
+            return;
+        }
+
         const formData = new FormData(form);
         const data = {};
 
@@ -4961,7 +5105,7 @@
         const displayOnlyFields = [
             'customer_name', 'customer_po_number', 'order_item_number', 'customer_batch_number', 'sub_item_number', 'drawing_number',
             'screening_item_name', 'total_weight_kg', 'weight_per_unit_g', 'total_units',
-            'tool_statistics', 'expected_delivery_date', 'customer_sample_status',
+            'tool_statistics', 'expected_delivery_date', 'expected_delivery_period', 'customer_sample_status',
             'part_number', 'delivery_location' // 新增的訂單資訊欄位也設為 display-only
         ];
 
@@ -4991,7 +5135,9 @@
             const notes = notesInput ? notesInput.value.trim() : '';
 
             if (!Number.isInteger(numericDefectQuantity) || numericDefectQuantity < 0) {
+                revealWorkOrderMainTabForField(defectInput || row, isEditMode);
                 showModalAlert('error', '不良品數量必須為 0 或正整數。', false, isEditMode);
+                defectInput?.focus();
                 return;
             }
 
@@ -5103,10 +5249,17 @@
             data.machine_id = null;
             const splitValidationMessage = validateSplitMachineRunsBeforeSubmit(isEditMode);
             if (splitValidationMessage) {
+                switchWorkOrderMainTab('flow', isEditMode);
                 showModalAlert('error', splitValidationMessage, false, isEditMode);
                 return;
             }
             data.machine_runs = collectSplitMachineRuns(isEditMode);
+        }
+        if (isEditMode && Array.isArray(state.currentWorkOrder?.production_flow?.stages)
+            && state.currentWorkOrder.production_flow.stages.length > 0) {
+            delete data.screening_defects;
+            delete data.production_records;
+            delete data.first_piece_dimensions;
         }
 
         if (isEditMode) {
@@ -5489,43 +5642,28 @@
         try {
             const selectedIds = Array.from(selectedWorkOrders);
             const params = buildWorkOrderQueryParams(1);
-            params.set('perPage', selectedIds.length > 0 ? String(Math.max(selectedIds.length, 100)) : '5000');
-
-            const response = await fetch(`api/work_orders/index.php?${params.toString()}`);
-            const result = await response.json();
-
-            if (!result.success) {
-                throw new Error(result.message || '匯出失敗');
-            }
-
-            let rows = Array.isArray(result.data) ? result.data : [];
+            params.delete('page');
+            params.delete('perPage');
             if (selectedIds.length > 0) {
-                const selectedIdSet = new Set(selectedIds.map(id => Number.parseInt(id, 10)));
-                rows = rows.filter(row => selectedIdSet.has(Number.parseInt(row.id, 10)));
+                params.set('ids', selectedIds.join(','));
             }
 
-            if (rows.length === 0) {
-                showAlert('沒有可匯出的工單資料', 'warning');
-                return;
+            const response = await fetch(`api/work_orders/export.php?${params.toString()}`, {
+                credentials: 'include'
+            });
+            if (!response.ok) {
+                const contentType = response.headers.get('content-type') || '';
+                if (contentType.includes('application/json')) {
+                    const result = await response.json();
+                    throw new Error(result.message || '匯出失敗');
+                }
+                throw new Error(`匯出失敗（HTTP ${response.status}）`);
             }
 
-            const csvRows = [
-                ['工單號碼', '工單類型', '訂單號碼', '客戶名稱', '受篩產品', '機台', '開始日期', '結束日期', '狀態'],
-                ...rows.map((row) => [
-                    row.work_order_number || '',
-                    getWorkOrderTypeLabel(row.work_order_type, Number.parseInt(row.machine_run_count, 10) || 0, row.rescreen_batch_number || ''),
-                    row.order_number || '',
-                    row.customer_name || '',
-                    row.screening_item_name || '',
-                    row.machine_name || '',
-                    row.actual_start_date || '',
-                    row.actual_end_date || '',
-                    row.status_label || ''
-                ])
-            ];
-
-            const csvContent = '\uFEFF' + csvRows.map(line => line.map(csvEscape).join(',')).join('\r\n');
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const blob = await response.blob();
+            if (blob.size === 0) {
+                throw new Error('匯出檔案為空。');
+            }
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -5535,7 +5673,12 @@
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
 
-            showAlert(`已匯出 ${rows.length} 筆工單資料`, 'success');
+            showAlert(
+                selectedIds.length > 0
+                    ? `已匯出 ${selectedIds.length} 筆工單的完整製程資料`
+                    : '已匯出篩選範圍的完整製程資料',
+                'success'
+            );
         } catch (error) {
             console.error('批次匯出失敗:', error);
             showAlert(error.message || '批次匯出失敗', 'error');
@@ -5949,7 +6092,7 @@
     }
 
     // Modal Functions
-    // 開啟建立工單 Modal (含頁籤選擇)
+    // 開啟建立工單 Modal（來源選擇與作業分組頁籤）
     function openCreateModal(options = {}) {
         const sourceMode = options.sourceMode === 'order_item' ? 'order_item' : 'manual';
         state.editingId = null;
@@ -5961,6 +6104,7 @@
         // Reset Tabs
         setCreateSourceTab('cascade');
         setCreateSourceMode(sourceMode);
+        switchWorkOrderMainTab('settings', false);
 
         // Reset Search Results
         const searchResults = elements.createModalForm.querySelector('[data-search-results]');
@@ -5996,7 +6140,7 @@
         resetWorkOrderFormSnapshot(false);
     }
 
-    // 開啟編輯工單 Modal (不含頁籤,直接編輯)
+    // 開啟編輯工單 Modal（依作業階段分組）
     async function openEditModal(id) {
         state.editingId = id;
         resetMobileQuickEntry();
@@ -6004,6 +6148,7 @@
         // Reset UI
         elements.editModalForm.reset();
         hideModalAlert(true);
+        switchWorkOrderMainTab('settings', true);
         setSplitRuns(true, []);
         setWorkOrderType(elements.editModalForm, 'normal');
         state.productionRecordModes.edit = 'preset';
@@ -6015,6 +6160,7 @@
 
         await loadWorkOrderData(id);
         setWorkOrderType(elements.editModalForm, 'normal');
+        switchWorkOrderMainTab('settings', true);
 
         elements.editModal.classList.remove('hidden');
         startLiveTimeTicker();
@@ -6127,6 +6273,9 @@
                     result.data.tool_condition_images || [],
                     '尚未上傳載具狀況圖片'
                 );
+                moduleRoot.dispatchEvent(new CustomEvent('work-order:loaded', {
+                    detail: { workOrder: result.data }
+                }));
                 await renderMobileQuickEntry(result.data);
 
                 // Load work order images
@@ -6273,7 +6422,8 @@
             'total_weight_kg': (((parseFloat(data.total_weight_kg) || 0) - (parseFloat(data.total_tool_weight) || 0)).toFixed(2)),
             'weight_per_unit_g': data.weight_per_unit_g,
             'total_units': data.total_units,
-            'expected_delivery_date': data.expected_delivery_date
+            'expected_delivery_date': data.expected_delivery_date,
+            'expected_delivery_period': getExpectedDeliveryPeriodLabel(data.expected_delivery_period)
         };
 
         // 同時使用 name 和 data-field 屬性來查找並設定欄位
@@ -6595,7 +6745,7 @@
             'customer_name', 'customer_po_number', 'sub_item_number', 'part_number',
             'drawing_number', 'screening_item_name', 'customer_sample_status',
             'delivery_location', 'total_weight_kg', 'weight_per_unit_g', 'total_units',
-            'tool_statistics', 'expected_delivery_date'
+            'tool_statistics', 'expected_delivery_date', 'expected_delivery_period'
         ];
 
         orderInfoFieldNames.forEach(fieldName => {
@@ -6655,12 +6805,12 @@
                           value="${escapeHtml(String(defectQuantity))}" min="0" step="1" inputmode="numeric"
                           data-service-id="${serviceKey}"
                           class="screening-service-defect-input" />`
-                : `<span>${defectQuantity}</span>`;
+                : '<span class="text-muted">建立後按機台記錄</span>';
 
             const notesValue = service.notes || '';
             const notesCell = isEditMode
                 ? `<input type="text" name="screening_notes_${serviceKey}" value="${escapeHtml(notesValue)}" data-service-id="${serviceKey}" class="screening-service-notes-input" placeholder="請輸入備註" />`
-                : `<span class="screening-service-notes-text">${escapeHtml(notesValue || '-')}</span>`;
+                : '<span class="screening-service-notes-text text-muted">服務條件快照</span>';
 
             return `
             <tr data-service-index="${index}" data-service-id="${serviceKey}">
@@ -6686,7 +6836,7 @@
             'customer_name', 'customer_po_number', 'sub_item_number', 'part_number', 'drawing_number',
             'screening_item_name', 'customer_sample_status', 'delivery_location',
             'total_weight_kg', 'weight_per_unit_g', 'total_units',
-            'tool_statistics', 'expected_delivery_date'
+            'tool_statistics', 'expected_delivery_date', 'expected_delivery_period'
         ];
 
         fieldNames.forEach(fieldName => {

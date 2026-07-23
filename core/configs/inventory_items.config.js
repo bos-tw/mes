@@ -56,7 +56,17 @@ ModuleConfig.register('inventory_items', {
             type: 'select',
             options: [{ value: '', label: '-- 所有產品 --' }]
         },
-        { 
+        {
+            name: 'stock_category',
+            label: '庫存類別',
+            type: 'select',
+            options: [
+                { value: '', label: '-- 所有類別 --' },
+                { value: 'good', label: '良品' },
+                { value: 'defect', label: '不良品' }
+            ]
+        },
+        {
             name: 'status', 
             label: '庫存狀態', 
             type: 'select',
@@ -98,6 +108,7 @@ ModuleConfig.register('inventory_items', {
     // ========================================
     columns: [
         { key: 'inventory_number', label: '庫存編號', sortable: true, selectable: true },
+        { key: 'stock_category', label: '類別', sortable: true, selectable: true },
         { key: 'work_order_number', label: '工單號碼', sortable: true, selectable: true },
         { key: 'order_item_number', label: '訂單明細', sortable: true, selectable: true },
         { key: 'customer_name', label: '客戶', sortable: true, selectable: true },
@@ -286,6 +297,25 @@ ModuleConfig.register('inventory_items', {
                             <input type="number" name="quantity" min="1" required placeholder="輸入出貨數量" autocomplete="off">
                             <small class="form-hint" data-shipping-max-qty></small>
                         </label>
+                    </div>
+                </section>
+
+                <section class="form-section ui-compact-section hidden" data-shipping-package-section>
+                    <h4>不良品實際出貨包／袋</h4>
+                    <p class="form-hint">塑膠袋不計重量；出貨支數由所選袋內實際支數加總，不可拆袋估算。</p>
+                    <div class="table-responsive">
+                        <table class="data-table compact ui-compact-table">
+                            <thead>
+                                <tr>
+                                    <th>選取</th>
+                                    <th>袋號</th>
+                                    <th>袋數</th>
+                                    <th>支數</th>
+                                    <th>內容物重量(kg)</th>
+                                </tr>
+                            </thead>
+                            <tbody data-shipping-package-body></tbody>
+                        </table>
                     </div>
                 </section>
 

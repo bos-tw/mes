@@ -331,6 +331,8 @@
             customerLabel: getOptionLabel('customer_id'),
             screeningItemId: getTextValue('screening_item_id'),
             screeningItemLabel: getOptionLabel('screening_item_id'),
+            stockCategory: getTextValue('stock_category'),
+            stockCategoryLabel: getOptionLabel('stock_category'),
             status: getTextValue('status'),
             statusLabel: getOptionLabel('status'),
             qualityStatus: getTextValue('quality_status'),
@@ -414,6 +416,7 @@
             if (filterValues.keyword) params.set('keyword', filterValues.keyword);
             if (filterValues.customerId) params.set('customer_id', filterValues.customerId);
             if (filterValues.screeningItemId) params.set('screening_item_id', filterValues.screeningItemId);
+            if (filterValues.stockCategory) params.set('stock_category', filterValues.stockCategory);
             if (filterValues.status) params.set('status', filterValues.status);
             if (filterValues.qualityStatus) params.set('quality_status', filterValues.qualityStatus);
             if (filterValues.startDate) params.set('start_date', filterValues.startDate);
@@ -545,7 +548,7 @@ function renderTable(items) {
         state.deleteBlockReasons.clear();
 
         if (items.length === 0) {
-            elements.tbody.innerHTML = '<tr class="empty-row"><td colspan="12" style="text-align: center; padding: 2rem;"><i class="fas fa-box-open" style="font-size: 3rem; color: #ccc;"></i><p style="color: #999; margin-top: 1rem;">暫無庫存資料</p></td></tr>';
+            elements.tbody.innerHTML = '<tr class="empty-row"><td colspan="13" class="text-center"><i class="fas fa-box-open"></i><p>暫無庫存資料</p></td></tr>';
             return;
         }
 
@@ -570,6 +573,7 @@ function renderTable(items) {
             return `
             <tr data-id="${item.id}">
                 <td><strong>${escapeHtml(item.inventory_number) || '-'}</strong>${receiptTypeBadge}${partialReceiptTrace}</td>
+                <td><span class="status-badge ${item.stock_category === 'defect' ? 'danger' : 'success'}">${item.stock_category === 'defect' ? `不良品${Number(item.package_quantity || 0) > 0 ? `／${formatNumber(item.package_quantity)}袋` : ''}` : '良品'}</span></td>
                 <td>${escapeHtml(item.work_order_number) || '-'}</td>
                 <td>${escapeHtml(item.order_item_number) || '-'}</td>
                 <td>${Number.isInteger(normalizedCustomerId) && normalizedCustomerId > 0 && item.customer_name ? `<button type="button" class="record-link-button" data-action="open-customer" data-customer-id="${normalizedCustomerId}" title="${customerOpenLabel}" aria-label="${customerOpenLabel}">${escapeHtml(item.customer_name)}</button>` : escapeHtml(item.customer_name || '-')}${item.customer_name && !customerIsActive ? ' <span class="text-muted">(已停用)</span>' : ''}</td>
@@ -640,10 +644,16 @@ function renderTable(items) {
     function renderDetailView(data) {
         if (!elements.detailContent) return;
 
-        const { item, transactions, shipping_history: shippingHistory, source_chain: sourceChain = [] } = data;
+        const { item, transactions, shipping_history: shippingHistory, source_chain: sourceChain = [], packages = [] } = data;
         const receiptTypeLabel = escapeHtml(item.receipt_type_label || '一般入庫');
         const formatWeightUnits = (netWeightKg, units) => `${Number(netWeightKg || 0).toFixed(2)} kg / ${formatNumber(units || 0)} 支`;
         const sourceChainSection = window.InventoryItemsSourceChain?.renderSection(sourceChain, { escapeHtml }) || '';
+        const packageSection = window.InventoryItemShippingPackages.renderDetailPackages(
+            item,
+            packages,
+            escapeHtml,
+            formatNumber
+        );
 
         elements.detailContent.innerHTML = `
             <dl class="detail-list inventory-detail-list">
@@ -666,6 +676,10 @@ function renderTable(items) {
                 <div>
                     <dt>入庫類型</dt>
                     <dd>${receiptTypeLabel}</dd>
+                </div>
+                <div>
+                    <dt>庫存類別</dt>
+                    <dd><span class="status-badge ${item.stock_category === 'defect' ? 'danger' : 'success'}">${item.stock_category === 'defect' ? '不良品' : '良品'}</span></dd>
                 </div>
             </dl>
 
@@ -723,6 +737,7 @@ function renderTable(items) {
                 </dl>
             </div>
             ${sourceChainSection}
+            ${packageSection}
 
             ${(item.receipt_type === 'partial' && item.partial_receipt_tool_breakdown) ? `
             <div class="detail-section">
@@ -828,7 +843,7 @@ function renderTable(items) {
                 <dl class="detail-list inventory-detail-list">
                     <div>
                         <dt>載具統計</dt>
-                        <dd>${item.tool_statistics}</dd>
+                        <dd>${escapeHtml(window.InventoryItemShippingPackages.formatToolStatistics(item.tool_statistics))}</dd>
                     </div>
                     <div>
                         <dt>載具總數量</dt>
@@ -1215,14 +1230,12 @@ function renderTable(items) {
         state.editingId = null;
     }
 
-    // ===== 出貨 Modal 相關函數 =====
     async function openShippingModal(inventoryItemId) {
         if (!elements.shippingModal || !elements.shippingForm) {
             showAlert('error', '出貨功能載入失敗');
             return;
         }
 
-        // 先取得庫存項目資訊
         try {
             const response = await fetch(`api/inventory_items/show.php?id=${inventoryItemId}`, {
                 credentials: 'include'
@@ -1234,7 +1247,6 @@ function renderTable(items) {
 
             const item = data.item;
 
-            // 安全的欄位設定函數
             function setShippingField(name, value) {
                 const field = elements.shippingForm.querySelector(`[name="${name}"]`);
                 if (field) {
@@ -1244,7 +1256,6 @@ function renderTable(items) {
                 }
             }
 
-            // 填入庫存項目資訊
             setShippingField('inventory_item_id', inventoryItemId);
             setShippingField('customer_id', item.customer_id);
             elements.shippingModal.querySelector('[data-shipping-inventory-number]').textContent = item.inventory_number || '-';
@@ -1263,15 +1274,24 @@ function renderTable(items) {
             elements.shippingModal.querySelector('[data-shipping-available-qty]').textContent = formatNumber(availableQty);
             elements.shippingModal.querySelector('[data-shipping-max-qty]').textContent = `最大可出貨數量: ${formatNumber(availableQty)}`;
 
-            // 設定數量輸入欄位的最大值
             const qtyInput = elements.shippingForm.querySelector('[name="quantity"]');
             qtyInput.max = availableQty;
             qtyInput.value = availableQty; // 預設全部出貨
+            window.InventoryItemShippingPackages.configurePackageSelection(
+                elements.shippingForm,
+                item,
+                data.packages || [],
+                escapeHtml,
+                formatNumber
+            );
 
-            // 載入該客戶的待處理出貨單
-            await loadPendingShippingOrders(item.customer_id);
+            await window.InventoryItemShippingPackages.loadPendingOrders(
+                elements.shippingForm,
+                item.customer_id,
+                item.stock_category || 'good',
+                escapeHtml
+            );
 
-            // 顯示 Modal
             elements.shippingModal.classList.remove('hidden');
             hideShippingModalAlert();
 
@@ -1281,39 +1301,10 @@ function renderTable(items) {
         }
     }
 
-    async function loadPendingShippingOrders(customerId) {
-        const select = elements.shippingForm.querySelector('[name="shipping_order_id"]');
-        if (!select) return;
-
-        select.innerHTML = '<option value="">載入中...</option>';
-
-        try {
-            const response = await fetch(`api/shipping_orders/pending.php?customer_id=${customerId || ''}`, {
-                credentials: 'include'
-            });
-            const data = await response.json();
-
-            let html = '<option value="new">＋ 建立新出貨單</option>';
-
-            if (data.orders && data.orders.length > 0) {
-                html += '<optgroup label="草稿出貨單">';
-                data.orders.forEach(order => {
-                    const date = order.created_at ? new Date(order.created_at).toLocaleDateString() : '';
-                    html += `<option value="${order.id}">${escapeHtml(order.shipping_order_number)} (${date}, ${order.item_count || 0}項)</option>`;
-                });
-                html += '</optgroup>';
-            }
-
-            select.innerHTML = html;
-        } catch (error) {
-            console.error('載入出貨單失敗:', error);
-            select.innerHTML = '<option value="new">＋ 建立新出貨單</option>';
-        }
-    }
-
     function closeShippingModal() {
         elements.shippingModal.classList.add('hidden');
         elements.shippingForm.reset();
+        window.InventoryItemShippingPackages.reset(elements.shippingForm);
         hideShippingModalAlert();
     }
 
@@ -1338,6 +1329,7 @@ function renderTable(items) {
         const shippingOrderId = formData.get('shipping_order_id');
         const quantity = parseInt(formData.get('quantity'));
         const notes = formData.get('notes');
+        const packageIds = window.InventoryItemShippingPackages.selectedPackageIds(elements.shippingForm);
 
         // 驗證
         if (!shippingOrderId) {
@@ -1362,7 +1354,8 @@ function renderTable(items) {
                 customer_id: customerId ? parseInt(customerId) : null,
                 quantity: quantity,
                 shipped_quantity: quantity,
-                notes: notes
+                notes: notes,
+                package_ids: packageIds
             };
 
             const response = await fetch('api/shipping_orders/add_item.php', {
@@ -1377,12 +1370,10 @@ function renderTable(items) {
                 throw new Error(data.message || '加入出貨單失敗');
             }
 
-            // 成功
             closeShippingModal();
             showAlert('success', data.message || '已成功加入出貨單');
             loadInventoryItems(); // 刷新表格
 
-            // 詢問是否跳轉到出貨單頁面
             const createdShippingOrderId = data.shipping_order_id
                 || data.data?.shipping_order_id
                 || data.data?.shipping_order?.id
@@ -1418,8 +1409,6 @@ function renderTable(items) {
             }
         }
     }
-    // ===== 出貨 Modal 相關函數結束 =====
-
     function updateDefectWeight() {
         if (!elements.modalForm) return;
         const defectUnits = parseFloat(elements.modalForm.querySelector('[name="total_defect_units"]')?.value || 0);
@@ -1731,6 +1720,7 @@ function renderTable(items) {
         if (values.keyword) params.set('keyword', values.keyword);
         if (values.customerId) params.set('customer_id', values.customerId);
         if (values.screeningItemId) params.set('screening_item_id', values.screeningItemId);
+        if (values.stockCategory) params.set('stock_category', values.stockCategory);
         if (values.status) params.set('status', values.status);
         if (values.qualityStatus) params.set('quality_status', values.qualityStatus);
         if (values.startDate) params.set('start_date', values.startDate);

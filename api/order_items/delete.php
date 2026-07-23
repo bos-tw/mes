@@ -172,11 +172,10 @@ if (!empty($relatedLabels)) {
 }
 
 try {
+    $pdo->beginTransaction();
+
     if (!softDeleteOrderItem($pdo, $id)) {
-        jsonResponse([
-            'success' => false,
-            'message' => '找不到對應的訂單品項資料。',
-        ], 404);
+        throw new InvalidArgumentException('找不到對應的訂單品項資料。');
     }
 
     recalculateOrderTotalAmount($pdo, $orderId);
@@ -184,7 +183,20 @@ try {
     logAuditAction('刪除訂單品項', 'OrderItems', $id, [
         'order_id' => $orderId,
     ]);
+
+    $pdo->commit();
+} catch (InvalidArgumentException $exception) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    jsonResponse([
+        'success' => false,
+        'message' => $exception->getMessage(),
+    ], 404);
 } catch (Throwable $exception) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     jsonResponse([
         'success' => false,
         'message' => '刪除訂單品項時發生錯誤。',

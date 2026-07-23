@@ -445,6 +445,8 @@ function handleCreateOrderItem(): void
             'part_number' => $data['part_number'] ?? null,
             'customer_batch_number' => $data['customer_batch_number'] ?? null,
             'customer_sample_status' => $data['customer_sample_status'] ?? null,
+            'expected_delivery_date' => $data['expected_delivery_date'] ?? null,
+            'expected_delivery_period' => $data['expected_delivery_period'] ?? null,
             'delivery_location' => $data['delivery_location'] ?? null,
             'notes' => $data['notes'] ?? null,
         ];

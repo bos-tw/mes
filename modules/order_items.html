@@ -409,8 +409,10 @@
 
                     <section class="order-items-editor-panel" id="order-items-panel-delivery" role="tabpanel" aria-labelledby="order-items-tab-delivery" data-order-items-tab-panel="delivery" hidden>
                         <section class="form-section">
-                            <h4>備註資訊</h4>
+                            <h4>交期與備註</h4>
                             <div class="form-grid">
+                                <label class="inline-label"><span>細項預計交期</span><input type="date" name="expected_delivery_date" data-field="expected-delivery-date"></label>
+                                <label class="inline-label"><span>交期時段</span><select name="expected_delivery_period" data-field="expected-delivery-period"><option value="">-- 請選擇時段 --</option><option value="morning">上午</option><option value="noon">中午</option><option value="afternoon">下午</option><option value="evening">晚間</option></select></label>
                                 <label class="inline-label full-width"><span>指送地點</span><input type="text" name="delivery_location" placeholder="請輸入指送地點" data-field="delivery-location"></label>
                                 <label class="inline-label full-width"><span>備註</span><textarea name="notes" rows="2" placeholder="請輸入備註" data-field="notes"></textarea></label>
                             </div>

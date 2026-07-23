@@ -237,7 +237,11 @@
                             break;
                         case 'add-item': {
                             const customerId = Number.parseInt(actionButton.dataset.customerId || '', 10);
-                            openAddItemModal(id, Number.isInteger(customerId) ? customerId : null);
+                            openAddItemModal(
+                                id,
+                                Number.isInteger(customerId) ? customerId : null,
+                                actionButton.dataset.shipmentPurpose || 'normal'
+                            );
                             break;
                         }
                         case 'delete':
@@ -506,6 +510,13 @@
                 if (itemSelect) {
                     itemSelect.addEventListener('change', handleInventoryItemChange);
                 }
+                elements.addItemForm?.addEventListener('change', (event) => {
+                    if (!event.target.matches('[data-inventory-package-checkbox]')) return;
+                    const selected = Array.from(elements.addItemForm.querySelectorAll('[data-inventory-package-checkbox]:checked'));
+                    const units = selected.reduce((sum, checkbox) => sum + Number(checkbox.dataset.containedUnits || 0), 0);
+                    const qtyInput = elements.addItemForm.querySelector('[name="quantity"]');
+                    if (qtyInput) qtyInput.value = String(units);
+                });
             }
 
             document.addEventListener('keydown', (event) => {
@@ -879,7 +890,7 @@ function renderTable(items) {
                             <i class="fas fa-edit"></i>
                         </button>
                         ${item.status === 'draft' ? `
-                        <button type="button" class="btn text" data-action="add-item" data-customer-id="${item.customer_id || ''}" title="新增項目">
+                        <button type="button" class="btn text" data-action="add-item" data-customer-id="${item.customer_id || ''}" data-shipment-purpose="${escapeHtml(item.shipment_purpose || 'normal')}" title="新增項目">
                             <i class="fas fa-plus"></i>
                         </button>
                         ` : ''}
@@ -2005,7 +2016,7 @@ function renderTable(items) {
                             <h4 style="margin: 0;">出貨項目 (${items.length}${returnStats})</h4>
                             <div>
                                 ${order.status === 'draft' ? `
-                                <button type="button" class="btn primary" onclick="window.shippingOrdersModule.openAddItem(${order.id}, ${order.customer_id || 'null'})">
+                                <button type="button" class="btn primary" onclick="window.shippingOrdersModule.openAddItem(${order.id}, ${order.customer_id || 'null'}, '${escapeHtml(order.shipment_purpose || 'normal')}')">
                                     <i class="fas fa-plus"></i> 新增項目
                                 </button>
                                 ` : ''}
@@ -2023,6 +2034,7 @@ function renderTable(items) {
                                     <tr>
                                         <th>庫存編號</th>
                                         <th>產品</th>
+                                        <th>類別／包裝</th>
                                         <th>出貨數量</th>
                                         <th>已退數量</th>
                                         <th>可退數量</th>
@@ -2054,6 +2066,14 @@ function renderTable(items) {
                                             ` : ''}
                                         </td>
                                         <td>${escapeHtml(item.screening_item_name || item.product_name) || '-'}</td>
+                                        <td>
+                                            ${item.stock_category === 'defect' ? '不良品' : '良品'}
+                                            ${item.stock_category === 'defect'
+                                                ? `<div class="text-muted small">${formatNumber(item.package_quantity || 0)} 袋</div>`
+                                                : (item.output_tool_summary
+                                                    ? `<div class="text-muted small">${escapeHtml(item.output_tool_summary)}</div>`
+                                                    : '')}
+                                        </td>
                                         <td>${formatNumber(item.shipped_quantity)}</td>
                                         <td>${totalReturned > 0 ? `<span class="text-danger">${formatNumber(totalReturned)}</span>` : '-'}</td>
                                         <td>${returnableQty > 0 ? `<span class="text-success"><strong>${formatNumber(returnableQty)}</strong></span>` : '<span class="text-muted">已全退</span>'}</td>
@@ -2170,10 +2190,10 @@ function renderTable(items) {
         }
 
         // Add Item Modal Functions
-        async function openAddItemModal(shippingOrderId, customerId) {
+        async function openAddItemModal(shippingOrderId, customerId, shipmentPurpose = 'normal') {
             elements.addItemForm.reset();
             elements.addItemForm.querySelector('[name="shipping_order_id"]').value = shippingOrderId;
-            state.addItemContext = { shippingOrderId, customerId };
+            state.addItemContext = { shippingOrderId, customerId, shipmentPurpose };
 
             // Load available inventory items for this customer
             await loadAvailableInventoryItems(customerId);
@@ -2195,6 +2215,16 @@ function renderTable(items) {
 
             try {
                 let url = 'api/inventory_items/index.php?perPage=1000&status=in_stock&quality_status=qualified';
+                const shipmentPurpose = state.addItemContext?.shipmentPurpose || 'normal';
+                if (shipmentPurpose === 'normal') {
+                    url += '&stock_category=good';
+                } else if (shipmentPurpose === 'defect_return') {
+                    url += '&stock_category=defect';
+                } else if (shipmentPurpose === 'tool_return') {
+                    select.innerHTML = '<option value="">-- 載具歸還不加入產品庫存 --</option>';
+                    state.inventoryItems = [];
+                    return;
+                }
                 if (customerId) {
                     url += `&customer_id=${customerId}`;
                 }
@@ -2211,12 +2241,15 @@ function renderTable(items) {
                     const available = parseInt(item.quantity_on_hand) - parseInt(item.quantity_allocated || 0);
                     const receiptType = String(item.receipt_type || 'standard').toLowerCase();
                     const receiptLabel = receiptType === 'partial' ? '（部分入庫）' : (receiptType === 'final' ? '（最終補入）' : '');
+                    const categoryLabel = item.stock_category === 'defect'
+                        ? `（不良品${Number(item.package_quantity || 0) > 0 ? `／${formatNumber(item.package_quantity)}袋` : ''}）`
+                        : '（良品）';
                     if (available > 0) {
                         appendSelectOption(
                             select,
                             item.id,
-                            `${item.inventory_number}${receiptLabel} - ${item.screening_item_name || '未知產品'} (可用: ${formatNumber(available)})`,
-                            { 'data-available': available }
+                            `${item.inventory_number}${categoryLabel}${receiptLabel} - ${item.screening_item_name || '未知產品'} (可用: ${formatNumber(available)})`,
+                            { 'data-available': available, 'data-stock-category': item.stock_category || 'good' }
                         );
                     }
                 });
@@ -2230,7 +2263,7 @@ function renderTable(items) {
             }
         }
 
-        function handleInventoryItemChange() {
+        async function handleInventoryItemChange() {
             const select = elements.addItemForm.querySelector('[name="inventory_item_id"]');
             const infoDiv = elements.addItemModal.querySelector('[data-selected-item-info]');
             const qtyInput = elements.addItemForm.querySelector('[name="quantity"]');
@@ -2242,6 +2275,7 @@ function renderTable(items) {
                 infoDiv.innerHTML = '<p class="text-muted">請先選擇庫存項目</p>';
                 qtyInput.max = '';
                 qtyInput.value = '';
+                qtyInput.readOnly = false;
                 return;
             }
 
@@ -2251,6 +2285,10 @@ function renderTable(items) {
                 const receiptType = String(item.receipt_type || 'standard').toLowerCase();
                 const receiptLabel = receiptType === 'partial' ? '部分入庫' : (receiptType === 'final' ? '最終補入' : '一般入庫');
                 infoDiv.innerHTML = `
+                    <div class="detail-item">
+                        <span class="detail-label">庫存類別</span>
+                        <span class="detail-value">${item.stock_category === 'defect' ? '不良品' : '良品'}</span>
+                    </div>
                     <div class="detail-item">
                         <span class="detail-label">庫存編號</span>
                         <span class="detail-value">${escapeHtml(item.inventory_number) || '-'}</span>
@@ -2288,6 +2326,41 @@ function renderTable(items) {
                 `;
                 qtyInput.max = available;
                 qtyInput.value = available;
+                qtyInput.readOnly = item.stock_category === 'defect';
+                if (item.stock_category === 'defect') {
+                    try {
+                        const packageResponse = await fetch(`api/inventory_items/packages.php?inventory_item_id=${encodeURIComponent(item.id)}`, {
+                            credentials: 'include'
+                        });
+                        const packagePayload = await packageResponse.json();
+                        if (!packageResponse.ok || packagePayload.success === false) {
+                            throw new Error(packagePayload.message || '載入不良品包裝失敗');
+                        }
+                        const packages = packagePayload.data || [];
+                        infoDiv.insertAdjacentHTML('beforeend', `
+                            <div class="detail-item full-width">
+                                <span class="detail-label">選擇實際出貨包／袋</span>
+                                <div class="table-responsive">
+                                    <table class="data-table compact ui-compact-table">
+                                        <thead><tr><th>選取</th><th>袋號</th><th>袋數</th><th>支數</th><th>內容物重量(kg)</th></tr></thead>
+                                        <tbody>${packages.map((itemPackage) => `
+                                            <tr>
+                                                <td><input type="checkbox" data-inventory-package-checkbox value="${itemPackage.id}" data-contained-units="${itemPackage.contained_units}"></td>
+                                                <td>${escapeHtml(itemPackage.package_number)}</td>
+                                                <td>${formatNumber(itemPackage.package_quantity)}</td>
+                                                <td>${formatNumber(itemPackage.contained_units)}</td>
+                                                <td>${Number(itemPackage.content_weight_kg || 0).toFixed(3)}</td>
+                                            </tr>
+                                        `).join('') || '<tr class="empty-row"><td colspan="5" class="text-center">無可用包裝</td></tr>'}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        `);
+                        qtyInput.value = '';
+                    } catch (error) {
+                        infoDiv.insertAdjacentHTML('beforeend', `<p class="text-danger">${escapeHtml(error.message)}</p>`);
+                    }
+                }
             }
         }
 
@@ -2297,6 +2370,9 @@ function renderTable(items) {
             const inventoryItemId = formData.get('inventory_item_id');
             const quantity = parseInt(formData.get('quantity'));
             const notes = formData.get('notes');
+            const packageIds = Array.from(elements.addItemForm.querySelectorAll('[data-inventory-package-checkbox]:checked'))
+                .map((checkbox) => Number.parseInt(checkbox.value, 10))
+                .filter(Number.isInteger);
 
             if (!inventoryItemId) {
                 showAddItemModalAlert('error', '請選擇庫存項目');
@@ -2322,7 +2398,8 @@ function renderTable(items) {
                         shipping_order_id: parseInt(shippingOrderId),
                         inventory_item_id: parseInt(inventoryItemId),
                         quantity: quantity,
-                        notes: notes
+                        notes: notes,
+                        package_ids: packageIds
                     })
                 });
 

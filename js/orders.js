@@ -352,6 +352,8 @@
                 customerName: order?.customer?.name ?? order?.customer_name ?? null,
                 customerId: order?.customer_id ?? order?.customer?.id ?? null,
                 createdAt: order?.created_at ?? null,
+                expectedDeliveryDate: order?.expected_delivery_date ?? null,
+                expectedDeliveryPeriod: order?.expected_delivery_period ?? null,
                 ...extra,
             };
         }
@@ -578,7 +580,12 @@
                     weightTolerance != null ? `±${formatNumber(weightTolerance, 2)}%` : '-',
                 ]]);
 
-                appendOrderDetailTable(itemSection, '備註資訊', ['指送地點', '備註'], [[item.delivery_location, item.notes]]);
+                appendOrderDetailTable(itemSection, '備註資訊', ['細項交期', '交期時段', '指送地點', '備註'], [[
+                    item.expected_delivery_date,
+                    getExpectedDeliveryPeriodLabel(item.expected_delivery_period),
+                    item.delivery_location,
+                    item.notes,
+                ]]);
                 appendOrderDetailTable(itemSection, '計算指標', [
                     '總重量(含桶重) (kg)', '載具重量合計 (kg)', '淨重 (kg)', '單支重 (g)',
                     '總支數', '單價 (元/M)', '單價合計 (參考)', '預估總金額',
@@ -732,6 +739,23 @@
             };
         }
 
+        function getExpectedDeliveryPeriodLabel(period) {
+            const labels = {
+                morning: '上午',
+                noon: '中午',
+                afternoon: '下午',
+                evening: '晚間',
+            };
+            const normalized = String(period || '').trim();
+            return labels[normalized] || normalized;
+        }
+
+        function getOrderItemExpectedDeliveryLabel(item) {
+            const date = String(item?.expected_delivery_date || '').trim();
+            const period = getExpectedDeliveryPeriodLabel(item?.expected_delivery_period);
+            return [date, period].filter(Boolean).join(' ') || '-';
+        }
+
         function renderOrderStatusBadge(status, statusLabel = null) {
             const badge = getOrderStatusBadge(status, statusLabel);
             return `<span class="status-badge ${badge.className}">${escapeHtml(badge.label)}</span>`;
@@ -767,6 +791,24 @@
             }
         }
 
+        /**
+         * 從訂單細項開啟新增工單表單並自動帶入客戶批號資料。
+         * 這裡沿用客戶批號頁面的既有轉工單流程。
+         *
+         * @param {number} orderItemId 客戶批號 ID
+         */
+        function handleCreateWorkOrder(orderItemId) {
+            window.openTab('work_orders', '生產工單', 'modules/work_orders.html');
+
+            setTimeout(() => {
+                if (window.openWorkOrderFromOrderItem && typeof window.openWorkOrderFromOrderItem === 'function') {
+                    window.openWorkOrderFromOrderItem(orderItemId);
+                } else {
+                    console.error('工單模組未正確載入,openWorkOrderFromOrderItem 函數不存在');
+                }
+            }, 500);
+        }
+
         function renderOrderItemsDetailRow(orderId) {
             const colspan = getTableColumnCount();
             const items = orderItemsCache.get(orderId);
@@ -797,6 +839,11 @@
                     const tools = Array.isArray(item.tools) ? item.tools : [];
                     const toolTypes = [...new Set(tools.map((tool) => String(tool.tool_type || '').trim()).filter(Boolean))];
                     const toolTypesLabel = toolTypes.length > 0 ? toolTypes.join(', ') : '-';
+                    const hasWorkOrder = item.has_work_order == 1;
+                    const workOrderBtnTitle = hasWorkOrder
+                        ? `已轉成工單 ${escapeHtml(item.work_order_number || '')}`.trim()
+                        : '轉為工單';
+                    const workOrderBtnAttr = hasWorkOrder ? 'data-has-work-order="true" disabled aria-disabled="true"' : '';
 
                     return `
                         <tr data-order-item-id="${escapeHtml(item.id)}">
@@ -816,6 +863,7 @@
                                 </div>
                                 ${item.drawing_number ? `<div class="table-secondary">圖面：${escapeHtml(item.drawing_number)}</div>` : ''}
                             </td>
+                            <td>${escapeHtml(getOrderItemExpectedDeliveryLabel(item))}</td>
                             <td class="text-right">${formatNumber(item.total_weight_kg ?? 0, 2)}</td>
                             <td class="text-right">${formatNumber(totals.tool_weight_kg ?? 0, 2)}</td>
                             <td class="text-right">${formatNumber(totals.net_weight_kg ?? 0, 2)}</td>
@@ -839,6 +887,9 @@
                             <td class="text-right">${tools.length > 0 ? tools.map((tool) => formatNumber(tool.weight_kg ?? 0, 4)).join(', ') : '-'}</td>
                             <td class="text-right">${tools.length > 0 ? tools.map((tool) => formatNumber(tool.quantity ?? 0, 0)).join(', ') : '-'}</td>
                             <td class="table-actions order-items-inline-actions">
+                                <button type="button" class="btn text" data-action="create-work-order" data-order-id="${orderId}" data-order-item-id="${item.id}" title="${workOrderBtnTitle}" ${workOrderBtnAttr}>
+                                    <i class="fas fa-cogs" aria-hidden="true"></i>
+                                </button>
                                 <button type="button" class="btn text" data-action="edit-order-item-inline" data-order-id="${orderId}" data-order-item-id="${item.id}" title="編輯客戶批號" aria-label="編輯客戶批號">
                                     <i class="fas fa-edit" aria-hidden="true"></i>
                                 </button>
@@ -861,6 +912,7 @@
                                     ${sortableHeader('order_number', '訂單號碼')}
                                     ${sortableHeader('customer_name', '客戶名稱')}
                                     ${sortableHeader('screening_label', '受篩品項')}
+                                    ${sortableHeader('expected_delivery_date', '細項交期')}
                                     ${sortableHeader('total_weight_kg', '總重量(kg)', 'text-right')}
                                     ${sortableHeader('tool_weight_kg', '載具重量(kg)', 'text-right')}
                                     ${sortableHeader('net_weight_kg', '淨重(kg)', 'text-right')}
@@ -929,6 +981,7 @@
                                     <label class="column-option"><input type="checkbox" data-column="order_number" checked><span>訂單號碼</span></label>
                                     <label class="column-option"><input type="checkbox" data-column="customer_name" checked><span>客戶名稱</span></label>
                                     <label class="column-option"><input type="checkbox" data-column="screening_label" checked><span>受篩品項</span></label>
+                                    <label class="column-option"><input type="checkbox" data-column="expected_delivery_date" checked><span>細項交期</span></label>
                                     <label class="column-option"><input type="checkbox" data-column="total_weight_kg" checked><span>總重量(kg)</span></label>
                                     <label class="column-option"><input type="checkbox" data-column="tool_weight_kg" checked><span>載具重量(kg)</span></label>
                                     <label class="column-option"><input type="checkbox" data-column="net_weight_kg" checked><span>淨重(kg)</span></label>
@@ -1007,7 +1060,7 @@
                         <td>${escapeHtml(order.order_number)}</td>
                         <td>${Number.isInteger(customerId) && customerId > 0 && customerName !== '-' ? `<button type="button" class="record-link-button" data-action="open-customer" data-customer-id="${customerId}" title="${customerOpenLabel}" aria-label="${customerOpenLabel}">${escapeHtml(customerName)}</button>` : escapeHtml(customerName)}${inactiveCustomerSuffix}</td>
                         <td>${formatDateTime(order.order_date)}${order.order_date ? ` <span class="weekday-text">${getWeekdayText(order.order_date)}</span>` : ''}</td>
-                        <td>${formatDateTime(order.expected_delivery_date)}${order.expected_delivery_date ? ` <span class="weekday-text">${getWeekdayText(order.expected_delivery_date)}</span>` : ''}</td>
+                        <td>${formatDateTime(order.expected_delivery_date)}${order.expected_delivery_date ? ` <span class="weekday-text">${getWeekdayText(order.expected_delivery_date)}</span>` : ''}${order.expected_delivery_period ? ` ${escapeHtml(getExpectedDeliveryPeriodLabel(order.expected_delivery_period))}` : ''}</td>
                         <td>${escapeHtml(displayNullableText(order.customer_po_number))}</td>
                         <td>${renderOrderStatusBadge(order.status, statusLabel)}</td>
                         <td class="text-right">$${formatCurrency(order.total_amount)} ${amountWarning}</td>
@@ -1627,7 +1680,6 @@
             if (isEdit && payload.hasOwnProperty('order_number')) {
                 delete payload.order_number;
             }
-
             const url = isEdit ? `api/orders/update.php?id=${state.currentEditingId}` : 'api/orders/index.php';
             const method = isEdit ? 'PUT' : 'POST';
 
@@ -1980,7 +2032,7 @@
 
             // 訂單主表標題
             lines.push([
-                '訂單ID', '訂單編號', '客戶名稱', '客戶訂單號', '訂單日期', '預計交期', '狀態', '預估總金額', '最終報價(元/M)', '備註'
+                '訂單ID', '訂單編號', '客戶名稱', '客戶訂單號', '訂單日期', '預訂交期', '狀態', '預估總金額', '最終報價(元/M)', '備註'
             ].map(escapeCsvCell).join(','));
 
             for (const order of allOrders) {
@@ -2004,7 +2056,7 @@
                     // 明細標題（僅輸出一次，在第一筆明細前）
                     lines.push([
                         '', '明細-批號', '明細-客戶批號', '明細-料號', '明細-圖號', '明細-受篩產品', '明細-總重(kg)',
-                        '明細-單重(g)', '明細-支數', '明細-指送地點', '明細-客戶樣品狀態', '明細-重量追蹤-客戶提供重量(kg)',
+                        '明細-單重(g)', '明細-支數', '明細-交期', '明細-交期時段', '明細-指送地點', '明細-客戶樣品狀態', '明細-重量追蹤-客戶提供重量(kg)',
                         '明細-重量追蹤-確認重量(kg)', '明細-備註'
                     ].map(escapeCsvCell).join(','));
                     for (const item of items) {
@@ -2021,6 +2073,8 @@
                             item.total_weight_kg != null && item.total_weight_kg !== '' ? formatNumber(item.total_weight_kg, 2) : '',
                             unitW,
                             item.total_units || '',
+                            item.expected_delivery_date || '',
+                            getExpectedDeliveryPeriodLabel(item.expected_delivery_period),
                             item.delivery_location || '',
                             item.customer_sample_status_label || item.customer_sample_status || '',
                             item.customer_provided_weight != null && item.customer_provided_weight !== '' ? formatNumber(item.customer_provided_weight, 2) : '',
@@ -2123,7 +2177,7 @@ th { font-weight: bold; white-space: nowrap; }
 <div class="section-title">批號明細</div>
 <table>
     <thead><tr>
-        <th>批號</th><th>客戶批號</th><th>受篩產品</th><th>總重(kg)</th><th>載具重(kg)</th>
+        <th>批號</th><th>客戶批號</th><th>受篩產品</th><th>細項交期</th><th>總重(kg)</th><th>載具重(kg)</th>
         <th>單重(g)</th><th>支數</th><th>指送地點</th><th>備註</th>
     </tr></thead>
     <tbody>${items.map(item => {
@@ -2134,6 +2188,7 @@ th { font-weight: bold; white-space: nowrap; }
             <td>${escapeHtml(item.sub_item_number || '-')}</td>
             <td>${escapeHtml(item.customer_batch_number || '-')}</td>
             <td>${escapeHtml(itemName)}</td>
+            <td>${escapeHtml(getOrderItemExpectedDeliveryLabel(item))}</td>
             <td style="text-align:right">${item.total_weight_kg != null && item.total_weight_kg !== '' ? formatNumber(item.total_weight_kg, 2) : '-'}</td>
             <td style="text-align:right">${formatNumber(toolW, 2)}</td>
             <td style="text-align:right">${unitW}</td>
@@ -2152,7 +2207,7 @@ th { font-weight: bold; white-space: nowrap; }
         <span class="label">客戶名稱</span><span class="value">${escapeHtml(customer.name || '-')}</span>
         <span class="label">客戶訂單號</span><span class="value">${escapeHtml(displayNullableText(order.customer_po_number))}</span>
         <span class="label">訂單日期</span><span class="value">${order.order_date || '-'}</span>
-        <span class="label">預計交期</span><span class="value">${order.expected_delivery_date || '-'}</span>
+        <span class="label">預訂交期</span><span class="value">${order.expected_delivery_date || '-'}${order.expected_delivery_period ? ` ${escapeHtml(getExpectedDeliveryPeriodLabel(order.expected_delivery_period))}` : ''}</span>
         <span class="label">狀態</span><span class="value">${escapeHtml(order.status_label || order.status || '-')}</span>
         <span class="label">預估總金額</span><span class="value">${order.total_amount ? '$' + Number(order.total_amount).toLocaleString('zh-TW', {minimumFractionDigits:2}) : '-'}</span>
         <span class="label">最終報價(元/M)</span><span class="value">${order.final_quote_per_m !== null && order.final_quote_per_m !== undefined && order.final_quote_per_m !== '' ? Number(order.final_quote_per_m).toLocaleString('zh-TW', {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</span>
@@ -2323,10 +2378,12 @@ ${pagesHtml}
                     <td class="text-right">${Number.isFinite(netWeight) ? formatNumber(netWeight, 2) : '&nbsp;'}</td>
                 </tr>
                 <tr>
+                    <th>細項交期</th>
+                    <td colspan="3">${item.expected_delivery_date ? escapeHtml(getOrderItemExpectedDeliveryLabel(item)) : '&nbsp;'}</td>
                     <th>指送地點</th>
-                    <td colspan="3">${item.delivery_location ? escapeHtml(item.delivery_location) : '&nbsp;'}</td>
+                    <td>${item.delivery_location ? escapeHtml(item.delivery_location) : '&nbsp;'}</td>
                     <th>備註</th>
-                    <td colspan="3">${item.notes ? escapeHtml(item.notes) : '&nbsp;'}</td>
+                    <td>${item.notes ? escapeHtml(item.notes) : '&nbsp;'}</td>
                 </tr>
             </tbody>
         </table>
@@ -2712,6 +2769,22 @@ ${pages}
                     if (Number.isInteger(orderId) && Number.isInteger(orderItemId)) {
                         openOrderItemEditor(orderId, orderItemId);
                     }
+                    return;
+                }
+
+                if (action === 'create-work-order') {
+                    const orderItemId = Number.parseInt(target.dataset.orderItemId || '', 10);
+                    if (!Number.isInteger(orderItemId)) {
+                        return;
+                    }
+
+                    const hasWorkOrder = target.getAttribute('data-has-work-order') === 'true';
+                    if (hasWorkOrder) {
+                        showAlert('error', '此客戶批號已轉成工單，請勿重複建立。');
+                        return;
+                    }
+
+                    handleCreateWorkOrder(orderItemId);
                     return;
                 }
 

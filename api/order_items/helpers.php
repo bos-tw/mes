@@ -181,6 +181,33 @@ function validateOrderItemData(array $payload, bool $isUpdate = false): array
         $data['customer_sample_status'] = $value === '' ? null : mb_substr($value, 0, 50);
     }
 
+    // expected_delivery_date - 每筆訂單細項自己的客戶承諾交期
+    if (array_key_exists('expected_delivery_date', $payload)) {
+        $value = trim((string)($payload['expected_delivery_date'] ?? ''));
+        if ($value === '') {
+            $data['expected_delivery_date'] = null;
+        } else {
+            $date = DateTime::createFromFormat('Y-m-d', $value);
+            if (!$date || $date->format('Y-m-d') !== $value) {
+                $errors['expected_delivery_date'] = '細項交期格式不正確。';
+            } else {
+                $data['expected_delivery_date'] = $value;
+            }
+        }
+    }
+
+    // expected_delivery_period - 每筆訂單細項自己的客戶承諾交期時段
+    if (array_key_exists('expected_delivery_period', $payload)) {
+        $value = trim((string)($payload['expected_delivery_period'] ?? ''));
+        if ($value === '') {
+            $data['expected_delivery_period'] = null;
+        } elseif (!in_array($value, ['morning', 'noon', 'afternoon', 'evening'], true)) {
+            $errors['expected_delivery_period'] = '細項交期時段格式不正確。';
+        } else {
+            $data['expected_delivery_period'] = $value;
+        }
+    }
+
     // delivery_location
     if (array_key_exists('delivery_location', $payload)) {
         $value = trim((string)$payload['delivery_location']);
@@ -1036,6 +1063,8 @@ function transformOrderItem(array $row, array $tools, array $details, array $dra
         'customer_batch_number' => $row['customer_batch_number'] ?? null,
         'customer_sample_status' => $row['customer_sample_status'] ?? null,
         'customer_sample_status_label' => $row['customer_sample_status_label'] ?? null,
+        'expected_delivery_date' => $row['expected_delivery_date'] ?? null,
+        'expected_delivery_period' => $row['expected_delivery_period'] ?? null,
         'delivery_location' => $row['delivery_location'] ?? null,
         'notes' => $row['notes'] ?? null,
         // 重量追蹤欄位

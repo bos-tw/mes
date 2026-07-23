@@ -277,6 +277,38 @@ function getInventoryItemSourceChain(PDO $pdo, int $inventoryItemId): array
             iis.source_order_item_id,
             iis.source_work_order_id,
             wo.work_order_number,
+            iis.source_stage_id,
+            stage.stage_type AS source_stage_type,
+            stage.secondary_mode AS source_stage_secondary_mode,
+            stage.source_quality AS source_stage_quality,
+            stage.image_requirement AS source_image_requirement,
+            stage.image_min_count AS source_image_min_count,
+            iis.source_machine_result_id,
+            result_row.result_revision AS source_machine_result_revision,
+            result_row.machine_run_id AS source_machine_run_id,
+            COALESCE(run.run_label, machine.name) AS source_machine_label,
+            result_row.machine_good_units AS source_machine_good_units,
+            result_row.machine_defect_units AS source_machine_defect_units,
+            result_row.defect_weight_kg AS source_defect_weight_kg,
+            result_row.weight_per_unit_g AS source_weight_per_unit_g,
+            result_row.settled_defect_units AS source_settled_defect_units,
+            result_row.defect_difference_units AS source_defect_difference_units,
+            (
+                SELECT COUNT(*)
+                FROM work_order_machine_result_images image_row
+                WHERE image_row.machine_result_id = result_row.id
+                  AND image_row.deleted_at IS NULL
+            ) AS source_machine_image_count,
+            (
+                SELECT GROUP_CONCAT(image_row.file_path ORDER BY image_row.sort_order, image_row.id SEPARATOR '|')
+                FROM work_order_machine_result_images image_row
+                WHERE image_row.machine_result_id = result_row.id
+                  AND image_row.deleted_at IS NULL
+            ) AS source_machine_image_paths,
+            iis.source_stage_transfer_id,
+            transfer_row.source_quality AS source_transfer_quality,
+            transfer_row.route AS source_transfer_route,
+            transfer_row.secondary_mode AS source_transfer_secondary_mode,
             iis.source_shipping_order_id,
             so.shipping_order_number,
             iis.source_return_order_id,
@@ -289,6 +321,11 @@ function getInventoryItemSourceChain(PDO $pdo, int $inventoryItemId): array
         FROM inventory_item_sources iis
         LEFT JOIN orders o ON o.id = iis.source_order_id
         LEFT JOIN work_orders wo ON wo.id = iis.source_work_order_id
+        LEFT JOIN work_order_stages stage ON stage.id = iis.source_stage_id
+        LEFT JOIN work_order_machine_results result_row ON result_row.id = iis.source_machine_result_id
+        LEFT JOIN work_order_machine_runs run ON run.id = result_row.machine_run_id
+        LEFT JOIN machines machine ON machine.id = run.machine_id
+        LEFT JOIN work_order_stage_transfers transfer_row ON transfer_row.id = iis.source_stage_transfer_id
         LEFT JOIN shipping_orders so ON so.id = iis.source_shipping_order_id
         LEFT JOIN return_orders ro ON ro.id = iis.source_return_order_id
         LEFT JOIN rescreen_batches rb ON rb.id = iis.source_rescreen_batch_id
@@ -337,17 +374,21 @@ function ensureInventoryItemSource(
     $sourceId ??= $inventoryItemId;
     $stmt = $pdo->prepare("INSERT INTO inventory_item_sources (
         inventory_item_id, source_type, source_id, source_order_id,
-        source_order_item_id, source_work_order_id, source_shipping_order_id,
+        source_order_item_id, source_work_order_id, source_stage_id,
+        source_machine_result_id, source_stage_transfer_id, source_shipping_order_id,
         source_shipping_order_item_id, source_return_order_id,
         source_return_order_item_id, source_rescreen_batch_id,
         source_rescreen_batch_item_id, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE id = id");
     $stmt->execute([
         $inventoryItemId, trim($sourceType), $sourceId,
         $links['source_order_id'] ?? null,
         $links['source_order_item_id'] ?? null,
         $links['source_work_order_id'] ?? null,
+        $links['source_stage_id'] ?? null,
+        $links['source_machine_result_id'] ?? null,
+        $links['source_stage_transfer_id'] ?? null,
         $links['source_shipping_order_id'] ?? null,
         $links['source_shipping_order_item_id'] ?? null,
         $links['source_return_order_id'] ?? null,
@@ -535,6 +576,14 @@ function buildInventoryWhereClause(array $filters): array
             $where[] = 'ii.quality_status = :quality_status';
         }
         $params['quality_status'] = $filters['quality_status'];
+    }
+
+    if (!empty($filters['stock_category'])) {
+        $stockCategory = strtolower(trim((string)$filters['stock_category']));
+        if (in_array($stockCategory, ['good', 'defect'], true)) {
+            $where[] = 'ii.stock_category = :stock_category';
+            $params['stock_category'] = $stockCategory;
+        }
     }
 
     // Date range filter

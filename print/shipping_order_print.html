@@ -778,6 +778,7 @@
                 items.forEach((item) => {
                     const unitWeight = parseFloat(item.weight_per_unit_g || 0);
                     const totalQuantity = parseFloat(item.shipped_quantity || 0);
+                    const stockCategory = String(item.stock_category || item.stock_category_snapshot || '').toLowerCase();
                     const defectQuantity = Math.max(parseFloat(item.total_defect_units || 0), 0);
                     const netWeight = parseFloat(item.net_weight_kg || 0);
                     const defectWeight = unitWeight > 0 && defectQuantity > 0 ? (defectQuantity * unitWeight) / 1000 : 0;
@@ -791,6 +792,28 @@
                         unitWeightValue: Number.isFinite(unitWeight) ? unitWeight : 0,
                         bucket_count: ''
                     };
+
+                    if (stockCategory === 'defect') {
+                        rows.push({
+                            ...baseRow,
+                            category: '不良品',
+                            weightValue: Math.max(parseFloat(item.package_content_weight_kg || netWeight || 0), 0),
+                            quantityValue: Math.max(totalQuantity, 0),
+                            bucket_count: `${Math.max(parseInt(item.package_quantity || 0, 10), 0)}袋`
+                        });
+                        return;
+                    }
+
+                    if (stockCategory === 'good') {
+                        rows.push({
+                            ...baseRow,
+                            category: '良品',
+                            weightValue: Number.isFinite(netWeight) ? Math.max(netWeight, 0) : 0,
+                            quantityValue: Math.max(totalQuantity, 0),
+                            bucket_count: item.output_tool_summary || ''
+                        });
+                        return;
+                    }
 
                     if (goodQuantity > 0 || goodWeight > 0) {
                         rows.push({

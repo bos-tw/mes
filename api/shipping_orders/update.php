@@ -184,7 +184,10 @@ try {
 
         // 取得所有出貨品項（狀態轉換時需要）
         $itemsStmt = $pdo->prepare("
-            SELECT soi.*, ii.inventory_number
+            SELECT
+                soi.*,
+                ii.inventory_number,
+                COALESCE(soi.stock_category_snapshot, ii.stock_category, 'good') AS stock_category
             FROM shipping_order_items soi
             LEFT JOIN inventory_items ii ON ii.id = soi.inventory_item_id
             WHERE soi.shipping_order_id = ?
@@ -192,6 +195,36 @@ try {
         ");
         $itemsStmt->execute([$id]);
         $shippingItems = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $invalidPurposeItem = null;
+        foreach ($shippingItems as $shippingItem) {
+            $itemCategory = (string)($shippingItem['stock_category'] ?? 'good');
+            $purposeAllowsItem = match ($nextShipmentPurpose) {
+                'normal' => $itemCategory === 'good',
+                'defect_return' => $itemCategory === 'defect',
+                'mixed' => in_array($itemCategory, ['good', 'defect'], true),
+                'tool_return' => false,
+                default => false,
+            };
+            if (!$purposeAllowsItem) {
+                $invalidPurposeItem = $shippingItem;
+                break;
+            }
+        }
+        if ($invalidPurposeItem !== null) {
+            $pdo->rollBack();
+            jsonResponse([
+                'success' => false,
+                'message' => match ($nextShipmentPurpose) {
+                    'normal' => '一般出貨不可包含不良品庫存。',
+                    'defect_return' => '不良回送不可包含良品庫存。',
+                    'tool_return' => '載具歸還不可包含產品庫存。',
+                    default => '出貨性質與既有品項的庫存類別不相容。',
+                },
+                'inventory_number' => $invalidPurposeItem['inventory_number'] ?? null,
+                'stock_category' => $invalidPurposeItem['stock_category'] ?? null,
+            ], 409);
+        }
 
         $currentUserId = getCurrentEmployeeId();
         $inventoryEffect = getShippingOrderInventoryEffect($oldStatus, $newStatus);
@@ -249,6 +282,46 @@ try {
                     ], 409);
                 }
 
+                if (($si['stock_category'] ?? 'good') === 'defect') {
+                    $packageValidationStmt = $pdo->prepare("
+                        SELECT
+                            link.shipped_units,
+                            link.shipped_package_quantity,
+                            package_row.package_status
+                        FROM shipping_order_item_packages link
+                        INNER JOIN inventory_packages package_row
+                            ON package_row.id = link.inventory_package_id
+                        WHERE link.shipping_order_item_id = ?
+                        FOR UPDATE
+                    ");
+                    $packageValidationStmt->execute([(int)$si['id']]);
+                    $packageRows = $packageValidationStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                    $packageUnits = array_sum(array_map(
+                        static fn(array $package): float => (float)$package['shipped_units'],
+                        $packageRows
+                    ));
+                    $packageQuantity = array_sum(array_map(
+                        static fn(array $package): int => (int)$package['shipped_package_quantity'],
+                        $packageRows
+                    ));
+                    $hasInvalidPackageStatus = array_filter(
+                        $packageRows,
+                        static fn(array $package): bool => $package['package_status'] !== 'reserved'
+                    ) !== [];
+                    if ($packageRows === []
+                        || abs($packageUnits - $qty) > 0.0001
+                        || $hasInvalidPackageStatus) {
+                        $pdo->rollBack();
+                        jsonResponse([
+                            'success' => false,
+                            'message' => "不良品 {$inventory['inventory_number']} 的包／袋保留狀態或支數不一致，請回到草稿重新選擇。",
+                            'package_units' => $packageUnits,
+                            'shipping_units' => $qty,
+                            'package_quantity' => $packageQuantity,
+                        ], 409);
+                    }
+                }
+
                 // 1. 更新庫存數量
                 $pdo->prepare("
                     UPDATE inventory_items SET
@@ -273,6 +346,13 @@ try {
 
                 // 3. 重新計算庫存狀態
                 recalculateInventoryStatus($pdo, $invId);
+                $pdo->prepare("
+                    UPDATE inventory_packages package_row
+                    JOIN shipping_order_item_packages link
+                      ON link.inventory_package_id = package_row.id
+                    SET package_row.package_status = 'shipped'
+                    WHERE link.shipping_order_item_id = ?
+                ")->execute([(int)$si['id']]);
             }
 
         }
@@ -329,6 +409,13 @@ try {
 
                 // 4. 重新計算庫存狀態
                 recalculateInventoryStatus($pdo, $invId);
+                $pdo->prepare("
+                    UPDATE inventory_packages package_row
+                    JOIN shipping_order_item_packages link
+                      ON link.inventory_package_id = package_row.id
+                    SET package_row.package_status = 'available'
+                    WHERE link.shipping_order_item_id = ?
+                ")->execute([(int)$si['id']]);
             }
 
         }

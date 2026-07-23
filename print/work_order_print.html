@@ -710,14 +710,14 @@
         return `${formatNumber(Math.abs(toNumber(plus)), 2)} / ${formatNumber(Math.abs(toNumber(minus)), 2)}`;
     }
 
-    function buildServiceRows(wo) {
-        const services = Array.isArray(wo.screening_services_details)
-            ? wo.screening_services_details
-            : [];
+    function buildServiceRows(wo, stage = null) {
+        const services = Array.isArray(stage?.services) && stage.services.length > 0
+            ? stage.services
+            : (Array.isArray(wo.screening_services_details) ? wo.screening_services_details : []);
         const rows = services.map((service, index) => `
             <tr>
                 <td class="seq">${index + 1}</td>
-                <td>${escapeHtml(service.custom_service_name || service.screening_service_name || '')}</td>
+                <td>${escapeHtml(service.service_name || service.custom_service_name || service.screening_service_name || '')}</td>
                 <td>${escapeHtml(buildTolerance(service))}</td>
                 <td class="text-center">${escapeHtml(service.ppm_standard || '')}</td>
                 <td></td>
@@ -735,8 +735,9 @@
         return rows.join('');
     }
 
-    function buildDimensionRows(wo) {
-        const fp = wo.first_piece_dimensions || {};
+    function buildDimensionRows(wo, run = null) {
+        const runRounds = Array.isArray(run?.first_piece_dimensions) ? run.first_piece_dimensions : [];
+        const fp = runRounds.length > 0 ? runRounds[runRounds.length - 1] : (wo.first_piece_dimensions || {});
         const dimensions = [
             ['頭高', fp.head_height],
             ['全長', fp.overall_length || fp.length],
@@ -786,7 +787,9 @@
     }
 
     function buildCardRows(wo, run, assignedRowCount = null) {
-        const runRecords = run && Array.isArray(run.production_records) ? run.production_records : [];
+        const runRecords = run && Array.isArray(run.cards)
+            ? run.cards
+            : (run && Array.isArray(run.production_records) ? run.production_records : []);
         const targetUnits = run ? toNumber(run.planned_units) : toNumber(wo.total_units);
         const configuredCount = runRecords.length || assignedRowCount || toNumber(wo.tool_quantity);
         const cardCount = Math.max(0, Math.round(configuredCount) || 0);
@@ -800,7 +803,13 @@
             const target = record.card_number || targets[index] || '';
             return {
                 cardNumber,
-                target: hasCard && target ? formatInt(target) : ''
+                target: hasCard && target ? formatInt(target) : '',
+                actualWeight: record.actual_gross_weight_kg !== null && record.actual_gross_weight_kg !== undefined
+                    ? `${formatNumber(record.actual_gross_weight_kg, 3)}`
+                    : '',
+                weighedAt: record.weighed_at ? formatDateTime(record.weighed_at) : '',
+                employee: record.weighed_by_name || record.employee_name || '',
+                notes: record.notes || ''
             };
         });
 
@@ -818,10 +827,10 @@
             <tr>
                 <td>${escapeHtml(row.cardNumber)}</td>
                 <td>${escapeHtml(row.target)}</td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
+                <td>${escapeHtml(row.actualWeight || '')}</td>
+                <td>${escapeHtml(row.weighedAt || '')}</td>
+                <td>${escapeHtml(row.employee || '')}</td>
+                <td>${escapeHtml(row.notes || '')}</td>
             </tr>
         `).join('');
     }
@@ -862,14 +871,19 @@
         `;
     }
 
-    function createPrintContext(wo, run, splitIndex, splitTotal, cardRowCount = null) {
-        const isSplit = wo.work_order_type === 'split';
+    function createPrintContext(wo, run, splitIndex, splitTotal, cardRowCount = null, stage = null) {
+        const isSplit = splitTotal > 1 || stage?.stage_type === 'secondary';
         const runSequence = run
             ? (Number.parseInt(run.machine_sequence, 10) || splitIndex + 1)
             : null;
+        const stageLabel = stage?.stage_type === 'secondary'
+            ? `二次篩分－${stage.secondary_mode === 'second_process' ? '第二道工序' : '放寬標準'}`
+            : '生產與篩分';
         return {
             isSplit,
             run,
+            stage,
+            stageLabel,
             splitIndex,
             splitTotal,
             displayNumber: isSplit
@@ -892,25 +906,30 @@
     function generateWorkOrderHtml(wo, context, companyInfo, reportDesc) {
         const company = companyInfo || {};
         const cardRows = buildCardRows(wo, context.run, context.cardRowCount);
-        const serviceCount = Array.isArray(wo.screening_services_details) ? wo.screening_services_details.length : 0;
+        const serviceCount = Array.isArray(context.stage?.services)
+            ? context.stage.services.length
+            : (Array.isArray(wo.screening_services_details) ? wo.screening_services_details.length : 0);
         const densityClass = cardRows.rowCount > 8 || serviceCount > 8 ? ' dense-sheet' : '';
         const mobileQuickEntryUrl = buildMobileQuickEntryUrl(wo.id);
         const notes = [
-            context.run?.notes ? `【拆分機台備註】${context.run.notes}` : '',
+            context.run?.notes ? `【機台備註】${context.run.notes}` : '',
+            context.stage?.image_requirement === 'required'
+                ? `【機台畫面】完成前至少上傳 ${formatInt(context.stage.image_min_count || 0)} 張`
+                : '',
             wo.customer_instructions ? `【客戶交辦】${wo.customer_instructions}` : '',
             wo.other_notes ? `【其他說明】${wo.other_notes}` : ''
         ].filter(Boolean).join('\n');
         const reportNotes = String(reportDesc?.description || '').trim();
 
         const splitMarker = context.isSplit
-            ? `<div class="split-marker">主工單：${escapeHtml(wo.work_order_number)}<strong>拆分工單 第 ${context.splitIndex + 1} 份／共 ${context.splitTotal} 份</strong></div>`
+            ? `<div class="split-marker">主工單：${escapeHtml(wo.work_order_number)}<strong>${escapeHtml(context.stageLabel)}／${escapeHtml(context.run?.run_label || `機台${context.splitIndex + 1}`)}（第 ${context.splitIndex + 1} 份／共 ${context.splitTotal} 份）</strong></div>`
             : '<div></div>';
 
         const splitNetHint = context.isSplit
-            ? `<span class="split-subvalue">本份分配：${formatNumber(context.targetNetWeight, 2)} kg</span>`
+            ? `<span class="split-subvalue">本機台分配：${formatNumber(context.targetNetWeight, 2)} kg</span>`
             : '';
         const splitUnitsHint = context.isSplit
-            ? `<span class="split-subvalue">本份分配：${formatInt(context.targetUnits)} 支</span>`
+            ? `<span class="split-subvalue">本機台分配：${formatInt(context.targetUnits)} 支</span>`
             : '';
         const displayToolQuantity = context.isSplit
             ? cardRows.cardCount
@@ -1030,7 +1049,7 @@
                         <th>備註</th>
                     </tr>
                 </thead>
-                <tbody>${buildServiceRows(wo)}</tbody>
+                <tbody>${buildServiceRows(wo, context.stage)}</tbody>
             </table>
         </section>
 
@@ -1038,7 +1057,7 @@
             <section>
                 <div class="subsection-heading">首件尺寸(mm)</div>
                 <table class="dimension-table">
-                    <tbody>${buildDimensionRows(wo)}</tbody>
+                    <tbody>${buildDimensionRows(wo, context.run)}</tbody>
                 </table>
             </section>
             <section class="attachment-box">
@@ -1164,6 +1183,30 @@
     }
 
     function buildPagesForWorkOrder(wo) {
+        const flowStages = Array.isArray(wo.production_flow?.stages)
+            ? wo.production_flow.stages.filter((stage) => stage.status !== 'cancelled')
+            : [];
+        const flowEntries = flowStages.flatMap((stage) =>
+            (stage.machine_runs || [])
+                .filter((run) => run.status !== 'cancelled')
+                .map((run) => ({ stage, run }))
+        );
+        if (flowEntries.length > 0) {
+            return flowEntries.map(({ stage, run }, index) => generateWorkOrderHtml(
+                wo,
+                createPrintContext(
+                    wo,
+                    run,
+                    index,
+                    flowEntries.length,
+                    Array.isArray(run.cards) ? run.cards.length : null,
+                    stage
+                ),
+                companyInfoCache,
+                reportDescriptionCache
+            ));
+        }
+
         if (wo.work_order_type !== 'split') {
             return [generateWorkOrderHtml(
                 wo,
